@@ -98,7 +98,7 @@ export default function ProfilePage() {
           // Ambil data pesanan lengkap dari koleksi 'orders'
           const orderIds = userData.orders || [];
           if (orderIds.length > 0) {
-            const orderPromises = orderIds.map(id => 
+            const orderPromises = orderIds.map((id: string) => 
               getDoc(doc(db, 'orders', id))
             );
             const orderDocs = await Promise.all(orderPromises);

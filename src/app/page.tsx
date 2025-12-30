@@ -6,60 +6,107 @@ import Link from 'next/link';
 import { 
   Search, ShoppingCart, User, Heart, Menu, X, Star, Truck, 
   Shield, RotateCcw, Award, Package, Store, 
-  ShieldCheck, Printer  // ✅ Impor ikon baru
+  ShieldCheck, Printer, AlertTriangle, Barcode
 } from 'lucide-react';
 import { 
-  PRODUCTS, 
-  CATEGORIES, 
-  type Product, 
-  getWishlist, 
-  addToWishlist, 
-  removeFromWishlist 
-} from '@/lib/products';
+  collection, 
+  getDocs,
+  query,
+  where
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getWishlist, addToWishlist, removeFromWishlist } from '@/lib/wishlist';
 
-const StarRating = ({ rating }: { rating: number }) => {
-  return (
-    <div className="flex items-center">
-      {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={16}
-          className={i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-        />
-      ))}
-      <span className="ml-1 text-sm text-gray-600">{rating}</span>
-    </div>
-  );
+// Tipe produk lokal
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  wholesalePrice: number;
+  purchasePrice: number;
+  stock: number;
+  stockByWarehouse?: Record<string, number>;
+  category: string;
+  unit: string;
+  barcode?: string;
+  image: string;
+  expiredDate?: string;
 };
 
-// Helper: konversi nama kategori ke slug
-const categoryToSlug = (name: string): string => {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
 };
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);
-  const [wishlist, setWishlist] = useState<number[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load cart & wishlist dari localStorage
+  // Load data dari Firestore
   useEffect(() => {
-    // Cart
-    const savedCart = localStorage.getItem('atayatoko-cart');
-    if (savedCart) {
+    const fetchData = async () => {
       try {
-        const cart = JSON.parse(savedCart);
-        const total = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
-        setCartCount(total);
-      } catch (e) {
-        setCartCount(0);
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productList = productsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || 'Produk Tanpa Nama',
+            price: data.price || 0,
+            wholesalePrice: data.wholesalePrice || data.price || 0,
+            purchasePrice: data.purchasePrice || 0,
+            stock: data.stock || 0,
+            stockByWarehouse: data.stockByWarehouse || {},
+            category: data.category || 'Lainnya',
+            unit: data.unit || 'pcs',
+            barcode: data.barcode || '',
+            image: data.image || '/logo-atayatoko.png',
+            expiredDate: data.expiredDate
+          };
+        }) as Product[];
+        
+        const categorySet = new Set(
+          productList
+            .map(p => p.category || 'Lainnya')
+            .filter(name => name && name.trim() !== '')
+            .map(name => name.trim())
+        );
+        
+        const categoryList = Array.from(categorySet).map((name, index) => ({
+          id: `cat-${index}`,
+          name: name || 'Lainnya',
+          slug: (name || 'lainnya').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        }));
+        
+        setProducts(productList);
+        setCategories(categoryList);
+        
+        const savedCart = localStorage.getItem('atayatoko-cart');
+        if (savedCart) {
+          try {
+            const cart = JSON.parse(savedCart);
+            setCartCount(cart.reduce((sum: number, item: any) => sum + item.quantity, 0));
+          } catch (e) {
+            setCartCount(0);
+          }
+        }
+        
+        const wl = JSON.parse(localStorage.getItem('atayatoko-wishlist') || '[]');
+        setWishlist(wl);
+      } catch (error) {
+        console.error('Gagal memuat data:', error);
+      } finally {
+        setLoading(false);
       }
-    }
-    
-    // Wishlist
-    const wl = getWishlist();
-    setWishlist(wl);
+    };
+
+    fetchData();
   }, []);
 
   const addToCart = (product: Product) => {
@@ -85,34 +132,31 @@ export default function Home() {
     setCartCount(cart.reduce((sum, item) => sum + item.quantity, 0));
   };
 
-  const toggleWishlist = (productId: number) => {
-    if (wishlist.includes(productId)) {
-      removeFromWishlist(productId);
-      setWishlist(prev => prev.filter(id => id !== productId));
-    } else {
-      addToWishlist(productId);
-      setWishlist(prev => [...prev, productId]);
-    }
+  const toggleWishlist = (productId: string) => {
+    const newWishlist = wishlist.includes(productId)
+      ? wishlist.filter(id => id !== productId)
+      : [...wishlist, productId];
+    
+    setWishlist(newWishlist);
+    localStorage.setItem('atayatoko-wishlist', JSON.stringify(newWishlist));
   };
 
-  // Filter produk berdasarkan pencarian
-  const filteredProducts = PRODUCTS.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProducts = products.filter(product =>
+    (product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+    (product.category?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+    (product.barcode?.includes(searchQuery) || false)
   );
 
-  // Data statis yang tidak perlu dari lib
-  const promoBanners = [
-    { id: 1, title: 'Harga Ecer Terjangkau', description: 'Beli satuan pun hemat!', image: 'https://placehold.co/800x400/f59e0b/ffffff?text=Harga+Ecer  ' },
-    { id: 2, title: 'Harga Grosir Super Hemat', description: 'Beli banyak lebih murah!', image: 'https://placehold.co/800x400/ef4444/ffffff?text=Harga+Grosir  ' },
-    { id: 3, title: 'Gratis Ongkir', description: 'Minimal belanja Rp100.000', image: 'https://placehold.co/800x400/10b981/ffffff?text=Gratis+Ongkir  ' }
-  ];
-
-  const testimonials = [
-    { id: 1, name: 'Ibu Siti', rating: 5, comment: 'Harga grosirnya benar-benar murah! Sekarang belanja bulanan jadi lebih hemat.', avatar: 'https://placehold.co/60x60/6366f1/ffffff?text=IS  ' },
-    { id: 2, name: 'Pak Budi', rating: 5, comment: 'Pengiriman cepat dan barang lengkap. Toko sembako favorit keluarga!', avatar: 'https://placehold.co/60x60/8b5cf6/ffffff?text=PB  ' },
-    { id: 3, name: 'Bu Rina', rating: 4, comment: 'Bisa beli ecer atau grosir sesuai kebutuhan. Sangat praktis!', avatar: 'https://placehold.co/60x60/06b6d4/ffffff?text=BR  ' }
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-black">Memuat produk...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -123,7 +167,12 @@ export default function Home() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="flex items-center space-x-2">
-                  <Store className="text-green-600" size={32} />
+                  {/* ✅ LOGO BARU DARI FILE ANDA */}
+                  <img 
+                    src="/logo-atayatoko.png" 
+                    alt="ATAYATOKO" 
+                    className="h-8 w-auto"
+                  />
                   <div>
                     <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
                     <p className="text-xs text-gray-600">Ecer & Grosir</p>
@@ -135,20 +184,21 @@ export default function Home() {
             <nav className="hidden md:flex items-center space-x-6">
               <Link href="/" className="text-gray-700 hover:text-green-600 font-medium">Beranda</Link>
               <Link href="/semua-kategori" className="text-gray-700 hover:text-green-600 font-medium">Kategori</Link>
-              <a href="#" className="text-gray-700 hover:text-green-600 font-medium">Promo</a>
-              <a href="#" className="text-gray-700 hover:text-green-600 font-medium">Tentang</a>
+              <Link href="/promo" className="text-gray-700 hover:text-green-600 font-medium">Promo</Link>
+              <Link href="/tentang" className="text-gray-700 hover:text-green-600 font-medium">Tentang</Link>
               <Link href="/kontak" className="text-gray-700 hover:text-green-600 font-medium">Kontak</Link>
             </nav>
 
             <div className="hidden md:flex flex-1 max-w-lg mx-8">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Cari produk sembako..."
+                  placeholder="Cari produk, kategori, atau barcode..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 />
               </div>
             </div>
@@ -188,12 +238,13 @@ export default function Home() {
           <div className="md:hidden mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Cari produk sembako..."
+                placeholder="Cari produk, kategori, atau barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
           </div>
@@ -204,8 +255,8 @@ export default function Home() {
             <div className="px-4 py-2 space-y-2">
               <Link href="/" className="block py-2 text-gray-700 hover:text-green-600">Beranda</Link>
               <Link href="/semua-kategori" className="block py-2 text-gray-700 hover:text-green-600">Kategori</Link>
-              <a href="#" className="block py-2 text-gray-700 hover:text-green-600">Promo</a>
-              <a href="#" className="block py-2 text-gray-700 hover:text-green-600">Tentang</a>
+              <Link href="/promo" className="block py-2 text-gray-700 hover:text-green-600">Promo</Link>
+              <Link href="/tentang" className="block py-2 text-gray-700 hover:text-green-600">Tentang</Link>
               <Link href="/kontak" className="block py-2 text-gray-700 hover:text-green-600">Kontak</Link>
               <Link href="/profil" className="block py-2 text-gray-700 hover:text-green-600">Profil</Link>
             </div>
@@ -217,11 +268,15 @@ export default function Home() {
       <section className="bg-gradient-to-r from-green-600 to-emerald-600 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center mb-4">
-            <Store size={48} className="mr-3" />
+            <img 
+              src="/logo-atayatoko.png" 
+              alt="ATAYATOKO" 
+              className="h-12 w-auto mr-3"
+            />
             <h1 className="text-3xl md:text-4xl font-bold">ATAYATOKO</h1>
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-6">Satu Toko untuk Semua Kebutuhan Sembako!</h2>
-          <div className="bg-white bg-opacity-20 rounded-lg p-6 max-w-2xl mx-auto mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold mb-6">Satu Toko untuk Semua Kebutuhan!</h2>
+          <div className="bg-white bg-opacity-20 rounded-lg p-6 max-w-2xl mx-auto mb-8 text-black">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               <div className="flex items-start">
                 <div className="bg-white text-green-600 rounded-full p-2 mr-3 mt-1">
@@ -243,17 +298,17 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-center bg-white bg-opacity-20 rounded-lg p-3 mb-8">
+          <div className="flex items-center justify-center bg-white bg-opacity-20 rounded-lg p-3 mb-8 text-black">
             <Truck size={24} className="mr-2" />
-            <span className="font-semibold">🚚 Pesan dari rumah – kami antar sampai pintu!</span>
+            <span className="font-semibold">Pesan dari rumah – kami antar sampai pintu!</span>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/" className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+            <Link href="/semua-kategori" className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
               Belanja Sekarang
             </Link>
-            <button className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors">
+            <Link href="/promo" className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors">
               Lihat Promo
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -265,35 +320,16 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Kategori Produk</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">Temukan semua kebutuhan sembako Anda di sini</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
-            {CATEGORIES.map((category) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            {categories.map((category) => (
               <Link key={category.id} href={`/kategori/${category.slug}`} className="text-center group cursor-pointer">
                 <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-green-100 transition-colors">
-                  <span className="text-2xl">{category.icon}</span>
+                  <Package size={24} className="text-gray-600" />
                 </div>
                 <h3 className="font-medium text-gray-900 group-hover:text-green-600 transition-colors text-sm">
                   {category.name}
                 </h3>
               </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Promo Banners */}
-      <section className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {promoBanners.map((banner) => (
-              <div key={banner.id} className="relative rounded-lg overflow-hidden h-48">
-                <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <h3 className="text-xl md:text-2xl font-bold mb-2">{banner.title}</h3>
-                    <p className="text-base">{banner.description}</p>
-                  </div>
-                </div>
-              </div>
             ))}
           </div>
         </div>
@@ -316,30 +352,39 @@ export default function Home() {
               {filteredProducts.map((product) => (
                 <div key={product.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden">
                   <Link href={`/produk/${product.id}`}>
-                    <img src={product.image.trim()} alt={product.name} className="w-full h-64 object-cover" />
+                    <img 
+                      src={product.image} 
+                      alt={product.name} 
+                      className="w-full h-64 object-cover" 
+                    />
                   </Link>
                   <div className="p-6">
                     <div className="flex items-center mb-2">
                       <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
                         {product.category}
                       </span>
+                      {product.stock <= 10 && (
+                        <AlertTriangle className="text-red-500 ml-2" size={16} />
+                      )}
                     </div>
                     <Link href={`/produk/${product.id}`}>
                       <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
                     </Link>
                     <p className="text-sm text-gray-600 mb-2">{product.unit}</p>
-                    <StarRating rating={product.rating} />
-                    <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center mb-3">
                       <div>
-                        <span className="text-xl font-bold text-gray-900">
-                          Rp{product.price.toLocaleString('id-ID')}
+                        <span className="text-lg font-bold text-green-600">
+                          Rp{product.wholesalePrice.toLocaleString('id-ID')}
                         </span>
-                        {product.originalPrice > product.price && (
-                          <span className="text-gray-500 line-through ml-2">
-                            Rp{product.originalPrice.toLocaleString('id-ID')}
-                          </span>
-                        )}
+                        <span className="text-gray-500 text-sm ml-1">/grosir</span>
                       </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-gray-900">
+                        Rp{product.price.toLocaleString('id-ID')} /ecer
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-4">
                       <div className="flex space-x-2">
                         <button
                           onClick={(e) => {
@@ -363,6 +408,9 @@ export default function Home() {
                           Tambah
                         </button>
                       </div>
+                      {product.barcode && (
+                        <span className="text-xs text-gray-500">#{product.barcode}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -408,44 +456,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Ulasan Pelanggan</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Lihat apa yang dikatakan pelanggan setia kami</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial) => (
-              <div key={testimonial.id} className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex items-center mb-4">
-                  <img src={testimonial.avatar} alt={testimonial.name} className="w-12 h-12 rounded-full mr-4" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
-                    <div className="flex">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} size={16} className="fill-yellow-400 text-yellow-400" />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-gray-600 italic">"{testimonial.comment}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="py-16 bg-green-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Store size={64} className="mx-auto mb-6" />
+          <img 
+            src="/logo-atayatoko.png" 
+            alt="ATAYATOKO" 
+            className="h-16 w-auto mx-auto mb-6"
+          />
           <h2 className="text-3xl font-bold mb-4">Siap Belanja Sembako?</h2>
           <p className="text-green-100 mb-8 max-w-2xl mx-auto">
-            Nikmati kemudahan belanja sembako dengan harga ecer terjangkau dan harga grosir super hemat. Pesan sekarang dan kami antar sampai ke pintu rumah Anda!
+            Nikmati kemudahan belanja dengan harga ecer terjangkau dan harga grosir super hemat. Pesan sekarang dan kami antar sampai ke pintu rumah Anda!
           </p>
           <Link
-            href="/"
+            href="/semua-kategori"
             className="bg-white text-green-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors"
           >
             Mulai Belanja Sekarang
@@ -459,8 +483,11 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <Store className="text-green-400" size={28} />
-                <h3 className="text-xl font-bold">ATAYATOKO</h3>
+                <img 
+                  src="/logo-atayatoko.png" 
+                  alt="ATAYATOKO" 
+                  className="h-8 w-auto"
+                />
               </div>
               <p className="text-gray-400 mb-2">Ecer & Grosir</p>
               <p className="text-gray-400">Satu toko untuk semua kebutuhan!</p>
@@ -484,7 +511,7 @@ export default function Home() {
             <div>
               <h4 className="font-semibold mb-4">Kategori</h4>
               <ul className="space-y-2 text-gray-400">
-                {CATEGORIES.slice(0, 6).map((category) => (
+                {categories.slice(0, 6).map((category) => (
                   <li key={category.id}>
                     <Link href={`/kategori/${category.slug}`} className="hover:text-white transition-colors">
                       {category.name}
@@ -496,12 +523,12 @@ export default function Home() {
             <div>
               <h4 className="font-semibold mb-4">Kontak</h4>
               <div className="space-y-2 text-gray-400">
-                <p>📍 Jl. Pandan 98, Semen, kediri</p>
+                <p>📍 Jl. Pandan 98, Semen, Kediri</p>
                 <p>📱 WhatsApp: 0858-5316-1174</p>
                 <p>✉️ info@atayatoko.com</p>
                 <p>🕒 Buka: Senin-Minggu, 08.00-20.00</p>
                 
-                {/* ✅ IKON ADMIN & KASIR KECIL DI FOOTER */}
+                {/* Akses Staff */}
                 <div className="mt-6 pt-4 border-t border-gray-800">
                   <h4 className="font-semibold mb-3">Akses Staff</h4>
                   <div className="flex space-x-4">
@@ -513,7 +540,7 @@ export default function Home() {
                       <ShieldCheck size={20} className="group-hover:text-green-400" />
                     </Link>
                     <Link 
-                      href="/profil/login" 
+                      href="/cashier" 
                       className="text-gray-400 hover:text-white transition-colors group"
                       title="Login Kasir"
                     >

@@ -5,7 +5,19 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Package, Truck, RotateCcw, Store, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { getProductById, type Product } from '@/lib/products';
+import { getProductById } from '@/lib/products';
+
+interface Product {
+  id?: string;
+  name: string;
+  price: number;
+  wholesalePrice: number;
+  minWholesaleQty?: number;
+  category: string;
+  unit: string;
+  image?: string;
+  description?: string;
+}
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -93,7 +105,7 @@ export default function ProductDetailPage() {
           {/* Gambar Produk */}
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <img
-              src={product.image.trim()}
+              src={product.image?.trim() || '/placeholder.png'}
               alt={product.name}
               className="w-full h-auto object-cover"
             />

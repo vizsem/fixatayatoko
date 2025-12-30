@@ -22,10 +22,6 @@ import {
   Calendar
 } from 'lucide-react';
 
-// Import XLSX secara dinamis untuk menghindari SSR issues
-import dynamic from 'next/dynamic';
-const XLSX = dynamic(() => import('xlsx'), { ssr: false });
-
 type PromotionRecord = {
   id: string;
   name: string;
@@ -75,7 +71,7 @@ export default function PromotionsReport() {
         const ordersSnapshot = await getDocs(
           query(collection(db, 'orders'), where('status', '==', 'SELESAI'))
         );
-        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
         const promoList: PromotionRecord[] = promotionsSnapshot.docs.map(doc => {
           const data = doc.data();
@@ -112,7 +108,7 @@ export default function PromotionsReport() {
     fetchPromotionsData();
   }, [authChecked, isAdmin]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!promotions.length) return;
 
     const exportData = promotions.map(promo => ({
@@ -127,12 +123,12 @@ export default function PromotionsReport() {
       'Conversion Rate': `${(promo.conversionRate * 100).toFixed(1)}%`
     }));
 
-    // Pastikan XLSX tersedia (karena di-import dinamis)
     if (typeof window !== 'undefined') {
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Laporan Promosi');
-      XLSX.writeFile(wb, 'laporan-promosi.xlsx');
+      const xlsxModule = await import('xlsx');
+      const ws = xlsxModule.utils.json_to_sheet(exportData);
+      const wb = xlsxModule.utils.book_new();
+      xlsxModule.utils.book_append_sheet(wb, ws, 'Laporan Promosi');
+      xlsxModule.writeFile(wb, 'laporan-promosi.xlsx');
     }
   };
 

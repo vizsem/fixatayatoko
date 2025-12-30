@@ -186,7 +186,7 @@ export default function EditProductPage() {
       return;
     }
 
-    if (product.price <= 0 || product.wholesalePrice <= 0) {
+    if ((product.price ?? 0) <= 0 || (product.wholesalePrice ?? 0) <= 0) {
       alert('Harga harus lebih dari 0!');
       return;
     }
