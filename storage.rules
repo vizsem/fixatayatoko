@@ -1,0 +1,46 @@
+// storage.rules
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ========== GAMBAR PRODUK ==========
+    match /products/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage(fileName) && request.size < 5 * 1024 * 1024;
+    }
+
+    // ========== STRUK/BUKTI PEMBAYARAN ==========
+    match /receipts/{fileName} {
+      allow read: if request.auth != null && isValidReceipt(fileName);
+      allow write: if (isAdmin() || isCashier()) && isValidReceipt(fileName) && request.size < 10 * 1024 * 
+1024;
+    }
+
+    // ========== SEMUA FILE LAINNYA ==========
+    match /{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+
+  // ========== FUNGSI VALIDASI ==========
+  function isValidImage(fileName) {
+    return fileName.matches('.*\\.(png|jpg|jpeg|webp)$');
+  }
+  
+  function isValidReceipt(fileName) {
+    return fileName.matches('.*\\.(png|jpg|jpeg|pdf)$');
+  }
+
+  // ========== FUNGSI ROLE (MENGGUNAKAN CUSTOM CLAIMS) ==========
+  function isAdmin() {
+    return request.auth != null && request.auth.token.role == 'admin';
+  }
+
+  function isCashier() {
+    return request.auth != null && request.auth.token.role == 'cashier';
+  }
+match /payment-proofs/{fileName} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null; // hanya boleh upload baru
+  allow update, delete: if false;       // tidak boleh edit/hapus
+}
+}

@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // PRODUK: Publik baca, admin & cashier CRUD (cashier butuh edit stok)
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || isCashier();
+    }    
+    
+    // PESANAN: User akses pesanannya, admin & cashier full akses
+    match /orders/{orderId} {
+      allow read, update: if 
+        isOwner(resource.data.customerId) || 
+        isAdmin() || 
+        isCashier();
+      allow create: if request.auth != null;
+      allow delete: if isAdmin();
+    }
+    
+    // PELANGGAN: Admin only
+    match /customers/{customerId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // USER PROFILE: Hanya pemilik
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // SUPPLIER: Admin only
+    match /suppliers/{supplierId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // PEMBELIAN: Admin only (cashier tidak perlu akses)
+    match /purchases/{purchaseId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // INVENTARIS TRANSACTIONS: Admin & cashier
+    match /inventory_transactions/{transactionId} {
+      allow read, write: if isAdmin() || isCashier();
+    }
+    
+    // PROMOTIONS: Admin only
+    match /promotions/{promotionId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // WAREHOUSES: Admin only
+    match /warehouses/{warehouseId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // SETTINGS: Admin only
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // SEMUA KOLEKSI LAINNYA: Admin only
+    match /{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+
+  // FUNGSI BANTUAN
+  function isOwner(userId) {
+    return request.auth != null && request.auth.uid == userId;
+  }
+  
+  function isAdmin() {
+    return request.auth != null && 
+           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+  }
+
+  // FUNGSI UNTUK KASIR
+  function isCashier() {
+    return request.auth != null && 
+           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cashier';
+  }
+}
