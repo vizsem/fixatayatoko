@@ -1,7 +1,7 @@
-// src/app/(admin)/warehouses/add/page.tsx
+// src/app/admin/warehouses/add/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -22,7 +22,7 @@ type Warehouse = {
   isActive: boolean;
 };
 
-export default function AddWarehousePage() {
+function WarehouseFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');
@@ -207,5 +207,13 @@ export default function AddWarehousePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function AddWarehousePage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading form gudang...</div>}>
+      <WarehouseFormContent />
+    </Suspense>
   );
 }
