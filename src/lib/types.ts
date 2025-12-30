@@ -2,6 +2,8 @@
 
 // ========== PRODUK ==========
 export interface Product {
+  rating: number;
+  originalPrice: number;
   id?: string; // opsional karena Firestore generate otomatis
   name: string;
   price: number; // harga ecer
