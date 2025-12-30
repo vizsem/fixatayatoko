@@ -4,3 +4,7 @@
 *.key
 node_modules/
 .next/
+
+git@github.com:vizsem/fixatayatoko.git
+/.gitignore
+/README.md
