@@ -1,8 +1,8 @@
-// src/app/admin/inventory/stock-in/page.tsx
+// src/app/admin/inventory/stock-in/StockInFormInner.tsx
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -31,16 +31,13 @@ type Supplier = {
   name: string;
 };
 
-function StockInContent() {
+export default function StockInFormInner({ productId }: { productId: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const productId = searchParams.get('productId');
-  
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [formData, setFormData] = useState({
-    productId: productId || '',
+    productId: productId,
     supplierId: '',
     quantity: 0,
     purchasePrice: 0,
@@ -68,7 +65,7 @@ function StockInContent() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, productId]);
 
   const loadSupportingData = async () => {
     try {
@@ -95,6 +92,7 @@ function StockInContent() {
         const product = productList.find(p => p.id === productId);
         if (product) {
           setSelectedProduct(product);
+          setFormData(prev => ({ ...prev, productId }));
         }
       }
     } catch (err) {
@@ -275,13 +273,5 @@ function StockInContent() {
         </div>
       </form>
     </div>
-  );
-}
-
-export default function StockInPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <StockInContent />
-    </Suspense>
   );
 }
