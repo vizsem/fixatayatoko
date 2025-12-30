@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -35,9 +35,9 @@ type Product = {
   category?: string;
 };
 
-/* ================= PAGE ================= */
+/* ================= INTERNAL COMPONENT ================= */
 
-export default function AddPromotionPage() {
+function AddPromotionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');
@@ -367,5 +367,15 @@ export default function AddPromotionPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+/* ================= MAIN EXPORT ================= */
+
+export default function AddPromotionPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AddPromotionContent />
+    </Suspense>
   );
 }
