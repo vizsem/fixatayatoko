@@ -1,12 +1,11 @@
-// ✅ Nonaktifkan prerendering — hanya render di client
-// src/app/(admin)/inventory/page.tsx
+// src/app/admin/inventory/page.tsx
 'use client';
 
+// ✅ Nonaktifkan prerendering — hanya render di client
 export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -16,7 +15,6 @@ import {
   where,
   onSnapshot
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { 
   Package, 
@@ -27,6 +25,9 @@ import {
   AlertTriangle,
   Calendar
 } from 'lucide-react';
+
+// ✅ Ambil fungsi Firebase (bukan instance langsung)
+import { getAuthInstance, getFirestoreInstance } from '@/lib/firebase';
 
 type Product = {
   id: string;
@@ -55,7 +56,11 @@ export default function InventoryDashboard() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    // ✅ Ambil instance di dalam useEffect
+    const auth = getAuthInstance();
+    const db = getFirestoreInstance();
+    
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -75,6 +80,9 @@ export default function InventoryDashboard() {
   // Fetch data real-time
   useEffect(() => {
     if (loading) return;
+
+    // ✅ Ambil instance di dalam useEffect
+    const db = getFirestoreInstance();
 
     // Fetch products
     const productsUnsub = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -96,17 +104,14 @@ export default function InventoryDashboard() {
           expiredDate: data.expiredDate
         };
 
-        // Hitung stok rendah
         if (product.stock <= 10 && product.stock > 0) {
           lowStock++;
         }
 
-        // Hitung kadaluarsa
         if (product.expiredDate && new Date(product.expiredDate) <= new Date()) {
           expired++;
         }
 
-        // Hitung nilai stok (asumsi harga beli = 80% harga jual)
         const purchasePrice = (data.price || 0) * 0.8;
         totalVal += product.stock * purchasePrice;
 
@@ -250,7 +255,7 @@ export default function InventoryDashboard() {
         </Link>
       </div>
 
-      {/* Daftar Produk dengan Stok Rendah */}
+      {/* Peringatan Stok */}
       {(lowStockCount > 0 || expiredCount > 0) && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-black mb-4">Peringatan Stok</h2>

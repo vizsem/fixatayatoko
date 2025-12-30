@@ -1,8 +1,28 @@
 // src/lib/firebase.ts
-import { initializeApp, getApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+
+// ✅ Validasi environment variables
+const requiredEnvVars = [
+  'NEXT_PUBLIC_FIREBASE_API_KEY',
+  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'NEXT_PUBLIC_FIREBASE_APP_ID'
+] as const;
+
+const missingEnvVars = requiredEnvVars.filter(
+  key => !process.env[key]
+);
+
+if (missingEnvVars.length > 0 && typeof window !== 'undefined') {
+  console.warn(
+    '[Firebase] Missing environment variables:',
+    missingEnvVars
+  );
+}
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,9 +33,26 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+let firebaseApp: ReturnType<typeof initializeApp> | null = null;
 
-export { auth, db, storage };
+// ✅ Hanya inisialisasi sekali
+const getAppInstance = () => {
+  if (!firebaseApp) {
+    if (getApps().length === 0) {
+      firebaseApp = initializeApp(firebaseConfig);
+    } else {
+      firebaseApp = getApp();
+    }
+  }
+  return firebaseApp;
+};
+
+export const getAuthInstance = () => {
+  const app = getAppInstance();
+  return getAuth(app);
+};
+
+export const getFirestoreInstance = () => {
+  const app = getAppInstance();
+  return getFirestore(app);
+};
