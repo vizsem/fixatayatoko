@@ -1,19 +1,15 @@
 /* src/app/globals.css */
-@import "tailwindcss";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* 💡 Komentari ini agar tidak aktif */
+/* Opsional: Dark mode (bisa diaktifkan nanti) */
 /*
 @media (prefers-color-scheme: dark) {
   :root {
@@ -24,7 +20,16 @@
 */
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+
+/* Opsional: Hilangkan outline fokus untuk UX lebih baik (tapi aksesibilitas first!) */
+:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }

@@ -6,102 +6,60 @@ import Link from 'next/link';
 import { 
   Search, ShoppingCart, User, Heart, Menu, X, Star, Truck, 
   Shield, RotateCcw, Award, Package, Store, 
-  ShieldCheck, Printer, AlertTriangle, Barcode
+  ShieldCheck, Printer  // ✅ Impor ikon baru
 } from 'lucide-react';
 import { 
-  collection, 
-  getDocs,
-  query,
-  where
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+  PRODUCTS, 
+  CATEGORIES, 
+  type Product, 
+  getWishlist, 
+  addToWishlist, 
+  removeFromWishlist 
+} from '@/lib/products';
 
-// Types
-type Product = {
-  id: string;
-  name: string;
-  price: number;          // Harga ecer
-  wholesalePrice: number; // Harga grosir
-  purchasePrice: number;  // Harga beli
-  stock: number;
-  stockByWarehouse?: Record<string, number>;
-  category: string;
-  unit: string;
-  barcode?: string;
-  image: string;
-  expiredDate?: string;
+const StarRating = ({ rating }: { rating: number }) => {
+  return (
+    <div className="flex items-center">
+      {[...Array(5)].map((_, i) => (
+        <Star
+          key={i}
+          size={16}
+          className={i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+        />
+      ))}
+      <span className="ml-1 text-sm text-gray-600">{rating}</span>
+    </div>
+  );
 };
 
-type Category = {
-  id: string;
-  name: string;
-  slug: string;
+// Helper: konversi nama kategori ke slug
+const categoryToSlug = (name: string): string => {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 };
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);
-  const [wishlist, setWishlist] = useState<string[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [wishlist, setWishlist] = useState<number[]>([]);
 
-  // Load data dari Firestore
+  // Load cart & wishlist dari localStorage
   useEffect(() => {
-    const fetchData = async () => {
-        // Ambil produk
-        const productsSnapshot = await getDocs(collection(db, 'products'));
-        const productList = productsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name || 'Produk Tanpa Nama',
-            price: data.price || 0,
-            wholesalePrice: data.wholesalePrice || data.price || 0,
-            purchasePrice: data.purchasePrice || 0,
-            stock: data.stock || 0,
-            stockByWarehouse: data.stockByWarehouse || {},
-            category: data.category || 'Lainnya', // ✅ Fallback jika tidak ada kategori
-            unit: data.unit || 'pcs',
-            barcode: data.barcode || '',
-            image: data.image || 'https://placehold.co/400x400/64748b/ffffff?text=No+Image',
-            expiredDate: data.expiredDate
-          };
-        }) as Product[];
-        
-        // Ambil kategori unik dengan penanganan safe
-        const categorySet = new Set(
-          productList
-            .map(p => p.category || 'Lainnya')
-            .filter(name => name && name.trim() !== '')
-            .map(name => name.trim())
-        );
-        
-        const categoryList = Array.from(categorySet).map((name, index) => ({
-          id: `cat-${index}`,
-          name: name || 'Lainnya',
-          slug: (name || 'lainnya').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        }));
-        
-        setProducts(productList);
-        setCategories(categoryList);
-        
-        // Cart & Wishlist
-        const savedCart = localStorage.getItem('atayatoko-cart');
-        if (savedCart) {
-          try {
-            const cart = JSON.parse(savedCart);
-            setCartCount(cart.reduce((sum: number, item: any) => sum + item.quantity, 0));
-          } catch (e) {
-            setCartCount(0);
-          }
-        }
-        
-        setLoading(false);
-    };
-
-    fetchData();
+    // Cart
+    const savedCart = localStorage.getItem('atayatoko-cart');
+    if (savedCart) {
+      try {
+        const cart = JSON.parse(savedCart);
+        const total = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
+        setCartCount(total);
+      } catch (e) {
+        setCartCount(0);
+      }
+    }
+    
+    // Wishlist
+    const wl = getWishlist();
+    setWishlist(wl);
   }, []);
 
   const addToCart = (product: Product) => {
@@ -127,44 +85,34 @@ export default function Home() {
     setCartCount(cart.reduce((sum, item) => sum + item.quantity, 0));
   };
 
-  const toggleWishlist = (productId: string) => {
-    const newWishlist = wishlist.includes(productId)
-      ? wishlist.filter(id => id !== productId)
-      : [...wishlist, productId];
-    
-    setWishlist(newWishlist);
-    localStorage.setItem('atayatoko-wishlist', JSON.stringify(newWishlist));
+  const toggleWishlist = (productId: number) => {
+    if (wishlist.includes(productId)) {
+      removeFromWishlist(productId);
+      setWishlist(prev => prev.filter(id => id !== productId));
+    } else {
+      addToWishlist(productId);
+      setWishlist(prev => [...prev, productId]);
+    }
   };
 
-  // Filter produk dengan penanganan safe
-  const filteredProducts = products.filter(product =>
-    (product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-    (product.category?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-    (product.barcode?.includes(searchQuery) || false)
+  // Filter produk berdasarkan pencarian
+  const filteredProducts = PRODUCTS.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Data statis yang tidak perlu dari lib
   const promoBanners = [
-    { id: 1, title: 'Harga Ecer Terjangkau', description: 'Beli satuan pun hemat!', image: 'https://placehold.co/800x400/f59e0b/ffffff?text=Harga+Ecer' },
-    { id: 2, title: 'Harga Grosir Super Hemat', description: 'Beli banyak lebih murah!', image: 'https://placehold.co/800x400/ef4444/ffffff?text=Harga+Grosir' },
-    { id: 3, title: 'Gratis Ongkir', description: 'Minimal belanja Rp100.000', image: 'https://placehold.co/800x400/10b981/ffffff?text=Gratis+Ongkir' }
+    { id: 1, title: 'Harga Ecer Terjangkau', description: 'Beli satuan pun hemat!', image: 'https://placehold.co/800x400/f59e0b/ffffff?text=Harga+Ecer  ' },
+    { id: 2, title: 'Harga Grosir Super Hemat', description: 'Beli banyak lebih murah!', image: 'https://placehold.co/800x400/ef4444/ffffff?text=Harga+Grosir  ' },
+    { id: 3, title: 'Gratis Ongkir', description: 'Minimal belanja Rp100.000', image: 'https://placehold.co/800x400/10b981/ffffff?text=Gratis+Ongkir  ' }
   ];
 
   const testimonials = [
-    { id: 1, name: 'Ibu Siti', rating: 5, comment: 'Harga grosirnya benar-benar murah! Sekarang belanja bulanan jadi lebih hemat.', avatar: 'https://placehold.co/60x60/6366f1/ffffff?text=IS' },
-    { id: 2, name: 'Pak Budi', rating: 5, comment: 'Pengiriman cepat dan barang lengkap. Toko sembako favorit keluarga!', avatar: 'https://placehold.co/60x60/8b5cf6/ffffff?text=PB' },
-    { id: 3, name: 'Bu Rina', rating: 4, comment: 'Bisa beli ecer atau grosir sesuai kebutuhan. Sangat praktis!', avatar: 'https://placehold.co/60x60/06b6d4/ffffff?text=BR' }
+    { id: 1, name: 'Ibu Siti', rating: 5, comment: 'Harga grosirnya benar-benar murah! Sekarang belanja bulanan jadi lebih hemat.', avatar: 'https://placehold.co/60x60/6366f1/ffffff?text=IS  ' },
+    { id: 2, name: 'Pak Budi', rating: 5, comment: 'Pengiriman cepat dan barang lengkap. Toko sembako favorit keluarga!', avatar: 'https://placehold.co/60x60/8b5cf6/ffffff?text=PB  ' },
+    { id: 3, name: 'Bu Rina', rating: 4, comment: 'Bisa beli ecer atau grosir sesuai kebutuhan. Sangat praktis!', avatar: 'https://placehold.co/60x60/06b6d4/ffffff?text=BR  ' }
   ];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat produk...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -187,21 +135,20 @@ export default function Home() {
             <nav className="hidden md:flex items-center space-x-6">
               <Link href="/" className="text-gray-700 hover:text-green-600 font-medium">Beranda</Link>
               <Link href="/semua-kategori" className="text-gray-700 hover:text-green-600 font-medium">Kategori</Link>
-              <Link href="/promo" className="text-gray-700 hover:text-green-600 font-medium">Promo</Link>
-              <Link href="/tentang" className="text-gray-700 hover:text-green-600 font-medium">Tentang</Link>
+              <a href="#" className="text-gray-700 hover:text-green-600 font-medium">Promo</a>
+              <a href="#" className="text-gray-700 hover:text-green-600 font-medium">Tentang</a>
               <Link href="/kontak" className="text-gray-700 hover:text-green-600 font-medium">Kontak</Link>
             </nav>
 
             <div className="hidden md:flex flex-1 max-w-lg mx-8">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Cari produk, kategori, atau barcode..."
+                  placeholder="Cari produk sembako..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 />
               </div>
             </div>
@@ -241,13 +188,12 @@ export default function Home() {
           <div className="md:hidden mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Cari produk, kategori, atau barcode..."
+                placeholder="Cari produk sembako..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
           </div>
@@ -258,8 +204,8 @@ export default function Home() {
             <div className="px-4 py-2 space-y-2">
               <Link href="/" className="block py-2 text-gray-700 hover:text-green-600">Beranda</Link>
               <Link href="/semua-kategori" className="block py-2 text-gray-700 hover:text-green-600">Kategori</Link>
-              <Link href="/promo" className="block py-2 text-gray-700 hover:text-green-600">Promo</Link>
-              <Link href="/tentang" className="block py-2 text-gray-700 hover:text-green-600">Tentang</Link>
+              <a href="#" className="block py-2 text-gray-700 hover:text-green-600">Promo</a>
+              <a href="#" className="block py-2 text-gray-700 hover:text-green-600">Tentang</a>
               <Link href="/kontak" className="block py-2 text-gray-700 hover:text-green-600">Kontak</Link>
               <Link href="/profil" className="block py-2 text-gray-700 hover:text-green-600">Profil</Link>
             </div>
@@ -274,8 +220,8 @@ export default function Home() {
             <Store size={48} className="mr-3" />
             <h1 className="text-3xl md:text-4xl font-bold">ATAYATOKO</h1>
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-6">Satu Toko untuk Semua Kebutuhan!</h2>
-          <div className="bg-white bg-opacity-20 rounded-lg p-6 max-w-2xl mx-auto mb-8 text-black">
+          <h2 className="text-2xl md:text-3xl font-bold mb-6">Satu Toko untuk Semua Kebutuhan Sembako!</h2>
+          <div className="bg-white bg-opacity-20 rounded-lg p-6 max-w-2xl mx-auto mb-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               <div className="flex items-start">
                 <div className="bg-white text-green-600 rounded-full p-2 mr-3 mt-1">
@@ -297,17 +243,17 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-center bg-white bg-opacity-20 rounded-lg p-3 mb-8 text-black">
+          <div className="flex items-center justify-center bg-white bg-opacity-20 rounded-lg p-3 mb-8">
             <Truck size={24} className="mr-2" />
-            <span className="font-semibold">Pesan dari rumah – kami antar sampai pintu!</span>
+            <span className="font-semibold">🚚 Pesan dari rumah – kami antar sampai pintu!</span>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/semua-kategori" className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+            <Link href="/" className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
               Belanja Sekarang
             </Link>
-            <Link href="/promo" className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors">
+            <button className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors">
               Lihat Promo
-            </Link>
+            </button>
           </div>
         </div>
       </section>
@@ -319,11 +265,11 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Kategori Produk</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">Temukan semua kebutuhan sembako Anda di sini</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {categories.map((category) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
+            {CATEGORIES.map((category) => (
               <Link key={category.id} href={`/kategori/${category.slug}`} className="text-center group cursor-pointer">
                 <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-green-100 transition-colors">
-                  <Package size={24} className="text-gray-600" />
+                  <span className="text-2xl">{category.icon}</span>
                 </div>
                 <h3 className="font-medium text-gray-900 group-hover:text-green-600 transition-colors text-sm">
                   {category.name}
@@ -370,39 +316,30 @@ export default function Home() {
               {filteredProducts.map((product) => (
                 <div key={product.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden">
                   <Link href={`/produk/${product.id}`}>
-                    <img 
-                      src={product.image} 
-                      alt={product.name} 
-                      className="w-full h-64 object-cover" 
-                    />
+                    <img src={product.image.trim()} alt={product.name} className="w-full h-64 object-cover" />
                   </Link>
                   <div className="p-6">
                     <div className="flex items-center mb-2">
                       <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
                         {product.category}
                       </span>
-                      {product.stock <= 10 && (
-                        <AlertTriangle className="text-red-500 ml-2" size={16} />
-                      )}
                     </div>
                     <Link href={`/produk/${product.id}`}>
                       <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
                     </Link>
                     <p className="text-sm text-gray-600 mb-2">{product.unit}</p>
-                    <div className="flex items-center mb-3">
-                      <div>
-                        <span className="text-lg font-bold text-green-600">
-                          Rp{product.wholesalePrice.toLocaleString('id-ID')}
-                        </span>
-                        <span className="text-gray-500 text-sm ml-1">/grosir</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-gray-900">
-                        Rp{product.price.toLocaleString('id-ID')} /ecer
-                      </span>
-                    </div>
+                    <StarRating rating={product.rating} />
                     <div className="flex items-center justify-between mt-4">
+                      <div>
+                        <span className="text-xl font-bold text-gray-900">
+                          Rp{product.price.toLocaleString('id-ID')}
+                        </span>
+                        {product.originalPrice > product.price && (
+                          <span className="text-gray-500 line-through ml-2">
+                            Rp{product.originalPrice.toLocaleString('id-ID')}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex space-x-2">
                         <button
                           onClick={(e) => {
@@ -426,9 +363,6 @@ export default function Home() {
                           Tambah
                         </button>
                       </div>
-                      {product.barcode && (
-                        <span className="text-xs text-gray-500">#{product.barcode}</span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -489,7 +423,7 @@ export default function Home() {
                   <div>
                     <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
                     <div className="flex">
-                      {[...Array(5)].map((_, i) => (
+                      {[...Array(testimonial.rating)].map((_, i) => (
                         <Star key={i} size={16} className="fill-yellow-400 text-yellow-400" />
                       ))}
                     </div>
@@ -508,10 +442,10 @@ export default function Home() {
           <Store size={64} className="mx-auto mb-6" />
           <h2 className="text-3xl font-bold mb-4">Siap Belanja Sembako?</h2>
           <p className="text-green-100 mb-8 max-w-2xl mx-auto">
-            Nikmati kemudahan belanja dengan harga ecer terjangkau dan harga grosir super hemat. Pesan sekarang dan kami antar sampai ke pintu rumah Anda!
+            Nikmati kemudahan belanja sembako dengan harga ecer terjangkau dan harga grosir super hemat. Pesan sekarang dan kami antar sampai ke pintu rumah Anda!
           </p>
           <Link
-            href="/semua-kategori"
+            href="/"
             className="bg-white text-green-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors"
           >
             Mulai Belanja Sekarang
@@ -550,7 +484,7 @@ export default function Home() {
             <div>
               <h4 className="font-semibold mb-4">Kategori</h4>
               <ul className="space-y-2 text-gray-400">
-                {categories.slice(0, 6).map((category) => (
+                {CATEGORIES.slice(0, 6).map((category) => (
                   <li key={category.id}>
                     <Link href={`/kategori/${category.slug}`} className="hover:text-white transition-colors">
                       {category.name}
@@ -579,7 +513,7 @@ export default function Home() {
                       <ShieldCheck size={20} className="group-hover:text-green-400" />
                     </Link>
                     <Link 
-                      href="/cashier" 
+                      href="/profil/login" 
                       className="text-gray-400 hover:text-white transition-colors group"
                       title="Login Kasir"
                     >
@@ -616,19 +550,3 @@ export default function Home() {
     </div>
   );
 }
-
-// Komponen bantu
-const StarRating = ({ rating }: { rating: number }) => {
-  return (
-    <div className="flex items-center">
-      {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={16}
-          className={i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-        />
-      ))}
-      <span className="ml-1 text-sm text-gray-600">{rating}</span>
-    </div>
-  );
-};
