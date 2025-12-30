@@ -1,5 +1,12 @@
 // src/lib/products.ts
-import type { Product, Category } from '@/lib/types';
+import type { Product } from '@/lib/types';
+
+type Category = {
+  id: string;
+  name: string;
+  icon: string;
+  slug: string;
+};
 
 // === DATA PRODUK ===
 export const PRODUCTS: Product[] = [
@@ -177,7 +184,7 @@ export const getCategoryBySlug = (slug: string): Category | undefined => {
 // Tambahkan di bagian paling bawah src/lib/products.ts
 
 // === Fungsi Wishlist (untuk user anonim) ===
-export const getWishlist = (): number[] => {
+export const getWishlist = (): string[] => {
   if (typeof window === 'undefined') return [];
   const saved = localStorage.getItem('atayatoko-wishlist');
   return saved ? JSON.parse(saved) : [];
@@ -192,7 +199,7 @@ export const addToWishlist = (productId: string) => {
   }
 };
 
-export const removeFromWishlist = (productId: string) => { // ← INI YANG KURANG
+export const removeFromWishlist = (productId: string) => {
   if (typeof window === 'undefined') return;
   const wishlist = getWishlist().filter(id => id !== productId);
   localStorage.setItem('atayatoko-wishlist', JSON.stringify(wishlist));

@@ -1,7 +1,12 @@
 // src/lib/fetchProducts.ts
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { Product } from '@/lib/products';
+import { PRODUCTS } from '@/lib/products';
+
+interface Product {
+  id: string;
+  [key: string]: any;
+}
 
 export const fetchProducts = async (): Promise<Product[]> => {
   try {

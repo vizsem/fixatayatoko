@@ -3,22 +3,89 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, Store, Package, ArrowLeft } from 'lucide-react';
-import { PRODUCTS, getWishlist, removeFromWishlist, type Product } from '@/lib/products';
+import { Heart, Store, Package, ArrowLeft, Trash2 } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+// Tipe produk lokal
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
+  unit: string;
+};
 
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const wishlist = getWishlist();
-    const products = PRODUCTS.filter(p => wishlist.includes(p.id));
-    setWishlistProducts(products);
+    const fetchWishlistProducts = async () => {
+      try {
+        // Ambil wishlist dari localStorage
+        const wishlist = localStorage.getItem('atayatoko-wishlist');
+        const wishlistIds = wishlist ? JSON.parse(wishlist) : [];
+        
+        if (wishlistIds.length === 0) {
+          setWishlistProducts([]);
+          setLoading(false);
+          return;
+        }
+
+        // Ambil produk dari Firestore berdasarkan ID di wishlist
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const wishlistProducts = productsSnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter((product: any) => wishlistIds.includes(product.id))
+          .map((product: any) => ({
+            id: product.id,
+            name: product.name || 'Produk Tanpa Nama',
+            price: product.price || 0,
+            image: product.image || '/logo-atayatoko.png',
+            category: product.category || 'Lainnya',
+            unit: product.unit || 'pcs'
+          })) as Product[];
+
+        setWishlistProducts(wishlistProducts);
+      } catch (error) {
+        console.error('Gagal memuat wishlist:', error);
+        setWishlistProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWishlistProducts();
   }, []);
 
-  const handleRemove = (id: number) => {
-    removeFromWishlist(id);
+  const handleRemove = (id: string) => {
+    // Hapus dari localStorage
+    const wishlist = localStorage.getItem('atayatoko-wishlist');
+    if (wishlist) {
+      const wishlistIds = JSON.parse(wishlist);
+      const updatedWishlist = wishlistIds.filter((productId: string) => productId !== id);
+      localStorage.setItem('atayatoko-wishlist', JSON.stringify(updatedWishlist));
+    }
+    
+    // Hapus dari state
     setWishlistProducts(prev => prev.filter(p => p.id !== id));
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-black">Memuat wishlist...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -28,7 +95,12 @@ export default function WishlistPage() {
             <Link href="/" className="text-gray-600 hover:text-green-600">
               <ArrowLeft size={20} />
             </Link>
-            <Store className="text-green-600" size={28} />
+            {/* ✅ GUNAKAN LOGO BARU */}
+            <img 
+              src="/logo-atayatoko.png" 
+              alt="ATAYATOKO" 
+              className="h-7 w-auto"
+            />
             <div>
               <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
               <p className="text-xs text-gray-600">Ecer & Grosir</p>
@@ -58,27 +130,35 @@ export default function WishlistPage() {
               <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="relative">
                   <Link href={`/produk/${product.id}`}>
-                    <img src={product.image.trim()} alt={product.name} className="w-full h-48 object-cover" />
+                    <img 
+                      src={product.image} 
+                      alt={product.name} 
+                      className="w-full h-48 object-cover"
+                    />
                   </Link>
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       handleRemove(product.id);
                     }}
-                    className="absolute top-2 right-2 bg-white p-1 rounded-full shadow"
+                    className="absolute top-2 right-2 bg-white p-1.5 rounded-full shadow-md hover:bg-red-50"
+                    title="Hapus dari wishlist"
                   >
-                    <Heart size={16} className="text-red-500 fill-red-500" />
+                    <Trash2 size={14} className="text-red-500" />
                   </button>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                  <p className="text-green-600 font-bold">Rp{product.price.toLocaleString('id-ID')}</p>
-                  <button
-                    onClick={() => handleRemove(product.id)}
-                    className="mt-2 text-xs text-red-500 hover:text-red-700"
+                  <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
+                  <p className="text-sm text-gray-600 mb-2">{product.unit} • {product.category}</p>
+                  <p className="text-green-600 font-bold text-lg">
+                    Rp{product.price.toLocaleString('id-ID')}
+                  </p>
+                  <Link
+                    href={`/produk/${product.id}`}
+                    className="mt-2 inline-block text-xs text-green-600 hover:text-green-800"
                   >
-                    Hapus dari Wishlist
-                  </button>
+                    Lihat Detail →
+                  </Link>
                 </div>
               </div>
             ))}

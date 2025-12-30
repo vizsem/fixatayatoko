@@ -1,6 +1,4 @@
-// src/app/layout.tsx
-
-// 👇 1. Deklarasi global untuk XLSX (SheetJS) — hanya di sisi client
+// 👇 1. Deklarasi global untuk XLSX (SheetJS)
 declare global {
   interface Window {
     XLSX: any;
@@ -9,6 +7,7 @@ declare global {
 
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 
 const geistSans = Geist({
@@ -21,16 +20,17 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-// 👇 2. Sesuaikan metadata dengan bisnis Anda
+// 👇 2. Metadata bisnis
 export const metadata: Metadata = {
   title: 'ATAYATOKO2 - Sembako Grosir & Ecer',
-  description: 'Lengkap • Hemat • Terpercaya. Belanja sembako grosir & ecer online atau langsung di toko.',
+  description:
+    'Lengkap • Hemat • Terpercaya. Belanja sembako grosir & ecer online atau langsung di toko.',
   keywords: 'sembako, grosir, ecer, kediri, toko sembako, ATAYATOKO2',
   authors: [{ name: 'ATAYATOKO2 Team' }],
   openGraph: {
     title: 'ATAYATOKO2 - Sembako Grosir & Ecer',
     description: 'Lengkap • Hemat • Terpercaya',
-    url: 'https://atayatoko2.vercel.app', // ganti dengan domain Anda nanti
+    url: 'https://atayatoko2.vercel.app',
     siteName: 'ATAYATOKO2',
     locale: 'id_ID',
     type: 'website',
@@ -39,20 +39,25 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="id"> {/* 👈 ganti ke "id" untuk Indonesia */}
+    <html lang="id">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+
         {/* 
-          ✅ Script XLSX hanya jalan di browser.
-          File `xlsx.full.min.js` harus ada di `public/xlsx.full.min.js`
+          ✅ XLSX hanya jalan di client
+          ✅ Tidak mengganggu hydration
+          File harus ada di: public/xlsx.full.min.js
         */}
-        <script src="/xlsx.full.min.js" />
+        <Script
+          src="/xlsx.full.min.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
