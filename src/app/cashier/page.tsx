@@ -1,11 +1,9 @@
-// src/app/cashier/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-// ✅ Benar
 import {
   collection,
   getDocs,
@@ -17,10 +15,10 @@ import {
   onSnapshot,
   where,
   serverTimestamp,
-  getDoc
+  getDoc,
+  limit,
+  writeBatch
 } from 'firebase/firestore';
-
-// ✅ Impor fungsi storage secara terpisah
 import {
   ref,
   uploadBytes,
@@ -28,19 +26,9 @@ import {
 } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { 
-  Package, 
-  ShoppingCart, 
-  Search, 
-  Plus, 
-  Minus, 
-  Printer, 
-  Bell,
-  MessageSquare,
-  Truck,
-  CheckCircle,
-  Upload,
-  QrCode,
-  Barcode
+  Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
+  MessageSquare, Truck, CheckCircle, Upload, QrCode, Barcode,
+  History, X, Trash2, LayoutGrid, List
 } from 'lucide-react';
 
 // Types
@@ -51,6 +39,7 @@ type Product = {
   unit: string;
   stock: number;
   barcode?: string;
+  image?: string; // Menampung URL Foto
 };
 
 type CartItem = {
@@ -70,21 +59,20 @@ type Order = {
   paymentMethod: string;
   deliveryMethod: string;
   status: string;
-  createdAt: string;
+  createdAt: any;
+  subtotal: number;
+  shippingCost: number;
+  transactionType: string;
 };
-
-// ✅ Contoh 5 produk baru
-const sampleProducts: Omit<Product, 'id'>[] = [
-  { name: "Gula Pasir 1kg", price: 16000, unit: "1kg", stock: 200, barcode: "GP001" },
-  { name: "Minyak Goreng 1L", price: 18000, unit: "1L", stock: 150, barcode: "MG002" },
-  { name: "Tepung Terigu 1kg", price: 12000, unit: "1kg", stock: 180, barcode: "TT003" },
-  { name: "Kopi Sachet 10pcs", price: 8000, unit: "10pcs", stock: 300, barcode: "KS004" },
-  { name: "Sabun Mandi 120gr", price: 6000, unit: "pcs", stock: 250, barcode: "SM005" }
-];
 
 export default function CashierPOS() {
   const router = useRouter();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // States
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // State View Mode
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,9 +80,10 @@ export default function CashierPOS() {
   const [newOrderCount, setNewOrderCount] = useState(0);
   const [showNotification, setShowNotification] = useState(false);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // ✅ State untuk transaksi & upload
+  // Transaksi States
   const [transactionType, setTransactionType] = useState<'toko' | 'online'>('toko');
   const [deliveryMethod, setDeliveryMethod] = useState('Ambil di Toko');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -108,749 +97,413 @@ export default function CashierPOS() {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + shippingCost;
 
-  // Hitung ongkir & kembalian
+  // 1. Load LocalStorage Cart & Auth
   useEffect(() => {
-    const shippingRates: Record<string, number> = {
-      'Ambil di Toko': 0,
-      'Kurir Toko': 15000,
-      'OJOL': 0
-    };
-    setShippingCost(shippingRates[deliveryMethod] || 0);
-  }, [deliveryMethod]);
+    const savedCart = localStorage.getItem('pos-cart');
+    if (savedCart) setCart(JSON.parse(savedCart));
 
-  useEffect(() => {
-    if (paymentMethod === 'CASH' && cashGiven) {
-      const given = parseFloat(cashGiven) || 0;
-      setChange(given - (subtotal + shippingCost));
-    } else {
-      setChange(0);
-    }
-  }, [paymentMethod, cashGiven, subtotal, shippingCost]);
-
-  // ✅ Update preview bukti bayar
-  useEffect(() => {
-    if (paymentProof) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProofPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(paymentProof);
-    } else {
-      setProofPreview(null);
-    }
-  }, [paymentProof]);
-
-  // ✅ Proteksi akses
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
+      if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const role = userDoc.data()?.role;
-      
-      if (role !== 'cashier' && role !== 'admin') {
-        alert('Akses ditolak! Anda bukan kasir atau admin.');
-        router.push('/profil');
-        return;
+      if (userDoc.data()?.role !== 'cashier' && userDoc.data()?.role !== 'admin') {
+        router.push('/profil'); return;
       }
-
-      // ✅ Tambahkan contoh produk jika belum ada
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      if (productsSnapshot.empty) {
-        for (const product of sampleProducts) {
-          await addDoc(collection(db, 'products'), {
-            ...product,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
-
       setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
 
-  // Load produk
+  // 2. Simpan Cart ke LocalStorage
   useEffect(() => {
-    if (loading) return;
+    localStorage.setItem('pos-cart', JSON.stringify(cart));
+  }, [cart]);
 
-    const fetchProducts = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, 'products'));
-        const productList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name || 'Produk Tanpa Nama',
-          price: doc.data().price || 0,
-          unit: doc.data().unit || 'pcs',
-          stock: doc.data().stock || 0,
-          barcode: doc.data().barcode || ''
-        })) as Product[];
-        setProducts(productList);
-        setFilteredProducts(productList);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      }
+  // 3. Shortcut Keyboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1') { e.preventDefault(); searchInputRef.current?.focus(); }
     };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-    fetchProducts();
-  }, [loading]);
-
-  // ✅ Filter produk (termasuk barcode)
-  useEffect(() => {
-    const filtered = products.filter(product =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.barcode?.includes(searchQuery)
-    );
-    setFilteredProducts(filtered);
-  }, [searchQuery, products]);
-
-  // 🔔 NOTIFIKASI PESANAN BARU
+  // 4. Fetch Products Realtime (Updated with Image Mapping)
   useEffect(() => {
     if (loading) return;
-
-    const ordersRef = collection(db, 'orders');
-    const q = query(
-      ordersRef, 
-      where('status', '==', 'MENUNGGU'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Order[];
-
-      setRecentOrders(orders);
-      setNewOrderCount(orders.length);
-      
-      if (orders.length > 0) {
-        setShowNotification(true);
-        setTimeout(() => setShowNotification(false), 5000);
-      }
-    }, (error) => {
-      console.error("Error listening to orders:", error);
+    const unsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const p = snapshot.docs.map(d => {
+        const data = d.data();
+        return { 
+          id: d.id, 
+          name: data.name || 'TANPA NAMA', 
+          price: data.price || 0,
+          unit: data.unit || 'pcs',
+          stock: data.stock || 0,
+          barcode: data.barcode || '',
+          // Mendeteksi berbagai kemungkinan nama field foto
+          image: data.image || data.imageUrl || data.photo || null 
+        } as Product;
+      });
+      setProducts(p);
+      setFilteredProducts(p);
     });
-
     return () => unsubscribe();
   }, [loading]);
 
-  // Fungsi keranjang
+  // 5. Fetch Completed Orders
+  useEffect(() => {
+    if (activeTab !== 'orders') return;
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCompletedOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
+    });
+    return () => unsubscribe();
+  }, [activeTab]);
+
+  // 6. Barcode & Search Logic
+  useEffect(() => {
+    const filtered = products.filter(p =>
+      (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
+      p.barcode === searchQuery
+    );
+    setFilteredProducts(filtered);
+
+    const exactMatch = products.find(p => p.barcode === searchQuery);
+    if (exactMatch && searchQuery.length >= 3) {
+      addToCart(exactMatch);
+      setSearchQuery(''); 
+    }
+  }, [searchQuery, products]);
+
+  // 7. Notifikasi Pesanan Online
+  useEffect(() => {
+    if (loading) return;
+    const q = query(collection(db, 'orders'), where('status', '==', 'MENUNGGU'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setRecentOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
+      setNewOrderCount(snapshot.docs.length);
+      if (!snapshot.empty) {
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+      }
+    });
+    return () => unsubscribe();
+  }, [loading]);
+
+  // 8. Logika Ongkir & Kembalian
+  useEffect(() => {
+    const rates: any = { 'Ambil di Toko': 0, 'Kurir Toko': 15000, 'OJOL': 0 };
+    setShippingCost(rates[deliveryMethod] || 0);
+  }, [deliveryMethod]);
+
+  useEffect(() => {
+    if (paymentMethod === 'CASH') {
+      setChange((parseFloat(cashGiven) || 0) - total);
+    } else { setChange(0); }
+  }, [cashGiven, total, paymentMethod]);
+
+  // Functions
   const addToCart = (product: Product) => {
-    const existingItem = cart.find(item => item.id === product.id);
-    if (existingItem) {
-      setCart(cart.map(item =>
-        item.id === product.id 
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
-      setCart([...cart, { 
-        id: product.id, 
-        name: product.name, 
-        price: product.price, 
-        quantity: 1,
-        unit: product.unit || 'pcs'
-      }]);
-    }
+    if (product.stock <= 0) return alert("Stok habis!");
+    setCart(prev => {
+      const exist = prev.find(i => i.id === product.id);
+      if (exist) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1, unit: product.unit }];
+    });
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCart(cart.filter(item => item.id !== id));
-    } else {
-      setCart(cart.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      ));
-    }
+  const updateQuantity = (id: string, q: number) => {
+    if (q <= 0) setCart(cart.filter(i => i.id !== id));
+    else setCart(cart.map(i => i.id === id ? { ...i, quantity: q } : i));
   };
 
-  // Cetak struk
-  const printReceipt = (order: any) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const isOnline = order.transactionType === 'online';
-    const receiptContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Struk ATAYATOKO</title>
-        <style>
-          body { 
-            font-family: 'Courier New', monospace; 
-            width: 80mm; 
-            margin: 0; 
-            padding: 10px;
-            font-size: 12px;
-          }
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .separator { border-top: 1px dashed #000; margin: 8px 0; }
-          .item { display: flex; justify-content: space-between; }
-          .highlight { background-color: #f0f0f0; padding: 2px; }
-        </style>
-      </head>
-      <body>
-        <div class="center">
-          <div class="bold">ATAYATOKO</div>
-          <div>Ecer & Grosir</div>
-          <div>Jl. Pandan 98, Semen, Kediri</div>
-          <div>0858-5316-1174</div>
-          <div class="separator"></div>
-          <div class="highlight">
-            ${isOnline ? 'PESANAN ONLINE' : 'TRANSAKSI TOKO'}
-          </div>
-          <div>${new Date(order.createdAt).toLocaleString('id-ID')}</div>
-          <div class="separator"></div>
-        </div>
-        
-        ${order.items.map((item: any) => `
-          <div class="item">
-            <span>${item.name} x${item.quantity}</span>
-            <span>Rp${(item.price * item.quantity).toLocaleString('id-ID')}</span>
-          </div>
-        `).join('')}
-        
-        <div class="separator"></div>
-        <div class="item">
-          <span>Subtotal</span>
-          <span>Rp${order.subtotal.toLocaleString('id-ID')}</span>
-        </div>
-        ${order.shippingCost > 0 ? `
-          <div class="item">
-            <span>Ongkir</span>
-            <span>Rp${order.shippingCost.toLocaleString('id-ID')}</span>
-          </div>
-        ` : ''}
-        <div class="item bold">
-          <span>TOTAL</span>
-          <span>Rp${order.total.toLocaleString('id-ID')}</span>
-        </div>
-        
-        <div class="separator"></div>
-        <div class="item">
-          <span>Metode Bayar</span>
-          <span>${order.paymentMethod}</span>
-        </div>
-        ${order.paymentMethod === 'CASH' ? `
-          <div class="item">
-            <span>Uang Tunai</span>
-            <span>Rp${order.cashGiven.toLocaleString('id-ID')}</span>
-          </div>
-          <div class="item">
-            <span>Kembalian</span>
-            <span>Rp${order.change.toLocaleString('id-ID')}</span>
-          </div>
-        ` : order.paymentProofUrl ? `
-          <div class="item">
-            <span>Bukti Bayar</span>
-            <span>✓ Terupload</span>
-          </div>
-        ` : ''}
-        
-        ${isOnline ? `
-          <div class="separator"></div>
-          <div class="item">
-            <span>Pengiriman</span>
-            <span>${order.deliveryMethod}</span>
-          </div>
-        ` : ''}
-        
-        <div class="separator"></div>
-        <div class="center">
-          ${isOnline ? 'Pesanan sedang diproses' : 'Terima kasih!'}<br>
-          Lengkap • Hemat • Terpercaya
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(receiptContent);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-  };
-
-  // ✅ Fungsi upload bukti bayar ke Firebase Storage
-  const uploadPaymentProof = async (file: File) => {
-    try {
-      const storageRef = ref(storage, `payment-proofs/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
-    } catch (error) {
-      console.error('Gagal upload bukti pembayaran:', error);
-      alert('Gagal mengupload bukti pembayaran. Silakan coba lagi.');
-      return null;
-    }
-  };
-
-  // Fungsi transaksi
   const handleTransaction = async () => {
-    if (cart.length === 0) {
-      alert('Keranjang kosong!');
-      return;
-    }
-
-    // ✅ Validasi bukti bayar untuk QRIS/TRANSFER
-    if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof) {
-      alert('Wajib upload bukti pembayaran untuk metode ini!');
-      return;
-    }
-
-    if (paymentMethod === 'CASH' && change < 0) {
-      alert('Uang tunai tidak cukup!');
-      return;
-    }
+    if (cart.length === 0) return;
+    if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof) return alert('Wajib upload bukti!');
+    if (paymentMethod === 'CASH' && change < 0) return alert('Uang kurang!');
 
     setIsProcessing(true);
+    const batch = writeBatch(db);
 
     try {
-      let paymentProofUrl = null;
+      let proofUrl = null;
       if (paymentProof) {
-        paymentProofUrl = await uploadPaymentProof(paymentProof);
-        if (!paymentProofUrl) {
-          setIsProcessing(false);
-          return;
-        }
+        const sRef = ref(storage, `payment-proofs/${Date.now()}`);
+        await uploadBytes(sRef, paymentProof);
+        proofUrl = await getDownloadURL(sRef);
       }
 
       const orderData = {
-        customerId: auth.currentUser?.uid,
-        customerName: 'Kasir Toko',
-        customerPhone: '',
+        customerName: transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko',
         items: cart,
-        subtotal: subtotal,
-        shippingCost: shippingCost,
-        total: total,
-        paymentMethod: paymentMethod,
-        cashGiven: paymentMethod === 'CASH' ? parseFloat(cashGiven) : null,
-        change: paymentMethod === 'CASH' ? change : null,
-        paymentProofUrl: paymentProofUrl,
-        deliveryMethod: deliveryMethod,
-        transactionType: transactionType,
-        status: transactionType === 'online' ? 'DIPROSES' : 'SELESAI',
+        subtotal, shippingCost, total,
+        paymentMethod, paymentProofUrl: proofUrl,
+        deliveryMethod, transactionType,
+        status: 'SELESAI',
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'orders'), orderData);
-      
-      // Cetak struk
-      printReceipt({ ...orderData, id: docRef.id, createdAt: new Date().toISOString() });
-      
-      // Reset
+      const newOrderRef = doc(collection(db, 'orders'));
+      batch.set(newOrderRef, orderData);
+
+      for (const item of cart) {
+        const pRef = doc(db, 'products', item.id);
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists()) {
+          batch.update(pRef, { stock: (pSnap.data().stock || 0) - item.quantity });
+        }
+      }
+
+      await batch.commit();
+      printReceipt({ ...orderData, id: newOrderRef.id, createdAt: new Date() });
       setCart([]);
-      setTransactionType('toko');
-      setPaymentMethod('CASH');
+      localStorage.removeItem('pos-cart');
       setCashGiven('');
-      setDeliveryMethod('Ambil di Toko');
       setPaymentProof(null);
-      
-      alert('Transaksi berhasil!');
-    } catch (error) {
-      console.error('Error creating order:', error);
-      alert('Gagal menyimpan transaksi.');
-    } finally {
-      setIsProcessing(false);
-    }
+      setProofPreview(null);
+      alert('Transaksi Berhasil!');
+    } catch (e) {
+      console.error(e);
+      alert('Gagal Transaksi');
+    } finally { setIsProcessing(false); }
   };
 
-  const markAsProcessed = async (orderId: string) => {
-    try {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'DIPROSES',
-        deliveryMethod: deliveryMethod,
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error updating order:', error);
-    }
+  const printReceipt = (order: any) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`
+      <html><body style="font-family:monospace;width:80mm;padding:5px;">
+        <center><b>ATAYATOKO</b><br>Kediri - 085853161174<br>--------------------------</center>
+        ${order.items.map((i:any) => `<div>${i.name}<br>${i.quantity}x @${i.price.toLocaleString()} = ${(i.price*i.quantity).toLocaleString()}</div>`).join('')}
+        --------------------------<br>
+        TOTAL: Rp${order.total.toLocaleString()}<br>
+        BAYAR: ${order.paymentMethod}<br>
+        --------------------------<br>
+        <center>Terima Kasih</center>
+      </body></html>
+    `);
+    w.document.close();
+    w.print();
+    w.close();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat sistem kasir...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Memuat Kasir...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 🔔 NOTIFIKASI PESANAN BARU */}
-      {showNotification && newOrderCount > 0 && (
-        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white p-4 rounded-lg shadow-lg animate-pulse">
-          <div className="flex items-center gap-3">
-            <Bell size={20} />
-            <div>
-              <p className="font-bold">Pesanan Baru!</p>
-              <p>{newOrderCount} pesanan menunggu diproses</p>
-            </div>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Navbar */}
+      <nav className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
+        <div className="flex items-center gap-6">
+          <h1 className="text-xl font-black italic text-green-600">ATAYATOKO <span className="text-gray-400 not-italic font-medium text-sm">POS</span></h1>
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button onClick={() => setActiveTab('pos')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
+            <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
         </div>
-      )}
 
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-black">POS Kasir</h1>
-          <button 
-            onClick={() => setIsDrawerOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-          >
-            <ShoppingCart size={18} />
-            <span>Pesanan Online ({newOrderCount})</span>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setIsDrawerOpen(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
+            <Bell size={20} className="group-hover:text-blue-600" />
+            {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
           </button>
         </div>
+      </nav>
 
-        {/* Pemilih Jenis Transaksi */}
-        <div className="mb-6 bg-white p-4 rounded-lg shadow">
-          <div className="flex space-x-4">
-            <button
-              onClick={() => setTransactionType('toko')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                transactionType === 'toko'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-200 text-black hover:bg-gray-300'
-              }`}
-            >
-              Transaksi Toko
-            </button>
-            <button
-              onClick={() => setTransactionType('online')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                transactionType === 'online'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-black hover:bg-gray-300'
-              }`}
-            >
-              Pesanan Online
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Produk */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow p-4 mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <Barcode className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Cari produk atau scan barcode..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                />
+      {activeTab === 'pos' ? (
+        <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
+          {/* Kiri: Produk */}
+          <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
+              <div className="bg-green-50 p-2 rounded-xl text-green-600"><Search size={20}/></div>
+              <input 
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Cari Produk atau Scan Barcode [F1]..." 
+                className="flex-1 outline-none font-medium text-gray-700"
+              />
+              {/* Toggle View Mode */}
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={18}/></button>
+                <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={18}/></button>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4">
-                {filteredProducts.map((product) => (
-                  <div 
-                    key={product.id} 
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer"
-                    onClick={() => addToCart(product)}
-                  >
-                    <div className="bg-gray-100 w-full h-24 rounded mb-2 flex items-center justify-center">
-                      {product.barcode ? <QrCode className="text-gray-600" size={24} /> : <Package className="text-gray-400" size={24} />}
+            <div className={viewMode === 'grid' 
+              ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" 
+              : "flex flex-col gap-2 overflow-y-auto pr-2"} 
+              style={{ maxHeight: 'calc(100vh - 200px)' }}
+            >
+              {filteredProducts.map(p => (
+                <button 
+                  key={p.id} 
+                  onClick={() => addToCart(p)}
+                  className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${
+                    viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'
+                  }`}
+                >
+                  <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
+                    {p.image ? (
+                      <img src={p.image} alt={p.name} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    ) : (
+                      p.barcode ? <Barcode size={24}/> : <Package size={24}/>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
+                    <p className="text-green-600 font-black text-sm">Rp{(p.price || 0).toLocaleString()}</p>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
+                      <span className={`text-[10px] font-bold ${p.stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
                     </div>
-                    <h3 className="font-medium text-black text-sm mb-1 line-clamp-2">{product.name}</h3>
-                    <p className="text-green-600 font-bold text-sm">
-                      Rp{(product.price || 0).toLocaleString('id-ID')}
-                    </p>
-                    <p className="text-xs text-black">{product.unit} {product.barcode && `• #${product.barcode}`}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Kanan: Keranjang */}
+          <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+            {/* Indikator Mode Transaksi */}
+            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${
+              transactionType === 'online' ? 'bg-blue-600 animate-pulse' : 'bg-green-600'
+            }`}>
+              {transactionType === 'online' ? <><Truck size={14}/> MODE PESANAN ONLINE</> : <><CheckCircle size={14}/> MODE TRANSAKSI TOKO</>}
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col overflow-hidden h-full">
+              <div className="p-5 border-b flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart size={18} className={transactionType === 'online' ? 'text-blue-600' : 'text-green-600'} />
+                  <h2 className="font-black text-xs uppercase tracking-widest text-gray-700">Keranjang</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                   <button onClick={() => setTransactionType(transactionType === 'toko' ? 'online' : 'toko')} className="text-[10px] font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300">GANTI MODE</button>
+                   <button onClick={() => setCart([])} className="text-red-400 hover:text-red-600"><Trash2 size={18}/></button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {cart.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center opacity-20"><ShoppingCart size={48} /><p className="text-[10px] font-black uppercase mt-2">Kosong</p></div>
+                ) : cart.map(item => (
+                  <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
+                      <p className="text-xs font-black text-green-600 ml-2">Rp{(item.price * item.quantity).toLocaleString()}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                         <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 bg-white border rounded-lg"><Minus size={12}/></button>
+                         <span className="w-8 text-center text-xs font-black">{item.quantity}</span>
+                         <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 bg-white border rounded-lg"><Plus size={12}/></button>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400">{item.unit}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
 
-          {/* Keranjang & Form */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold text-lg text-black">Keranjang ({cart.length} item)</h2>
-            </div>
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {cart.length === 0 ? (
-                <p className="text-black text-center py-8">Keranjang kosong</p>
-              ) : (
-                <div className="space-y-4">
-                  {cart.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-sm text-black">{item.name}</h3>
-                        <p className="text-green-600 text-sm">
-                          Rp{(item.price || 0).toLocaleString('id-ID')} × {item.quantity}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="w-8 text-center text-sm text-black">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* Form Transaksi */}
-            <div className="p-4 border-t">
-              {transactionType === 'online' && (
-                <div className="mb-4">
-                  <label className="block text-black text-sm font-medium mb-2">
-                    Metode Pengiriman
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Ambil di Toko', 'Kurir Toko', 'OJOL'].map((method) => (
-                      <button
-                        key={method}
-                        onClick={() => setDeliveryMethod(method)}
-                        className={`py-2 rounded text-sm font-medium ${
-                          deliveryMethod === method
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-black hover:bg-gray-300'
-                        }`}
-                      >
-                        {method}
-                      </button>
-                    ))}
-                  </div>
-                  {shippingCost > 0 && (
-                    <p className="mt-2 text-sm text-black">
-                      Ongkir: Rp{shippingCost.toLocaleString('id-ID')}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label className="block text-black text-sm font-medium mb-2">
-                  Metode Pembayaran
-                </label>
+              <div className="p-5 bg-white border-t space-y-4">
                 <div className="grid grid-cols-3 gap-2">
-                  {['CASH', 'QRIS', 'TRANSFER', 'CREDIT', 'COD'].map((method) => (
-                    <button
-                      key={method}
-                      onClick={() => {
-                        setPaymentMethod(method);
-                        if (method !== 'CASH') setCashGiven('');
-                        setPaymentProof(null);
-                      }}
-                      className={`py-2 rounded text-sm font-medium ${
-                        paymentMethod === method
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 text-black hover:bg-gray-300'
-                      }`}
-                    >
-                      {method}
-                    </button>
+                  {['CASH', 'QRIS', 'TRANSFER'].map(m => (
+                    <button key={m} onClick={() => setPaymentMethod(m)} className={`py-2 rounded-xl text-[10px] font-black border transition-all ${paymentMethod === m ? (transactionType === 'online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-green-600 border-green-600 text-white') : 'bg-white text-gray-400'}`}>{m}</button>
                   ))}
                 </div>
-              </div>
 
-              {/* ✅ Upload Bukti Bayar (QRIS/TRANSFER) */}
-              {(paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && (
-                <div className="mb-4">
-                  <label className="block text-black text-sm font-medium mb-2">
-                    Upload Bukti Pembayaran
-                  </label>
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    {proofPreview ? (
-                      <img src={proofPreview} alt="Preview" className="w-full h-full object-cover rounded" />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="text-gray-400" size={24} />
-                        <p className="text-sm text-gray-500">Klik untuk upload gambar</p>
-                      </div>
-                    )}
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
-                    />
-                  </label>
-                  {paymentProof && (
-                    <p className="mt-2 text-sm text-black">
-                      File: {paymentProof.name} ({(paymentProof.size / 1024).toFixed(1)} KB)
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {paymentMethod === 'CASH' && (
-                <div className="mb-4">
-                  <label className="block text-black text-sm font-medium mb-2">
-                    Uang Tunai (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-black"
-                    placeholder="Masukkan jumlah uang"
-                    min={total}
-                  />
-                  {change >= 0 && (
-                    <p className="mt-2 text-green-600 font-medium">
-                      Kembalian: Rp{change.toLocaleString('id-ID')}
-                    </p>
-                  )}
-                  {change < 0 && (
-                    <p className="mt-2 text-red-600">
-                      Uang kurang Rp{Math.abs(change).toLocaleString('id-ID')}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-between font-bold text-lg mb-3">
-                <span className="text-black">Total:</span>
-                <span className="text-black">Rp{total.toLocaleString('id-ID')}</span>
-              </div>
-              
-              <button 
-                onClick={handleTransaction}
-                disabled={isProcessing || (paymentMethod === 'CASH' && change < 0)}
-                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400 flex items-center justify-center"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Memproses...
-                  </>
+                {paymentMethod === 'CASH' ? (
+                  <div className="bg-gray-50 p-3 rounded-2xl">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">Bayar Tunai</label>
+                    <input type="number" value={cashGiven} onChange={e => setCashGiven(e.target.value)} className="w-full bg-transparent font-black text-lg outline-none" placeholder="0" />
+                    {change >= 0 && <p className="text-[10px] font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
+                  </div>
                 ) : (
-                  'Selesai Transaksi'
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl h-24 bg-gray-50 cursor-pointer overflow-hidden relative">
+                    {proofPreview ? <img src={proofPreview} className="absolute inset-0 w-full h-full object-cover" /> : <><Upload size={20} className="text-gray-300"/><span className="text-[10px] font-black text-gray-400 mt-1 uppercase">Bukti Bayar</span></>}
+                    <input type="file" className="hidden" onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
+                    }} />
+                  </label>
                 )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* 📱 DRAWER PESANAN ONLINE */}
-      {isDrawerOpen && (
-        <div className="fixed inset-0 z-40">
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50"
-            onClick={() => setIsDrawerOpen(false)}
-          ></div>
-          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-black">Pesanan Online</h2>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-xs font-black text-gray-400 uppercase">Total</span>
+                  <span className={`text-xl font-black ${transactionType === 'online' ? 'text-blue-600' : 'text-green-600'}`}>Rp{total.toLocaleString()}</span>
+                </div>
+
                 <button 
-                  onClick={() => setIsDrawerOpen(false)}
-                  className="text-black"
+                  disabled={isProcessing || cart.length === 0}
+                  onClick={handleTransaction}
+                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:bg-gray-200 ${
+                    transactionType === 'online' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-green-600 hover:bg-green-700 shadow-green-100'
+                  }`}
                 >
-                  ✕
+                  {isProcessing ? 'Proses...' : <><Printer size={16}/> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi'}</>}
                 </button>
               </div>
-              {newOrderCount > 0 && (
-                <p className="text-red-600 text-sm mt-1">
-                  {newOrderCount} pesanan menunggu diproses
-                </p>
-              )}
             </div>
-            
-            <div className="p-4 overflow-y-auto h-[calc(100vh-120px)]">
-              {recentOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShoppingCart className="mx-auto text-gray-400 mb-3" size={48} />
-                  <p className="text-black">Tidak ada pesanan online</p>
+          </div>
+        </main>
+      ) : (
+        /* RIWAYAT ORDER */
+        <main className="flex-1 p-6 overflow-y-auto">
+          <div className="max-w-4xl mx-auto space-y-4">
+            <h2 className="font-black text-xl text-gray-800 flex items-center gap-2"><History/> 20 Transaksi Terakhir</h2>
+            {completedOrders.map(order => (
+              <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="flex gap-4 items-center">
+                  <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24}/></div>
+                  <div>
+                    <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)} ({order.transactionType || 'toko'})</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{new Date(order.createdAt?.seconds * 1000).toLocaleString('id-ID')}</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-bold text-black">#{order.id.substring(0, 8)}</h3>
-                          <p className="text-sm text-black">
-                            {new Date(order.createdAt).toLocaleTimeString('id-ID')}
-                          </p>
-                        </div>
-                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
-                          Baru
-                        </span>
-                      </div>
-                      
-                      <p className="font-medium text-black">{order.customerName}</p>
-                      <p className="text-sm text-black mb-3">{order.customerPhone}</p>
-                      
-                      <div className="mb-3">
-                        {order.items.slice(0, 2).map((item: any, idx: number) => (
-                          <p key={idx} className="text-sm text-black">
-                            {item.name} × {item.quantity}
-                          </p>
-                        ))}
-                        {order.items.length > 2 && (
-                          <p className="text-sm text-black">
-                            +{order.items.length - 2} item lainnya
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold text-green-600">
-                          Rp{(order.total || 0).toLocaleString('id-ID')}
-                        </span>
-                        <div className="flex items-center gap-1 text-sm text-black">
-                          {order.deliveryMethod.includes('Kurir') || order.deliveryMethod.includes('OJOL') ? (
-                            <Truck className="text-blue-600" size={14} />
-                          ) : (
-                            <CheckCircle className="text-green-600" size={14} />
-                          )}
-                          <span>{order.paymentMethod}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => markAsProcessed(order.id)}
-                          className="flex-1 bg-blue-600 text-white text-sm py-1.5 rounded"
-                        >
-                          Proses
-                        </button>
-                        {order.customerPhone && (
-                          <a
-                            href={`https://wa.me/${order.customerPhone.replace('+', '')}`}
-                            className="p-1.5 bg-green-100 text-green-600 rounded"
-                            title="Chat via WhatsApp"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <MessageSquare size={16} />
-                          </a>
-                        )}
-                      </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-green-600">Rp{(order.total || 0).toLocaleString()}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod} • {order.items?.length || 0} ITEM</p>
+                </div>
+                <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18}/></button>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {/* DRAWER PESANAN ONLINE (Floating) */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsDrawerOpen(false)} />
+          <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300">
+            <div className="p-6 border-b flex justify-between items-center bg-blue-600 text-white">
+              <h2 className="font-black uppercase tracking-widest flex items-center gap-2"><ShoppingCart/> Pesanan Masuk</h2>
+              <button onClick={() => setIsDrawerOpen(false)}><X/></button>
+            </div>
+            <div className="p-4 overflow-y-auto h-full pb-20 space-y-4">
+              {recentOrders.length === 0 ? <p className="text-center text-gray-400 mt-20 font-bold uppercase text-[10px]">Kosong</p> : recentOrders.map(o => (
+                <div key={o.id} className="bg-gray-50 border rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-black text-xs uppercase">{o.customerName || 'Customer'}</p>
+                      <p className="text-[10px] font-bold text-gray-400">{o.customerPhone}</p>
                     </div>
-                  ))}
+                    <span className="bg-red-100 text-red-600 text-[8px] font-black px-2 py-1 rounded uppercase">Masuk</span>
+                  </div>
+                  <div className="space-y-1">
+                    {o.items?.map((i:any, idx:number) => <p key={idx} className="text-[10px] font-bold text-gray-500">• {i.name} ({i.quantity}x)</p>)}
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <p className="font-black text-blue-600 text-sm">Rp{(o.total || 0).toLocaleString()}</p>
+                    <div className="flex gap-2">
+                      <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16}/></a>
+                      <button onClick={async () => {
+                        await updateDoc(doc(db, 'orders', o.id), { status: 'DIPROSES' });
+                        alert('Order Diproses');
+                      }} className="bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase">Proses</button>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </div>

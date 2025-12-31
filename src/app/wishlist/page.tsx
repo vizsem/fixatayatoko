@@ -1,13 +1,11 @@
-// src/app/wishlist/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, Store, Package, ArrowLeft, Trash2 } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2, Sparkles } from 'lucide-react';
+import { collection, getDocs, query, where, documentId, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// Tipe produk lokal
 type Product = {
   id: string;
   name: string;
@@ -19,151 +17,181 @@ type Product = {
 
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchWishlistProducts = async () => {
+    const fetchData = async () => {
       try {
-        // Ambil wishlist dari localStorage
-        const wishlist = localStorage.getItem('atayatoko-wishlist');
-        const wishlistIds = wishlist ? JSON.parse(wishlist) : [];
+        const localWishlist = localStorage.getItem('atayatoko-wishlist');
+        const wishlistIds = localWishlist ? JSON.parse(localWishlist) : [];
         
-        if (wishlistIds.length === 0) {
-          setWishlistProducts([]);
-          setLoading(false);
-          return;
+        // 1. Ambil Produk Wishlist
+        if (wishlistIds.length > 0) {
+          const qWishlist = query(
+            collection(db, 'products'), 
+            where(documentId(), 'in', wishlistIds.slice(0, 30)) 
+          );
+          const wishlistSnap = await getDocs(qWishlist);
+          const products = wishlistSnap.docs.map(doc => {
+            const data = doc.data();
+            return { 
+              id: doc.id, 
+              name: data.name || 'Produk Tanpa Nama',
+              price: Number(data.price) || 0,
+              image: data.image && data.image !== "" ? data.image : "/logo-atayatoko.png",
+              category: data.category || 'Ecer/Grosir',
+              unit: data.unit || 'pcs'
+            } as Product;
+          });
+          setWishlistProducts(products);
         }
 
-        // Ambil produk dari Firestore berdasarkan ID di wishlist
-        const productsSnapshot = await getDocs(collection(db, 'products'));
-        const wishlistProducts = productsSnapshot.docs
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          .filter((product: any) => wishlistIds.includes(product.id))
-          .map((product: any) => ({
-            id: product.id,
-            name: product.name || 'Produk Tanpa Nama',
-            price: product.price || 0,
-            image: product.image || '/logo-atayatoko.png',
-            category: product.category || 'Lainnya',
-            unit: product.unit || 'pcs'
-          })) as Product[];
-
-        setWishlistProducts(wishlistProducts);
+        // 2. Ambil Rekomendasi Produk
+        const qRec = query(collection(db, 'products'), limit(20)); 
+        const recSnap = await getDocs(qRec);
+        const allRecs = recSnap.docs
+          .map(doc => {
+            const data = doc.data();
+            return { 
+              id: doc.id, 
+              name: data.name || 'Produk Tanpa Nama',
+              price: Number(data.price) || 0,
+              image: data.image && data.image !== "" ? data.image : "/logo-atayatoko.png",
+              category: data.category || 'Ecer/Grosir',
+              unit: data.unit || 'pcs'
+            } as Product;
+          })
+          .filter(p => !wishlistIds.includes(p.id)) 
+          .slice(0, 10); 
+        
+        setRecommendedProducts(allRecs);
       } catch (error) {
-        console.error('Gagal memuat wishlist:', error);
-        setWishlistProducts([]);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchWishlistProducts();
+    fetchData();
   }, []);
 
-  const handleRemove = (id: string) => {
-    // Hapus dari localStorage
-    const wishlist = localStorage.getItem('atayatoko-wishlist');
-    if (wishlist) {
-      const wishlistIds = JSON.parse(wishlist);
-      const updatedWishlist = wishlistIds.filter((productId: string) => productId !== id);
-      localStorage.setItem('atayatoko-wishlist', JSON.stringify(updatedWishlist));
+  const handleAddToCart = (product: Product) => {
+    const cart = localStorage.getItem('atayatoko-cart');
+    const cartItems = cart ? JSON.parse(cart) : [];
+    const existingItem = cartItems.find((item: any) => item.id === product.id);
+    
+    if (existingItem) {
+      existingItem.quantity += 1;
+    } else {
+      cartItems.push({ ...product, quantity: 1 });
     }
     
-    // Hapus dari state
-    setWishlistProducts(prev => prev.filter(p => p.id !== id));
+    localStorage.setItem('atayatoko-cart', JSON.stringify(cartItems));
+    window.dispatchEvent(new Event('cart-updated'));
+    alert(`Berhasil ditambah ke keranjang!`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat wishlist...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleRemove = (id: string) => {
+    const wishlist = JSON.parse(localStorage.getItem('atayatoko-wishlist') || '[]');
+    const updated = wishlist.filter((pid: string) => pid !== id);
+    localStorage.setItem('atayatoko-wishlist', JSON.stringify(updated));
+    setWishlistProducts(prev => prev.filter(p => p.id !== id));
+    window.dispatchEvent(new Event('wishlist-updated'));
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <Loader2 className="animate-spin text-green-600 mb-2" size={32} />
+      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Menyiapkan Favorit Anda...</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-2">
-            <Link href="/" className="text-gray-600 hover:text-green-600">
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="bg-gray-100 p-2 rounded-full hover:bg-green-100 text-gray-600 transition-colors">
               <ArrowLeft size={20} />
             </Link>
-            {/* ✅ GUNAKAN LOGO BARU */}
-            <img 
-              src="/logo-atayatoko.png" 
-              alt="ATAYATOKO" 
-              className="h-7 w-auto"
-            />
-            <div>
-              <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
-              <p className="text-xs text-gray-600">Ecer & Grosir</p>
-            </div>
+            <h1 className="text-sm font-black text-gray-800 uppercase tracking-tighter">Wishlist Saya</h1>
           </div>
+          <img src="/logo-atayatoko.png" alt="Logo" className="h-6 w-auto" />
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Daftar Wishlist</h1>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <section className="mb-12">
+          {wishlistProducts.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-gray-200">
+              <Heart size={40} className="mx-auto text-gray-200 mb-3" />
+              <p className="text-xs font-black text-gray-400 uppercase">Belum Ada Favorit</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {wishlistProducts.map(product => (
+                <ProductCard key={product.id} product={product} onRemove={() => handleRemove(product.id)} onAdd={() => handleAddToCart(product)} isWishlist />
+              ))}
+            </div>
+          )}
+        </section>
 
-        {wishlistProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <Heart size={64} className="mx-auto text-gray-400 mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Wishlist Kosong</h2>
-            <p className="text-gray-600 mb-6">Belum ada produk yang Anda sukai.</p>
-            <Link
-              href="/"
-              className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
-            >
-              Jelajahi Produk
-            </Link>
+        <section>
+          <div className="flex items-center gap-2 mb-6">
+            <div className="bg-yellow-100 p-2 rounded-xl text-yellow-600">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-gray-800 uppercase tracking-tight">Rekomendasi Untukmu</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase">Mungkin Anda juga butuh ini</p>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {wishlistProducts.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="relative">
-                  <Link href={`/produk/${product.id}`}>
-                    <img 
-                      src={product.image} 
-                      alt={product.name} 
-                      className="w-full h-48 object-cover"
-                    />
-                  </Link>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleRemove(product.id);
-                    }}
-                    className="absolute top-2 right-2 bg-white p-1.5 rounded-full shadow-md hover:bg-red-50"
-                    title="Hapus dari wishlist"
-                  >
-                    <Trash2 size={14} className="text-red-500" />
-                  </button>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{product.unit} • {product.category}</p>
-                  <p className="text-green-600 font-bold text-lg">
-                    Rp{product.price.toLocaleString('id-ID')}
-                  </p>
-                  <Link
-                    href={`/produk/${product.id}`}
-                    className="mt-2 inline-block text-xs text-green-600 hover:text-green-800"
-                  >
-                    Lihat Detail →
-                  </Link>
-                </div>
-              </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {recommendedProducts.map(product => (
+              <ProductCard key={product.id} product={product} onAdd={() => handleAddToCart(product)} />
             ))}
           </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function ProductCard({ product, onRemove, onAdd, isWishlist }: any) {
+  // Validasi Gambar: Jika kosong atau null, gunakan logo default
+  const imgFallback = product.image && product.image !== "" ? product.image : "/logo-atayatoko.png";
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+      <div className="relative">
+        <Link href={`/produk/${product.id}`}>
+          <img 
+            src={imgFallback} 
+            alt={product.name || 'Produk'} 
+            className="w-full aspect-square object-cover" 
+          />
+        </Link>
+        {isWishlist && (
+          <button onClick={onRemove} className="absolute top-2 right-2 bg-white/90 p-2 rounded-xl text-red-500 shadow-sm transition-colors hover:bg-red-500 hover:text-white">
+            <Trash2 size={14} />
+          </button>
         )}
+      </div>
+      <div className="p-3 flex-1 flex flex-col">
+        <h3 className="text-[11px] font-black text-gray-800 uppercase leading-tight line-clamp-2 mb-1">
+          {product.name || 'Produk Tanpa Nama'}
+        </h3>
+        <p className="text-green-600 font-black text-sm mb-3">
+          Rp{(Number(product.price) || 0).toLocaleString('id-ID')}
+        </p>
+        <button 
+          onClick={() => onAdd(product)} 
+          className="mt-auto w-full bg-gray-50 hover:bg-green-600 hover:text-white text-green-600 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1 border border-transparent hover:border-green-600"
+        >
+          <ShoppingCart size={12} /> + Keranjang
+        </button>
       </div>
     </div>
   );

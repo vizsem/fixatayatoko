@@ -1,900 +1,344 @@
-// src/app/cart/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, Trash2, Package, Truck, Store, MapPin, CreditCard, Upload, CheckCircle, User } from 'lucide-react';
-import Link from 'next/link';
-import { 
-  addDoc, 
-  collection, 
-  serverTimestamp,
-  doc,
-  updateDoc,
-  arrayUnion,
-  getDoc
-} from 'firebase/firestore';
+import { ShoppingCart, Trash2, Package, Truck, Store, MapPin, CreditCard, Upload, User, Printer, Send, Bike, Box, Info, AlertCircle, CheckCircle2, ChevronLeft, X, Plus, Minus, Clock } from 'lucide-react';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth } from '@/lib/firebase';
 import { db, storage } from '@/lib/firebase';
+import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 
-type Address = {
-  id: string;
-  label: string;
-  address: string;
-  lat: number;
-  lng: number;
-};
+const TOKO_LAT = -7.8014;
+const TOKO_LNG = 111.8139;
 
-type CartItem = {
-  id: number;
-  name: string;
-  price: number;
-  originalPrice: number;
-  image: string;
-  category: string;
-  unit: string;
-  quantity: number;
-  discount: number;
+const generateOrderId = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 5; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ATY-${result}`;
 };
 
 export default function CartPage() {
   const router = useRouter();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<any[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [deliveryLocation, setDeliveryLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
+  const [courierType, setCourierType] = useState<'toko' | 'ojol' | 'ekspedisi'>('toko');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
-  const [note, setNote] = useState('');
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
-  const [proofUrl, setProofUrl] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [distance, setDistance] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
+  const markerRef = useRef<any>(null);
 
-  // Load cart from localStorage
   useEffect(() => {
-    const savedCart = localStorage.getItem('atayatoko-cart');
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error('Gagal memuat keranjang:', e);
-        setCart([]);
-      }
-    }
-    const savedName = localStorage.getItem('atayatoko-customer-name');
-    const savedPhone = localStorage.getItem('atayatoko-customer-phone');
-    if (savedName) setCustomerName(savedName);
-    if (savedPhone) setCustomerPhone(savedPhone);
+    const saved = localStorage.getItem('atayatoko-cart');
+    if (saved) setCart(JSON.parse(saved));
+    setCustomerName(localStorage.getItem('atayatoko-customer-name') || '');
+    setCustomerPhone(localStorage.getItem('atayatoko-customer-phone') || '');
+    setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('atayatoko-cart', JSON.stringify(cart));
-    }
-  }, [cart]);
-
-  // Load user profile & saved addresses
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (auth.currentUser?.uid) {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          setProfile(userData);
-          setSavedAddresses(userData.addresses || []);
-          
-          if (userData.addresses?.length === 1) {
-            const addr = userData.addresses[0];
-            setSelectedAddressId(addr.id);
-            setCustomerName(userData.name || '');
-            setCustomerPhone(userData.whatsapp || userData.phone || '');
-            setCustomerAddress(addr.address);
-            setDeliveryLocation({ lat: addr.lat, lng: addr.lng });
-          }
-        }
-      }
-    };
-    fetchUserData();
-  }, []);
-
-  // Handle payment proof preview
-  useEffect(() => {
-    if (paymentProof) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProofPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(paymentProof);
-    } else {
-      setProofPreview(null);
-    }
+    if (!paymentProof) { setProofPreview(null); return; }
+    const url = URL.createObjectURL(paymentProof);
+    setProofPreview(url);
+    return () => URL.revokeObjectURL(url);
   }, [paymentProof]);
 
-  // Load Google Maps API
-  useEffect(() => {
-    if (typeof window !== 'undefined' && deliveryMethod === 'delivery' && !mapLoaded) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDV5Oz_zphv8UatLlZssdLkrbHSIZ8fOZI`;
-      script.async = true;
-      script.onload = () => setMapLoaded(true);
-      document.head.appendChild(script);
-      
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
-    }
-  }, [deliveryMethod, mapLoaded]);
-
-  // Initialize map
-  useEffect(() => {
-    if (mapLoaded && mapRef.current && deliveryMethod === 'delivery') {
-      const defaultCenter = { lat: -7.8014, lng: 111.8139 };
-      const map = new (window as any).google.maps.Map(mapRef.current, {
-        zoom: 13,
-        center: deliveryLocation || defaultCenter,
-        mapTypeId: (window as any).google.maps.MapTypeId.ROADMAP
-      });
-
-      map.addListener('click', (mapsMouseEvent: any) => {
-        const lat = mapsMouseEvent.latLng.lat();
-        const lng = mapsMouseEvent.latLng.lng();
-        setDeliveryLocation({ lat, lng });
-      });
-
-      if (deliveryLocation) {
-        new (window as any).google.maps.Marker({
-          position: { lat: deliveryLocation.lat, lng: deliveryLocation.lng },
-          map: map,
-          title: 'Lokasi Pengiriman'
-        });
-      }
-    }
-  }, [mapLoaded, deliveryMethod, deliveryLocation]);
-
-  const updateQuantity = (id: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) => {
-          if (item.id === id) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : item;
-          }
-          return item;
-        })
-        .filter((item) => item.quantity > 0)
-    );
-  };
-
-  const removeItem = (id: number) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const getTotalPrice = () => {
-    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
-  };
-
-  const getTotalItems = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const subtotal = getTotalPrice();
-  const shipping = deliveryMethod === 'pickup' || subtotal > 100000 ? 0 : 15000;
-  const total = subtotal + shipping;
-
-  const buildWhatsAppMessage = () => {
-    let message = `Halo ATAYATOKO,\n\nSaya ${customerName || 'pelanggan'} ingin memesan:\n\n`;
-    cart.forEach((item) => {
-      message += `• ${item.name}\n`;
-      message += `  ${item.quantity} x Rp${(item.price * item.quantity).toLocaleString('id-ID')}\n\n`;
-    });
-    message += `TOTAL: Rp${total.toLocaleString('id-ID')}\n\n`;
-    message += `Metode Pengiriman: ${deliveryMethod === 'pickup' ? 'Ambil di Toko' : 'Antar ke Alamat'}\n`;
-    message += `Metode Pembayaran: ${
-      paymentMethod === 'cash' ? 'Tunai' : paymentMethod === 'transfer' ? 'Transfer Bank' : 'QRIS'
-    }\n`;
-    if (deliveryMethod === 'delivery' && customerAddress) {
-      message += `\nAlamat: ${customerAddress}\n`;
-    }
-    if (note) message += `\nCatatan: ${note}\n`;
-    if (proofUrl) message += `\nBukti pembayaran telah diupload.\n`;
-    message += `\nTerima kasih!`;
-    return encodeURIComponent(message);
-  };
-
-  const validate = () => {
-    if ((paymentMethod === 'transfer' || paymentMethod === 'qris') && !auth.currentUser) {
-      alert('Silakan login dulu untuk menggunakan metode pembayaran ini');
-      router.push('/profil/login');
-      return false;
-    }
-    
-    const newErrors: Record<string, string> = {};
-    if (!customerName.trim()) newErrors.name = 'Nama wajib diisi';
-    if (!customerPhone.trim()) newErrors.phone = 'Nomor WhatsApp wajib diisi';
-    if (deliveryMethod === 'delivery') {
-      if (!customerAddress.trim()) newErrors.address = 'Alamat pengiriman wajib diisi';
-      if (!deliveryLocation) newErrors.location = 'Lokasi pengiriman wajib dipilih di peta';
-    }
-    if ((paymentMethod === 'transfer' || paymentMethod === 'qris') && !paymentProof) {
-      newErrors.paymentProof = 'Bukti pembayaran wajib diupload';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const compressImage = (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 600;
-          let width = img.width;
-          let height = img.height;
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          ctx?.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => resolve(blob as Blob), 'image/jpeg', 0.7);
-        };
-      };
-    });
-  };
-
-  const uploadPaymentProof = async () => {
-    if (!auth.currentUser) {
-      alert('Silakan login dulu untuk upload bukti pembayaran');
-      router.push('/profil/login');
-      return null;
-    }
-    if (!paymentProof) return null;
-    
-    setUploading(true);
-    try {
-      const compressedBlob = await compressImage(paymentProof);
-      const storageRef = ref(storage, `payment-proofs/${Date.now()}_${paymentProof.name}`);
-      const snapshot = await uploadBytes(storageRef, compressedBlob);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
-    } catch (error) {
-      console.error('Gagal upload bukti pembayaran:', error);
-      alert('Gagal mengupload bukti pembayaran. Silakan coba lagi.');
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const saveOrderToFirestore = async () => {
-    if (!validate()) return false;
-    
-    setIsSubmitting(true);
-    try {
-      let paymentProofUrl = null;
-      if (paymentProof) {
-        paymentProofUrl = await uploadPaymentProof();
-        if (!paymentProofUrl) return false;
-      }
-
-      const backendDeliveryMethod = deliveryMethod === 'pickup' ? 'Ambil di Toko' : 'Kurir Toko';
-      const backendPaymentMethod = 
-        paymentMethod === 'cash' ? 'CASH' :
-        paymentMethod === 'transfer' ? 'TRANSFER' : 'QRIS';
-
-      const orderData = {
-        customerId: auth.currentUser?.uid || null,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        deliveryAddress: customerAddress.trim(),
-        deliveryLocation: deliveryLocation,
-        deliveryMethod: backendDeliveryMethod,
-        paymentMethod: backendPaymentMethod,
-        paymentProofUrl: paymentProofUrl,
-        note: note.trim(),
-        items: cart,
-        subtotal,
-        shipping,
-        total,
-        status: paymentMethod === 'cash' ? 'MENUNGGU' : 'MENUNGGU',
-        createdAt: serverTimestamp()
-      };
-
-      const docRef = await addDoc(collection(db, 'orders'), orderData);
-      
-      if (auth.currentUser?.uid) {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        await updateDoc(userRef, {
-          orders: arrayUnion(docRef.id)
-        });
-      }
-
-      localStorage.removeItem('atayatoko-cart');
-      localStorage.removeItem('atayatoko-customer-name');
-      localStorage.removeItem('atayatoko-customer-phone');
-      
-      return true;
-    } catch (error) {
-      console.error('Gagal menyimpan pesanan:', error);
-      alert('Gagal mengirim pesanan. Silakan coba lagi.');
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleWhatsAppAndSave = async () => {
-    if (!validate()) return;
-    const success = await saveOrderToFirestore();
-    if (!success) return;
-    const whatsappUrl = `https://wa.me/6285853161174?text=${buildWhatsAppMessage()}`;
-    window.open(whatsappUrl, '_blank');
-    setTimeout(() => router.push('/'), 1000);
-  };
-
-  // ✅ FUNGSI SIMPAN PDF
-  const handleDownloadPDF = async () => {
-    if (!validate()) return;
-    
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const receiptContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Struk ATAYATOKO</title>
-        <style>
-          body { 
-            font-family: 'Courier New', monospace; 
-            width: 80mm; 
-            margin: 0; 
-            padding: 5mm;
-            font-size: 12px;
-          }
-          .center { text-align: center; }
-          .item { display: flex; justify-content: space-between; margin: 2px 0; }
-          .bold { font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="center">
-          <div class="bold">ATAYATOKO</div>
-          <div class="text-xs">Ecer & Grosir</div>
-          <div class="text-xs mt-1">${new Date().toLocaleString('id-ID')}</div>
-          <hr style="margin: 4px 0; border: 0; border-top: 1px dashed #000;">
-        </div>
-        
-        ${cart.map(item => `
-          <div class="item">
-            <span>${item.name}</span>
-            <span>${item.quantity} x Rp${(item.price * item.quantity).toLocaleString('id-ID')}</span>
-          </div>
-        `).join('')}
-        
-        <hr style="margin: 4px 0; border: 0; border-top: 1px dashed #000;">
-        <div class="item bold">
-          <span>TOTAL</span>
-          <span>Rp${total.toLocaleString('id-ID')}</span>
-        </div>
-        <div class="center mt-4 text-xs">
-          Terima kasih!<br>
-          Lengkap • Hemat • Terpercaya
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(receiptContent);
-    printWindow.document.close();
-    
-    // Simpan sebagai PDF
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
-  };
-
-  const handleSelectAddress = (addr: Address) => {
-    setSelectedAddressId(addr.id);
-    setCustomerName(profile?.name || '');
-    setCustomerPhone(profile?.whatsapp || profile?.phone || '');
-    setCustomerAddress(addr.address);
-    setDeliveryLocation({ lat: addr.lat, lng: addr.lng });
-  };
-
-  const handleSaveNewAddress = async () => {
-    if (!auth.currentUser?.uid || !customerAddress.trim() || !deliveryLocation) {
-      return;
-    }
-
-    const autoLabel = customerAddress.split(',')[0] || `Alamat ${savedAddresses.length + 1}`;
-    const newAddress: Address = {
-      id: `addr-${Date.now()}`,
-      label: autoLabel,
-      address: customerAddress.trim(),
-      lat: deliveryLocation.lat,
-      lng: deliveryLocation.lng
+  // --- TAMBAHAN: LOGIKA KOMPRESI ---
+  const compressImage = async (file: File) => {
+    const options = {
+      maxSizeMB: 0.2, // Maks 200KB
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+      fileType: 'image/jpeg'
     };
+    try {
+      return await imageCompression(file, options);
+    } catch (error) {
+      console.error("Compression error:", error);
+      return file; // Kirim file asli jika kompresi gagal
+    }
+  };
 
-    const userRef = doc(db, 'users', auth.currentUser.uid);
-    await updateDoc(userRef, {
-      addresses: arrayUnion(newAddress)
-    });
+  const updateQty = (index: number, delta: number) => {
+    const newCart = [...cart];
+    const newQty = newCart[index].quantity + delta;
+    if (newQty > 0) {
+      newCart[index].quantity = newQty;
+      setCart(newCart);
+      localStorage.setItem('atayatoko-cart', JSON.stringify(newCart));
+    } else if (confirm("Hapus produk?")) {
+      newCart.splice(index, 1);
+      setCart(newCart);
+      localStorage.setItem('atayatoko-cart', JSON.stringify(newCart));
+    }
+  };
 
-    setSavedAddresses(prev => [...prev, newAddress]);
-    setSelectedAddressId(newAddress.id);
+  const getItemPrice = (item: any) => {
+    if (item.priceGrosir && item.quantity >= (item.minGrosir || 10)) return item.priceGrosir;
+    return item.price;
+  };
+
+  const subtotal = cart.reduce((t, i) => t + (getItemPrice(i) * i.quantity), 0);
+  const isGrosirTotal = subtotal >= 500000;
+
+  const getOperationalStatus = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    const isOpen = hour >= 7 && hour < 21;
+    const isDeliveryTime = hour >= 8 && hour < 16;
+
+    if (!isOpen) return { ok: false, msg: "Toko Tutup (Buka 07:00 - 21:00)", type: 'closed' };
+    if (deliveryMethod === 'delivery' && !isDeliveryTime) {
+      return { ok: true, msg: "Order diterima, dikirim besok pagi (Jadwal: 08:00 - 16:00)", type: 'delay' };
+    }
+    return { ok: true, msg: "Toko Buka & Siap Kirim", type: 'open' };
+  };
+  const opStatus = getOperationalStatus();
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
   };
 
   useEffect(() => {
-    if (customerName) localStorage.setItem('atayatoko-customer-name', customerName);
-    if (customerPhone) localStorage.setItem('atayatoko-customer-phone', customerPhone);
-  }, [customerName, customerPhone]);
+    if (deliveryMethod === 'delivery' && courierType === 'toko' && isLoaded) {
+      const initMap = () => {
+        const win = window as any;
+        const googleObj = win.google;
+        if (!googleObj || !mapRef.current) return;
+        const map = new googleObj.maps.Map(mapRef.current, {
+          center: { lat: TOKO_LAT, lng: TOKO_LNG },
+          zoom: 15,
+          disableDefaultUI: true,
+          zoomControl: true,
+        });
+        markerRef.current = new googleObj.maps.Marker({
+          position: { lat: TOKO_LAT, lng: TOKO_LNG },
+          map,
+          draggable: true
+        });
+        markerRef.current.addListener('dragend', () => {
+          const pos = markerRef.current.getPosition();
+          const dist = calculateDistance(TOKO_LAT, TOKO_LNG, pos.lat(), pos.lng());
+          setDistance(dist);
+        });
+      };
+      if (!(window as any).google) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDV5Oz_zphv8UatLlZssdLkrbHSIZ8fOZI`;
+        script.async = true;
+        script.onload = initMap;
+        document.head.appendChild(script);
+      } else {
+        initMap();
+      }
+    }
+  }, [deliveryMethod, courierType, isLoaded]);
 
-  if (cart.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center py-12">
-            <ShoppingCart size={64} className="mx-auto text-gray-400 mb-6" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Keranjang Belanja Kosong</h1>
-            <p className="text-gray-600 mb-8">Belum ada produk di keranjang Anda.</p>
-            <Link
-              href="/"
-              className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
-            >
-              Lanjut Belanja
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+  const getStatus = () => {
+  // 1. Jam operasional HANYA pesan, tidak memblokir tombol (Hapus pengecekan opStatus.ok di sini)
+  
+  if (deliveryMethod === 'pickup') return { ok: true, msg: "Ambil di Toko Ataya" };
+  
+  if (deliveryMethod === 'delivery' && courierType === 'toko') {
+    // Cek Jarak hanya jika menggunakan Kurir Toko
+    if (distance !== null) {
+       if (isGrosirTotal && distance > 10) return { ok: false, msg: "Jarak Grosir Maks 10km" };
+       if (!isGrosirTotal && distance > 3) return { ok: false, msg: "Jarak Ecer Maks 3km" };
+    }
+    // Cek Minimal Belanja hanya jika menggunakan Kurir Toko
+    if (!isGrosirTotal && subtotal < 100000) return { ok: false, msg: "Min. Belanja Kurir Toko 100rb" };
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ✅ HEADER HANYA ICON */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Store className="text-green-600" size={28} />
-              {auth.currentUser ? (
-                <Link href="/profil" className="text-gray-600 hover:text-green-600">
-                  <User size={24} />
-                </Link>
-              ) : (
-                <Link href="/profil/login" className="text-gray-600 hover:text-green-600">
-                  <User size={24} />
-                </Link>
-              )}
-            </div>
+  // Jika semua pengecekan di atas lewat, maka tombol AKTIF
+  return { ok: true, msg: "Data Lengkap, Siap Dipesan" };
+};
 
-            <Link href="/" className="text-green-600 hover:text-green-700 text-sm">
-              ← Kembali
-            </Link>
-          </div>
-        </div>
+  const validation = getStatus();
+
+  // --- HANDLE CHECKOUT (DIUBAH UNTUK KOMPRESI) ---
+  const handleCheckout = async () => {
+    if (!customerName || !customerPhone) return alert("Isi Nama & No WA");
+    if (paymentMethod !== 'cash' && !paymentProof) return alert("Mohon upload bukti pembayaran!");
+    
+    setIsSubmitting(true);
+    const orderId = generateOrderId();
+
+    try {
+      let proofUrl = "";
+      if (paymentProof) {
+        // PROSES KOMPRESI SEBELUM UPLOAD
+        const compressedFile = await compressImage(paymentProof);
+        
+        const sRef = ref(storage, `payments/${orderId}`);
+        const snap = await uploadBytes(sRef, compressedFile); // Upload file terkompres
+        proofUrl = await getDownloadURL(snap.ref);
+      }
+
+      const orderData = {
+        orderId, name: customerName, phone: customerPhone, items: cart, total: subtotal,
+        delivery: { method: deliveryMethod, type: courierType, address: customerAddress, distance: distance?.toFixed(2) || "N/A" },
+        payment: { method: paymentMethod, proof: proofUrl },
+        status: 'PENDING', createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'orders'), orderData);
+
+      let itemNote = cart.map((i, idx) => `  ${idx + 1}. ${i.name} (${i.quantity}x) = Rp${(getItemPrice(i) * i.quantity).toLocaleString()}`).join('\n');
+      const waMsg = `*PESANAN BARU - ${orderId}*\n------------------\n*Nama:* ${customerName}\n*WA:* ${customerPhone}\n*Metode:* ${deliveryMethod} (${courierType})\n*Bayar:* ${paymentMethod.toUpperCase()}\n------------------\n*PRODUK:*\n${itemNote}\n------------------\n*TOTAL: Rp${subtotal.toLocaleString()}*\n------------------\n*Alamat:* ${customerAddress || '-'}\n*Status:* ${opStatus.msg}`;
+
+      window.open(`https://wa.me/6285853161174?text=${encodeURIComponent(waMsg)}`, '_blank');
+      localStorage.removeItem('atayatoko-cart');
+      router.push(`/success?id=${orderId}`);
+    } catch (e) { 
+      console.error(e);
+      alert("Terjadi kesalahan saat upload/simpan data."); 
+    } finally { setIsSubmitting(false); }
+  };
+
+  if (!isLoaded) return null;
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-black font-sans pb-20">
+      <header className="bg-white p-4 shadow-sm flex items-center gap-4 sticky top-0 z-50">
+        <button onClick={() => router.back()}><ChevronLeft /></button>
+        <h1 className="font-bold text-green-600">Checkout</h1>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Keranjang Belanja</h1>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center p-4 border-b last:border-b-0">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-20 h-20 object-cover rounded-md"
-                  />
-                  <div className="ml-4 flex-1">
-                    <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                    <p className="text-sm text-gray-600">{item.unit} • {item.category}</p>
-                    <div className="flex items-center mt-2">
-                      <span className="text-lg font-bold text-gray-900">
-                        Rp{item.price.toLocaleString('id-ID')}
-                      </span>
-                      {item.originalPrice > item.price && (
-                        <span className="text-sm text-gray-500 line-through ml-2">
-                          Rp{item.originalPrice.toLocaleString('id-ID')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => updateQuantity(item.id, -1)}
-                      className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
-                    >
-                      −
-                    </button>
-                    <span className="w-8 text-center font-medium text-black">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, 1)}
-                      className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="ml-4 p-1.5 text-gray-500 hover:text-red-500"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+      <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          
+          <div className={`p-4 rounded-2xl flex items-center gap-3 border ${opStatus.ok ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+            <Clock size={20}/>
+            <div className="text-xs">
+                <p className="font-bold uppercase tracking-tight">Informasi Operasional</p>
+                <p className="opacity-80">{opStatus.msg}</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 h-fit space-y-6">
-            <h2 className="text-xl font-bold text-gray-900">Detail Pemesanan</h2>
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="font-bold mb-4 flex items-center gap-2 text-xs tracking-widest uppercase text-gray-400"><Package size={18} className="text-green-600"/> Item Pesanan</h2>
+            <div className="space-y-4">
+                {cart.map((item, idx) => {
+                    const isGrosir = item.priceGrosir && item.quantity >= (item.minGrosir || 10);
+                    const price = isGrosir ? item.priceGrosir : item.price;
+                    return (
+                        <div key={idx} className="flex gap-4 py-3 border-b border-gray-50 last:border-0 items-center">
+                            <img src={item.image} className="w-14 h-14 rounded-lg object-cover bg-gray-100" />
+                            <div className="flex-1">
+                                <h3 className="text-sm font-bold">{item.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    <p className={`font-bold text-xs ${isGrosir ? 'text-blue-600' : 'text-green-600'}`}>Rp{price.toLocaleString()}</p>
+                                    {isGrosir && <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black">GROSIR</span>}
+                                </div>
+                            </div>
+                            <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-2">
+                                <button onClick={()=>updateQty(idx, -1)} className="bg-white p-1 rounded shadow-sm text-red-500 hover:bg-gray-50"><Minus size={14}/></button>
+                                <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
+                                <button onClick={()=>updateQty(idx, 1)} className="bg-green-600 p-1 rounded shadow-sm text-white hover:bg-green-700"><Plus size={14}/></button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+          </div>
 
-            {auth.currentUser && savedAddresses.length > 0 ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pilih Alamat Pengiriman
-                </label>
-                <div className="space-y-3">
-                  {savedAddresses.map((addr) => (
-                    <div 
-                      key={addr.id}
-                      className={`p-3 border rounded-lg cursor-pointer ${
-                        selectedAddressId === addr.id 
-                          ? 'border-green-500 bg-green-50' 
-                          : 'border-gray-300 hover:bg-gray-50'
-                      }`}
-                      onClick={() => handleSelectAddress(addr)}
-                    >
-                      <div className="font-medium">{addr.label}</div>
-                      <div className="text-sm text-gray-600">{addr.address}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {profile?.name || '–'} • {profile?.whatsapp || profile?.phone || '–'}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedAddressId('new');
-                      setCustomerName(profile?.name || '');
-                      setCustomerPhone(profile?.whatsapp || profile?.phone || '');
-                      setCustomerAddress('');
-                      setDeliveryLocation(null);
-                    }}
-                    className="w-full text-left p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
-                  >
-                    + Tambah Alamat Baru
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-black bg-white ${
-                      errors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-green-200'
-                    }`}
-                    placeholder="Contoh: Agus"
-                  />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
-                  <input
-                    type="text"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-black bg-white ${
-                      errors.phone ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-green-200'
-                    }`}
-                    placeholder="Contoh: 081234567890"
-                  />
-                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Metode Pengiriman</label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="delivery"
-                    checked={deliveryMethod === 'pickup'}
-                    onChange={() => setDeliveryMethod('pickup')}
-                    className="mr-2"
-                  />
-                  <MapPin className="text-gray-600 mr-2" size={16} />
-                  <span className="text-gray-900">Ambil di Toko</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="delivery"
-                    checked={deliveryMethod === 'delivery'}
-                    onChange={() => setDeliveryMethod('delivery')}
-                    className="mr-2"
-                  />
-                  <Truck className="text-gray-600 mr-2" size={16} />
-                  <span className="text-gray-900">Antar ke Alamat</span>
-                </label>
-              </div>
+          <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+            <h2 className="font-bold flex items-center gap-2 text-xs tracking-widest uppercase text-gray-400"><Truck size={18} className="text-green-600"/> Pengiriman</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input placeholder="Nama Penerima" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-green-500 transition-all" />
+              <input placeholder="Nomor WhatsApp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-green-500 transition-all" />
             </div>
 
-            {deliveryMethod === 'delivery' && selectedAddressId === 'new' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Alamat Lengkap*</label>
-                  <textarea
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    rows={3}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-black bg-white ${
-                      errors.address ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-green-200'
-                    }`}
-                    placeholder="Jl. Merdeka No. 123, Kediri"
-                  />
-                  {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pilih Lokasi di Peta
-                  </label>
-                  <div className="relative h-64 rounded-lg overflow-hidden border border-gray-300">
-                    {mapLoaded ? (
-                      <div ref={mapRef} className="w-full h-full" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                        <div className="text-gray-500">Memuat peta...</div>
-                      </div>
-                    )}
-                  </div>
-                  {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
-                </div>
-
-                {auth.currentUser && (
-                  <button
-                    onClick={handleSaveNewAddress}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm"
-                  >
-                    Simpan Alamat Ini
-                  </button>
-                )}
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Metode Pembayaran</label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === 'cash'}
-                    onChange={() => setPaymentMethod('cash')}
-                    className="mr-2"
-                  />
-                  <CreditCard className="text-gray-600 mr-2" size={16} />
-                  <span className="text-gray-900">Tunai (Cash)</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === 'transfer'}
-                    onChange={() => setPaymentMethod('transfer')}
-                    className="mr-2"
-                  />
-                  <span className="text-gray-900">Transfer Bank</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === 'qris'}
-                    onChange={() => setPaymentMethod('qris')}
-                    className="mr-2"
-                  />
-                  <span className="text-gray-900">QRIS (DANA/OVO/LinkAja)</span>
-                </label>
-              </div>
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-lg text-xs font-black transition-all ${deliveryMethod === 'pickup' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>AMBIL SENDIRI</button>
+              <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-lg text-xs font-black transition-all ${deliveryMethod === 'delivery' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>DIANTAR KURIR</button>
             </div>
 
-            {(paymentMethod === 'transfer' || paymentMethod === 'qris') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Upload Bukti Pembayaran
-                </label>
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                  {proofPreview ? (
-                    <img src={proofPreview} alt="Preview" className="w-full h-full object-cover rounded" />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="text-gray-400" size={24} />
-                      <p className="text-sm text-gray-500 mt-2">Klik untuk upload gambar</p>
-                    </div>
-                  )}
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
-                  />
-                </label>
-                {paymentProof && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    File: {paymentProof.name} ({(paymentProof.size / 1024).toFixed(1)} KB)
-                  </p>
-                )}
-                {errors.paymentProof && <p className="text-red-500 text-xs mt-1">{errors.paymentProof}</p>}
-                {uploading && (
-                  <p className="text-sm text-green-600 mt-2 flex items-center">
-                    <CheckCircle size={16} className="mr-1" />
-                    Mengupload...
-                  </p>
-                )}
-                {proofUrl && !uploading && (
-                  <p className="text-sm text-green-600 mt-2 flex items-center">
-                    <CheckCircle size={16} className="mr-1" />
-                    Berhasil diupload!
-                  </p>
+            {deliveryMethod === 'delivery' && (
+              <div className="space-y-4 pt-2 animate-in fade-in duration-300">
+                <div className="grid grid-cols-3 gap-2">
+                    <button onClick={()=>setCourierType('toko')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'toko' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Truck size={20}/><span className="text-[10px] font-bold">Kurir Toko</span></button>
+                    <button onClick={()=>setCourierType('ojol')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ojol' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Bike size={20}/><span className="text-[10px] font-bold">Ojol</span></button>
+                    <button onClick={()=>setCourierType('ekspedisi')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ekspedisi' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Box size={20}/><span className="text-[10px] font-bold">Ekspedisi</span></button>
+                </div>
+                <textarea placeholder="Alamat & Patokan Rumah..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl h-20 text-sm outline-none focus:border-green-500 transition-all" />
+                {courierType === 'toko' && (
+                   <div className="relative border rounded-xl overflow-hidden shadow-inner">
+                      <div ref={mapRef} className="h-40 w-full bg-gray-100" />
+                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[9px] px-2 py-1 rounded-md uppercase font-bold tracking-widest">GESER MARKER JIKA INGIN CEK JARAK</div>
+                   </div>
                 )}
               </div>
             )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Catatan Tambahan (Opsional)</label>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-200 text-black bg-white"
-                placeholder="Contoh: Bel pintu sebelah kiri..."
-              />
+            
+            <div className={`p-3 rounded-xl border text-[10px] font-black uppercase flex items-center gap-2 tracking-wider ${validation.ok ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+              {validation.ok ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} {validation.msg}
             </div>
-
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">Rp{subtotal.toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Ongkos Kirim</span>
-                <span className="font-medium">
-                  {shipping === 0 ? 'Gratis' : `Rp${shipping.toLocaleString('id-ID')}`}
-                </span>
-              </div>
-              <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t">
-                <span>Total</span>
-                <span className="text-green-600">Rp{total.toLocaleString('id-ID')}</span>
-              </div>
-            </div>
-
-            {/* ✅ TOMBOL AKSI: LIHAT / SIMPAN / KIRIM */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => {
-                  // ✅ LIHAT: Preview struk di popup
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                    const receiptContent = `
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Struk ATAYATOKO</title>
-                        <style>
-                          body { 
-                            font-family: 'Courier New', monospace; 
-                            width: 80mm; 
-                            margin: 0; 
-                            padding: 5mm;
-                            font-size: 12px;
-                          }
-                          .center { text-align: center; }
-                          .item { display: flex; justify-content: space-between; margin: 2px 0; }
-                          .bold { font-weight: bold; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="center">
-                          <div class="bold">ATAYATOKO</div>
-                          <div class="text-xs">Ecer & Grosir</div>
-                          <div class="text-xs mt-1">${new Date().toLocaleString('id-ID')}</div>
-                          <hr style="margin: 4px 0; border: 0; border-top: 1px dashed #000;">
-                        </div>
-                        
-                        ${cart.map(item => `
-                          <div class="item">
-                            <span>${item.name}</span>
-                            <span>${item.quantity} x Rp${(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                          </div>
-                        `).join('')}
-                        
-                        <hr style="margin: 4px 0; border: 0; border-top: 1px dashed #000;">
-                        <div class="item bold">
-                          <span>TOTAL</span>
-                          <span>Rp${total.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div class="center mt-4 text-xs">
-                          Terima kasih!<br>
-                          Lengkap • Hemat • Terpercaya
-                        </div>
-                      </body>
-                      </html>
-                    `;
-                    printWindow.document.write(receiptContent);
-                    printWindow.document.close();
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded text-sm"
-              >
-                👁️ Lihat
-              </button>
-
-              <button
-                onClick={handleDownloadPDF}
-                className="bg-gray-800 hover:bg-black text-white py-2.5 rounded text-sm"
-              >
-                💾 Simpan
-              </button>
-
-              <button
-                onClick={handleWhatsAppAndSave}
-                disabled={isSubmitting || uploading}
-                className="bg-green-600 hover:bg-green-700 text-white py-2.5 rounded text-sm disabled:bg-gray-400"
-              >
-                📲 Kirim
-              </button>
-            </div>
-
-            <Link
-              href="/"
-              className="mt-2 w-full block text-center text-green-600 font-medium hover:text-green-700"
-            >
-              ← Lanjut Belanja
-            </Link>
           </div>
         </div>
-      </div>
+
+        <div className="space-y-4">
+          <div className="bg-white rounded-3xl p-6 shadow-xl sticky top-24 border border-gray-50">
+            <h2 className="font-bold flex items-center mb-6 text-gray-700 text-xs tracking-widest uppercase"><CreditCard size={18} className="text-green-600 mr-2"/> Metode Bayar</h2>
+            <div className="space-y-2 mb-6">
+              {['cash', 'transfer', 'qris'].map(m => (
+                <button key={m} onClick={()=>setPaymentMethod(m as any)} className={`w-full p-4 border rounded-2xl text-left transition-all ${paymentMethod === m ? 'border-green-600 bg-green-50 text-green-600 font-bold ring-1 ring-green-600' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
+                  <span className="text-[10px] uppercase tracking-widest">{m === 'cash' ? '💵 Bayar di Tempat' : m === 'transfer' ? '🏦 Transfer Bank' : '📱 QRIS / E-Wallet'}</span>
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod !== 'cash' && (
+              <div className="mb-6 animate-in zoom-in-95 duration-200">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-4 cursor-pointer relative overflow-hidden h-36 hover:border-green-400 transition-all bg-gray-50/50">
+                  {proofPreview ? (
+                    <>
+                      <img src={proofPreview} className="w-full h-full object-contain" />
+                      <div onClick={(e)=>{e.preventDefault(); setPaymentProof(null)}} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"><X size={14}/></div>
+                    </>
+                  ) : (
+                    <><Upload size={24} className="text-gray-300 mb-2"/><span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">KLIK UNTUK UPLOAD BUKTI</span></>
+                  )}
+                  <input type="file" hidden accept="image/*" onChange={e=>setPaymentProof(e.target.files?.[0] || null)} />
+                </label>
+                {/* TAMBAHAN INFO KOMPRESI */}
+                <p className="text-[9px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest">Foto auto-compress ke 200KB</p>
+              </div>
+            )}
+
+            <div className="flex justify-between items-end border-t pt-6">
+              <span className="text-xs font-bold text-gray-400 tracking-tighter uppercase">Total Bayar</span>
+              <span className="text-3xl font-black text-green-600">Rp{subtotal.toLocaleString()}</span>
+            </div>
+
+            <button onClick={handleCheckout} disabled={!validation.ok || isSubmitting} className="w-full bg-green-600 text-white py-5 rounded-2xl font-black mt-8 shadow-lg shadow-green-100 disabled:bg-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+              {isSubmitting ? (
+                 <>
+                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                   <span className="text-xs">MENGOPTIMALKAN GAMBAR...</span>
+                 </>
+              ) : (
+                 <><Send size={18} /><span>KONFIRMASI PESANAN</span></>
+              )}
+            </button>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

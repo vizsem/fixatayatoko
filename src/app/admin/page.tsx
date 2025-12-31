@@ -1,96 +1,47 @@
-// src/app/admin/page.tsx
 'use client';
 
 import { useEffect, useState, useLayoutEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  Settings, 
-  TrendingUp, 
-  AlertTriangle, 
-  Clock, 
-  DollarSign,
-  MessageSquare,
-  Database,
-  FileText,
-  Gift,          
-  Warehouse,     
-  ShieldCheck    
+  Package, ShoppingCart, Users, Settings, TrendingUp, AlertTriangle, 
+  Clock, DollarSign, MessageSquare, Database, FileText, Gift,          
+  Warehouse, ShieldCheck, LogOut, ChevronRight, Menu, X 
 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
-  collection, 
-  doc, 
-  getDoc,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-  where
+  collection, doc, getDoc, getDocs, query, orderBy, limit, where 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
-// Komponen Quick Action
+// Komponen Quick Action dengan styling lebih halus
 const QuickActionCard = ({ 
-  icon: Icon, 
-  title, 
-  description, 
-  href,
-  color = "bg-blue-100 text-blue-600"
-}: {
-  icon: React.ComponentType<{ size?: number }>;
-  title: string;
-  description: string;
-  href: string;
-  color?: string;
-}) => (
-  <Link href={href} className="block">
-    <div className="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
-      <div className={`${color} p-2 rounded-lg w-10 h-10 flex items-center justify-center mb-3`}>
-        <Icon size={20} />
+  icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600"
+}: any) => (
+  <Link href={href} className="group">
+    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-100 transition-all h-full">
+      <div className={`${color} p-3 rounded-xl w-12 h-12 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+        <Icon size={24} />
       </div>
-      <h3 className="font-semibold text-black mb-1">{title}</h3>
-      <p className="text-sm text-black">{description}</p>
+      <h3 className="font-bold text-gray-800 text-sm mb-1 uppercase tracking-tight">{title}</h3>
+      <p className="text-[11px] text-gray-500 leading-tight">{description}</p>
     </div>
   </Link>
 );
 
-const formatTimeAgo = (timestamp: string) => {
-  const now = new Date();
-  const orderTime = new Date(timestamp);
-  const diffMs = now.getTime() - orderTime.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-
-  if (diffMins < 1) return 'Baru saja';
-  if (diffMins < 60) return `${diffMins} menit lalu`;
-  if (diffHours < 24) return `${diffHours} jam lalu`;
-  return `${Math.floor(diffMs / 86400000)} hari lalu`;
-};
-
 export default function AdminDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({
-    dailySales: 0,
-    totalProducts: 0,
-    lowStock: 0,
-    unreadOrders: 0,
-    warehouses: 0,
-    promotions: 0,
-    users: 0
+    dailySales: 0, totalProducts: 0, lowStock: 0, unreadOrders: 0,
+    warehouses: 0, promotions: 0, users: 0
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
-  // ✅ Force light mode
   useLayoutEffect(() => {
-    if (document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.remove('dark');
     document.documentElement.classList.add('light');
   }, []);
 
@@ -100,443 +51,214 @@ export default function AdminDashboard() {
         router.push('/profil/login');
         return;
       }
-
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        alert('Akses ditolak!');
         router.push('/profil');
         return;
       }
-
       await fetchDashboardData();
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [router]);
 
   const fetchDashboardData = async () => {
     try {
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      const totalProducts = productsSnapshot.size;
-      const lowStockSnapshot = await getDocs(query(
-        collection(db, 'products'), 
-        where('stock', '<=', 10)
-      ));
-      const lowStock = lowStockSnapshot.size;
+      const pSnap = await getDocs(collection(db, 'products'));
+      const lowStockCount = pSnap.docs.filter(d => (d.data().stock || 0) <= 10).length;
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const qOrders = query(collection(db, 'orders'), where('createdAt', '>=', today.toISOString()));
+      const oSnap = await getDocs(qOrders);
+      const sales = oSnap.docs.reduce((sum, d) => sum + (Number(d.data().total) || 0), 0);
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const ordersSnapshot = await getDocs(query(
-        collection(db, 'orders'),
-        where('createdAt', '>=', todayStart.toISOString())
-      ));
-      const dailySales = ordersSnapshot.docs.reduce((sum, doc) => sum + doc.data().total, 0);
-
-      const unreadSnapshot = await getDocs(query(
-        collection(db, 'orders'),
-        where('status', '==', 'MENUNGGU'),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      ));
-      const unreadOrders = unreadSnapshot.size;
-
-      const warehousesSnapshot = await getDocs(collection(db, 'warehouses'));
-      const promotionsSnapshot = await getDocs(collection(db, 'promotions'));
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-
-      const recentOrders = unreadSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timeAgo: formatTimeAgo(doc.data().createdAt)
-      }));
+      const qUnread = query(collection(db, 'orders'), where('status', '==', 'MENUNGGU'), limit(5));
+      const unreadSnap = await getDocs(qUnread);
+      
+      const wSnap = await getDocs(collection(db, 'warehouses'));
+      const promSnap = await getDocs(collection(db, 'promotions'));
+      const uSnap = await getDocs(collection(db, 'users'));
 
       setStats({
-        dailySales,
-        totalProducts,
-        lowStock,
-        unreadOrders,
-        warehouses: warehousesSnapshot.size,
-        promotions: promotionsSnapshot.size,
-        users: usersSnapshot.size
+        dailySales: sales,
+        totalProducts: pSnap.size,
+        lowStock: lowStockCount,
+        unreadOrders: unreadSnap.size,
+        warehouses: wSnap.size,
+        promotions: promSnap.size,
+        users: uSnap.size
       });
-      setRecentOrders(recentOrders);
-    } catch (error) {
-      console.error('Error fetching dashboard ', error);
-    }
+      setRecentOrders(unreadSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memverifikasi akses admin...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/profil/login');
+  };
 
-  // ✅ RETURN DENGAN SIDEBAR
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-green-600"></div>
+    </div>
+  );
+
+  const NavItem = ({ href, icon: Icon, label, colorClass }: any) => {
+    const isActive = pathname === href;
+    return (
+      <li>
+        <Link 
+          href={href} 
+          className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+            isActive ? `${colorClass} font-bold shadow-sm` : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Icon size={18} />
+            <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+          </div>
+          {isActive && <ChevronRight size={14} />}
+        </Link>
+      </li>
+    );
+  };
+
   return (
-    <div className="flex">
-      {/* Sidebar Navigasi */}
-      <aside className="w-64 bg-white h-screen fixed left-0 top-0 shadow-lg border-r border-gray-200">
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-bold">AT</span>
-            </div>
+    <div className="min-h-screen bg-[#FBFBFE] flex">
+      {/* Sidebar - Desktop */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-100 transition-transform lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 h-full flex flex-col">
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="w-10 h-10 bg-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-100 text-white font-black">AT</div>
             <div>
-              <h2 className="text-lg font-bold text-green-600">ATAYATOKO2</h2>
-              <p className="text-xs text-gray-500">Admin Dashboard</p>
+              <h2 className="text-lg font-black text-gray-800 leading-none tracking-tighter">ATAYATOKO</h2>
+              <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Admin Central</p>
             </div>
           </div>
-        </div>
 
-        <nav className="mt-6 px-4">
-          <ul className="space-y-1">
-            <li>
-              <Link 
-                href="/admin/products" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-blue-50 rounded"
-              >
-                <Package size={16} />
-                Produk
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/orders" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-purple-50 rounded"
-              >
-                <ShoppingCart size={16} />
-                Pesanan
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/customers" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-orange-50 rounded"
-              >
-                <Users size={16} />
-                Pelanggan
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/inventory" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-emerald-50 rounded"
-              >
-                <Database size={16} />
-                Inventaris
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/promotions" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-pink-50 rounded"
-              >
-                <Gift size={16} />
-                Program Promosi
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/warehouses" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-indigo-50 rounded"
-              >
-                <Warehouse size={16} />
-                Multi-Gudang
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/users" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-amber-50 rounded"
-              >
-                <ShieldCheck size={16} />
-                Manajemen Pengguna
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/settings" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-gray-50 rounded"
-              >
-                <Settings size={16} />
-                Pengaturan
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/admin/reports" 
-                className="flex items-center gap-3 px-3 py-2 text-black hover:bg-blue-50 rounded"
-              >
-                <FileText size={16} />
-                Laporan
-              </Link>
-            </li>
-          </ul>
-        </nav>
+          <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <ul className="space-y-1">
+              <NavItem href="/admin" icon={TrendingUp} label="Dashboard" colorClass="bg-green-50 text-green-700" />
+              <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" />
+              <NavItem href="/admin/orders" icon={ShoppingCart} label="Pesanan" colorClass="bg-purple-50 text-purple-700" />
+              <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" />
+              <NavItem href="/admin/inventory" icon={Database} label="Inventaris" colorClass="bg-emerald-50 text-emerald-700" />
+              <NavItem href="/admin/promotions" icon={Gift} label="Program Promosi" colorClass="bg-pink-50 text-pink-700" />
+              <NavItem href="/admin/warehouses" icon={Warehouse} label="Multi-Gudang" colorClass="bg-indigo-50 text-indigo-700" />
+              <NavItem href="/admin/users" icon={ShieldCheck} label="Pengguna" colorClass="bg-amber-50 text-amber-700" />
+              <NavItem href="/admin/settings" icon={Settings} label="Pengaturan" colorClass="bg-gray-100 text-gray-700" />
+              <NavItem href="/admin/reports" icon={FileText} label="Laporan" colorClass="bg-red-50 text-red-700" />
+            </ul>
+          </nav>
+
+          <button onClick={handleLogout} className="mt-6 flex items-center gap-3 px-4 py-4 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-black text-xs uppercase tracking-widest">
+            <LogOut size={18} /> Keluar Sistem
+          </button>
+        </div>
       </aside>
 
-      {/* Konten Dashboard */}
-      <main className="ml-64 flex-1 bg-gray-50 p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-black">Dashboard Admin</h1>
-          <p className="text-black">Kelola toko, produk, dan pesanan Anda</p>
+      {/* Main Content */}
+      <main className="flex-1 lg:ml-72 min-h-screen p-4 lg:p-10">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex justify-between items-center mb-6">
+          <div className="font-black text-green-600">ATAYATOKO</div>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-white rounded-xl shadow-sm">
+            {isMobileMenuOpen ? <X /> : <Menu />}
+          </button>
+        </div>
+
+        <div className="mb-10">
+          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Dashboard Utama</h1>
+          <p className="text-gray-400 text-sm font-medium">Pantau performa bisnis AtayaToko secara real-time.</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+          <StatBox label="Sales Hari Ini" value={`Rp${stats.dailySales.toLocaleString()}`} icon={DollarSign} color="text-green-600" bg="bg-green-100" />
+          <StatBox label="Pesanan Baru" value={stats.unreadOrders} icon={Clock} color="text-red-600" bg="bg-red-100" />
+          <StatBox label="Stok Rendah" value={stats.lowStock} icon={AlertTriangle} color="text-yellow-600" bg="bg-yellow-100" />
+          <StatBox label="Total Produk" value={stats.totalProducts} icon={Package} color="text-blue-600" bg="bg-blue-100" />
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <QuickActionCard
-            icon={Package}
-            title="Produk"
-            description="Kelola stok & harga"
-            href="/admin/products"
-            color="bg-blue-100 text-blue-600"
-          />
-          <QuickActionCard
-            icon={ShoppingCart}
-            title="Pesanan"
-            description="Kelola pesanan baru"
-            href="/admin/orders"
-            color="bg-purple-100 text-purple-600"
-          />
-          <QuickActionCard
-            icon={Users}
-            title="Pelanggan"
-            description="Data & piutang"
-            href="/admin/customers"
-            color="bg-orange-100 text-orange-600"
-          />
-          <QuickActionCard
-            icon={Database}
-            title="Inventaris"
-            description="Stok & mutasi"
-            href="/admin/inventory"
-            color="bg-emerald-100 text-emerald-600"
-          />
-          <QuickActionCard
-            icon={Gift}
-            title="Program Promosi"
-            description="Buat diskon & kupon"
-            href="/admin/promotions"
-            color="bg-pink-100 text-pink-600"
-          />
-          <QuickActionCard
-            icon={Warehouse}
-            title="Multi-Gudang"
-            description="Kelola stok per gudang"
-            href="/admin/warehouses"
-            color="bg-indigo-100 text-indigo-600"
-          />
-          <QuickActionCard
-            icon={ShieldCheck}
-            title="Manajemen Pengguna"
-            description="Atur role & akses"
-            href="/admin/users"
-            color="bg-amber-100 text-amber-600"
-          />
-          <QuickActionCard
-            icon={Settings}
-            title="Pengaturan"
-            description="Konfigurasi toko"
-            href="/admin/settings"
-            color="bg-gray-100 text-gray-600"
-          />
+        <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Akses Cepat</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <QuickActionCard icon={Package} title="Produk" description="Update stok & harga ecer grosir" href="/admin/products" color="bg-blue-100 text-blue-600" />
+          <QuickActionCard icon={ShoppingCart} title="Pesanan" description="Proses pengiriman & nota" href="/admin/orders" color="bg-purple-100 text-purple-600" />
+          <QuickActionCard icon={Users} title="Pelanggan" description="Cek riwayat & data piutang" href="/admin/customers" color="bg-orange-100 text-orange-600" />
+          <QuickActionCard icon={Warehouse} title="Gudang" description="Mutasi stok antar cabang" href="/admin/warehouses" color="bg-indigo-100 text-indigo-600" />
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-black">Penjualan Hari Ini</p>
-                <p className="text-2xl font-bold mt-1">Rp{stats.dailySales.toLocaleString('id-ID')}</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-full">
-                <DollarSign className="text-green-600" size={24} />
-              </div>
+        {/* Bottom Section */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="xl:col-span-2 bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="font-black text-gray-800 uppercase text-sm tracking-tight">Pesanan Perlu Diproses</h3>
+              <Link href="/admin/orders" className="text-[10px] font-black text-green-600 uppercase hover:underline">Lihat Semua</Link>
             </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-black">Total Produk</p>
-                <p className="text-2xl font-bold mt-1">{stats.totalProducts}</p>
-              </div>
-              <div className="bg-blue-100 p-3 rounded-full">
-                <Package className="text-blue-600" size={24} />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-black">Stok Rendah</p>
-                <p className="text-2xl font-bold mt-1">{stats.lowStock}</p>
-              </div>
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <AlertTriangle className="text-yellow-600" size={24} />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-black">Pesanan Baru</p>
-                <p className="text-2xl font-bold mt-1">{stats.unreadOrders}</p>
-              </div>
-              <div className="bg-red-100 p-3 rounded-full">
-                <Clock className="text-red-600" size={24} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Notifikasi Pesanan Baru */}
-        {stats.unreadOrders > 0 && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <AlertTriangle className="text-red-600 mr-2" size={20} />
-              <span className="font-medium text-red-800">
-                {stats.unreadOrders} pesanan baru menunggu diproses!
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Pesanan Terbaru */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow border border-gray-200">
-            <h2 className="text-lg font-semibold mb-4 text-black">Pesanan Terbaru</h2>
-            {recentOrders.length === 0 ? (
-              <p className="text-black text-sm">Tidak ada pesanan baru</p> 
-            ) : (
-              <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-start justify-between pb-3 border-b border-gray-100 last:border-0 last:pb-0">
-                    <div className="flex-1">
-                      <div className="flex items-center">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          order.status === 'MENUNGGU' 
-                            ? 'bg-red-100 text-red-800' 
-                            : order.status === 'DIPROSES'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {order.status}
-                        </span>
-                        <span className="ml-2 text-sm font-medium text-black">#{order.id.substring(0, 8)}</span>
+            <div className="space-y-4">
+              {recentOrders.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase">Semua pesanan telah diproses ✨</div>
+              ) : (
+                recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-green-50 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-gray-400 group-hover:text-green-600 transition-colors">
+                        <Clock size={18} />
                       </div>
-                      <p className="text-sm text-black mt-1">
-                        {order.customerName || 'Pelanggan'} • Rp{order.total.toLocaleString('id-ID')}
-                      </p>
-                      <p className="text-xs text-black mt-1">
-                        {order.timeAgo} • {order.deliveryMethod}
-                      </p>
+                      <div>
+                        <p className="text-xs font-black text-gray-800 uppercase tracking-tighter">#{order.id.substring(0, 8)}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">{order.customerName || 'Pelanggan'}</p>
+                      </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Link 
-                        href={`/admin/orders/${order.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Lihat
-                      </Link>
-                      {order.customerPhone && (
-                        <a 
-                          href={`https://wa.me/${order.customerPhone.replace('+', '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600 hover:text-green-800"
-                          title="Chat via WhatsApp"
-                        >
-                          <MessageSquare size={16} />
-                        </a>
-                      )}
+                    <div className="text-right">
+                      <p className="text-xs font-black text-gray-800">Rp{(order.total || 0).toLocaleString()}</p>
+                      <Link href={`/admin/orders/${order.id}`} className="text-[9px] font-black text-blue-600 uppercase">Proses Sekarang →</Link>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
 
-          {/* Panel Kanan */}
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <h2 className="text-lg font-semibold mb-4 text-black">Inventaris</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-black">Total Produk</span>
-                  <span className="font-medium">{stats.totalProducts}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-black">Stok Rendah</span>
-                  <span className="font-medium text-red-600">{stats.lowStock}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-black">Nilai Stok</span>
-                  <span className="font-medium">Rp0</span>
-                </div>
-              </div>
-              <Link 
-                href="/admin/inventory" 
-                className="mt-4 inline-block text-blue-600 hover:text-blue-800 text-sm"
-              >
-                Lihat detail inventaris →
-              </Link>
+          <div className="bg-gray-900 rounded-[32px] p-8 text-white">
+            <h3 className="font-black text-gray-500 uppercase text-[10px] tracking-[0.2em] mb-6">Ringkasan Sistem</h3>
+            <div className="space-y-6">
+              <SystemInfo label="Gudang Aktif" value={stats.warehouses} />
+              <SystemInfo label="Promo Berjalan" value={stats.promotions} />
+              <SystemInfo label="Total User" value={stats.users} />
             </div>
-
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <h2 className="text-lg font-semibold mb-4 text-black">Operasional</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-black">Gudang</span>
-                  <span className="font-medium">{stats.warehouses}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-black">Promosi Aktif</span>
-                  <span className="font-medium">{stats.promotions}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-black">Pengguna</span>
-                  <span className="font-medium">{stats.users}</span>
-                </div>
-              </div>
-              <Link 
-                href="/admin/users" 
-                className="mt-4 inline-block text-amber-600 hover:text-amber-800 text-sm"
-              >
-                Kelola pengguna →
-              </Link>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <h2 className="text-lg font-semibold mb-4 text-black">Laporan</h2>
-              <div className="space-y-3">
-                <Link href="/admin/reports/sales" className="block p-2 hover:bg-gray-50 rounded">
-                  <FileText size={16} className="inline mr-2" />
-                  <span className="text-black">Laporan Penjualan</span>
-                </Link>
-                <Link href="/admin/reports/inventory" className="block p-2 hover:bg-gray-50 rounded">
-                  <Database size={16} className="inline mr-2" />
-                  <span className="text-black">Laporan Inventaris</span>
-                </Link>
-                <Link href="/admin/reports/customers" className="block p-2 hover:bg-gray-50 rounded">
-                  <Users size={16} className="inline mr-2" />
-                  <span className="text-black">Laporan Pelanggan</span>
-                </Link>
-              </div>
+            <div className="mt-10 p-4 bg-white/5 rounded-2xl border border-white/10">
+              <p className="text-[10px] text-gray-400 font-bold uppercase leading-relaxed text-center">
+                Gunakan menu laporan untuk analisis bulanan yang lebih mendalam.
+              </p>
             </div>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function StatBox({ label, value, icon: Icon, color, bg }: any) {
+  return (
+    <div className="bg-white p-6 rounded-[28px] shadow-sm border border-gray-100 flex items-center justify-between">
+      <div>
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+        <p className="text-xl font-black text-gray-800 tracking-tighter">{value}</p>
+      </div>
+      <div className={`${bg} ${color} p-3 rounded-2xl`}><Icon size={20} /></div>
+    </div>
+  );
+}
+
+function SystemInfo({ label, value }: any) {
+  return (
+    <div className="flex justify-between items-end border-b border-white/10 pb-4">
+      <span className="text-[11px] font-bold text-gray-400 uppercase">{label}</span>
+      <span className="text-2xl font-black leading-none">{value}</span>
     </div>
   );
 }

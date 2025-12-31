@@ -1,4 +1,3 @@
-// src/app/(admin)/promotions/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,11 +8,10 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   deleteDoc,
   query,
-  where,
-  onSnapshot
+  onSnapshot,
+  orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
@@ -26,13 +24,17 @@ import {
   Calendar,
   Percent,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  Layers,
+  Clock
 } from 'lucide-react';
 
+// Update Tipe Data untuk Mendukung Flash Sale & Bundle
 type Promotion = {
   id: string;
   name: string;
-  type: 'product' | 'category' | 'coupon';
+  type: 'product' | 'category' | 'coupon' | 'flash-sale' | 'bundle';
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   targetId?: string;
@@ -69,30 +71,17 @@ export default function PromotionsPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Fetch promosi real-time
+  // Fetch promosi real-time dengan urutan terbaru
   useEffect(() => {
     if (loading) return;
 
-    const q = query(collection(db, 'promotions'));
+    const q = query(collection(db, 'promotions'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const promoList: Promotion[] = [];
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        promoList.push({
-          id: doc.id,
-          name: data.name || '',
-          type: data.type || 'product',
-          discountType: data.discountType || 'percentage',
-          discountValue: data.discountValue || 0,
-          targetId: data.targetId,
-          targetName: data.targetName,
-          code: data.code,
-          startDate: data.startDate || '',
-          endDate: data.endDate || '',
-          isActive: data.isActive !== false,
-          createdAt: data.createdAt || ''
-        });
-      });
+      const promoList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Promotion[];
+      
       setPromotions(promoList);
       setError(null);
     }, (err) => {
@@ -130,82 +119,77 @@ export default function PromotionsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat data promosi...</p>
+          <p className="mt-4 text-black font-bold uppercase tracking-widest text-xs">Menghubungkan Database...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Gift className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Program Promosi</h1>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-black p-2 rounded-lg text-white">
+                <Gift size={24} />
+            </div>
+            <h1 className="text-2xl font-black text-black uppercase tracking-tight">Marketing Center</h1>
+          </div>
+          <p className="text-gray-500 text-sm">Kelola diskon, Flash Sale, dan promo kategori untuk meningkatkan penjualan.</p>
         </div>
-        <p className="text-black">Kelola diskon, kupon, dan promo untuk pelanggan Anda</p>
+        
+        <Link
+          href="/admin/promotions/add"
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-100 flex items-center justify-center gap-2"
+        >
+          <Plus size={18} />
+          Buat Promo Baru
+        </Link>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-3 text-sm">
+          <AlertTriangle size={18} />
           {error}
         </div>
       )}
 
-      {/* Aksi Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="text-sm text-black">
-          Total: <span className="font-medium">{promotions.length} promosi</span>
+      {/* Stats Mini */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-black text-gray-400 uppercase">Total Program</p>
+            <p className="text-xl font-black text-black">{promotions.length}</p>
         </div>
-        <Link
-          href="/admin/promotions/add"
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Tambah Promosi
-        </Link>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-black text-gray-400 uppercase">Aktif Sekarang</p>
+            <p className="text-xl font-black text-green-600">{promotions.filter(p => isActiveNow(p)).length}</p>
+        </div>
       </div>
 
       {/* Tabel Promosi */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-[2rem] border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Promosi
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Target
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Diskon
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Periode
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Aksi
-                </th>
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Detail Promo</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Target</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Potongan</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Periode</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-50">
               {promotions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-black">
-                    <Gift className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada program promosi</p>
-                    <Link
-                      href="/admin/promotions/add"
-                      className="mt-2 inline-block text-green-600 hover:text-green-800 font-medium"
-                    >
-                      Buat promosi sekarang
-                    </Link>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center opacity-20">
+                        <Gift size={48} className="mb-4" />
+                        <p className="text-sm font-black uppercase tracking-widest">Belum ada promo aktif</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -214,72 +198,78 @@ export default function PromotionsPage() {
                   const activeNow = isActiveNow(promo);
                   
                   return (
-                    <tr key={promo.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-black">{promo.name}</div>
-                        <div className="flex items-center gap-1 mt-1">
-                          {promo.type === 'product' && <Tag size={14} className="text-gray-500" />}
-                          {promo.type === 'category' && <Percent size={14} className="text-gray-500" />}
-                          {promo.type === 'coupon' && <Gift size={14} className="text-gray-500" />}
-                          <span className="text-xs text-black capitalize">{promo.type}</span>
+                    <tr key={promo.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-gray-900 uppercase text-xs">{promo.name}</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {promo.type === 'product' && <Tag size={12} className="text-blue-500" />}
+                          {promo.type === 'category' && <Layers size={12} className="text-purple-500" />}
+                          {promo.type === 'coupon' && <Gift size={12} className="text-pink-500" />}
+                          {promo.type === 'flash-sale' && <Zap size={12} className="text-orange-500" fill="currentColor" />}
+                          {promo.type === 'bundle' && <Plus size={12} className="text-green-500" />}
+                          <span className="text-[10px] font-black text-gray-400 uppercase">{promo.type}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="px-6 py-4">
                         {promo.type === 'coupon' ? (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-mono">
+                          <span className="px-2 py-1 bg-gray-100 text-black rounded-lg text-[10px] font-black font-mono border border-gray-200">
                             {promo.code}
                           </span>
                         ) : (
-                          promo.targetName || '–'
+                          <span className="text-xs font-bold text-gray-600 italic">{promo.targetName || 'Semua Produk'}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
-                        {promo.discountType === 'percentage' 
-                          ? `${promo.discountValue}%` 
-                          : `Rp${promo.discountValue.toLocaleString('id-ID')}`}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} className="text-gray-500" />
-                          <span>{new Date(promo.startDate).toLocaleDateString('id-ID')} –</span>
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Calendar size={14} className="text-gray-500" />
-                          <span>{new Date(promo.endDate).toLocaleDateString('id-ID')}</span>
+                      <td className="px-6 py-4">
+                        <div className="text-xs font-black text-green-600">
+                            {promo.discountType === 'percentage' 
+                              ? `${promo.discountValue}%` 
+                              : `Rp${(promo.discountValue || 0).toLocaleString('id-ID')}`}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1 text-[10px] font-bold text-gray-500 uppercase">
+                          <div className="flex items-center gap-1">
+                            <Clock size={10} />
+                            <span>{new Date(promo.startDate).toLocaleDateString('id-ID')}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar size={10} />
+                            <span>{new Date(promo.endDate).toLocaleDateString('id-ID')}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
                         {expired ? (
-                          <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                          <span className="px-2 py-1 text-[8px] font-black bg-red-50 text-red-500 rounded-md uppercase border border-red-100">
                             Kedaluwarsa
                           </span>
                         ) : activeNow ? (
-                          <div className="flex items-center gap-1">
-                            <CheckCircle size={16} className="text-green-600" />
-                            <span className="text-green-600">Aktif</span>
+                          <div className="flex items-center gap-1.5 text-green-600">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></div>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Berjalan</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1">
-                            <AlertTriangle size={16} className="text-yellow-600" />
-                            <span className="text-yellow-600">Akan Datang</span>
+                          <div className="flex items-center gap-1.5 text-orange-500">
+                            <Clock size={12} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Terjadwal</span>
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        <div className="flex items-center gap-3">
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <Link
                             href={`/admin/promotions/edit/${promo.id}`}
-                            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                            title="Edit"
                           >
                             <Edit size={16} />
-                            Edit
                           </Link>
                           <button
                             onClick={() => handleDelete(promo.id, promo.name)}
-                            className="text-red-600 hover:text-red-800 flex items-center gap-1"
+                            className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
+                            title="Hapus"
                           >
                             <Trash2 size={16} />
-                            Hapus
                           </button>
                         </div>
                       </td>
@@ -290,6 +280,10 @@ export default function PromotionsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mt-8 text-center">
+         <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.3em]">Atayatoko Marketing Engine v2.0</p>
       </div>
     </div>
   );
