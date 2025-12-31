@@ -9,16 +9,6 @@
   --foreground: #171717;
 }
 
-/* Opsional: Dark mode (bisa diaktifkan nanti) */
-/*
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-*/
-
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -28,8 +18,71 @@ body {
   line-height: 1.5;
 }
 
-/* Opsional: Hilangkan outline fokus untuk UX lebih baik (tapi aksesibilitas first!) */
+/* Aksesibilitas Fokus */
 :focus {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
+}
+
+/* --- KONFIGURASI CETAK (PRINT MODE) --- */
+@media print {
+  /* Sembunyikan elemen dashboard, tombol, dan navigasi saat print */
+  .no-print, 
+  nav, 
+  footer, 
+  button, 
+  aside,
+  .floating-action-bar {
+    display: none !important;
+  }
+
+  /* Reset layout agar memenuhi kertas */
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hilangkan bayangan dan border container saat print */
+  .max-w-4xl, .max-w-3xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Pastikan tabel tercetak dengan jelas */
+  table {
+    width: 100% !important;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    border-bottom: 1px solid #eee !important;
+  }
+
+  /* Paksa browser mencetak warna latar belakang (jika ada logo/badge status) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hindari pemotongan halaman di tengah-tengah item tabel */
+  tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* Utilitas Tambahan untuk UI Admin */
+@layer components {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
