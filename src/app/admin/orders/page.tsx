@@ -1,25 +1,22 @@
-// src/app/(admin)/orders/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { 
-  ShoppingCart, 
-  Search, 
-  CheckCircle, 
-  Truck, 
-  MapPin,
-  AlertTriangle
+  collection, query, orderBy, doc, getDoc, updateDoc, onSnapshot, writeBatch 
+} from 'firebase/firestore';
+import { 
+  ShoppingCart, Search, CheckCircle, Truck, MapPin, 
+  AlertTriangle, Filter, MoreVertical, Printer, Clock, XCircle,
+  LayoutDashboard, CheckSquare, Square, ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 
 type Order = {
   id: string;
-  createdAt: string;
+  createdAt: any;
   customerName?: string;
   customerPhone?: string;
   total: number;
@@ -31,241 +28,204 @@ export default function AdminOrders() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [authChecked, setAuthChecked] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'cashier' | null>(null);
+  const [activeTab, setActiveTab] = useState<'SEMUA' | 'MENUNGGU' | 'DIPROSES' | 'SELESAI'>('SEMUA');
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]); // ✅ Untuk fitur Masal
 
-  // 🔒 Proteksi akses: hanya admin atau cashier
+  // 1. Proteksi Akses
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        router.push('/profil/login');
-        return;
-      }
-
       const role = userDoc.data()?.role;
-      if (role !== 'admin' && role !== 'cashier') {
-        alert('Akses ditolak! Hanya admin atau kasir yang dapat mengakses halaman ini.');
-        router.push('/profil');
-        return;
-      }
-
-      setUserRole(role);
-      setAuthChecked(true);
+      if (role !== 'admin' && role !== 'cashier') return router.push('/profil');
     });
-
-    return () => unsubscribe();
   }, [router]);
 
-  // 📥 Ambil data pesanan
+  // 2. Real-time Data
   useEffect(() => {
-    if (!authChecked) return;
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      setOrders(list);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const fetchOrders = async () => {
-      try {
-        const querySnapshot = await getDocs(
-          query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
-        );
+  // 3. Fungsi Ubah Status Masal
+  const handleBulkUpdate = async (newStatus: string) => {
+    if (selectedOrders.length === 0) return;
+    if (!confirm(`Ubah ${selectedOrders.length} pesanan menjadi ${newStatus}?`)) return;
 
-        const ordersList: Order[] = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            createdAt: data.createdAt || '',
-            customerName: data.customerName || '',
-            customerPhone: data.customerPhone || '',
-            total: typeof data.total === 'number' ? data.total : 0,
-            status: data.status || 'MENUNGGU',
-            deliveryMethod: data.deliveryMethod || 'AMBIL_DI_TOKO',
-          };
-        });
+    try {
+      const batch = writeBatch(db);
+      selectedOrders.forEach((orderId) => {
+        const orderRef = doc(db, 'orders', orderId);
+        batch.update(orderRef, { status: newStatus });
+      });
+      await batch.commit();
+      setSelectedOrders([]);
+      alert('Status berhasil diperbarui secara masal!');
+    } catch (err) {
+      alert('Gagal memperbarui status masal');
+    }
+  };
 
-        setOrders(ordersList);
-        setError(null);
-      } catch (err) {
-        console.error('Gagal memuat pesanan:', err);
-        setError('Gagal memuat data pesanan. Silakan coba lagi.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const toggleSelect = (id: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
 
-    fetchOrders();
-  }, [authChecked]);
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTab = activeTab === 'SEMUA' || order.status === activeTab;
+    return matchesSearch && matchesTab;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'MENUNGGU': return 'bg-red-100 text-red-800';
-      case 'DIPROSES': return 'bg-yellow-100 text-yellow-800';
-      case 'DIKIRIM': return 'bg-blue-100 text-blue-800';
-      case 'SELESAI': return 'bg-green-100 text-green-800';
-      case 'DIBATALKAN': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'MENUNGGU': return 'bg-red-500 text-white';
+      case 'DIPROSES': return 'bg-amber-500 text-white';
+      case 'DIKIRIM': return 'bg-blue-500 text-white';
+      case 'SELESAI': return 'bg-emerald-500 text-white';
+      default: return 'bg-gray-400 text-white';
     }
   };
-
-  const getDeliveryIcon = (method: string) => {
-    switch (method) {
-      case 'KURIR_TOKO':
-      case 'OJOL':
-        return <Truck size={16} className="text-blue-600" />;
-      case 'AMBIL_DI_TOKO':
-        return <CheckCircle size={16} className="text-green-600" />;
-      default:
-        return <MapPin size={16} className="text-gray-600" />;
-    }
-  };
-
-  const getDeliveryLabel = (method: string) => {
-    switch (method) {
-      case 'AMBIL_DI_TOKO': return 'Ambil di Toko';
-      case 'KURIR_TOKO': return 'Kurir Toko';
-      case 'OJOL': return 'Ojek Online';
-      default: return method;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? '-' : date.toLocaleDateString('id-ID');
-  };
-
-  const filteredOrders = orders.filter(order =>
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (order.customerPhone && order.customerPhone.includes(searchTerm))
-  );
-
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-green-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-          <div className="flex items-center">
-            <AlertTriangle className="text-red-500 mr-2" />
-            <p className="text-red-700">{error}</p>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-3 text-sm text-red-600 hover:underline"
-          >
-            Coba Lagi
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-black">Manajemen Pesanan</h1>
-        {userRole === 'admin' && (
-          <Link 
-            href="/admin" 
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            ← Kembali ke Dashboard
-          </Link>
-        )}
-      </div>
-
-      <div className="bg-white rounded-lg shadow p-4 mb-6 border border-gray-200">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Cari pesanan (ID, nama, HP)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-black"
-          />
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
+      
+      {/* Tombol Dashboard Kecil di Atas */}
+      <div className="mb-6 flex items-center justify-between">
+        <Link 
+          href="/admin" 
+          className="flex items-center gap-2 text-xs font-bold bg-white border px-3 py-1.5 rounded-lg hover:bg-gray-100 transition shadow-sm"
+        >
+          <LayoutDashboard size={14} /> DASHBOARD
+        </Link>
+        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Manajemen Pesanan v2.0
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8 text-black">
-          Memuat daftar pesanan...
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900">List Pesanan</h1>
+          <p className="text-gray-500 text-sm">Update status pengiriman pelanggan Anda di sini.</p>
         </div>
-      ) : filteredOrders.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center border border-gray-200">
-          <ShoppingCart className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <p className="text-black">Tidak ada pesanan ditemukan.</p>
+      </div>
+
+      {/* Toolbar & Filter */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="flex-1 min-w-[300px] relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Cari ID atau nama pelanggan..."
+              className="w-full pl-11 pr-4 py-3 bg-white border-none shadow-sm rounded-2xl focus:ring-2 focus:ring-black outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
         </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Pesanan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Pelanggan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Pengiriman</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <ShoppingCart className="text-gray-400 mr-3" size={32} />
-                      <div>
-                        <Link 
-                          href={`/admin/orders/${order.id}`} 
-                          className="text-sm font-medium text-green-600 hover:underline"
-                        >
-                          #{order.id.substring(0, 8).toUpperCase()}
-                        </Link>
-                        <div className="text-sm text-black mt-1">
-                          {formatDate(order.createdAt)}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-black">{order.customerName || '–'}</div>
-                    <div className="text-sm text-black">{order.customerPhone || '–'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-medium text-black">
-                      Rp{(order.total || 0).toLocaleString('id-ID')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getDeliveryIcon(order.deliveryMethod)}
-                      <span className="ml-2 text-sm text-black">
-                        {getDeliveryLabel(order.deliveryMethod)}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+            {['SEMUA', 'MENUNGGU', 'DIPROSES', 'SELESAI'].map((tab) => (
+                <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={`px-5 py-3 rounded-2xl text-xs font-black transition-all whitespace-nowrap ${
+                        activeTab === tab ? 'bg-black text-white' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'
+                    }`}
+                >
+                    {tab}
+                </button>
+            ))}
+        </div>
+      </div>
+
+      {/* Floating Bulk Action Bar (Muncul jika ada yang dicentang) */}
+      {selectedOrders.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex items-center gap-6 animate-in slide-in-from-bottom-5">
+            <div className="text-sm font-bold">{selectedOrders.length} Pesanan dipilih</div>
+            <div className="h-6 w-[1px] bg-gray-700"></div>
+            <div className="flex gap-2">
+                <button onClick={() => handleBulkUpdate('DIPROSES')} className="bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-xl text-[10px] font-black transition">PROSES MASAL</button>
+                <button onClick={() => handleBulkUpdate('DIKIRIM')} className="bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded-xl text-[10px] font-black transition">KIRIM MASAL</button>
+                <button onClick={() => handleBulkUpdate('SELESAI')} className="bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-xl text-[10px] font-black transition">SELESAI MASAL</button>
+                <button onClick={() => setSelectedOrders([])} className="bg-gray-800 p-1.5 rounded-xl hover:bg-gray-700 transition"><XCircle size={16} /></button>
+            </div>
         </div>
       )}
+
+      {/* List Pesanan */}
+      <div className="grid grid-cols-1 gap-4">
+        {loading ? (
+          <div className="text-center py-20 animate-pulse font-bold text-gray-300">Menarik Data...</div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100 italic text-gray-400">
+            Tidak ada pesanan ditemukan.
+          </div>
+        ) : (
+          filteredOrders.map((order) => (
+            <div 
+                key={order.id} 
+                className={`group bg-white rounded-3xl p-5 border shadow-sm transition-all flex flex-col md:flex-row items-center gap-5 ${
+                    selectedOrders.includes(order.id) ? 'border-black ring-1 ring-black bg-gray-50' : 'border-gray-50'
+                }`}
+            >
+              {/* Checkbox Masal */}
+              <button 
+                onClick={() => toggleSelect(order.id)}
+                className={`transition-all ${selectedOrders.includes(order.id) ? 'text-black' : 'text-gray-200 hover:text-gray-400'}`}
+              >
+                {selectedOrders.includes(order.id) ? <CheckSquare size={24} /> : <Square size={24} />}
+              </button>
+
+              <div className="flex-1 flex items-center gap-4 w-full">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${getStatusColor(order.status)}`}>
+                  <ShoppingCart size={22} />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-sm uppercase tracking-tighter">#{order.id.substring(0, 8)}</span>
+                    <span className={`text-[8px] px-2 py-0.5 rounded-lg font-black ${getStatusColor(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 truncate">{order.customerName || 'Pelanggan Umum'}</h3>
+                  <p className="text-[10px] text-gray-400 font-bold">{order.customerPhone || 'Tanpa WhatsApp'}</p>
+                </div>
+              </div>
+
+              <div className="w-full md:w-auto flex flex-col md:items-end">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pembayaran</p>
+                <p className="text-lg font-black text-emerald-600">Rp {order.total.toLocaleString()}</p>
+                <div className="flex items-center gap-1 text-[9px] font-black text-gray-400 mt-0.5">
+                    <Truck size={10} /> {order.deliveryMethod.replace('_', ' ')}
+                </div>
+              </div>
+
+              <div className="flex gap-2 shrink-0 border-t md:border-t-0 pt-4 md:pt-0 w-full md:w-auto justify-end">
+                <Link 
+                    href={`/admin/orders/${order.id}`}
+                    className="flex items-center gap-2 bg-gray-100 text-gray-500 hover:text-black px-4 py-2 rounded-xl text-[10px] font-black transition-all"
+                >
+                    DETAIL <ChevronRight size={14} />
+                </Link>
+                <button className="p-2 bg-gray-50 text-gray-400 hover:text-black rounded-xl border border-gray-100 transition-all">
+                    <Printer size={18} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      
+      {/* Space bawah agar tidak tertutup floating bar */}
+      {selectedOrders.length > 0 && <div className="h-24"></div>}
+
     </div>
   );
 }
