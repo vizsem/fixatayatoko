@@ -16,7 +16,7 @@ import {
   Plus, Edit, Trash2, Download, Upload, Barcode, 
   TrendingUp, Camera, Search, X, LayoutDashboard, 
   Globe, CheckSquare, Square, Link as LinkIcon, AlertCircle, 
-  Layers, Tag, ChevronLeft, ChevronRight, Filter
+  Layers, Tag, ChevronLeft, ChevronRight, Filter, ShoppingBag
 } from 'lucide-react';
 
 type Variant = { name: string; additionalPrice: number; };
@@ -26,13 +26,13 @@ type Product = {
   name: string;
   slug: string;
   price: number;
-  wholesalePrice: number;
-  minWholesaleQty: number;
+  wholesalePrice: number; // Harga Grosir
+  minWholesaleQty: number; // Min Grosir
   minOrder: number;
   purchasePrice: number;
   stock: number;
   category: string;
-  unit: string;
+  unit: string; // Satuan
   barcode: string;
   image: string;
   variants?: Variant[];
@@ -49,21 +49,18 @@ export default function AdminProducts() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const [formData, setFormData] = useState({
     name: '', slug: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1,
-    minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: '',
+    minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: 'Pcs',
     barcode: '', image: '', variants: [] as Variant[]
   });
 
-  // Statistik & Profit
   const totalAssetValue = products.reduce((acc, p) => acc + (p.stock * (p.purchasePrice || 0)), 0);
   const potentialProfit = products.reduce((acc, p) => acc + (p.stock * (p.price - (p.purchasePrice || 0))), 0);
 
-  // Ambil list kategori unik untuk Filter
   const categories = ['Semua Kategori', ...Array.from(new Set(products.map(p => p.category || 'Umum')))];
 
   const handleNameChange = (name: string) => {
@@ -93,7 +90,6 @@ export default function AdminProducts() {
     return () => unsub();
   }, [loading]);
 
-  // --- LOGIKA FILTER & PAGINATION ---
   const filteredProducts = products.filter(p => {
     const matchSearch = (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode || "").includes(searchTerm);
     const matchCategory = selectedCategory === 'Semua Kategori' || p.category === selectedCategory;
@@ -105,7 +101,6 @@ export default function AdminProducts() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
 
-  // --- MANAJEMEN VARIAN ---
   const addVariantField = () => {
     setFormData({ ...formData, variants: [...formData.variants, { name: '', additionalPrice: 0 }] });
   };
@@ -122,7 +117,6 @@ export default function AdminProducts() {
     setFormData({ ...formData, variants: newVariants });
   };
 
-  // --- ACTIONS ---
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -139,6 +133,8 @@ export default function AdminProducts() {
         ...formData,
         stockByWarehouse: { 'gudang-utama': formData.stock },
         image: formData.image || "https://placehold.co/400x400/eeeeee/999999?text=No+Image",
+        profit_ecer: Number(formData.price) - Number(formData.purchasePrice),
+        profit_grosir: Number(formData.wholesalePrice) - Number(formData.purchasePrice),
         createdAt: serverTimestamp()
       });
       setShowAddModal(false);
@@ -147,7 +143,7 @@ export default function AdminProducts() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', slug: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1, minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: '', barcode: '', image: '', variants: [] });
+    setFormData({ name: '', slug: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1, minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: 'Pcs', barcode: '', image: '', variants: [] });
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -161,25 +157,25 @@ export default function AdminProducts() {
     }
   };
 
-  // --- EXPORT ---
   const handleExport = () => {
     const data = products.map(p => ({ 
+      Barcode: p.barcode,
       Nama: p.name, 
       Kategori: p.category,
-      Barcode: p.barcode,
+      Satuan: p.unit,
+      Stok: p.stock, 
       Modal: p.purchasePrice,
       Ecer: p.price, 
-      Stok: p.stock, 
-      Profit_Ecer: p.price - p.purchasePrice,
+      Grosir: p.wholesalePrice,
+      Min_Grosir: p.minWholesaleQty,
       Link_Foto: p.image 
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-    XLSX.writeFile(wb, 'Laporan_Inventaris.xlsx');
+    XLSX.writeFile(wb, 'Laporan_Inventaris_Ataya.xlsx');
   };
 
-  // --- IMPORT ---
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,9 +197,12 @@ export default function AdminProducts() {
             barcode: String(row.Barcode || row.barcode || ''),
             purchasePrice: Number(row.Modal || row.purchasePrice) || 0,
             price: Number(row.Ecer || row.price) || 0,
+            wholesalePrice: Number(row.Grosir || row.wholesalePrice) || 0,
+            minWholesaleQty: Number(row.Min_Grosir || row.minWholesaleQty) || 1,
             stock: Number(row.Stok || row.stock) || 0,
-            unit: row.Satuan || 'pcs',
-            image: row.Link_Foto || '',
+            unit: row.Satuan || row.unit || 'Pcs',
+            image: row.Link_Foto || row.image || '',
+            profit_ecer: (Number(row.Ecer) || 0) - (Number(row.Modal) || 0),
             createdAt: serverTimestamp()
           });
         }
@@ -257,7 +256,6 @@ export default function AdminProducts() {
           <input type="text" placeholder="Cari Produk..." className="w-full pl-12 pr-4 py-4 rounded-3xl border-none shadow-sm bg-white font-bold outline-none focus:ring-2 focus:ring-black" value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}} />
         </div>
 
-        {/* Filter Kategori Dinamis */}
         <div className="relative min-w-[180px]">
           <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <select 
@@ -293,9 +291,9 @@ export default function AdminProducts() {
                       {selectedProducts.length === currentItems.length ? <CheckSquare size={18} className="text-black"/> : <Square size={18} className="text-gray-200"/>}
                    </button>
                 </th>
-                <th className="p-6">Informasi Produk</th>
+                <th className="p-6">Produk & Satuan</th>
                 <th className="p-6">Kategori</th>
-                <th className="p-6">Harga & Profit</th>
+                <th className="p-6">Harga (Ecer/Grosir)</th>
                 <th className="p-6">Stok</th>
                 <th className="p-6 text-center">Tindakan</th>
               </tr>
@@ -316,7 +314,7 @@ export default function AdminProducts() {
                       <div>
                         <div className="font-black text-gray-900 leading-tight uppercase">{p.name}</div>
                         <div className="text-[9px] text-gray-400 font-black uppercase mt-1 flex items-center gap-2">
-                          <Barcode size={10} /> {p.barcode || 'NO-SKU'}
+                          <Barcode size={10} /> {p.barcode || 'NO-SKU'} | <span className="text-blue-500">{p.unit}</span>
                         </div>
                       </div>
                     </div>
@@ -327,9 +325,10 @@ export default function AdminProducts() {
                     </span>
                   </td>
                   <td className="p-6">
-                    <div className="text-sm font-black text-gray-900">Rp {p.price?.toLocaleString()}</div>
+                    <div className="text-sm font-black text-gray-900">E: Rp {p.price?.toLocaleString()}</div>
+                    <div className="text-[10px] font-bold text-orange-600">G: Rp {p.wholesalePrice?.toLocaleString()} (min {p.minWholesaleQty})</div>
                     <div className="text-emerald-600 text-[9px] font-black uppercase mt-1">
-                      Profit: +Rp {(p.price - (p.purchasePrice || 0)).toLocaleString()}
+                      Profit Ecer: +Rp {(p.price - (p.purchasePrice || 0)).toLocaleString()}
                     </div>
                   </td>
                   <td className="p-6">
@@ -353,7 +352,6 @@ export default function AdminProducts() {
           </table>
         </div>
 
-        {/* Kontrol Pagination */}
         <div className="p-6 flex items-center justify-between bg-gray-50/50 border-t">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
             Data {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredProducts.length)} Dari {filteredProducts.length}
@@ -378,13 +376,13 @@ export default function AdminProducts() {
         </div>
       </div>
 
-      {/* 6. Modal Tambah dengan Varian & Kategori */}
+      {/* 6. Modal Tambah Lengkap (Grosir & Satuan) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                <Plus size={20}/> Produk & Varian Baru
+                <Plus size={20}/> Produk Lengkap Baru
               </h2>
               <button onClick={() => {setShowAddModal(false); resetForm();}} className="bg-gray-100 p-2 rounded-full hover:bg-red-500 hover:text-white transition-all"><X size={20}/></button>
             </div>
@@ -407,8 +405,11 @@ export default function AdminProducts() {
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-3xl border">
-                   <label className="text-[9px] font-black text-gray-400 uppercase block mb-1 flex items-center gap-1"><Layers size={10}/> Kategori Produk</label>
-                   <input required type="text" placeholder="Makanan, Fashion, dll..." className="w-full bg-white border-none p-3 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-black" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
+                   <label className="text-[9px] font-black text-gray-400 uppercase block mb-1 flex items-center gap-1"><Layers size={10}/> Kategori & Satuan</label>
+                   <div className="flex gap-2">
+                     <input required type="text" placeholder="Kategori" className="w-full bg-white border-none p-3 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-black" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
+                     <input required type="text" placeholder="Pcs/Dus" className="w-24 bg-white border-none p-3 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-black" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} />
+                   </div>
                 </div>
               </div>
 
@@ -421,13 +422,32 @@ export default function AdminProducts() {
                   <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Barcode SKU</label>
                   <input type="text" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-black" value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Harga Modal</label>
-                  <input required type="number" className="w-full bg-gray-100 border-none p-4 rounded-2xl font-black outline-none" onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Modal</label>
+                  <input required type="number" className="w-full bg-gray-100 border-none p-4 rounded-2xl font-black outline-none" value={formData.purchasePrice} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Harga Jual</label>
-                  <input required type="number" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} />
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Harga Ecer</label>
+                  <input required type="number" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" value={formData.price} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Stok Awal</label>
+                  <input required type="number" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" value={formData.stock} onChange={(e) => setFormData({...formData, stock: Number(e.target.value)})} />
+                </div>
+              </div>
+
+              {/* SECTION HARGA GROSIR */}
+              <div className="p-6 bg-orange-50/50 rounded-[2rem] border border-dashed border-orange-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-orange-600 uppercase ml-2 flex items-center gap-1"><ShoppingBag size={10}/> Harga Grosir</label>
+                  <input type="number" className="w-full bg-white border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" value={formData.wholesalePrice} onChange={(e) => setFormData({...formData, wholesalePrice: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-orange-600 uppercase ml-2">Min. Beli Grosir</label>
+                  <input type="number" className="w-full bg-white border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" value={formData.minWholesaleQty} onChange={(e) => setFormData({...formData, minWholesaleQty: Number(e.target.value)})} />
                 </div>
               </div>
 
