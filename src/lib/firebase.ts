@@ -1,29 +1,10 @@
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
-// ✅ Validasi environment variables
-const requiredEnvVars = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  'NEXT_PUBLIC_FIREBASE_APP_ID'
-] as const;
-
-const missingEnvVars = requiredEnvVars.filter(
-  key => !process.env[key]
-);
-
-if (missingEnvVars.length > 0 && typeof window !== 'undefined') {
-  console.warn(
-    '[Firebase] Missing environment variables:',
-    missingEnvVars
-  );
-}
-
+// Konfigurasi Firebase — ganti dengan konfigurasi Anda
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -33,26 +14,10 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let firebaseApp: ReturnType<typeof initializeApp> | null = null;
+// Inisialisasi hanya sekali
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// ✅ Hanya inisialisasi sekali
-const getAppInstance = () => {
-  if (!firebaseApp) {
-    if (getApps().length === 0) {
-      firebaseApp = initializeApp(firebaseConfig);
-    } else {
-      firebaseApp = getApp();
-    }
-  }
-  return firebaseApp;
-};
-
-export const getAuthInstance = () => {
-  const app = getAppInstance();
-  return getAuth(app);
-};
-
-export const getFirestoreInstance = () => {
-  const app = getAppInstance();
-  return getFirestore(app);
-};
+// Ekspor instance yang digunakan di seluruh aplikasi
+export const auth: Auth = getAuth(app);
+export const db: Firestore = getFirestore(app);
+export const storage: FirebaseStorage = getStorage(app);

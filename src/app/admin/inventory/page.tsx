@@ -1,4 +1,3 @@
-// src/app/admin/inventory/page.tsx
 'use client';
 
 // ✅ Nonaktifkan prerendering — hanya render di client
@@ -10,9 +9,6 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
-  query,
-  where,
   onSnapshot
 } from 'firebase/firestore';
 import Link from 'next/link';
@@ -26,8 +22,8 @@ import {
   Calendar
 } from 'lucide-react';
 
-// ✅ Ambil fungsi Firebase (bukan instance langsung)
-import { getAuthInstance, getFirestoreInstance } from '@/lib/firebase';
+// ✅ Gunakan import yang sudah ada di lib/firebase
+import { auth, db } from '@/lib/firebase';
 
 type Product = {
   id: string;
@@ -56,23 +52,25 @@ export default function InventoryDashboard() {
 
   // Proteksi admin
   useEffect(() => {
-    // ✅ Ambil instance di dalam useEffect
-    const auth = getAuthInstance();
-    const db = getFirestoreInstance();
-    
+    // ✅ Gunakan 'auth' dan 'db' yang di-import dari @/lib/firebase
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+          alert('Akses ditolak! Anda bukan admin.');
+          router.push('/profil');
+          return;
+        }
+        setLoading(false);
+      } catch (error) {
+        console.error("Error checking admin status:", error);
         router.push('/profil');
-        return;
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
@@ -81,10 +79,7 @@ export default function InventoryDashboard() {
   useEffect(() => {
     if (loading) return;
 
-    // ✅ Ambil instance di dalam useEffect
-    const db = getFirestoreInstance();
-
-    // Fetch products
+    // ✅ Fetch products menggunakan 'db' dari import
     const productsUnsub = onSnapshot(collection(db, 'products'), (snapshot) => {
       const productList: Product[] = [];
       let lowStock = 0;
@@ -255,50 +250,6 @@ export default function InventoryDashboard() {
         </Link>
       </div>
 
-      {/* Peringatan Stok */}
-      {(lowStockCount > 0 || expiredCount > 0) && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-black mb-4">Peringatan Stok</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {lowStockCount > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center mb-2">
-                  <AlertTriangle className="text-yellow-800 mr-2" size={20} />
-                  <h3 className="font-medium text-yellow-800">Stok Rendah</h3>
-                </div>
-                <p className="text-black text-sm">
-                  {lowStockCount} produk stok ≤10 unit. Segera lakukan pembelian!
-                </p>
-                <Link 
-                  href="/admin/inventory/stock-in" 
-                  className="mt-2 inline-block text-yellow-700 hover:text-yellow-900 font-medium"
-                >
-                  Tambah stok →
-                </Link>
-              </div>
-            )}
-            
-            {expiredCount > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center mb-2">
-                  <Calendar className="text-red-800 mr-2" size={20} />
-                  <h3 className="font-medium text-red-800">Kadaluarsa</h3>
-                </div>
-                <p className="text-black text-sm">
-                  {expiredCount} produk sudah melewati tanggal kadaluarsa!
-                </p>
-                <Link 
-                  href="/admin/products" 
-                  className="mt-2 inline-block text-red-700 hover:text-red-900 font-medium"
-                >
-                  Periksa produk →
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Tabel Inventaris */}
       <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
         <div className="p-4 border-b">
@@ -308,114 +259,46 @@ export default function InventoryDashboard() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Produk
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Kategori
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Stok
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Produk</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Kategori</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Stok</th>
                 {warehouses.length > 1 && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                    Per Gudang
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Per Gudang</th>
                 )}
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Aksi
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Aksi</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {products.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-black">
-                    <Package className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada produk dalam inventaris</p>
-                    <Link
-                      href="/admin/products"
-                      className="mt-2 inline-block text-green-600 hover:text-green-800 font-medium"
-                    >
-                      Tambah produk
-                    </Link>
-                  </td>
-                </tr>
-              ) : (
-                products.map((product) => {
-                  const isLowStock = product.stock <= 10 && product.stock > 0;
-                  const isExpired = product.expiredDate && new Date(product.expiredDate) <= new Date();
-                  
-                  return (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-black">{product.name}</div>
-                        {product.barcode && (
-                          <div className="text-xs text-black">#{product.barcode}</div>
-                        )}
+              {products.map((product) => {
+                const isLowStock = product.stock <= 10 && product.stock > 0;
+                const isExpired = product.expiredDate && new Date(product.expiredDate) <= new Date();
+                return (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-black">{product.name}</div>
+                      {product.barcode && <div className="text-xs text-black">#{product.barcode}</div>}
+                    </td>
+                    <td className="px-6 py-4 text-black">{product.category}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <span className={`${isExpired || isLowStock ? 'text-red-600 font-bold' : 'text-black'}`}>
+                          {product.stock} {product.unit}
+                        </span>
+                      </div>
+                    </td>
+                    {warehouses.length > 1 && (
+                      <td className="px-6 py-4 text-sm text-black">
+                        {warehouses.map(w => (
+                          <div key={w.id}>{w.name}: {product.stockByWarehouse?.[w.id] || 0}</div>
+                        ))}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
-                        {product.category}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className={`font-medium ${
-                            isExpired ? 'text-red-600' : 
-                            isLowStock ? 'text-orange-600' : 'text-black'
-                          }`}>
-                            {product.stock} {product.unit}
-                          </span>
-                          {isLowStock && (
-                            <AlertTriangle className="ml-2 h-4 w-4 text-orange-500" />
-                          )}
-                          {isExpired && (
-                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                              Expired
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      {warehouses.length > 1 && (
-                        <td className="px-6 py-4 text-sm text-black">
-                          {warehouses.map(warehouse => (
-                            <div key={warehouse.id} className="mb-1">
-                              <span className="text-gray-600">{warehouse.name}:</span>
-                              <span className="ml-1">
-                                {product.stockByWarehouse?.[warehouse.id] || 0}
-                              </span>
-                            </div>
-                          ))}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        <div className="flex items-center gap-3">
-                          <Link
-                            href={`/admin/inventory/stock-in?productId=${product.id}`}
-                            className="text-green-600 hover:text-green-800"
-                            title="Tambah Stok"
-                          >
-                            <ArrowDown size={16} />
-                          </Link>
-                          <Link
-                            href={`/admin/inventory/stock-out?productId=${product.id}`}
-                            className="text-red-600 hover:text-red-800"
-                            title="Kurangi Stok"
-                          >
-                            <ArrowUp size={16} />
-                          </Link>
-                          <Link
-                            href={`/admin/products/edit/${product.id}`}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Edit Produk"
-                          >
-                            Edit
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                    )}
+                    <td className="px-6 py-4 text-sm">
+                      <Link href={`/admin/products/edit/${product.id}`} className="text-blue-600">Edit</Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
