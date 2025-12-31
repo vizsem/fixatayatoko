@@ -1,274 +1,105 @@
-// src/app/admin/products/page.tsx
 'use client';
 
-// ✅ Gunakan SheetJS dari CDN (aman dari vulnerability)
+// ✅ SheetJS dari CDN
 declare const XLSX: any;
 
 import { useEffect, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, orderBy, onSnapshot, serverTimestamp, limit, startAfter, where
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Package, 
-  Upload, 
-  Download,
-  AlertTriangle,
-  Barcode,
-  Warehouse,
-  TrendingUp
+  Plus, Edit, Trash2, Package, Upload, Download, AlertTriangle, 
+  Barcode, TrendingUp, Camera, ChevronLeft, ChevronRight, Printer, 
+  Search, X, LayoutDashboard, Settings
 } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+
+// --- Types ---
+type Variant = { name: string; additionalPrice: number; };
 
 type Product = {
   id: string;
   name: string;
   price: number;
   wholesalePrice: number;
-  purchasePrice: number; // ✅ HARGA BELI
+  minWholesaleQty: number;
+  purchasePrice: number;
   stock: number;
   stockByWarehouse?: Record<string, number>;
   category: string;
   unit: string;
-  barcode: string; // ✅ BARCODE UNIK
+  barcode: string;
   image: string;
   expiredDate?: string;
-  createdAt: string;
+  variants?: Variant[];
+  createdAt: any;
 };
-
-// Contoh produk awal dengan barcode & harga beli
-const sampleProducts: Omit<Product, 'id' | 'createdAt'>[] = [
-  {
-    name: "Beras Premium 5kg",
-    price: 65000,
-    wholesalePrice: 60000,
-    purchasePrice: 50000,
-    stock: 150,
-    category: "Beras & Tepung",
-    unit: "5kg",
-    barcode: "BR001",
-    image: "https://placehold.co/400x400/f59e0b/ffffff?text=Beras+5kg"
-  },
-  {
-    name: "Minyak Goreng 2L",
-    price: 32000,
-    wholesalePrice: 28000,
-    purchasePrice: 25000,
-    stock: 85,
-    category: "Minyak & Gula",
-    unit: "2L",
-    barcode: "MG002",
-    image: "https://placehold.co/400x400/ef4444/ffffff?text=Minyak+2L"
-  },
-  {
-    name: "Gula Pasir 1kg",
-    price: 18000,
-    wholesalePrice: 16000,
-    purchasePrice: 14000,
-    stock: 200,
-    category: "Minyak & Gula",
-    unit: "1kg",
-    barcode: "GP003",
-    image: "https://placehold.co/400x400/f97316/ffffff?text=Gula+1kg"
-  },
-  {
-    name: "Mie Instan 40pcs",
-    price: 2000,
-    wholesalePrice: 1800,
-    purchasePrice: 1500,
-    stock: 500,
-    category: "Mie & Sereal",
-    unit: "pcs",
-    barcode: "MI004",
-    image: "https://placehold.co/400x400/8b5cf6/ffffff?text=Mie+Instan"
-  },
-  {
-    name: "Sabun Mandi 120gr",
-    price: 6000,
-    wholesalePrice: 5500,
-    purchasePrice: 4800,
-    stock: 250,
-    category: "Perlengkapan Mandi",
-    unit: "pcs",
-    barcode: "SM005",
-    image: "https://placehold.co/400x400/ec4899/ffffff?text=Sabun"
-  },
-  {
-    name: "Tepung Terigu 1kg",
-    price: 12000,
-    wholesalePrice: 11000,
-    purchasePrice: 9500,
-    stock: 180,
-    category: "Beras & Tepung",
-    unit: "1kg",
-    barcode: "TT006",
-    image: "https://placehold.co/400x400/3b82f6/ffffff?text=Tepung+1kg"
-  },
-  {
-    name: "Kopi Sachet 20pcs",
-    price: 15000,
-    wholesalePrice: 13500,
-    purchasePrice: 12000,
-    stock: 300,
-    category: "Minuman",
-    unit: "20pcs",
-    barcode: "KS007",
-    image: "https://placehold.co/400x400/6366f1/ffffff?text=Kopi+Sachet"
-  },
-  {
-    name: "Popok Bayi XL 30pcs",
-    price: 85000,
-    wholesalePrice: 78000,
-    purchasePrice: 70000,
-    stock: 120,
-    category: "Perlengkapan Bayi",
-    unit: "30pcs",
-    barcode: "PB008",
-    image: "https://placehold.co/400x400/10b981/ffffff?text=Popok+Bayi"
-  },
-  {
-    name: "Tisu Basah 80pcs",
-    price: 10000,
-    wholesalePrice: 9000,
-    purchasePrice: 8500,
-    stock: 200,
-    category: "Perlengkapan Mandi",
-    unit: "80pcs",
-    barcode: "TB009",
-    image: "https://placehold.co/400x400/f59e0b/ffffff?text=Tisu+Basah"
-  },
-  {
-    name: "Susu Bubuk 800gr",
-    price: 120000,
-    wholesalePrice: 110000,
-    purchasePrice: 95000,
-    stock: 80,
-    category: "Minuman",
-    unit: "800gr",
-    barcode: "SB010",
-    image: "https://placehold.co/400x400/8b5cf6/ffffff?text=Susu+Bubuk"
-  }
-];
 
 export default function AdminProducts() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<{id: string, name: string}[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [bulkEdit, setBulkEdit] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   
+  // Pagination & Filter States
+  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [filterType, setFilterType] = useState<'all' | 'low_stock' | 'expired'>('all');
+  const PAGE_SIZE = 15;
+
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    price: 0,
-    wholesalePrice: 0,
-    purchasePrice: 0, // ✅
-    stock: 0,
-    category: '',
-    unit: '',
-    barcode: '',
-    expiredDate: ''
+    name: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1,
+    purchasePrice: 0, stock: 0, category: '', unit: '',
+    barcode: '', expiredDate: '', variants: [] as Variant[]
   });
 
-  // Proteksi akses admin
+  // --- Analitik: Valuasi Aset ---
+  const totalAssetValue = products.reduce((acc, p) => acc + (p.stock * (p.purchasePrice || 0)), 0);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
+      if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
-        router.push('/profil');
-        return;
+        router.push('/profil'); return;
       }
-
-      // Tambahkan contoh produk jika belum ada
-      const productsSnapshot = await getDocs(collection(db, 'products'));
-      if (productsSnapshot.empty) {
-        for (const product of sampleProducts) {
-          await addDoc(collection(db, 'products'), {
-            ...product,
-            stockByWarehouse: { 'gudang-utama': product.stock },
-            createdAt: serverTimestamp()
-          });
-        }
-      }
-
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [router]);
 
-  // Ambil data produk & gudang real-time
   useEffect(() => {
     if (loading) return;
-
-    // Produk
-    const productsRef = collection(db, 'products');
-    const productsQ = query(productsRef, orderBy('name', 'asc'));
-    const productsUnsub = onSnapshot(productsQ, (snapshot) => {
-      const productList: Product[] = [];
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        productList.push({
-          id: doc.id,
-          name: data.name || '',
-          price: data.price || 0,
-          wholesalePrice: data.wholesalePrice || 0,
-          purchasePrice: data.purchasePrice || 0, // ✅
-          stock: data.stock || 0,
-          stockByWarehouse: data.stockByWarehouse || {},
-          category: data.category || '',
-          unit: data.unit || '',
-          barcode: data.barcode || '',
-          image: data.image || 'https://placehold.co/400x400/64748b/ffffff?text=No+Image',
-          expiredDate: data.expiredDate,
-          createdAt: data.createdAt || ''
-        });
-      });
-      setProducts(productList);
+    const q = query(collection(db, 'products'), orderBy('name', 'asc'), limit(PAGE_SIZE));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+      setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
     });
-
-    // Gudang
-    const warehousesRef = collection(db, 'warehouses');
-    const warehousesUnsub = onSnapshot(warehousesRef, (snapshot) => {
-      const warehouseList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name || ''
-      }));
-      setWarehouses(warehouseList);
+    const whUnsub = onSnapshot(collection(db, 'warehouses'), (snap) => {
+      setWarehouses(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
     });
-
-    return () => {
-      productsUnsub();
-      warehousesUnsub();
-    };
+    return () => { unsub(); whUnsub(); };
   }, [loading]);
 
+  useEffect(() => {
+    if (showScanner) {
+      const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
+      scanner.render((data) => { setSearchTerm(data); setShowScanner(false); scanner.clear(); }, () => {});
+      return () => { scanner.clear(); };
+    }
+  }, [showScanner]);
+
+  // --- Functions: CRUD & Actions ---
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -279,602 +110,243 @@ export default function AdminProducts() {
         createdAt: serverTimestamp()
       });
       setShowAddModal(false);
-      setFormData({
-        name: '',
-        price: 0,
-        wholesalePrice: 0,
-        purchasePrice: 0,
-        stock: 0,
-        category: '',
-        unit: '',
-        barcode: '',
-        expiredDate: ''
-      });
-    } catch (err) {
-      alert('Gagal menambahkan produk.');
-      console.error(err);
-    }
+      setFormData({ name: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1, purchasePrice: 0, stock: 0, category: '', unit: '', barcode: '', expiredDate: '', variants: [] });
+    } catch (err) { alert('Gagal menambah'); }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus produk "${name}"?`)) return;
-    try {
-      await deleteDoc(doc(db, 'products', id));
-    } catch (err) {
-      alert('Gagal menghapus produk.');
-      console.error(err);
-    }
+    if (confirm(`Hapus ${name}?`)) await deleteDoc(doc(db, 'products', id));
   };
 
-  const toggleSelect = (id: string) => {
-    if (selectedProducts.includes(id)) {
-      setSelectedProducts(selectedProducts.filter(pid => pid !== id));
-    } else {
-      setSelectedProducts([...selectedProducts, id]);
-    }
-  };
-
-  const handleBulkAction = async (action: 'increase' | 'decrease' | 'setPrice') => {
-    if (selectedProducts.length === 0) {
-      alert('Pilih minimal 1 produk untuk edit massal.');
-      return;
-    }
-
-    let value = 0;
-    if (action !== 'setPrice') {
-      value = parseInt(prompt(`Masukkan jumlah stok untuk ${action === 'increase' ? 'tambah' : 'kurangi'}:`) || '0');
-    } else {
-      value = parseInt(prompt('Masukkan harga ecer baru:') || '0');
-    }
-
-    if (isNaN(value) || value < 0) {
-      alert('Nilai tidak valid.');
-      return;
-    }
-
-    try {
-      for (const id of selectedProducts) {
-        const product = products.find(p => p.id === id);
-        if (product) {
-          if (action === 'setPrice') {
-            await updateDoc(doc(db, 'products', id), { price: value });
-          } else {
-            const newStock = action === 'increase' 
-              ? product.stock + value 
-              : Math.max(0, product.stock - value);
-            
-            const stockByWarehouse = { ...product.stockByWarehouse };
-            const mainWarehouse = warehouses[0]?.id || 'gudang-utama';
-            stockByWarehouse[mainWarehouse] = 
-              (stockByWarehouse[mainWarehouse] || 0) + (action === 'increase' ? value : -value);
-
-            await updateDoc(doc(db, 'products', id), { 
-              stock: newStock,
-              stockByWarehouse
-            });
-          }
-        }
+  const handleBulkAction = async (action: 'increase' | 'setPrice') => {
+    const val = parseInt(prompt(`Masukkan nilai:`) || '0');
+    if (isNaN(val)) return;
+    for (const id of selectedProducts) {
+      const p = products.find(x => x.id === id);
+      if (p) {
+        const update = action === 'setPrice' ? { price: val } : { stock: p.stock + val };
+        await updateDoc(doc(db, 'products', id), update);
       }
-      setSelectedProducts([]);
-    } catch (err) {
-      alert('Gagal edit massal.');
-      console.error(err);
     }
+    setSelectedProducts([]);
   };
 
-  // ✅ Import Excel (aman menggunakan SheetJS 0.20.2+ dari CDN)
-  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      alert('Hanya file Excel (.xlsx, .xls) yang diizinkan!');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File terlalu besar! Maksimal 5MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      if (typeof bstr !== 'string') return;
-      
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-      const productsToImport = data.slice(1)
-        .filter((row: string | any[]) => row.length >= 4)
-        .map((row: any[]) => ({
-          name: row[0] || '',
-          price: Number(row[1]) || 0,
-          wholesalePrice: Number(row[2]) || 0,
-          purchasePrice: Number(row[3]) || 0, // ✅
-          stock: Number(row[4]) || 0,
-          category: row[5] || 'Umum',
-          unit: row[6] || 'pcs',
-          barcode: row[7] || '',
-          image: row[8] || 'https://placehold.co/400x400/64748b/ffffff?text=No+Image',
-          stockByWarehouse: { 'gudang-utama': Number(row[4]) || 0 },
-          createdAt: serverTimestamp()
-        }));
-
-      productsToImport.forEach(async (product: any) => {
-        await addDoc(collection(db, 'products'), product);
-      });
-
-      alert(`Berhasil mengimpor ${productsToImport.length} produk!`);
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
-  };
-
-  // ✅ Export Excel
   const handleExport = () => {
-    const data = products.map(product => ({
-      Nama: product.name,
-      'Harga Ecer': product.price,
-      'Harga Grosir': product.wholesalePrice,
-      'Harga Beli': product.purchasePrice, // ✅
-      Stok: product.stock,
-      Kategori: product.category,
-      Satuan: product.unit,
-      Barcode: product.barcode, // ✅
-      Gambar: product.image
-    }));
-
+    const data = products.map(p => ({ Nama: p.name, Ecer: p.price, Grosir: p.wholesalePrice, Beli: p.purchasePrice, Stok: p.stock, Barcode: p.barcode }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Produk');
     XLSX.writeFile(wb, 'produk-atayatoko.xlsx');
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode.includes(searchTerm) // ✅ Pencarian via barcode
-  );
-
-  const isExpired = (date: string | undefined) => {
-    if (!date) return false;
-    return new Date(date) < new Date();
+  const handlePrintLabel = (p: Product) => {
+    const win = window.open('', '_blank');
+    win?.document.write(`<html><body style="text-align:center;padding:20px;border:1px solid #000;width:150px;"><b>${p.name}</b><br>Rp${p.price.toLocaleString()}<br><br>|| ||| ||<br>${p.barcode}</body></html>`);
+    win?.print();
   };
 
-  // Hitung profit margin
-  const calculateProfitMargin = (product: Product) => {
-    if (!product.purchasePrice || product.purchasePrice <= 0) return 0;
-    return ((product.price - product.purchasePrice) / product.price) * 100;
-  };
+  const filteredProducts = products.filter(p => {
+    const match = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.barcode.includes(searchTerm);
+    if (filterType === 'low_stock') return match && p.stock <= 5;
+    if (filterType === 'expired') return match && p.expiredDate && new Date(p.expiredDate) < new Date();
+    return match;
+  });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat data produk...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-10 text-center">Memuat Sistem...</div>;
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Package className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Manajemen Produk</h1>
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
+      {/* --- Dashboard Header --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-3">
+          <Link href="/admin" className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition shadow-md">
+            <LayoutDashboard size={18} /> Dashboard Admin
+          </Link>
+          <h1 className="text-xl font-bold hidden md:block">/ Manajemen Produk</h1>
         </div>
-        <p className="text-black">Kelola produk grosir & ecer Anda dengan lengkap</p>
+        <div className="flex gap-2">
+          <button onClick={handleExport} className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50">
+            <Download size={16} /> Export
+          </button>
+          <label className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer hover:bg-gray-50">
+            <Upload size={16} /> Import <input type="file" className="hidden" accept=".xlsx" />
+          </label>
+        </div>
       </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
-          {error}
+      {/* --- Valuasi Card --- */}
+      <div className="bg-emerald-600 text-white p-6 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center shadow-lg shadow-emerald-100">
+        <div>
+          <p className="opacity-80 text-sm">Total Nilai Aset (Harga Beli × Stok)</p>
+          <h2 className="text-4xl font-black mt-1">Rp {totalAssetValue.toLocaleString('id-ID')}</h2>
+        </div>
+        <TrendingUp size={48} className="opacity-20 hidden md:block" />
+      </div>
+
+      {/* --- Toolbar Utama --- */}
+      <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input type="text" placeholder="Cari nama, kategori, atau barcode..." className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        <button onClick={() => setShowScanner(!showScanner)} className={`p-3 rounded-2xl border ${showScanner ? 'bg-red-500 text-white' : 'bg-white text-gray-600 border-gray-200 shadow-sm'}`}><Camera size={24} /></button>
+        <select className="p-3 rounded-2xl border border-gray-200 bg-white text-sm" onChange={(e) => setFilterType(e.target.value as any)}>
+          <option value="all">Semua Stok</option>
+          <option value="low_stock">Stok Menipis (≤5)</option>
+          <option value="expired">Kadaluarsa</option>
+        </select>
+        <button onClick={() => setShowAddModal(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all"><Plus size={20} /> Produk Baru</button>
+      </div>
+
+      {/* --- Bulk Actions --- */}
+      {selectedProducts.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+          <span className="text-sm font-bold text-blue-700">{selectedProducts.length} Produk dipilih</span>
+          <button onClick={() => handleBulkAction('increase')} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">+ Stok</button>
+          <button onClick={() => handleBulkAction('setPrice')} className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Ubah Harga</button>
+          <button onClick={() => setSelectedProducts([])} className="text-gray-400 hover:text-black"><X size={18}/></button>
         </div>
       )}
 
-      {/* Aksi Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative w-full md:w-64">
-            <input
-              type="text"
-              placeholder="Cari produk, kategori, atau barcode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-            />
-            <Barcode className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          </div>
-          
-          {selectedProducts.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-black">
-                {selectedProducts.length} dipilih
-              </span>
-              <button
-                onClick={() => handleBulkAction('increase')}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-              >
-                + Stok
-              </button>
-              <button
-                onClick={() => handleBulkAction('decrease')}
-                className="px-3 py-1 bg-orange-600 text-white rounded text-sm"
-              >
-                - Stok
-              </button>
-              <button
-                onClick={() => handleBulkAction('setPrice')}
-                className="px-3 py-1 bg-purple-600 text-white rounded text-sm"
-              >
-                Ubah Harga
-              </button>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer">
-            <Upload size={18} />
-            Import Excel
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleImport}
-              className="hidden"
-            />
-          </label>
-          <button
-            onClick={handleExport}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-          >
-            <Download size={18} />
-            Export Excel
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Tambah Produk
-          </button>
-        </div>
-      </div>
+      {showScanner && <div id="reader" className="mb-6 border-2 border-dashed border-emerald-500 rounded-2xl overflow-hidden"></div>}
 
-      {/* Tabel Produk */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      {/* --- Table Section --- */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th scope="col" className="px-4 py-3 w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.length > 0 && selectedProducts.length === products.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedProducts(products.map(p => p.id));
-                      } else {
-                        setSelectedProducts([]);
-                      }
-                    }}
-                    className="rounded"
-                  />
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Produk
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Harga (Rp)
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Stok
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Aksi
-                </th>
+                <th className="p-4 w-10"><input type="checkbox" onChange={(e) => setSelectedProducts(e.target.checked ? products.map(p=>p.id) : [])} /></th>
+                <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-widest">Info Produk</th>
+                <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-widest">Harga (Ecer/Grosir)</th>
+                <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-widest">Stok / Gudang</th>
+                <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-black">
-                    <Package className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada produk</p>
+            <tbody className="divide-y divide-gray-50">
+              {filteredProducts.map(p => (
+                <tr key={p.id} className="hover:bg-gray-50/80 transition-colors">
+                  <td className="p-4"><input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => setSelectedProducts(prev => prev.includes(p.id) ? prev.filter(x=>x!==p.id) : [...prev, p.id])} /></td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <img src={p.image} className="w-12 h-12 rounded-xl object-cover bg-gray-100 border" alt="" />
+                      <div>
+                        <div className="font-bold text-gray-900 leading-tight">{p.name}</div>
+                        <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-1 font-bold"><Barcode size={10} /> {p.barcode} | {p.category}</div>
+                        <div className="flex gap-1 mt-1">
+                          {p.variants?.map((v, i) => <span key={i} className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-bold uppercase">{v.name}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-sm font-bold">Rp {p.price.toLocaleString()}</div>
+                    <div className="text-emerald-600 text-xs font-bold">Grosir: Rp {p.wholesalePrice.toLocaleString()} <span className="text-gray-400 font-normal">(Min {p.minWholesaleQty})</span></div>
+                    <div className="text-[10px] text-blue-500 mt-1 font-medium italic">Profit: Rp {(p.price - p.purchasePrice).toLocaleString()}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                      {p.stock} {p.unit}
+                    </div>
+                    {warehouses.length > 0 && (
+                      <div className="text-[10px] text-gray-400 mt-1">Utama: {p.stockByWarehouse?.['gudang-utama'] || 0}</div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-2">
+                      <button onClick={() => handlePrintLabel(p)} className="p-2 text-gray-400 hover:text-black hover:bg-white border border-transparent hover:border-gray-200 rounded-xl transition-all" title="Cetak Label"><Printer size={16} /></button>
+                      <Link href={`/admin/products/edit/${p.id}`} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Edit Produk"><Edit size={16} /></Link>
+                      <button onClick={() => handleDelete(p.id, p.name)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Hapus"><Trash2 size={16} /></button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                filteredProducts.map((product) => {
-                  const isLowStock = product.stock <= 10 && product.stock > 0;
-                  const isOutOfStock = product.stock === 0;
-                  const expired = isExpired(product.expiredDate);
-                  const profitMargin = calculateProfitMargin(product);
-
-                  return (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.includes(product.id)}
-                          onChange={() => toggleSelect(product.id)}
-                          className="rounded"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <img 
-                            src={product.image} 
-                            alt={product.name}
-                            className="w-12 h-12 object-cover rounded border"
-                          />
-                          <div>
-                            <div className="font-medium text-black">{product.name}</div>
-                            <div className="text-sm text-black">{product.unit} • {product.category}</div>
-                            {product.barcode && (
-                              <div className="text-xs text-black flex items-center gap-1">
-                                <Barcode size={12} />
-                                {product.barcode}
-                              </div>
-                            )}
-                            {expired && (
-                              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full mt-1">
-                                Expired
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <span className="text-black">Ecer: </span>
-                          <span className="font-medium">Rp{product.price.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div>
-                          <span className="text-green-600">Grosir: Rp{product.wholesalePrice.toLocaleString('id-ID')}</span>
-                        </div>
-                        {product.purchasePrice > 0 && (
-                          <div className="text-xs mt-1">
-                            <span className="text-blue-600 flex items-center gap-1">
-                              <TrendingUp size={12} />
-                              Profit: Rp{(product.price - product.purchasePrice).toLocaleString('id-ID')} 
-                              ({profitMargin.toFixed(0)}%)
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span
-                            className={`font-medium ${
-                              isOutOfStock
-                                ? 'text-red-600'
-                                : isLowStock
-                                ? 'text-orange-600'
-                                : expired
-                                ? 'text-red-600'
-                                : 'text-black'
-                            }`}
-                          >
-                            {product.stock}
-                          </span>
-                          {isLowStock && (
-                            <AlertTriangle className="ml-2 h-4 w-4 text-orange-500" />
-                          )}
-                          {isOutOfStock && (
-                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                              Habis
-                            </span>
-                          )}
-                        </div>
-                        {warehouses.length > 1 && (
-                          <div className="text-xs text-black mt-1">
-                            {warehouses.map(wh => (
-                              <div key={wh.id} className="flex justify-between">
-                                <span>{wh.name}:</span>
-                                <span>{product.stockByWarehouse?.[wh.id] || 0}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        <div className="flex items-center gap-3">
-                          <Link
-                            href={`/admin/products/edit/${product.id}`}
-                            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            <Edit size={16} />
-                            Edit
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(product.id, product.name)}
-                            className="text-red-600 hover:text-red-800 flex items-center gap-1"
-                          >
-                            <Trash2 size={16} />
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+              ))}
             </tbody>
           </table>
         </div>
+
+        {/* --- Pagination --- */}
+        <div className="p-4 bg-gray-50 border-t flex justify-between items-center">
+          <p className="text-xs font-bold text-gray-400">Halaman {page}</p>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-2 border bg-white rounded-xl disabled:opacity-30"><ChevronLeft size={20}/></button>
+            <button onClick={() => setPage(p => p + 1)} className="p-2 border bg-white rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"><ChevronRight size={20}/></button>
+          </div>
+        </div>
       </div>
 
-      {/* Modal Tambah Produk */}
+      {/* --- Modal Tambah --- */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-black">Tambah Produk Baru</h2>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <form onSubmit={handleCreate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Nama Produk *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Kategori
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="Beras, Minyak, dll"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Satuan *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.unit}
-                      onChange={(e) => setFormData({...formData, unit: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="kg, pcs, dus, liter"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Barcode
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.barcode}
-                      onChange={(e) => setFormData({...formData, barcode: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Harga Ecer (Rp) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Harga Grosir (Rp) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={formData.wholesalePrice}
-                      onChange={(e) => setFormData({...formData, wholesalePrice: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Harga Beli (Rp) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={formData.purchasePrice}
-                      onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="Harga dari supplier"
-                    />
-                    {formData.purchasePrice > 0 && formData.price > 0 && (
-                      <p className="text-xs text-black mt-1">
-                        Margin: {(
-                          ((formData.price - formData.purchasePrice) / formData.price) * 100
-                        ).toFixed(1)}%
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Stok Awal *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({...formData, stock: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Tgl Kadaluarsa
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.expiredDate}
-                      onChange={(e) => setFormData({...formData, expiredDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-8 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-black hover:bg-gray-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                  >
-                    Tambah Produk
-                  </button>
-                </div>
-              </form>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black flex items-center gap-2"><Plus className="bg-emerald-100 text-emerald-600 p-1 rounded-lg" /> Tambah Produk Baru</h2>
+              <button onClick={() => setShowAddModal(false)} className="bg-gray-50 p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-all"><X size={20} /></button>
             </div>
+            
+            <form onSubmit={handleCreate} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Nama Produk *</label>
+                  <input required type="text" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Barcode / SKU *</label>
+                  <input required type="text" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Harga Beli (Modal)</label>
+                  <input required type="number" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Harga Jual Ecer</label>
+                  <input required type="number" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Harga Grosir</label>
+                  <input required type="number" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" onChange={(e) => setFormData({...formData, wholesalePrice: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Min. Grosir (Qty)</label>
+                  <input required type="number" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" defaultValue={1} onChange={(e) => setFormData({...formData, minWholesaleQty: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Stok Awal</label>
+                  <input required type="number" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" onChange={(e) => setFormData({...formData, stock: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Satuan (Pcs/Kg)</label>
+                  <input required type="text" className="w-full border-gray-200 border p-3 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="pcs" onChange={(e) => setFormData({...formData, unit: e.target.value})} />
+                </div>
+              </div>
+
+              {/* Varian */}
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Varian Produk (Opsional)</p>
+                <div className="flex gap-2">
+                  <input id="vn" type="text" placeholder="Ukuran/Warna" className="flex-1 border-gray-200 border p-2 rounded-xl text-sm" />
+                  <input id="vp" type="number" placeholder="+ Harga" className="w-24 border-gray-200 border p-2 rounded-xl text-sm" />
+                  <button type="button" onClick={() => {
+                    const n = document.getElementById('vn') as HTMLInputElement;
+                    const p = document.getElementById('vp') as HTMLInputElement;
+                    if(n.value) { setFormData({...formData, variants: [...formData.variants, {name: n.value, additionalPrice: Number(p.value)} ]}); n.value=''; p.value=''; }
+                  }} className="bg-black text-white px-4 rounded-xl text-xs font-bold">Tambah</button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {formData.variants.map((v, i) => (
+                    <span key={i} className="bg-white border px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-2 shadow-sm">
+                      {v.name} (+{v.additionalPrice})
+                      <X size={12} className="text-red-400 cursor-pointer" onClick={() => setFormData({...formData, variants: formData.variants.filter((_, idx)=>idx!==i)})} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-gray-400 font-bold hover:text-black">Batal</button>
+                <button type="submit" className="px-10 py-3 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">Simpan Produk</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
