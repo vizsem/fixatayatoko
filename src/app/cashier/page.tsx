@@ -6,7 +6,6 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
-  getDocs,
   addDoc,
   doc,
   updateDoc,
@@ -30,6 +29,7 @@ import {
   MessageSquare, Truck, CheckCircle, Upload, QrCode, Barcode,
   History, X, Trash2, LayoutGrid, List
 } from 'lucide-react';
+import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 
 // Types
 type Product = {
@@ -39,7 +39,7 @@ type Product = {
   unit: string;
   stock: number;
   barcode?: string;
-  image?: string; // Menampung URL Foto
+  image?: string;
 };
 
 type CartItem = {
@@ -72,7 +72,7 @@ export default function CashierPOS() {
   // States
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // State View Mode
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,7 +97,22 @@ export default function CashierPOS() {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + shippingCost;
 
-  // 1. Load LocalStorage Cart & Auth
+  // --- TAMBAHAN: LOGIKA KOMPRESI PHOTO ---
+  const compressImage = async (file: File) => {
+    const options = {
+      maxSizeMB: 0.2, // Maks 200KB agar database tidak bengkak
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+      fileType: 'image/jpeg'
+    };
+    try {
+      return await imageCompression(file, options);
+    } catch (error) {
+      console.error("Compression error:", error);
+      return file;
+    }
+  };
+
   useEffect(() => {
     const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) setCart(JSON.parse(savedCart));
@@ -113,12 +128,10 @@ export default function CashierPOS() {
     return () => unsubscribe();
   }, [router]);
 
-  // 2. Simpan Cart ke LocalStorage
   useEffect(() => {
     localStorage.setItem('pos-cart', JSON.stringify(cart));
   }, [cart]);
 
-  // 3. Shortcut Keyboard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F1') { e.preventDefault(); searchInputRef.current?.focus(); }
@@ -127,7 +140,6 @@ export default function CashierPOS() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 4. Fetch Products Realtime (Updated with Image Mapping)
   useEffect(() => {
     if (loading) return;
     const unsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -140,7 +152,6 @@ export default function CashierPOS() {
           unit: data.unit || 'pcs',
           stock: data.stock || 0,
           barcode: data.barcode || '',
-          // Mendeteksi berbagai kemungkinan nama field foto
           image: data.image || data.imageUrl || data.photo || null 
         } as Product;
       });
@@ -150,7 +161,6 @@ export default function CashierPOS() {
     return () => unsubscribe();
   }, [loading]);
 
-  // 5. Fetch Completed Orders
   useEffect(() => {
     if (activeTab !== 'orders') return;
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(20));
@@ -160,7 +170,6 @@ export default function CashierPOS() {
     return () => unsubscribe();
   }, [activeTab]);
 
-  // 6. Barcode & Search Logic
   useEffect(() => {
     const filtered = products.filter(p =>
       (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
@@ -175,7 +184,6 @@ export default function CashierPOS() {
     }
   }, [searchQuery, products]);
 
-  // 7. Notifikasi Pesanan Online
   useEffect(() => {
     if (loading) return;
     const q = query(collection(db, 'orders'), where('status', '==', 'MENUNGGU'));
@@ -190,7 +198,6 @@ export default function CashierPOS() {
     return () => unsubscribe();
   }, [loading]);
 
-  // 8. Logika Ongkir & Kembalian
   useEffect(() => {
     const rates: any = { 'Ambil di Toko': 0, 'Kurir Toko': 15000, 'OJOL': 0 };
     setShippingCost(rates[deliveryMethod] || 0);
@@ -202,7 +209,6 @@ export default function CashierPOS() {
     } else { setChange(0); }
   }, [cashGiven, total, paymentMethod]);
 
-  // Functions
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return alert("Stok habis!");
     setCart(prev => {
@@ -217,6 +223,7 @@ export default function CashierPOS() {
     else setCart(cart.map(i => i.id === id ? { ...i, quantity: q } : i));
   };
 
+  // --- HANDLE TRANSACTION (DIUBAH UNTUK KOMPRESI) ---
   const handleTransaction = async () => {
     if (cart.length === 0) return;
     if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof) return alert('Wajib upload bukti!');
@@ -228,8 +235,10 @@ export default function CashierPOS() {
     try {
       let proofUrl = null;
       if (paymentProof) {
+        // PROSES KOMPRESI SEBELUM UPLOAD
+        const compressedFile = await compressImage(paymentProof);
         const sRef = ref(storage, `payment-proofs/${Date.now()}`);
-        await uploadBytes(sRef, paymentProof);
+        await uploadBytes(sRef, compressedFile);
         proofUrl = await getDownloadURL(sRef);
       }
 
@@ -291,7 +300,6 @@ export default function CashierPOS() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Navbar */}
       <nav className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
         <div className="flex items-center gap-6">
           <h1 className="text-xl font-black italic text-green-600">ATAYATOKO <span className="text-gray-400 not-italic font-medium text-sm">POS</span></h1>
@@ -300,7 +308,6 @@ export default function CashierPOS() {
             <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
         </div>
-
         <div className="flex items-center gap-4">
           <button onClick={() => setIsDrawerOpen(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
             <Bell size={20} className="group-hover:text-blue-600" />
@@ -311,7 +318,6 @@ export default function CashierPOS() {
 
       {activeTab === 'pos' ? (
         <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
-          {/* Kiri: Produk */}
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
               <div className="bg-green-50 p-2 rounded-xl text-green-600"><Search size={20}/></div>
@@ -322,36 +328,21 @@ export default function CashierPOS() {
                 placeholder="Cari Produk atau Scan Barcode [F1]..." 
                 className="flex-1 outline-none font-medium text-gray-700"
               />
-              {/* Toggle View Mode */}
               <div className="flex bg-gray-100 p-1 rounded-lg">
                 <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={18}/></button>
                 <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={18}/></button>
               </div>
             </div>
 
-            <div className={viewMode === 'grid' 
-              ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" 
-              : "flex flex-col gap-2 overflow-y-auto pr-2"} 
-              style={{ maxHeight: 'calc(100vh - 200px)' }}
-            >
+            <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} style={{ maxHeight: 'calc(100vh - 200px)' }}>
               {filteredProducts.map(p => (
-                <button 
-                  key={p.id} 
-                  onClick={() => addToCart(p)}
-                  className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${
-                    viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'
-                  }`}
-                >
+                <button key={p.id} onClick={() => addToCart(p)} className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'}`}>
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
-                    {p.image ? (
-                      <img src={p.image} alt={p.name} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                    ) : (
-                      p.barcode ? <Barcode size={24}/> : <Package size={24}/>
-                    )}
+                    {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : p.barcode ? <Barcode size={24}/> : <Package size={24}/>}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
-                    <p className="text-green-600 font-black text-sm">Rp{(p.price || 0).toLocaleString()}</p>
+                    <p className="text-green-600 font-black text-sm">Rp{p.price.toLocaleString()}</p>
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
                       <span className={`text-[10px] font-bold ${p.stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
@@ -362,12 +353,8 @@ export default function CashierPOS() {
             </div>
           </div>
 
-          {/* Kanan: Keranjang */}
           <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
-            {/* Indikator Mode Transaksi */}
-            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${
-              transactionType === 'online' ? 'bg-blue-600 animate-pulse' : 'bg-green-600'
-            }`}>
+            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'online' ? 'bg-blue-600 animate-pulse' : 'bg-green-600'}`}>
               {transactionType === 'online' ? <><Truck size={14}/> MODE PESANAN ONLINE</> : <><CheckCircle size={14}/> MODE TRANSAKSI TOKO</>}
             </div>
 
@@ -384,9 +371,7 @@ export default function CashierPOS() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                {cart.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center opacity-20"><ShoppingCart size={48} /><p className="text-[10px] font-black uppercase mt-2">Kosong</p></div>
-                ) : cart.map(item => (
+                {cart.map(item => (
                   <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex justify-between items-start">
                       <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
@@ -418,13 +403,16 @@ export default function CashierPOS() {
                     {change >= 0 && <p className="text-[10px] font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl h-24 bg-gray-50 cursor-pointer overflow-hidden relative">
-                    {proofPreview ? <img src={proofPreview} className="absolute inset-0 w-full h-full object-cover" /> : <><Upload size={20} className="text-gray-300"/><span className="text-[10px] font-black text-gray-400 mt-1 uppercase">Bukti Bayar</span></>}
-                    <input type="file" className="hidden" onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
-                    }} />
-                  </label>
+                  <div className="space-y-1">
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl h-24 bg-gray-50 cursor-pointer overflow-hidden relative">
+                      {proofPreview ? <img src={proofPreview} className="absolute inset-0 w-full h-full object-cover" /> : <><Upload size={20} className="text-gray-300"/><span className="text-[10px] font-black text-gray-400 mt-1 uppercase">Upload Bukti</span></>}
+                      <input type="file" className="hidden" accept="image/*" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
+                      }} />
+                    </label>
+                    <p className="text-[8px] text-center text-gray-400 font-bold uppercase">Auto-Compress to 200KB</p>
+                  </div>
                 )}
 
                 <div className="flex justify-between items-center py-2">
@@ -439,14 +427,18 @@ export default function CashierPOS() {
                     transactionType === 'online' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-green-600 hover:bg-green-700 shadow-green-100'
                   }`}
                 >
-                  {isProcessing ? 'Proses...' : <><Printer size={16}/> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi'}</>}
+                  {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                       <span>PROSES KOMPRESI...</span>
+                    </div>
+                  ) : <><Printer size={16}/> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi'}</>}
                 </button>
               </div>
             </div>
           </div>
         </main>
       ) : (
-        /* RIWAYAT ORDER */
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto space-y-4">
             <h2 className="font-black text-xl text-gray-800 flex items-center gap-2"><History/> 20 Transaksi Terakhir</h2>
@@ -455,13 +447,13 @@ export default function CashierPOS() {
                 <div className="flex gap-4 items-center">
                   <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24}/></div>
                   <div>
-                    <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)} ({order.transactionType || 'toko'})</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{new Date(order.createdAt?.seconds * 1000).toLocaleString('id-ID')}</p>
+                    <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString('id-ID') : '-'}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-green-600">Rp{(order.total || 0).toLocaleString()}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod} • {order.items?.length || 0} ITEM</p>
+                  <p className="text-sm font-black text-green-600">Rp{order.total?.toLocaleString()}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
                 </div>
                 <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18}/></button>
               </div>
@@ -470,7 +462,6 @@ export default function CashierPOS() {
         </main>
       )}
 
-      {/* DRAWER PESANAN ONLINE (Floating) */}
       {isDrawerOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsDrawerOpen(false)} />
@@ -480,20 +471,17 @@ export default function CashierPOS() {
               <button onClick={() => setIsDrawerOpen(false)}><X/></button>
             </div>
             <div className="p-4 overflow-y-auto h-full pb-20 space-y-4">
-              {recentOrders.length === 0 ? <p className="text-center text-gray-400 mt-20 font-bold uppercase text-[10px]">Kosong</p> : recentOrders.map(o => (
+              {recentOrders.map(o => (
                 <div key={o.id} className="bg-gray-50 border rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-black text-xs uppercase">{o.customerName || 'Customer'}</p>
+                      <p className="font-black text-xs uppercase">{o.customerName}</p>
                       <p className="text-[10px] font-bold text-gray-400">{o.customerPhone}</p>
                     </div>
                     <span className="bg-red-100 text-red-600 text-[8px] font-black px-2 py-1 rounded uppercase">Masuk</span>
                   </div>
-                  <div className="space-y-1">
-                    {o.items?.map((i:any, idx:number) => <p key={idx} className="text-[10px] font-bold text-gray-500">• {i.name} ({i.quantity}x)</p>)}
-                  </div>
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <p className="font-black text-blue-600 text-sm">Rp{(o.total || 0).toLocaleString()}</p>
+                    <p className="font-black text-blue-600 text-sm">Rp{o.total?.toLocaleString()}</p>
                     <div className="flex gap-2">
                       <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16}/></a>
                       <button onClick={async () => {
