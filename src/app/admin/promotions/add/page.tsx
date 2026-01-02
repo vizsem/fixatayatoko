@@ -48,6 +48,7 @@ function AddPromotionContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Promotion>({
+    code: '',
     name: '',
     type: 'product',
     discountType: 'percentage',
@@ -171,6 +172,7 @@ function AddPromotionContent() {
       } else {
         await addDoc(collection(db, 'promotions'), {
           ...formData,
+          code: formData.code || "",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -213,6 +215,7 @@ function AddPromotionContent() {
         {/* Nama */}
         <input
           required
+          
           value={formData.name}
           onChange={(e) =>
             setFormData({ ...formData, name: e.target.value })

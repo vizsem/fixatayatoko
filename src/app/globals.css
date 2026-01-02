@@ -24,19 +24,58 @@ body {
   outline-offset: 2px;
 }
 
+/* --- ANIMASI CUSTOM UNTUK LUXURY UI --- */
+@keyframes bounce-horizontal {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-bounce-horizontal {
+  animation: bounce-horizontal 2s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+
+/* --- UTILITIES UNTUK TAMPILAN PREMIUM --- */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Efek Glassmorphism Luxury */
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20;
+  }
+
+  /* Tracking huruf extra lebar untuk label */
+  .tracking-luxury {
+    letter-spacing: 0.3em;
+  }
+}
+
 /* --- KONFIGURASI CETAK (PRINT MODE) --- */
 @media print {
-  /* Sembunyikan elemen dashboard, tombol, dan navigasi saat print */
   .no-print, 
   nav, 
   footer, 
   button, 
   aside,
-  .floating-action-bar {
+  .floating-action-bar,
+  header {
     display: none !important;
   }
 
-  /* Reset layout agar memenuhi kertas */
   body {
     background: white !important;
     color: black !important;
@@ -44,8 +83,7 @@ body {
     padding: 0;
   }
 
-  /* Hilangkan bayangan dan border container saat print */
-  .max-w-4xl, .max-w-3xl {
+  .max-w-4xl, .max-w-3xl, .max-w-5xl {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
@@ -54,7 +92,6 @@ body {
     box-shadow: none !important;
   }
 
-  /* Pastikan tabel tercetak dengan jelas */
   table {
     width: 100% !important;
     border-collapse: collapse;
@@ -64,19 +101,17 @@ body {
     border-bottom: 1px solid #eee !important;
   }
 
-  /* Paksa browser mencetak warna latar belakang (jika ada logo/badge status) */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Hindari pemotongan halaman di tengah-tengah item tabel */
   tr {
     page-break-inside: avoid;
   }
 }
 
-/* Utilitas Tambahan untuk UI Admin */
+/* Utilitas Tambahan untuk UI Admin & Katalog */
 @layer components {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

@@ -31,7 +31,6 @@ type Category = {
   slug: string;
 };
 
-// Tipe data untuk Promosi dari Back Office
 type Promotion = {
   id: string;
   name: string;
@@ -54,21 +53,41 @@ export default function Home() {
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- LOGIKA SINKRONISASI KERANJANG ---
+  const updateCartCount = () => {
+    if (typeof window !== 'undefined') {
+      const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
+      const count = savedCart.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 0), 0);
+      setCartCount(count);
+    }
+  };
+
+  useEffect(() => {
+    // Jalankan saat pertama kali muat
+    updateCartCount();
+
+    // Dengar perubahan dari halaman lain (seperti /cart)
+    window.addEventListener('cart-updated', updateCartCount);
+    window.addEventListener('storage', updateCartCount);
+
+    return () => {
+      window.removeEventListener('cart-updated', updateCartCount);
+      window.removeEventListener('storage', updateCartCount);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch Produk
         const productsSnapshot = await getDocs(collection(db, 'products'));
         const productList = productsSnapshot.docs.map(doc => {
           const data = doc.data();
-          const price = Number(data.price) || 0;
-          const wholesale = Number(data.wholesalePrice) || price;
           return {
             id: doc.id,
             ...data,
-            price,
-            wholesalePrice: wholesale,
-            minWholesale: data.minWholesale || 10,
+            price: Number(data.price) || 0,
+            wholesalePrice: Number(data.wholesalePrice) || Number(data.price) || 0,
+            minWholesale: Number(data.minWholesale) || 1,
             unit: data.unit || 'pcs',
             category: data.category || 'Umum',
             image: data.image || '/logo-atayatoko.png',
@@ -76,19 +95,22 @@ export default function Home() {
           };
         }) as Product[];
 
-        // 2. Fetch Promosi (Back Office)
         const promoSnapshot = await getDocs(collection(db, 'promotions'));
         const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
         const promoList = promoSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Promotion[];
 
-        // Filter promo yang sedang aktif hari ini
         const currentlyActive = promoList.filter(p => {
+          if (!p.isActive || !p.startDate || !p.endDate) return false;
           const start = new Date(p.startDate);
           const end = new Date(p.endDate);
-          return p.isActive && now >= start && now <= end;
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          return now >= start && now <= end;
         });
         
         setActivePromos(currentlyActive);
@@ -102,9 +124,6 @@ export default function Home() {
         
         setProducts(productList);
         setCategories(categoryList);
-        
-        const savedCart = JSON.parse(localStorage.getItem('atayatoko-cart') || '[]');
-        setCartCount(savedCart.reduce((sum: number, item: any) => sum + item.quantity, 0));
         setWishlist(JSON.parse(localStorage.getItem('atayatoko-wishlist') || '[]'));
       } catch (error) {
         console.error('Gagal memuat data:', error);
@@ -115,39 +134,50 @@ export default function Home() {
     fetchData();
   }, []);
 
-  // Fungsi helper untuk menghitung harga setelah diskon promosi
+  const toggleWishlist = (id: string) => {
+    let newWishlist = [...wishlist];
+    if (newWishlist.includes(id)) {
+      newWishlist = newWishlist.filter(item => item !== id);
+    } else {
+      newWishlist.push(id);
+    }
+    setWishlist(newWishlist);
+    localStorage.setItem('atayatoko-wishlist', JSON.stringify(newWishlist));
+  };
+
   const getDiscountedPrice = (product: Product) => {
-    // Cari promo untuk produk spesifik atau kategori
     const promo = activePromos.find(p => 
       (p.type === 'product' && p.targetId === product.id) || 
       (p.type === 'category' && p.targetName === product.category)
     );
 
     if (promo) {
-      let finalPrice = product.wholesalePrice;
+      let finalPrice = product.price;
       if (promo.discountType === 'percentage') {
-        finalPrice = product.wholesalePrice - (product.wholesalePrice * (promo.discountValue / 100));
+        finalPrice = product.price - (product.price * (promo.discountValue / 100));
       } else {
-        finalPrice = product.wholesalePrice - promo.discountValue;
+        finalPrice = product.price - promo.discountValue;
       }
       return { price: finalPrice, hasPromo: true, promoName: promo.name };
     }
-    return { price: product.wholesalePrice, hasPromo: false, promoName: null };
+    return { price: product.price, hasPromo: false, promoName: null };
   };
 
   const addToCart = (product: Product) => {
     const { price } = getDiscountedPrice(product);
-    let cart = JSON.parse(localStorage.getItem('atayatoko-cart') || '[]');
-    const existingIndex = cart.findIndex((item: any) => item.id === product.id);
-    
-    // Simpan ke keranjang dengan harga yang sudah dipotong promo
-    const productToCart = { ...product, wholesalePrice: price };
+    // GANTI KEY MENJADI 'cart'
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const existingIndex = cart.findIndex((item: any) => (item.id === product.id || item.productId === product.id));
+    const productToCart = { ...product, productId: product.id, price: price };
 
     if (existingIndex >= 0) cart[existingIndex].quantity += 1;
     else cart.push({ ...productToCart, quantity: 1 });
     
-    localStorage.setItem('atayatoko-cart', JSON.stringify(cart));
-    setCartCount(cart.reduce((sum: number, item: any) => sum + item.quantity, 0));
+    localStorage.setItem('cart', JSON.stringify(cart));
+    
+    // Trigger sinkronisasi global
+    updateCartCount();
+    window.dispatchEvent(new Event('cart-updated'));
   };
 
   const filteredProducts = products.filter(product =>
@@ -174,51 +204,69 @@ export default function Home() {
         <div className="flex overflow-x-auto gap-3 px-4 pb-2 scrollbar-hide snap-x">
           {items.slice(0, 10).map((product) => {
             const promoInfo = getDiscountedPrice(product);
+            const isWishlisted = wishlist.includes(product.id);
             return (
-              <div key={product.id} className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm flex flex-col">
-                <Link href={`/produk/${product.id}`} className="relative block aspect-square bg-gray-50">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+              <div key={product.id} className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm flex flex-col relative group transition-transform active:scale-95">
+                <button 
+                  onClick={() => toggleWishlist(product.id)}
+                  className="absolute top-2 right-2 z-20 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md active:scale-75 transition-all"
+                >
+                  <Heart size={14} className={isWishlisted ? "fill-red-500 text-red-500" : "text-gray-400"} />
+                </button>
+
+                <Link href={`/produk/${product.id}`} className="relative block aspect-square bg-gray-50 overflow-hidden">
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  
                   {promoInfo.hasPromo && (
-                    <div className="absolute top-2 left-2 bg-orange-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-1 shadow-lg">
-                      <Sparkles size={8} /> Promo
+                    <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase flex items-center gap-1 shadow-lg animate-pulse">
+                        <Sparkles size={10} className="fill-white" /> Special Deal
+                      </div>
+                      <div className="bg-black/60 backdrop-blur-sm text-white text-[7px] font-bold px-1.5 py-0.5 rounded shadow-sm inline-block w-fit uppercase">
+                        {promoInfo.promoName}
+                      </div>
                     </div>
                   )}
                 </Link>
+
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="text-[10px] md:text-xs font-bold text-gray-700 line-clamp-1 uppercase leading-tight">{product.name}</h3>
                   <p className="text-[8px] font-bold text-gray-400 mb-2 uppercase tracking-tighter">
-                    {product.variant ? `Varian: ${product.variant}` : 'Kemasan Standar'}
+                    {product.variant || 'Kemasan Standar'}
                   </p>
                   
-                  <div className="mb-3 space-y-0.5">
+                  <div className="mb-3 space-y-2">
                     <div className="flex flex-col">
                       {promoInfo.hasPromo && (
-                        <span className="text-[7px] font-black text-orange-500 uppercase leading-none mb-0.5">
-                          {promoInfo.promoName}
+                        <span className="text-[9px] text-gray-400 line-through decoration-red-500/50">
+                          Rp{product.price.toLocaleString()}
                         </span>
                       )}
                       <div className="flex items-baseline gap-1">
-                        <span className={`text-[13px] font-black leading-none ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>
+                        <span className={`text-[15px] font-black leading-none ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>
                           Rp{promoInfo.price.toLocaleString('id-ID')}
                         </span>
-                        <span className="text-[8px] font-bold text-gray-400">/{product.unit}</span>
+                        <span className="text-[9px] font-bold text-gray-400">/{product.unit}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        {promoInfo.hasPromo && (
-                          <span className="text-[8px] text-gray-300 line-through mr-1">
-                            Rp{product.wholesalePrice.toLocaleString()}
+                      
+                      <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex flex-col gap-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">Harga Grosir</span>
+                          <span className="text-[11px] font-black text-slate-900 tracking-tighter">
+                            Rp{product.wholesalePrice?.toLocaleString()}
                           </span>
-                        )}
-                        <span className="text-[8px] font-bold text-blue-600 uppercase italic">Grosir</span>
-                        <span className="text-[7px] font-bold bg-blue-100 text-blue-700 px-1 rounded">
-                          Min. {product.minWholesale}
-                        </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                           <span className="bg-blue-50 text-blue-600 text-[7px] font-black px-1.5 py-0.5 rounded border border-blue-100">
+                             MIN. {product.minWholesale} {product.unit}
+                           </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                   <button 
                     onClick={() => addToCart(product)}
-                    className="mt-auto w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-lg uppercase active:scale-95 transition-all"
+                    className="mt-auto w-full py-2.5 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase active:bg-green-600 transition-colors shadow-lg shadow-gray-200"
                   >
                     + Keranjang
                   </button>
@@ -239,7 +287,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-black pb-24 md:pb-12">
-      {/* Top Banner Marquee */}
       <div className="bg-green-700 text-white py-1.5 overflow-hidden whitespace-nowrap">
         <div className="animate-marquee inline-block text-[10px] font-bold uppercase tracking-widest px-4">
           🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • STOK TERBARU HARI INI • 
@@ -247,7 +294,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
@@ -274,22 +320,19 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Banner (Carousel Promosi) */}
       <section className="px-4 py-4 max-w-7xl mx-auto overflow-hidden">
         <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 scrollbar-hide pb-2">
-          {/* Banner Utama Statis */}
-          <div className="min-w-full snap-center rounded-[2rem] bg-gradient-to-br from-green-600 to-emerald-800 text-white p-8 relative overflow-hidden shadow-lg shadow-green-100">
+          <div className="min-w-[90%] md:min-w-full snap-center rounded-[2rem] bg-gradient-to-br from-green-600 to-emerald-800 text-white p-8 relative overflow-hidden shadow-lg shadow-green-100">
             <div className="relative z-10">
               <h2 className="text-2xl md:text-3xl font-black mb-1 leading-tight uppercase">Pusat Grosir Sembako</h2>
-              <p className="text-green-100 text-[11px] mb-6 max-w-[200px] leading-relaxed">Belanja eceran rasa grosir, dikirim langsung ke pintu rumah Anda.</p>
-              <Link href="/semua-kategori" className="inline-block bg-white text-green-700 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">Mulai Belanja</Link>
+              <p className="text-green-100 text-[11px] mb-6 max-w-[200px] leading-relaxed italic">Belanja eceran rasa grosir, dikirim langsung ke depan pintu.</p>
+              <Link href="/semua-kategori" className="inline-block bg-white text-green-700 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-transform">Mulai Belanja</Link>
             </div>
             <Package size={160} className="absolute -right-10 -bottom-10 opacity-10 rotate-12" />
           </div>
 
-          {/* Banner dari Promo Back Office */}
           {activePromos.map((promo) => (
-            <div key={promo.id} className="min-w-full snap-center rounded-[2rem] bg-gradient-to-br from-orange-500 to-red-600 text-white p-8 relative overflow-hidden shadow-lg">
+            <div key={promo.id} className="min-w-[90%] md:min-w-full snap-center rounded-[2rem] bg-gradient-to-br from-orange-500 to-red-600 text-white p-8 relative overflow-hidden shadow-lg">
               <div className="relative z-10">
                 <span className="text-[8px] font-black bg-white/20 px-2 py-0.5 rounded-full mb-2 inline-block uppercase">Promo Aktif</span>
                 <h2 className="text-2xl md:text-3xl font-black mb-1 leading-tight uppercase">{promo.name}</h2>
@@ -305,7 +348,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pencarian atau Katalog Utama */}
       {searchQuery ? (
         <section className="px-4 py-4 max-w-7xl mx-auto">
             <h2 className="text-sm font-black uppercase mb-4 text-gray-800">Hasil Pencarian</h2>
@@ -314,28 +356,28 @@ export default function Home() {
                     {filteredProducts.map(p => {
                         const promoInfo = getDiscountedPrice(p);
                         return (
-                          <div key={p.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col">
+                          <div key={p.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col relative">
+                              <button onClick={() => toggleWishlist(p.id)} className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 rounded-full shadow-sm">
+                                <Heart size={14} className={wishlist.includes(p.id) ? "fill-red-500 text-red-500" : "text-gray-400"} />
+                              </button>
                               <Link href={`/produk/${p.id}`} className="relative block aspect-square mb-2">
                                   <img src={p.image} alt={p.name} className="w-full h-full object-cover rounded-xl" />
                                   {promoInfo.hasPromo && (
-                                    <div className="absolute top-2 left-2 bg-orange-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Promo</div>
+                                    <div className="absolute top-2 left-2 bg-orange-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-1 shadow-lg">
+                                       <Sparkles size={8} /> Promo
+                                    </div>
                                   )}
                               </Link>
                               <h3 className="text-[11px] font-bold text-gray-700 line-clamp-1 uppercase leading-tight">{p.name}</h3>
-                              <p className="text-[8px] font-bold text-gray-400 mb-2 uppercase tracking-tighter">{p.variant || 'Standar'}</p>
-                              <div className="mb-3">
+                              <div className="mt-2 mb-3">
                                   <div className="flex flex-col">
-                                      <div className="flex items-baseline gap-1">
-                                          <span className={`text-sm font-black leading-none ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>
-                                            Rp{promoInfo.price.toLocaleString('id-ID')}
-                                          </span>
-                                      </div>
-                                      <div className="flex items-center gap-1 mt-0.5">
-                                          <span className="text-[7px] font-bold bg-blue-100 text-blue-700 px-1 rounded">Min. {p.minWholesale}</span>
-                                      </div>
+                                      <span className={`text-[15px] font-black ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>
+                                        Rp{promoInfo.price.toLocaleString('id-ID')}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-blue-600 tracking-tighter">Grosir: Rp{p.wholesalePrice?.toLocaleString()}</span>
                                   </div>
                               </div>
-                              <button onClick={() => addToCart(p)} className="mt-auto w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-lg uppercase shadow-md">+ Keranjang</button>
+                              <button onClick={() => addToCart(p)} className="mt-auto w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-lg uppercase shadow-md active:scale-95 transition-transform">+ Keranjang</button>
                           </div>
                         )
                     })}
@@ -349,14 +391,12 @@ export default function Home() {
         </section>
       ) : (
         <>
-          {/* Baris Promo Khusus yang mengambil data dari Program Promo Back Office */}
           <CatalogRow 
-            title="Sedang Diskon" 
+            title="🔥 Sedang Diskon" 
             items={products.filter(p => getDiscountedPrice(p).hasPromo)} 
             icon={Sparkles} 
             colorClass="bg-orange-500" 
           />
-          
           {categories.map(cat => (
             <CatalogRow 
                 key={cat.id}
@@ -369,7 +409,6 @@ export default function Home() {
         </>
       )}
 
-      {/* Staff Access */}
       <div className="mt-16 mb-12 px-4 flex flex-col items-center opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-4 py-2 px-4 bg-white rounded-xl border border-gray-100 shadow-sm">
           <Link href="/profil/login" className="flex items-center gap-1.5 text-gray-500">
@@ -385,7 +424,6 @@ export default function Home() {
         <p className="mt-3 text-[8px] font-bold text-gray-300 uppercase tracking-[0.2em]">Atayatoko Store © 2026</p>
       </div>
 
-      {/* Navigasi Mobile */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50">
         <Link href="/" className="flex flex-col items-center gap-1 text-green-600">
           <HomeIcon size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Beranda</span>
@@ -396,7 +434,7 @@ export default function Home() {
         <Link href="/cart" className="flex flex-col items-center gap-1 text-gray-400 relative">
           <div className="relative">
             <ShoppingCart size={20} />
-            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{cartCount}</span>}
+            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold rounded-full h-4 w-4 flex items-center justify-center animate-bounce">{cartCount}</span>}
           </div>
           <span className="text-[8px] font-black uppercase tracking-widest">Keranjang</span>
         </Link>

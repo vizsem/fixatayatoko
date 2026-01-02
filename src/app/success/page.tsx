@@ -2,9 +2,9 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import * as htmlToImage from 'html-to-image';
 
@@ -24,10 +24,20 @@ function SuccessContent() {
         return;
       }
       try {
-        const docRef = doc(db, 'orders', orderId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setOrderData(docSnap.data());
+        // PERBAIKAN: Menggunakan Query where('orderId') 
+        // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
+        const q = query(
+          collection(db, 'orders'), 
+          where('orderId', '==', orderId),
+          limit(1)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          setOrderData(querySnapshot.docs[0].data());
+        } else {
+          console.warn("Pesanan tidak ditemukan di database.");
         }
       } catch (error) {
         console.error("Gagal mengambil data pesanan:", error);
@@ -38,12 +48,12 @@ function SuccessContent() {
     fetchOrder();
   }, [orderId]);
 
-  // Menggunakan Optional Chaining (?.) agar tidak error null is not an object
-  const displayTotal = orderData?.total || orderData?.subtotal || 0;
+  // Logic mapping data agar fleksibel
+  const displayTotal = orderData?.total || 0;
   const displayItems = orderData?.items || [];
-  const displayMethod = orderData?.deliveryMethod || orderData?.delivery?.method || 'Ambil di Toko';
-  const displayPayment = orderData?.paymentMethod || orderData?.payment?.method || 'CASH';
-  const displayCustomer = orderData?.customerName || orderData?.name || 'Pelanggan';
+  const displayMethod = orderData?.delivery?.method || orderData?.deliveryMethod || 'Ambil di Toko';
+  const displayPayment = orderData?.payment?.method || orderData?.paymentMethod || 'CASH';
+  const displayCustomer = orderData?.name || orderData?.customerName || 'Pelanggan';
 
   const printThermal = () => {
     if (!orderData) return;
@@ -61,19 +71,20 @@ function SuccessContent() {
     w.document.write(`
       <html>
         <head>
+          <title>Cetak Struk - ${orderId}</title>
           <style>
             @page { margin: 0; }
-            body { font-family: 'Courier New', monospace; width: 58mm; padding: 4mm; font-size: 11px; line-height: 1.2; }
+            body { font-family: 'Courier New', monospace; width: 58mm; padding: 4mm; font-size: 11px; line-height: 1.2; background: white; }
             .center { text-align: center; }
             .bold { font-weight: bold; }
             .line { border-top: 1px dashed #000; margin: 5px 0; }
           </style>
         </head>
-        <body onload="window.print(); window.close();">
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 500);">
           <div class="center bold" style="font-size: 14px;">ATAYA TOKO</div>
           <div class="center">KEDIRI - JATIM</div>
           <div class="line"></div>
-          <div>ID: ${orderId?.slice(-8).toUpperCase()}</div>
+          <div>ID: ${orderId?.toUpperCase()}</div>
           <div>Tgl: ${new Date().toLocaleString('id-ID')}</div>
           <div class="line"></div>
           ${itemsHtml}
@@ -93,15 +104,18 @@ function SuccessContent() {
     if (!invoiceRef.current) return;
     setIsDownloading(true);
     try {
+      // Tunggu sebentar untuk memastikan font ter-render
       const dataUrl = await htmlToImage.toJpeg(invoiceRef.current, {
         quality: 0.95,
         backgroundColor: '#ffffff',
+        pixelRatio: 2 // Menambah ketajaman gambar
       });
       const link = document.createElement('a');
       link.download = `Nota-Ataya-${orderId}.jpg`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
+      console.error(err);
       alert('Gagal menyimpan nota');
     } finally {
       setIsDownloading(false);
@@ -118,8 +132,19 @@ function SuccessContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+        <Loader2 className="animate-spin text-green-600" size={48} />
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Memuat Data Pesanan...</p>
+      </div>
+    );
+  }
+
+  if (!orderData && !loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+        <h1 className="text-xl font-bold text-gray-800">Maaf, Data Tidak Ditemukan</h1>
+        <p className="text-gray-500 mb-6 mt-2">Pesanan dengan ID <b>{orderId}</b> mungkin masih diproses atau tidak ada.</p>
+        <Link href="/" className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold">Kembali ke Toko</Link>
       </div>
     );
   }
@@ -129,7 +154,7 @@ function SuccessContent() {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden text-center p-6 md:p-10 relative">
           <div className="flex justify-center mb-6">
-            <div className="bg-green-100 p-4 rounded-full text-green-600">
+            <div className="bg-green-100 p-4 rounded-full text-green-600 animate-bounce">
               <CheckCircle size={64} />
             </div>
           </div>
@@ -150,23 +175,18 @@ function SuccessContent() {
             </div>
           </div>
 
-          {/* RINCIAN ITEM TAMPILAN LAYAR */}
           <div className="text-left mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
             <h3 className="font-black text-gray-400 text-[10px] uppercase tracking-widest border-b pb-2 mb-3">Rincian Pesanan</h3>
             <div className="space-y-3">
-              {displayItems.length > 0 ? (
-                displayItems.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-50 pb-2 italic">
-                    <div className="pr-4">
-                      <p className="font-bold text-gray-800 uppercase text-[11px] leading-tight">{item.name}</p>
-                      <p className="text-[10px] text-gray-500">{item.quantity} x Rp{item.price?.toLocaleString()}</p>
-                    </div>
-                    <p className="font-bold text-gray-900 text-xs">Rp{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</p>
+              {displayItems.map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-50 pb-2">
+                  <div className="pr-4">
+                    <p className="font-bold text-gray-800 uppercase text-[11px] leading-tight">{item.name}</p>
+                    <p className="text-[10px] text-gray-500">{item.quantity} x Rp{item.price?.toLocaleString()}</p>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-center text-gray-400 py-2 italic">Item tidak ditemukan</p>
-              )}
+                  <p className="font-bold text-gray-900 text-xs">Rp{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -193,15 +213,15 @@ function SuccessContent() {
               disabled={isDownloading}
               className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg active:scale-95 disabled:bg-gray-400"
             >
-              {isDownloading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ImageIcon size={18} /> <span>Nota Foto</span></>}
+              {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <><ImageIcon size={18} /> <span>Simpan Gambar Nota</span></>}
             </button>
             <button onClick={printThermal} className="flex items-center justify-center space-x-2 bg-gray-800 text-white py-3.5 rounded-xl font-bold hover:bg-black shadow-lg active:scale-95">
               <Printer size={18} />
-              <span>Cetak Struk</span>
+              <span>Cetak Struk Thermal</span>
             </button>
             <Link href="/" className="md:col-span-2 flex items-center justify-center space-x-2 bg-green-600 text-white py-3.5 rounded-xl font-bold hover:bg-green-700 shadow-lg active:scale-95">
               <ShoppingBag size={18} />
-              <span>Kembali Belanja</span>
+              <span>Belanja Lagi</span>
             </Link>
           </div>
 
@@ -214,17 +234,17 @@ function SuccessContent() {
       </div>
 
       {/* --- TEMPLATE NOTA FOTO (HIDDEN) --- */}
-      <div className="absolute left-[-9999px] top-0 shadow-none">
+      <div className="fixed left-[-9999px] top-0 shadow-none pointer-events-none">
         <div ref={invoiceRef} className="bg-white p-10" style={{ width: '500px', fontFamily: 'monospace' }}>
           <div className="text-center border-b-2 border-dashed border-black pb-6 mb-6">
             <h1 className="text-3xl font-black italic">ATAYA TOKO</h1>
-            <p>KEDIRI, JAWA TIMUR</p>
-            <p>WA: 085853161174</p>
+            <p className="text-sm">KEDIRI, JAWA TIMUR</p>
+            <p className="text-sm">WA: 085853161174</p>
           </div>
           <div className="space-y-1 mb-6 text-sm">
-            <p className="flex justify-between"><span>ID TRANS:</span> <strong>{orderId?.toUpperCase()}</strong></p>
-            <p className="flex justify-between"><span>NAMA:</span> <strong>{displayCustomer}</strong></p>
-            <p className="flex justify-between"><span>TANGGAL:</span> <span>{new Date().toLocaleString('id-ID')}</span></p>
+            <div className="flex justify-between"><span>ID TRANS:</span> <strong>{orderId?.toUpperCase()}</strong></div>
+            <div className="flex justify-between"><span>NAMA:</span> <strong>{displayCustomer}</strong></div>
+            <div className="flex justify-between"><span>TANGGAL:</span> <span>{new Date().toLocaleString('id-ID')}</span></div>
           </div>
           <table className="w-full text-sm mb-6 border-t border-black">
             <thead>
@@ -236,8 +256,8 @@ function SuccessContent() {
             </thead>
             <tbody>
               {displayItems.map((item: any, idx: number) => (
-                <tr key={idx} className="border-b border-gray-100 italic">
-                  <td className="py-2">{item.name}</td>
+                <tr key={idx} className="border-b border-gray-100">
+                  <td className="py-2 text-[12px] uppercase">{item.name}</td>
                   <td className="text-center">{item.quantity}</td>
                   <td className="text-right">{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</td>
                 </tr>
@@ -259,7 +279,7 @@ function SuccessContent() {
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-green-600" size={32} /></div>}>
       <SuccessContent />
     </Suspense>
   );

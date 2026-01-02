@@ -9,7 +9,8 @@ import {
 } from 'firebase/firestore';
 import { 
   ShoppingCart, Search, Truck, Printer, XCircle,
-  LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft, Clock
+  LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft, Clock,
+  CheckCircle2 // Import icon tambahan
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -59,7 +60,6 @@ export default function AdminOrders() {
 
   // 3. Fungsi Cetak Cepat
   const handlePrint = (orderId: string) => {
-    // Membuka jendela cetak atau mengarahkan ke halaman khusus print
     router.push(`/admin/orders/print/${orderId}`);
   };
 
@@ -79,6 +79,21 @@ export default function AdminOrders() {
       alert('Berhasil diperbarui!');
     } catch (err) {
       alert('Gagal memperbarui status.');
+    }
+  };
+
+  // FITUR TANDAI SEMUA (Sesuai Filter yang sedang aktif)
+  const handleSelectAll = () => {
+    const filteredIds = currentItems.map(order => order.id);
+    
+    // Jika semua item di halaman ini sudah terpilih, maka kosongkan (unselect all)
+    const isAllSelected = filteredIds.every(id => selectedOrders.includes(id));
+    
+    if (isAllSelected) {
+      setSelectedOrders(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      // Tambahkan ID yang belum terpilih
+      setSelectedOrders(prev => [...new Set([...prev, ...filteredIds])]);
     }
   };
 
@@ -120,7 +135,7 @@ export default function AdminOrders() {
       </div>
 
       {/* Toolbar Cari & Filter */}
-      <div className="flex flex-wrap gap-3 mb-6 no-print">
+      <div className="flex flex-wrap gap-3 mb-6 no-print items-center">
         <div className="flex-1 min-w-[300px] relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
             <input
@@ -131,6 +146,19 @@ export default function AdminOrders() {
               onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
             />
         </div>
+        
+        {/* TOMBOL TANDAI SEMUA */}
+        <button 
+          onClick={handleSelectAll}
+          className={`flex items-center gap-2 px-6 py-4 rounded-[1.5rem] text-[10px] font-black transition-all border tracking-widest uppercase ${
+            currentItems.length > 0 && currentItems.every(id => selectedOrders.includes(id.id))
+            ? 'bg-emerald-600 text-white border-emerald-600'
+            : 'bg-white text-black border-gray-100 shadow-sm'
+          }`}
+        >
+          <CheckCircle2 size={16} /> Tandai Hal Ini
+        </button>
+
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {['SEMUA', 'MENUNGGU', 'DIPROSES', 'SELESAI'].map((tab) => (
                 <button
@@ -146,7 +174,7 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Floating Bulk Action (Muncul jika ada pilihan) */}
+      {/* Floating Bulk Action */}
       {selectedOrders.length > 0 && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-5 rounded-[2rem] shadow-2xl z-50 flex items-center gap-6 border border-white/10 no-print">
             <div className="text-xs font-black uppercase tracking-widest">{selectedOrders.length} Dipilih</div>
@@ -174,19 +202,19 @@ export default function AdminOrders() {
                 }`}
             >
               {/* Checkbox */}
-              <button onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} className="text-gray-200 hover:text-black">
+              <button onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} className="text-gray-200 hover:text-black transition-colors">
                 {selectedOrders.includes(order.id) ? <CheckSquare size={26} className="text-black" /> : <Square size={26} />}
               </button>
 
               {/* Info Utama */}
               <div className="flex-1 flex items-center gap-4 w-full">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${getStatusColor(order.status)}`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${getStatusColor(order.status)}`}>
                   <ShoppingCart size={24} />
                 </div>
                 <div className="overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-black text-xs uppercase">ORD-{order.id.substring(0, 5)}</span>
-                    <span className={`text-[8px] px-2 py-1 rounded-lg font-black tracking-widest uppercase ${getStatusColor(order.status)}`}>
+                    <span className={`text-[8px] px-2 py-1 rounded-lg font-black tracking-widest uppercase transition-colors ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
                   </div>

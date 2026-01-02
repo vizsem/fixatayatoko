@@ -1,20 +1,13 @@
-// src/app/kategori/[slug]/page.tsx
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Store, Package, Star } from 'lucide-react';
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  where 
-} from 'firebase/firestore';
+import { Store, Package, ArrowLeft, ShoppingCart, Sparkles } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { ArrowLeft } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 
-// ✅ Tipe Product lokal — sesuai dengan Firestore dan cart.ts
 type Product = {
   id: string;
   name: string;
@@ -23,9 +16,7 @@ type Product = {
   category: string;
   unit: string;
   image: string;
-  barcode?: string;
-  rating?: number;
-  originalPrice?: number;
+  variant?: string;
 };
 
 type Category = {
@@ -34,159 +25,190 @@ type Category = {
   slug: string;
 };
 
-const StarRating = ({ rating }: { rating: number }) => {
-  return (
-    <div className="flex items-center">
-      {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={16}
-          className={i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-        />
-      ))}
-      <span className="ml-1 text-sm text-gray-600">{rating}</span>
-    </div>
-  );
+type Promotion = {
+  id: string;
+  name: string;
+  type: 'product' | 'category';
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  targetId?: string;
+  targetName?: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
 };
 
-function CategoryContent() {
+function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const slug = searchParams.get('slug');
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
   
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
+  const [activePromos, setActivePromos] = useState<Promotion[]>([]);
 
   useEffect(() => {
-    const fetchCategoryData = async () => {
-      if (!slug) {
-        router.push('/');
-        return;
-      }
-
+    const fetchData = async () => {
       try {
-        // Ambil kategori dari Firestore
-        const categoriesSnap = await getDocs(collection(db, 'categories'));
-        const catList = categoriesSnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Category[];
+        setLoading(true);
 
-        const foundCategory = catList.find(c => c.slug === slug);
-        if (!foundCategory) {
-          router.push('/404');
-          return;
-        }
-
-        // Ambil produk berdasarkan kategori
-        const q = query(
-          collection(db, 'products'),
-          where('category', '==', foundCategory.name)
-        );
-        const productsSnap = await getDocs(q);
-        const productList = productsSnap.docs.map(doc => ({
+        // 1. Ambil Semua Produk (Logic Utama)
+        const productsSnap = await getDocs(collection(db, 'products'));
+        const allProducts = productsSnap.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Product[];
 
-        setCategory(foundCategory);
-        setProducts(productList);
+        // 2. Ambil Promo Aktif
+        const promoSnap = await getDocs(collection(db, 'promotions'));
+        const now = new Date();
+        const promoList = promoSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Promotion))
+          .filter(p => p.isActive && now >= new Date(p.startDate) && now <= new Date(p.endDate));
+        setActivePromos(promoList);
+
+        // 3. Filter Produk Berdasarkan Slug (Logic Anti-Gagal)
+        const filtered = allProducts.filter(p => {
+          if (!p.category) return false;
+          
+          // Konversi nama kategori produk menjadi slug untuk dicocokkan dengan URL
+          const generatedSlug = p.category
+            .toLowerCase()
+            .replace(/&/g, 'dan')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+            
+          return generatedSlug === slug;
+        });
+
+        // 4. Ambil Info Kategori dari koleksi categories (sebagai data pendukung)
+        const categoriesSnap = await getDocs(collection(db, 'categories'));
+        const foundCategory = categoriesSnap.docs
+          .map(doc => doc.data() as Category)
+          .find(c => c.slug === slug);
+
+        if (filtered.length > 0) {
+          setCategory({
+            id: foundCategory?.id || `cat-${slug}`,
+            name: foundCategory?.name || filtered[0].category,
+            slug: slug
+          });
+          setProducts(filtered);
+        } else if (foundCategory) {
+          // Jika kategori ada di database tapi produk belum ada
+          setCategory(foundCategory);
+          setProducts([]);
+        } else {
+          // Jika benar-benar tidak ada, kembali ke beranda
+          router.push('/');
+        }
+
       } catch (error) {
-        console.error('Gagal memuat kategori:', error);
-        router.push('/404');
+        console.error('Error Detail:', error);
+        toast.error("Gagal memuat data");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCategoryData();
+    if (slug) fetchData();
   }, [slug, router]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-      </div>
+  const getDiscountedPrice = (product: Product) => {
+    const promo = activePromos.find(p => 
+      (p.type === 'product' && p.targetId === product.id) || 
+      (p.type === 'category' && p.targetName?.toLowerCase() === product.category?.toLowerCase())
     );
-  }
+
+    if (promo) {
+      const price = promo.discountType === 'percentage' 
+        ? product.price - (product.price * (promo.discountValue / 100))
+        : product.price - promo.discountValue;
+      return { price, hasPromo: true };
+    }
+    return { price: product.price, hasPromo: false };
+  };
+
+  const addToCart = (product: Product) => {
+    const { price } = getDiscountedPrice(product);
+    let cart = JSON.parse(localStorage.getItem('atayatoko-cart') || '[]');
+    const existing = cart.findIndex((item: any) => item.id === product.id);
+    
+    if (existing >= 0) cart[existing].quantity += 1;
+    else cart.push({ ...product, price, quantity: 1 });
+    
+    localStorage.setItem('atayatoko-cart', JSON.stringify(cart));
+    toast.success(`${product.name} ditambah!`, {
+      icon: '🛒',
+      style: { borderRadius: '15px', background: '#333', color: '#fff', fontSize: '10px', fontWeight: 'bold' }
+    });
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-600"></div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-2">
-            <Link href="/" className="text-gray-600 hover:text-green-600">
-              <ArrowLeft size={20} />
-            </Link>
-            <Store className="text-green-600" size={28} />
-            <div>
-              <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
-              <p className="text-xs text-gray-600">Ecer & Grosir</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <Toaster position="top-center" />
+      
+      <header className="bg-white border-b sticky top-0 z-50 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-4">
+          <button onClick={() => router.push('/')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <ArrowLeft size={20} className="text-gray-600" />
+          </button>
+          <h1 className="text-[12px] font-black uppercase tracking-widest text-gray-800">
+            {category?.name || 'Kategori'}
+          </h1>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {category ? (
-          <>
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">{category.name}</h1>
-              <Link 
-                href="/" 
-                className="text-green-600 hover:text-green-800 text-sm"
-              >
-                ← Kembali ke Beranda
-              </Link>
-            </div>
-
-            {products.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="mx-auto text-gray-400 mb-4" size={48} />
-                <p className="text-gray-600">Tidak ada produk di kategori ini.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {products.map((product) => (
-                  <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                    <Link href={`/produk/${product.id}`} className="block">
-                      <img 
-                        src={product.image || '/logo-atayatoko.png'} 
-                        alt={product.name} 
-                        className="w-full h-48 object-cover"
-                      />
-                    </Link>
-                    <div className="p-4">
-                      <Link href={`/produk/${product.id}`}>
-                        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">{product.name}</h3>
-                      </Link>
-                      <p className="text-sm text-gray-600 mb-2">{product.unit}</p>
-                      
-                      {/* ✅ Tampilkan rating jika ada */}
-                      {product.rating !== undefined && product.rating > 0 && (
-                        <StarRating rating={product.rating} />
-                      )}
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <div>
-                          <span className="text-lg font-bold text-green-600">
-                            Rp{product.price.toLocaleString('id-ID')}
-                          </span>
-                        </div>
-                        {product.barcode && (
-                          <span className="text-xs text-gray-500">#{product.barcode}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {products.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-inner">
+            <Package className="mx-auto text-gray-200 mb-4" size={64} />
+            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest leading-relaxed px-10">
+              Maaf, produk untuk kategori ini <br/> sedang tidak tersedia
+            </p>
+          </div>
         ) : (
-          <div className="text-center py-12">
-            <h2 className="text-xl text-gray-900">Kategori tidak ditemukan</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {products.map((product) => {
+              const promo = getDiscountedPrice(product);
+              return (
+                <div key={product.id} className="bg-white rounded-[2rem] border border-gray-100 p-3 shadow-sm relative group active:scale-95 transition-all">
+                  {promo.hasPromo && (
+                    <div className="absolute top-4 left-4 z-10 bg-red-600 text-white text-[7px] font-black px-2 py-0.5 rounded shadow-lg animate-pulse flex items-center gap-1 uppercase">
+                      <Sparkles size={8} /> Promo
+                    </div>
+                  )}
+                  
+                  <Link href={`/produk/${product.id}`} className="block aspect-square mb-3 overflow-hidden rounded-2xl bg-gray-50">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  </Link>
+
+                  <h3 className="text-[10px] font-black text-gray-800 uppercase line-clamp-2 mb-1 leading-tight h-7">{product.name}</h3>
+                  <div className="mb-3 h-10">
+                    {promo.hasPromo && (
+                      <p className="text-[9px] text-gray-400 line-through">Rp{product.price.toLocaleString()}</p>
+                    )}
+                    <p className={`text-sm font-black ${promo.hasPromo ? 'text-red-600' : 'text-green-600'}`}>
+                      Rp{promo.price.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <button 
+                    onClick={() => addToCart(product)}
+                    className="w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase shadow-md active:bg-green-600 transition-colors"
+                  >
+                    + Keranjang
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -194,10 +216,10 @@ function CategoryContent() {
   );
 }
 
-export default function CategoryPage() {
+export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
-    <Suspense fallback={<div className="p-6">Memuat kategori...</div>}>
-      <CategoryContent />
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Memuat...</div>}>
+      <CategoryContent params={params} />
     </Suspense>
   );
 }

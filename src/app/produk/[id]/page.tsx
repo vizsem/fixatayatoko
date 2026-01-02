@@ -1,245 +1,244 @@
-// src/app/produk/[id]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Package, Truck, RotateCcw, Store, ArrowLeft, Heart, ShoppingCart } from 'lucide-react';
+import { 
+  ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2 
+} from 'lucide-react';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, limit, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
-import { addToCart } from '@/lib/cart';
-
-// ✅ Tipe produk lokal
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  wholesalePrice?: number;
-  purchasePrice?: number;
-  stock: number;
-  category: string;
-  unit: string;
-  barcode?: string;
-  image: string;
-  description?: string;
-  rating?: number;
-  originalPrice?: number;
-};
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
   const productId = params?.id as string;
 
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<any | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      if (!productId) {
-        router.push('/404');
-        return;
-      }
+    let tempId = localStorage.getItem('temp_user_id');
+    if (!tempId) {
+      tempId = 'user_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('temp_user_id', tempId);
+    }
+    setUserId(tempId);
 
+    const fetchData = async () => {
+      if (!productId) return;
       try {
         const docRef = doc(db, 'products', productId);
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setProduct({
-            id: docSnap.id,
-            name: data.name || 'Produk Tanpa Nama',
-            price: data.price || 0,
-            wholesalePrice: data.wholesalePrice,
-            purchasePrice: data.purchasePrice,
-            stock: data.stock || 0,
-            category: data.category || 'Lainnya',
-            unit: data.unit || 'pcs',
-            barcode: data.barcode,
-            image: data.image || '/logo-atayatoko.png',
-            description: data.description,
-            rating: data.rating,
-            originalPrice: data.originalPrice
-          });
+          setProduct({ id: docSnap.id, ...data });
 
-          // Cek apakah di wishlist
+          const q = query(collection(db, 'products'), where('category', '==', data.category), limit(8));
+          const relatedSnap = await getDocs(q);
+          setRelatedProducts(relatedSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.id !== productId));
+
           const wishlist = getWishlist();
           setInWishlist(wishlist.includes(productId));
-        } else {
-          router.push('/404');
         }
-      } catch (error) {
-        console.error('Gagal memuat produk:', error);
-        router.push('/404');
-      } finally {
-        setLoading(false);
-      }
+      } catch (error) { console.error(error); } finally { setLoading(false); }
     };
+    fetchData();
+  }, [productId]);
 
-    fetchProduct();
-  }, [productId, router]);
-
-  const handleAddToCart = () => {
-    if (product) {
-      addToCart(product);
-      alert('Produk ditambahkan ke keranjang!');
-    }
-  };
-
-  const handleToggleWishlist = () => {
-    if (!product) return;
+  // --- FUNGSI SINKRONISASI DIPERBAIKI ---
+  const syncToFirebaseCart = async (p: any, q: number) => {
+    setIsAdding(true);
     
-    if (inWishlist) {
-      // ❌ Hapus dari wishlist (opsional, jika Anda punya fungsi)
-      const wishlist = getWishlist().filter(id => id !== product.id);
-      localStorage.setItem('atayatoko-wishlist', JSON.stringify(wishlist));
+    // 1. Simpan ke Local Storage (Gunakan Key 'cart' & properti 'productId')
+    const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const idToMatch = p.id || p.productId;
+    const localIdx = localCart.findIndex((item: any) => (item.productId === idToMatch || item.id === idToMatch));
+    
+    const minGrosir = p.minWholesale || p.minGrosir || 10;
+    const finalPrice = (p.wholesalePrice && q >= minGrosir) ? p.wholesalePrice : p.price;
+
+    if (localIdx > -1) {
+      localCart[localIdx].quantity += q;
+      localCart[localIdx].price = finalPrice;
     } else {
-      addToWishlist(product.id);
+      localCart.push({ 
+        productId: idToMatch, 
+        id: idToMatch, 
+        name: p.name, 
+        price: finalPrice, 
+        image: p.image, 
+        unit: p.unit, 
+        quantity: q,
+        wholesalePrice: p.wholesalePrice,
+        minWholesale: minGrosir
+      });
     }
+
+    localStorage.setItem('cart', JSON.stringify(localCart));
     
-    setInWishlist(!inWishlist);
+    // Trigger event agar badge keranjang di Navbar langsung update
+    window.dispatchEvent(new Event('cart-updated'));
+    window.dispatchEvent(new Event('storage'));
+
+    // 2. Sinkronkan ke Firebase Cloud
+    if (userId) {
+      try {
+        const cartRef = doc(db, 'carts', userId);
+        const cartSnap = await getDoc(cartRef);
+        let cloudItems = cartSnap.exists() ? cartSnap.data().items : [];
+        
+        const existingIndex = cloudItems.findIndex((item: any) => item.productId === idToMatch);
+        if (existingIndex > -1) {
+          cloudItems[existingIndex].quantity += q;
+          cloudItems[existingIndex].price = finalPrice;
+        } else {
+          cloudItems.push({
+            productId: idToMatch,
+            name: p.name,
+            price: finalPrice,
+            image: p.image,
+            unit: p.unit,
+            quantity: q,
+            addedAt: new Date().toISOString()
+          });
+        }
+
+        await setDoc(cartRef, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
+        toast.success(`${p.name} ditambah`, {
+          icon: '✅',
+          style: { borderRadius: '15px', background: '#1a1a1a', color: '#fff', fontSize: '11px', fontWeight: 'bold' }
+        });
+      } catch (error) {
+        console.error("Cloud sync error:", error);
+      } finally {
+        setIsAdding(false);
+      }
+    } else {
+      setIsAdding(false);
+      toast.success("Tersimpan di perangkat");
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-      </div>
-    );
-  }
+  const handleQuantity = (type: 'plus' | 'minus') => {
+    if (type === 'plus') setQuantity(prev => prev + 1);
+    if (type === 'minus' && quantity > 1) setQuantity(prev => prev - 1);
+  };
 
-  if (!product) {
-    return null;
-  }
+  if (loading || !product) return <div className="min-h-screen flex items-center justify-center font-black text-gray-300 animate-pulse">MEMUAT PRODUK...</div>;
+
+  const isWholesaleEligible = product.wholesalePrice && quantity >= (product.minWholesale || 10);
+  const currentPrice = isWholesaleEligible ? product.wholesalePrice! : product.price;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-2">
-            <Link href="/" className="text-gray-600 hover:text-green-600">
-              <ArrowLeft size={20} />
-            </Link>
-            <Store className="text-green-600" size={28} />
-            <div>
-              <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
-              <p className="text-xs text-gray-600">Ecer & Grosir</p>
-            </div>
+    <div className="min-h-screen bg-white pb-32">
+      <Toaster position="top-center" />
+      
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-50 px-4 py-4 flex items-center justify-between">
+          <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ArrowLeft size={20}/></button>
+          <div className="flex flex-col items-center">
+            <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400">Atayatoko</h1>
+            <span className="text-[10px] font-bold text-green-600 uppercase">Product Gallery</span>
           </div>
-        </div>
+          <Link href="/cart" className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ShoppingCart size={20} className="text-gray-700" /></Link>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link href="/" className="text-green-600 hover:text-green-800 mb-6 inline-block">
-          ← Kembali ke Beranda
-        </Link>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Gambar Produk */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <img 
-              src={product.image} 
-              alt={product.name} 
-              className="w-full h-96 object-cover rounded"
-            />
+      <div className="max-w-5xl mx-auto px-4 pt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          <div className="relative">
+            <div className="aspect-square rounded-[3rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-2xl relative">
+              <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+            </div>
+            <button onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} className="absolute top-6 right-6 p-4 bg-white/90 backdrop-blur shadow-2xl rounded-full active:scale-90 transition-all">
+              <Heart size={20} className={inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-300'} />
+            </button>
           </div>
 
-          {/* Detail Produk */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex justify-between items-start mb-4">
-              <h1 className="text-3xl font-bold text-black">{product.name}</h1>
-              <button
-                onClick={handleToggleWishlist}
-                className="p-2 text-gray-500 hover:text-red-500"
-              >
-                <Heart 
-                  size={24} 
-                  className={inWishlist ? 'fill-red-500 text-red-500' : ''}
-                />
-              </button>
+          <div className="flex flex-col">
+            <div className="mb-6">
+              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-lg mb-4 inline-block">{product.category}</span>
+              <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-[0.85] mb-2">{product.name}</h1>
+              <p className="text-gray-400 text-[10px] font-bold uppercase">Harga Per {product.unit}</p>
             </div>
 
-            <p className="text-gray-600 mb-4">{product.category} • {product.unit}</p>
-
-            {product.description && (
-              <p className="text-gray-700 mb-6">{product.description}</p>
-            )}
-
-            {/* Harga */}
-            <div className="mb-6">
-              {product.originalPrice && product.originalPrice > product.price && (
-                <p className="text-gray-500 line-through">
-                  Rp{product.originalPrice.toLocaleString('id-ID')}
-                </p>
-              )}
-              <p className="text-2xl font-bold text-green-600">
-                Rp{product.price.toLocaleString('id-ID')} <span className="text-base font-normal">/ ecer</span>
-              </p>
-              {product.wholesalePrice && (
-                <p className="text-gray-700">
-                  Grosir: Rp{product.wholesalePrice.toLocaleString('id-ID')}
-                </p>
-              )}
-            </div>
-
-            {/* Stok & Barcode */}
-            <div className="mb-6">
-              <div className="flex items-center gap-4">
-                <span className={`px-2 py-1 rounded ${
-                  product.stock > 10 ? 'bg-green-100 text-green-800' : 
-                  product.stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {product.stock > 0 ? `${product.stock} tersedia` : 'Habis'}
+            <div className={`rounded-[2.5rem] p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-50 border-orange-200 shadow-inner' : 'bg-gray-50 border-gray-100'}`}>
+              <div className="flex items-end gap-2">
+                <span className={`text-5xl font-black tracking-tighter ${isWholesaleEligible ? 'text-orange-600' : 'text-gray-900'}`}>
+                  Rp{currentPrice.toLocaleString('id-ID')}
                 </span>
-                {product.barcode && (
-                  <span className="text-sm text-gray-500">#{product.barcode}</span>
-                )}
+                <span className="text-lg font-bold text-gray-400 mb-2">/{product.unit}</span>
               </div>
+              {product.wholesalePrice && (
+                <div className="mt-4 p-3 bg-white/50 rounded-xl border border-dashed border-gray-300 text-[9px] font-bold text-gray-600 uppercase">
+                  MIN. <span className="text-orange-600">{product.minWholesale || 10}</span> {product.unit} UNTUK HARGA GROSIR
+                </div>
+              )}
             </div>
 
-            {/* Aksi */}
-            <div className="flex gap-4">
-              <button
-                onClick={handleAddToCart}
-                disabled={product.stock <= 0}
-                className="flex-1 bg-green-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-green-700 disabled:bg-gray-400"
+            <div className="flex items-center gap-4 mb-8">
+              <div className="flex items-center bg-white border-2 border-gray-100 rounded-2xl p-1 shadow-sm">
+                <button onClick={() => handleQuantity('minus')} className="p-3 hover:text-red-500 transition-colors"><Minus size={18}/></button>
+                <span className="w-10 text-center font-black text-xl">{quantity}</span>
+                <button onClick={() => handleQuantity('plus')} className="p-3 hover:text-green-600 transition-colors"><Plus size={18}/></button>
+              </div>
+              <button 
+                onClick={() => syncToFirebaseCart(product, quantity)} 
+                disabled={isAdding}
+                className="flex-1 bg-gray-900 text-white py-5 rounded-[1.5rem] font-black uppercase text-[11px] tracking-widest hover:bg-green-600 disabled:bg-gray-400 shadow-xl transition-all flex items-center justify-center gap-2"
               >
-                <ShoppingCart size={20} />
-                {product.stock > 0 ? 'Tambah ke Keranjang' : 'Stok Habis'}
+                {isAdding ? <Loader2 className="animate-spin" size={18} /> : 'Add To Cart'}
               </button>
-            </div>
-
-            {/* Fitur */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3">
-                  <Truck className="text-green-600" size={24} />
-                  <div>
-                    <h3 className="font-medium">Antar ke Rumah</h3>
-                    <p className="text-sm text-gray-600">Minimal belanja Rp100.000</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Package className="text-green-600" size={24} />
-                  <div>
-                    <h3 className="font-medium">Ecer & Grosir</h3>
-                    <p className="text-sm text-gray-600">Beli satuan pun hemat!</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <RotateCcw className="text-green-600" size={24} />
-                  <div>
-                    <h3 className="font-medium">Garansi Stok</h3>
-                    <p className="text-sm text-gray-600">Stok selalu tersedia</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
+
+        {/* PRODUK SERUPA */}
+        <div className="mt-16">
+          <h2 className="text-[11px] font-black uppercase tracking-[0.3em] mb-6">Mungkin Anda Butuh</h2>
+          <div className="flex overflow-x-auto gap-4 pb-6 no-scrollbar snap-x">
+            {relatedProducts.map((item) => (
+              <div key={item.id} className="min-w-[160px] snap-start relative group">
+                <Link href={`/produk/${item.id}`}>
+                  <div className="aspect-square rounded-[2rem] overflow-hidden bg-gray-50 border border-gray-100 mb-3 group-hover:shadow-lg transition-all">
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  </div>
+                  <h3 className="text-[10px] font-black uppercase text-gray-800 truncate pr-10">{item.name}</h3>
+                  <p className="text-[11px] font-bold text-green-600 mt-1">Rp{item.price.toLocaleString('id-ID')}</p>
+                </Link>
+                <button 
+                  onClick={() => syncToFirebaseCart(item, 1)}
+                  className="absolute bottom-6 right-2 p-2.5 bg-green-600 text-white rounded-xl shadow-lg active:scale-90 transition-transform"
+                >
+                  <ShoppingCart size={14} strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE ACTION BAR */}
+      <div className="md:hidden fixed bottom-6 left-4 right-4 z-[100] flex gap-2">
+        <div className="bg-gray-900 p-2 rounded-2xl flex items-center text-white shadow-2xl">
+           <button onClick={() => handleQuantity('minus')} className="p-2"><Minus size={16}/></button>
+           <span className="w-8 text-center font-black">{quantity}</span>
+           <button onClick={() => handleQuantity('plus')} className="p-2"><Plus size={16}/></button>
+        </div>
+        <button 
+          onClick={() => syncToFirebaseCart(product, quantity)} 
+          disabled={isAdding}
+          className="flex-1 bg-green-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
+          {isAdding ? <Loader2 className="animate-spin" size={16} /> : 'Masuk Keranjang'}
+        </button>
       </div>
     </div>
   );
