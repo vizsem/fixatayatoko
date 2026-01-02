@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, Trash2, Package, Truck, Store, MapPin, CreditCard, Upload, User, Printer, Send, Bike, Box, Info, AlertCircle, CheckCircle2, ChevronLeft, X, Plus, Minus, Clock } from 'lucide-react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { ShoppingCart, Trash2, Package, Truck, Store, MapPin, CreditCard, Upload, User, Printer, Send, Bike, Box, Info, AlertCircle, CheckCircle2, ChevronLeft, X, Plus, Minus, Clock, Loader2, FileText } from 'lucide-react';
+import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
-import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
+import { auth, db, storage } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import imageCompression from 'browser-image-compression';
 
 const TOKO_LAT = -7.8014;
 const TOKO_LNG = 111.8139;
@@ -25,9 +26,15 @@ export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   
+  // Data Form (Opsional)
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  
+  // State Alamat Tersimpan
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
   const [courierType, setCourierType] = useState<'toko' | 'ojol' | 'ekspedisi'>('toko');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
@@ -42,10 +49,29 @@ export default function CartPage() {
   useEffect(() => {
     const saved = localStorage.getItem('atayatoko-cart');
     if (saved) setCart(JSON.parse(saved));
-    setCustomerName(localStorage.getItem('atayatoko-customer-name') || '');
-    setCustomerPhone(localStorage.getItem('atayatoko-customer-phone') || '');
-    setIsLoaded(true);
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setSavedAddresses(userData.addresses || []);
+        }
+      }
+      setIsLoaded(true);
+    });
+    return () => unsubscribe();
   }, []);
+
+  const handleSelectAddress = (addr: any) => {
+    setCustomerName(addr.receiverName);
+    setCustomerPhone(addr.receiverPhone);
+    setCustomerAddress(addr.address);
+    setDeliveryMethod('delivery');
+    setCourierType('toko');
+  };
 
   useEffect(() => {
     if (!paymentProof) { setProofPreview(null); return; }
@@ -54,20 +80,9 @@ export default function CartPage() {
     return () => URL.revokeObjectURL(url);
   }, [paymentProof]);
 
-  // --- TAMBAHAN: LOGIKA KOMPRESI ---
   const compressImage = async (file: File) => {
-    const options = {
-      maxSizeMB: 0.2, // Maks 200KB
-      maxWidthOrHeight: 1024,
-      useWebWorker: true,
-      fileType: 'image/jpeg'
-    };
-    try {
-      return await imageCompression(file, options);
-    } catch (error) {
-      console.error("Compression error:", error);
-      return file; // Kirim file asli jika kompresi gagal
-    }
+    const options = { maxSizeMB: 0.1, maxWidthOrHeight: 1024, useWebWorker: true };
+    try { return await imageCompression(file, options); } catch (e) { return file; }
   };
 
   const updateQty = (index: number, delta: number) => {
@@ -92,250 +107,224 @@ export default function CartPage() {
   const subtotal = cart.reduce((t, i) => t + (getItemPrice(i) * i.quantity), 0);
   const isGrosirTotal = subtotal >= 500000;
 
-  const getOperationalStatus = () => {
-    const now = new Date();
-    const hour = now.getHours();
-    const isOpen = hour >= 7 && hour < 21;
-    const isDeliveryTime = hour >= 8 && hour < 16;
+  const opStatus = (() => {
+    const hour = new Date().getHours();
+    if (hour < 7 || hour >= 21) return { ok: false, msg: "Toko Tutup (Buka 07:00-21:00)" };
+    return { ok: true, msg: "Toko Buka & Siap Kirim" };
+  })();
 
-    if (!isOpen) return { ok: false, msg: "Toko Tutup (Buka 07:00 - 21:00)", type: 'closed' };
-    if (deliveryMethod === 'delivery' && !isDeliveryTime) {
-      return { ok: true, msg: "Order diterima, dikirim besok pagi (Jadwal: 08:00 - 16:00)", type: 'delay' };
-    }
-    return { ok: true, msg: "Toko Buka & Siap Kirim", type: 'open' };
-  };
-  const opStatus = getOperationalStatus();
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-  };
-
-  useEffect(() => {
-    if (deliveryMethod === 'delivery' && courierType === 'toko' && isLoaded) {
-      const initMap = () => {
-        const win = window as any;
-        const googleObj = win.google;
-        if (!googleObj || !mapRef.current) return;
-        const map = new googleObj.maps.Map(mapRef.current, {
-          center: { lat: TOKO_LAT, lng: TOKO_LNG },
-          zoom: 15,
-          disableDefaultUI: true,
-          zoomControl: true,
-        });
-        markerRef.current = new googleObj.maps.Marker({
-          position: { lat: TOKO_LAT, lng: TOKO_LNG },
-          map,
-          draggable: true
-        });
-        markerRef.current.addListener('dragend', () => {
-          const pos = markerRef.current.getPosition();
-          const dist = calculateDistance(TOKO_LAT, TOKO_LNG, pos.lat(), pos.lng());
-          setDistance(dist);
-        });
-      };
-      if (!(window as any).google) {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDV5Oz_zphv8UatLlZssdLkrbHSIZ8fOZI`;
-        script.async = true;
-        script.onload = initMap;
-        document.head.appendChild(script);
-      } else {
-        initMap();
+  const validation = (() => {
+    if (deliveryMethod === 'pickup') return { ok: true, msg: "Ambil di Toko Ataya" };
+    if (deliveryMethod === 'delivery' && courierType === 'toko') {
+      if (distance !== null) {
+         if (isGrosirTotal && distance > 10) return { ok: false, msg: "Jarak Grosir Maks 10km" };
+         if (!isGrosirTotal && distance > 3) return { ok: false, msg: "Jarak Ecer Maks 3km" };
       }
+      if (!isGrosirTotal && subtotal < 100000) return { ok: false, msg: "Min. Belanja Kurir Toko 100rb" };
     }
-  }, [deliveryMethod, courierType, isLoaded]);
+    return { ok: true, msg: "Siap dipesan" };
+  })();
 
-  const getStatus = () => {
-  // 1. Jam operasional HANYA pesan, tidak memblokir tombol (Hapus pengecekan opStatus.ok di sini)
-  
-  if (deliveryMethod === 'pickup') return { ok: true, msg: "Ambil di Toko Ataya" };
-  
-  if (deliveryMethod === 'delivery' && courierType === 'toko') {
-    // Cek Jarak hanya jika menggunakan Kurir Toko
-    if (distance !== null) {
-       if (isGrosirTotal && distance > 10) return { ok: false, msg: "Jarak Grosir Maks 10km" };
-       if (!isGrosirTotal && distance > 3) return { ok: false, msg: "Jarak Ecer Maks 3km" };
-    }
-    // Cek Minimal Belanja hanya jika menggunakan Kurir Toko
-    if (!isGrosirTotal && subtotal < 100000) return { ok: false, msg: "Min. Belanja Kurir Toko 100rb" };
-  }
-
-  // Jika semua pengecekan di atas lewat, maka tombol AKTIF
-  return { ok: true, msg: "Data Lengkap, Siap Dipesan" };
-};
-
-  const validation = getStatus();
-
-  // --- HANDLE CHECKOUT (DIUBAH UNTUK KOMPRESI) ---
   const handleCheckout = async () => {
-    if (!customerName || !customerPhone) return alert("Isi Nama & No WA");
-    if (paymentMethod !== 'cash' && !paymentProof) return alert("Mohon upload bukti pembayaran!");
+    if (paymentMethod !== 'cash' && !paymentProof) return alert("Upload bukti transfer!");
     
     setIsSubmitting(true);
     const orderId = generateOrderId();
+    const finalName = customerName || 'Pelanggan Umum';
+    const finalPhone = customerPhone || '-';
 
     try {
       let proofUrl = "";
       if (paymentProof) {
-        // PROSES KOMPRESI SEBELUM UPLOAD
-        const compressedFile = await compressImage(paymentProof);
-        
+        const compressed = await compressImage(paymentProof);
         const sRef = ref(storage, `payments/${orderId}`);
-        const snap = await uploadBytes(sRef, compressedFile); // Upload file terkompres
+        const snap = await uploadBytes(sRef, compressed);
         proofUrl = await getDownloadURL(snap.ref);
       }
 
-      const orderData = {
-        orderId, name: customerName, phone: customerPhone, items: cart, total: subtotal,
-        delivery: { method: deliveryMethod, type: courierType, address: customerAddress, distance: distance?.toFixed(2) || "N/A" },
+      await addDoc(collection(db, 'orders'), {
+        orderId, name: finalName, phone: finalPhone, items: cart, total: subtotal,
+        delivery: { method: deliveryMethod, type: courierType, address: customerAddress || 'Ambil di Toko' },
         payment: { method: paymentMethod, proof: proofUrl },
-        status: 'PENDING', createdAt: serverTimestamp()
-      };
+        status: 'PENDING', createdAt: serverTimestamp(), userId: user?.uid || 'guest'
+      });
 
-      await addDoc(collection(db, 'orders'), orderData);
-
-      let itemNote = cart.map((i, idx) => `  ${idx + 1}. ${i.name} (${i.quantity}x) = Rp${(getItemPrice(i) * i.quantity).toLocaleString()}`).join('\n');
-      const waMsg = `*PESANAN BARU - ${orderId}*\n------------------\n*Nama:* ${customerName}\n*WA:* ${customerPhone}\n*Metode:* ${deliveryMethod} (${courierType})\n*Bayar:* ${paymentMethod.toUpperCase()}\n------------------\n*PRODUK:*\n${itemNote}\n------------------\n*TOTAL: Rp${subtotal.toLocaleString()}*\n------------------\n*Alamat:* ${customerAddress || '-'}\n*Status:* ${opStatus.msg}`;
+      // --- STRUK WHATSAPP PROFESIONAL ---
+      const line = "------------------------------------------";
+      const itemText = cart.map(i => `• ${i.name}\n  ${i.quantity}x @Rp${getItemPrice(i).toLocaleString()} = Rp${(getItemPrice(i)*i.quantity).toLocaleString()}`).join('\n\n');
+      
+      const waMsg = `*STRUK PESANAN ATAYA TOKO*\n${line}\n*ID:* ${orderId}\n*TANGGAL:* ${new Date().toLocaleString('id-ID')}\n${line}\n*PELANGGAN:* ${finalName}\n*WHATSAPP:* ${finalPhone}\n${line}\n\n*RINCIAN PESANAN:*\n${itemText}\n\n${line}\n*TOTAL BAYAR: Rp${subtotal.toLocaleString()}*\n${line}\n*METODE:* ${paymentMethod.toUpperCase()}\n*PENGIRIMAN:* ${deliveryMethod.toUpperCase()} (${courierType.toUpperCase()})\n*ALAMAT:* ${customerAddress || 'Ambil di Toko'}\n\n_Mohon tunggu konfirmasi Admin. Terima kasih!_`;
 
       window.open(`https://wa.me/6285853161174?text=${encodeURIComponent(waMsg)}`, '_blank');
       localStorage.removeItem('atayatoko-cart');
       router.push(`/success?id=${orderId}`);
-    } catch (e) { 
-      console.error(e);
-      alert("Terjadi kesalahan saat upload/simpan data."); 
-    } finally { setIsSubmitting(false); }
+    } catch (e) { alert("Error simpan data."); } finally { setIsSubmitting(false); }
   };
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-green-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black font-sans pb-20">
-      <header className="bg-white p-4 shadow-sm flex items-center gap-4 sticky top-0 z-50">
-        <button onClick={() => router.back()}><ChevronLeft /></button>
-        <h1 className="font-bold text-green-600">Checkout</h1>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24">
+      <header className="bg-white/80 backdrop-blur-md p-4 shadow-sm flex items-center gap-4 sticky top-0 z-50 border-b">
+        <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><ChevronLeft /></button>
+        <h1 className="font-black text-green-600 uppercase text-sm tracking-widest">Konfirmasi Checkout</h1>
       </header>
 
       <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-5">
           
-          <div className={`p-4 rounded-2xl flex items-center gap-3 border ${opStatus.ok ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
-            <Clock size={20}/>
-            <div className="text-xs">
-                <p className="font-bold uppercase tracking-tight">Informasi Operasional</p>
-                <p className="opacity-80">{opStatus.msg}</p>
+          {/* Status Toko */}
+          <div className={`p-4 rounded-3xl flex items-center gap-4 border-2 ${opStatus.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+            <Clock size={24} className="flex-shrink-0" />
+            <div className="text-xs uppercase font-black tracking-wider">
+                <p className="opacity-60 mb-0.5">Status Toko</p>
+                <p>{opStatus.msg}</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="font-bold mb-4 flex items-center gap-2 text-xs tracking-widest uppercase text-gray-400"><Package size={18} className="text-green-600"/> Item Pesanan</h2>
-            <div className="space-y-4">
-                {cart.map((item, idx) => {
-                    const isGrosir = item.priceGrosir && item.quantity >= (item.minGrosir || 10);
-                    const price = isGrosir ? item.priceGrosir : item.price;
-                    return (
-                        <div key={idx} className="flex gap-4 py-3 border-b border-gray-50 last:border-0 items-center">
-                            <img src={item.image} className="w-14 h-14 rounded-lg object-cover bg-gray-100" />
-                            <div className="flex-1">
-                                <h3 className="text-sm font-bold">{item.name}</h3>
-                                <div className="flex items-center gap-2">
-                                    <p className={`font-bold text-xs ${isGrosir ? 'text-blue-600' : 'text-green-600'}`}>Rp{price.toLocaleString()}</p>
-                                    {isGrosir && <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black">GROSIR</span>}
-                                </div>
-                            </div>
-                            <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-2">
-                                <button onClick={()=>updateQty(idx, -1)} className="bg-white p-1 rounded shadow-sm text-red-500 hover:bg-gray-50"><Minus size={14}/></button>
-                                <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
-                                <button onClick={()=>updateQty(idx, 1)} className="bg-green-600 p-1 rounded shadow-sm text-white hover:bg-green-700"><Plus size={14}/></button>
-                            </div>
+          {/* List Barang */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200/60 overflow-hidden">
+            <h2 className="font-black mb-5 flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-slate-400"><Package size={16}/> Item Dalam Keranjang</h2>
+            <div className="divide-y divide-slate-100">
+                {cart.map((item, idx) => (
+                    <div key={idx} className="flex gap-4 py-4 items-center group">
+                        <div className="relative">
+                            <img src={item.image} className="w-16 h-16 rounded-2xl object-cover bg-slate-100 group-hover:scale-105 transition-transform" />
+                            <span className="absolute -top-2 -right-2 bg-green-600 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white">{item.quantity}</span>
                         </div>
-                    );
-                })}
+                        <div className="flex-1">
+                            <h3 className="text-sm font-black text-slate-800 leading-tight mb-1">{item.name}</h3>
+                            <p className="font-black text-xs text-green-600 tracking-wide">Rp{getItemPrice(item).toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1">
+                            <button onClick={()=>updateQty(idx, -1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-rose-500 shadow-sm active:scale-90 transition-all"><Minus size={14}/></button>
+                            <button onClick={()=>updateQty(idx, 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-green-600 shadow-sm active:scale-90 transition-all"><Plus size={14}/></button>
+                        </div>
+                    </div>
+                ))}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-            <h2 className="font-bold flex items-center gap-2 text-xs tracking-widest uppercase text-gray-400"><Truck size={18} className="text-green-600"/> Pengiriman</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input placeholder="Nama Penerima" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-green-500 transition-all" />
-              <input placeholder="Nomor WhatsApp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-green-500 transition-all" />
+          {/* Pengiriman & Alamat */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200/60 space-y-6">
+            <h2 className="font-black flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-slate-400"><Truck size={16}/> Informasi Pengiriman</h2>
+            
+            {savedAddresses.length > 0 && (
+              <div className="bg-emerald-50/60 p-5 rounded-3xl border border-emerald-100">
+                <p className="text-[10px] font-black text-emerald-700 uppercase mb-4 tracking-widest flex items-center gap-2"><MapPin size={12}/> Pilih Alamat Tersimpan</p>
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {savedAddresses.map((addr) => (
+                    <button key={addr.id} type="button" onClick={() => handleSelectAddress(addr)} className="flex-shrink-0 w-64 p-5 text-left bg-white border-2 border-transparent hover:border-green-500 rounded-[1.5rem] shadow-sm transition-all hover:shadow-md focus:border-green-500 active:scale-95 group">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-black text-green-600 uppercase bg-green-50 px-2 py-1 rounded-md">{addr.label}</span>
+                        <CheckCircle2 size={16} className="text-green-500 opacity-0 group-focus:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-xs font-black text-slate-800 uppercase mb-1">{addr.receiverName}</p>
+                      <p className="text-[10px] text-slate-500 font-bold leading-relaxed line-clamp-2">{addr.address}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Identitas Penerima (Opsional)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="relative flex items-center">
+                        <User size={16} className="absolute left-4 text-slate-400" />
+                        <input placeholder="Nama Penerima" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all" />
+                    </div>
+                    <div className="relative flex items-center">
+                        <Send size={16} className="absolute left-4 text-slate-400" />
+                        <input placeholder="No. WhatsApp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all" />
+                    </div>
+                </div>
             </div>
 
-            <div className="flex bg-gray-100 p-1 rounded-xl">
-              <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-lg text-xs font-black transition-all ${deliveryMethod === 'pickup' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>AMBIL SENDIRI</button>
-              <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-lg text-xs font-black transition-all ${deliveryMethod === 'delivery' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>DIANTAR KURIR</button>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+              <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-[1rem] text-[10px] font-black tracking-widest transition-all flex items-center justify-center gap-2 ${deliveryMethod === 'pickup' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400 hover:text-slate-600'}`}><Store size={14}/> AMBIL SENDIRI</button>
+              <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-[1rem] text-[10px] font-black tracking-widest transition-all flex items-center justify-center gap-2 ${deliveryMethod === 'delivery' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400 hover:text-slate-600'}`}><Truck size={14}/> DIANTAR</button>
             </div>
 
             {deliveryMethod === 'delivery' && (
-              <div className="space-y-4 pt-2 animate-in fade-in duration-300">
+              <div className="space-y-4 pt-2 animate-in slide-in-from-top-4 duration-300">
                 <div className="grid grid-cols-3 gap-2">
-                    <button onClick={()=>setCourierType('toko')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'toko' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Truck size={20}/><span className="text-[10px] font-bold">Kurir Toko</span></button>
-                    <button onClick={()=>setCourierType('ojol')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ojol' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Bike size={20}/><span className="text-[10px] font-bold">Ojol</span></button>
-                    <button onClick={()=>setCourierType('ekspedisi')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ekspedisi' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100 text-gray-400'}`}><Box size={20}/><span className="text-[10px] font-bold">Ekspedisi</span></button>
+                    {['toko', 'ojol', 'ekspedisi'].map((type) => (
+                        <button key={type} onClick={()=>setCourierType(type as any)} className={`p-4 border-2 rounded-2xl flex flex-col items-center gap-2 transition-all active:scale-95 ${courierType === type ? 'border-green-500 bg-green-50 text-green-600' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
+                            {type === 'toko' ? <Truck size={20}/> : type === 'ojol' ? <Bike size={20}/> : <Box size={20}/>}
+                            <span className="text-[9px] font-black uppercase tracking-tighter">{type}</span>
+                        </button>
+                    ))}
                 </div>
-                <textarea placeholder="Alamat & Patokan Rumah..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl h-20 text-sm outline-none focus:border-green-500 transition-all" />
-                {courierType === 'toko' && (
-                   <div className="relative border rounded-xl overflow-hidden shadow-inner">
-                      <div ref={mapRef} className="h-40 w-full bg-gray-100" />
-                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[9px] px-2 py-1 rounded-md uppercase font-bold tracking-widest">GESER MARKER JIKA INGIN CEK JARAK</div>
-                   </div>
-                )}
+                <div className="relative">
+                    <MapPin size={18} className="absolute top-4 left-4 text-slate-300" />
+                    <textarea placeholder="Alamat Lengkap & Patokan Rumah (Wajib jika diantar)..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-100 rounded-2xl h-32 text-xs font-black outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all" />
+                </div>
               </div>
             )}
             
-            <div className={`p-3 rounded-xl border text-[10px] font-black uppercase flex items-center gap-2 tracking-wider ${validation.ok ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-              {validation.ok ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} {validation.msg}
+            <div className={`p-4 rounded-2xl border flex items-center gap-3 transition-colors ${validation.ok ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}`}>
+              {validation.ok ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+              <span className="text-[10px] font-black uppercase tracking-widest">{validation.msg}</span>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-white rounded-3xl p-6 shadow-xl sticky top-24 border border-gray-50">
-            <h2 className="font-bold flex items-center mb-6 text-gray-700 text-xs tracking-widest uppercase"><CreditCard size={18} className="text-green-600 mr-2"/> Metode Bayar</h2>
-            <div className="space-y-2 mb-6">
+        {/* Payment Sidebar */}
+        <div className="space-y-5">
+          <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl sticky top-24 border border-slate-100">
+            <h2 className="font-black flex items-center mb-8 text-slate-700 text-[10px] tracking-[0.2em] uppercase"><CreditCard size={18} className="mr-3 text-green-600"/> Metode Bayar</h2>
+            
+            <div className="space-y-3 mb-8">
               {['cash', 'transfer', 'qris'].map(m => (
-                <button key={m} onClick={()=>setPaymentMethod(m as any)} className={`w-full p-4 border rounded-2xl text-left transition-all ${paymentMethod === m ? 'border-green-600 bg-green-50 text-green-600 font-bold ring-1 ring-green-600' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
-                  <span className="text-[10px] uppercase tracking-widest">{m === 'cash' ? '💵 Bayar di Tempat' : m === 'transfer' ? '🏦 Transfer Bank' : '📱 QRIS / E-Wallet'}</span>
+                <button key={m} onClick={()=>setPaymentMethod(m as any)} className={`w-full p-4 border-2 rounded-2xl text-left transition-all flex items-center justify-between ${paymentMethod === m ? 'border-green-600 bg-green-50/50 text-green-700 shadow-sm' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200'}`}>
+                  <span className="text-[10px] font-black uppercase tracking-widest">{m === 'cash' ? '💵 Bayar Ditempat' : m === 'transfer' ? '🏦 Transfer Bank' : '📱 QRIS / E-Wallet'}</span>
+                  {paymentMethod === m && <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />}
                 </button>
               ))}
             </div>
 
             {paymentMethod !== 'cash' && (
-              <div className="mb-6 animate-in zoom-in-95 duration-200">
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-4 cursor-pointer relative overflow-hidden h-36 hover:border-green-400 transition-all bg-gray-50/50">
+              <div className="mb-8 animate-in zoom-in-95 duration-300">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-[2rem] p-6 cursor-pointer h-44 hover:border-green-400 hover:bg-green-50/30 transition-all relative overflow-hidden bg-slate-50/50 group">
                   {proofPreview ? (
-                    <>
-                      <img src={proofPreview} className="w-full h-full object-contain" />
-                      <div onClick={(e)=>{e.preventDefault(); setPaymentProof(null)}} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"><X size={14}/></div>
-                    </>
+                    <img src={proofPreview} className="h-full w-full object-contain p-2" />
                   ) : (
-                    <><Upload size={24} className="text-gray-300 mb-2"/><span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">KLIK UNTUK UPLOAD BUKTI</span></>
+                    <>
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                            <Upload size={20} className="text-slate-400" />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Klik Upload Bukti</span>
+                    </>
                   )}
                   <input type="file" hidden accept="image/*" onChange={e=>setPaymentProof(e.target.files?.[0] || null)} />
                 </label>
-                {/* TAMBAHAN INFO KOMPRESI */}
-                <p className="text-[9px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest">Foto auto-compress ke 200KB</p>
               </div>
             )}
 
-            <div className="flex justify-between items-end border-t pt-6">
-              <span className="text-xs font-bold text-gray-400 tracking-tighter uppercase">Total Bayar</span>
-              <span className="text-3xl font-black text-green-600">Rp{subtotal.toLocaleString()}</span>
+            <div className="space-y-4 border-t border-slate-50 pt-6">
+                <div className="flex justify-between items-center text-slate-400">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Subtotal Barang</span>
+                    <span className="text-xs font-bold">Rp{subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-end">
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Total Bayar</span>
+                    <span className="text-3xl font-black text-green-600">Rp{subtotal.toLocaleString()}</span>
+                </div>
             </div>
 
-            <button onClick={handleCheckout} disabled={!validation.ok || isSubmitting} className="w-full bg-green-600 text-white py-5 rounded-2xl font-black mt-8 shadow-lg shadow-green-100 disabled:bg-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <button onClick={handleCheckout} disabled={!validation.ok || isSubmitting} className="w-full bg-green-600 text-white py-5 rounded-[1.5rem] font-black mt-8 shadow-[0_15px_30px_-10px_rgba(22,163,74,0.4)] disabled:bg-slate-200 disabled:shadow-none hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-[0.1em]">
               {isSubmitting ? (
                  <>
-                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                   <span className="text-xs">MENGOPTIMALKAN GAMBAR...</span>
+                   <Loader2 className="animate-spin" size={20}/>
+                   <span>Memproses...</span>
                  </>
               ) : (
-                 <><Send size={18} /><span>KONFIRMASI PESANAN</span></>
+                 <><Send size={18} /><span>Konfirmasi Pesanan</span></>
               )}
             </button>
+
+            <p className="text-[8px] text-slate-400 text-center mt-5 font-bold uppercase tracking-widest px-4">Dengan mengklik tombol diatas, pesanan akan diteruskan ke WhatsApp Admin.</p>
           </div>
         </div>
       </main>
