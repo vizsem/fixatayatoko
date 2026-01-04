@@ -1,4 +1,3 @@
-// src/lib/productService.ts
 import { 
   collection, 
   doc, 
@@ -8,22 +7,51 @@ import {
   deleteDoc,
   getDocs,
   query,
-  where
+  where,
+  serverTimestamp // Gunakan ini agar sinkron dengan fungsi import Excel
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // ✅ Gunakan db client
-import { Product } from '@/lib/cart'; // ✅ Gunakan tipe dari cart.ts
+import { db } from '@/lib/firebase';
 
-// ✅ Untuk semua operasi (client + server)
+// Sesuaikan interface dengan kolom Excel terbaru Anda
+export interface Product {
+  id: string; // ID Firestore
+  ID: string; // ID dari Excel/Manual
+  Barcode: string;
+  Parent_ID: string;
+  Nama: string;
+  Kategori: string;
+  Satuan: string;
+  Stok: number;
+  Min_Stok: number;
+  Modal: number;
+  Ecer: number;
+  Harga_Coret: number;
+  Grosir: number;
+  Min_Grosir: number;
+  Link_Foto: string;
+  Deskripsi: string;
+  Status: number;
+  Supplier: string;
+  No_WA_Supplier: string;
+  updatedAt?: any;
+  createdAt?: any;
+}
+
+// ✅ Membuat Produk Baru
 export async function createProduct(product: Omit<Product, 'id'>): Promise<string> {
-  const docRef = doc(collection(db, 'products')); // ✅ Gunakan db client
+  // Gunakan ID dari Excel sebagai ID dokumen jika tersedia, jika tidak generate otomatis
+  const customId = product.ID || undefined;
+  const docRef = customId ? doc(db, 'products', customId) : doc(collection(db, 'products'));
+  
   await setDoc(docRef, {
     ...product,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   });
   return docRef.id;
 }
 
+// ✅ Mengambil Satu Produk
 export async function getProduct(id: string): Promise<Product | null> {
   const docSnap = await getDoc(doc(db, 'products', id));
   if (docSnap.exists()) {
@@ -32,26 +60,40 @@ export async function getProduct(id: string): Promise<Product | null> {
   return null;
 }
 
+// ✅ Update Produk (Mendukung Partial Update)
 export async function updateProduct(id: string, product: Partial<Product>): Promise<void> {
   await updateDoc(doc(db, 'products', id), {
     ...product,
-    updatedAt: new Date().toISOString()
+    updatedAt: serverTimestamp()
   });
 }
 
+// ✅ Hapus Produk
 export async function deleteProduct(id: string): Promise<void> {
   await deleteDoc(doc(db, 'products', id));
 }
 
-export async function getProducts(): Promise<Product[]> {
-  const querySnapshot = await getDocs(collection(db, 'products'));
+// ✅ Ambil Semua Produk (Bisa difilter yang aktif saja)
+export async function getProducts(onlyActive = false): Promise<Product[]> {
+  let q = query(collection(db, 'products'));
+  
+  if (onlyActive) {
+    q = query(collection(db, 'products'), where("Status", "==", 1));
+  }
+  
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   })) as Product[];
 }
 
-// Fungsi untuk admin (masih pakai client SDK)
-export async function getProductsForAdmin(): Promise<Product[]> {
-  return getProducts();
+// ✅ Ambil Produk Berdasarkan Parent_ID (Untuk Variasi)
+export async function getProductVariations(parentId: string): Promise<Product[]> {
+  const q = query(collection(db, 'products'), where("Parent_ID", "==", parentId));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as Product[];
 }

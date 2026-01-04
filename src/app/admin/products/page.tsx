@@ -1,42 +1,31 @@
 'use client';
 
-// ✅ SheetJS (Wajib install: npm install xlsx)
+// ✅ SheetJS untuk Export Excel
 declare const XLSX: any;
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
-  query, orderBy, onSnapshot, serverTimestamp, where, getDocs
+  collection, doc, getDoc, addDoc, deleteDoc,
+  query, orderBy, onSnapshot, serverTimestamp, where, getDocs, updateDoc, writeBatch
 } from 'firebase/firestore';
+import { importFromExcel } from '@/lib/excelHelper'; 
 import Link from 'next/link';
 import { 
   Plus, Edit, Trash2, Download, Upload, Barcode, 
   TrendingUp, Camera, Search, X, LayoutDashboard, 
-  Globe, CheckSquare, Square, Link as LinkIcon, AlertCircle, 
-  Layers, Tag, ChevronLeft, ChevronRight, Filter, ShoppingBag
+  AlertCircle, Tag, ChevronLeft, ChevronRight, Filter, 
+  ShoppingBag, Truck, Package, Layers, RefreshCw, CheckSquare, Eye, EyeOff,
+  ArrowUpDown
 } from 'lucide-react';
 
-type Variant = { name: string; additionalPrice: number; };
-
 type Product = {
-  id: string;
-  name: string;
-  slug: string;
-  price: number;
-  wholesalePrice: number; // Harga Grosir
-  minWholesaleQty: number; // Min Grosir
-  minOrder: number;
-  purchasePrice: number;
-  stock: number;
-  category: string;
-  unit: string; // Satuan
-  barcode: string;
-  image: string;
-  variants?: Variant[];
-  createdAt: any;
+  id: string; ID: string; Barcode: string; Parent_ID: string; Nama: string;
+  Kategori: string; Satuan: string; Stok: number; Min_Stok: number;
+  Modal: number; Ecer: number; Harga_Coret: number; Status: number;
+  updatedAt: any; [key: string]: any;
 };
 
 export default function AdminProducts() {
@@ -46,28 +35,23 @@ export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua Kategori');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  
+  // ✅ STATE BARU UNTUK FILTER & SORTING
+  const [selectedIds, setSelectedIds] = useState<string[]>([]); 
+  const [showInactive, setShowInactive] = useState(false); 
+  const [sortBy, setSortBy] = useState<'Nama' | 'Ecer' | 'Stok' | 'updatedAt'>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // ✅ SETTING 20 ITEM PER HALAMAN
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
 
-  const [formData, setFormData] = useState({
-    name: '', slug: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1,
-    minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: 'Pcs',
-    barcode: '', image: '', variants: [] as Variant[]
+  const [formData, setFormData] = useState<Partial<Product>>({
+    ID: '', Barcode: '', Nama: '', Kategori: 'Umum',
+    Satuan: 'Pcs', Stok: 0, Min_Stok: 5, Modal: 0, Ecer: 0, Status: 1
   });
-
-  const totalAssetValue = products.reduce((acc, p) => acc + (p.stock * (p.purchasePrice || 0)), 0);
-  const potentialProfit = products.reduce((acc, p) => acc + (p.stock * (p.price - (p.purchasePrice || 0))), 0);
-
-  const categories = ['Semua Kategori', ...Array.from(new Set(products.map(p => p.category || 'Umum')))];
-
-  const handleNameChange = (name: string) => {
-    const slug = name.toLowerCase().trim().replace(/ /g, '-').replace(/[^\w-]+/g, '');
-    setFormData({ ...formData, name, slug });
-    setErrorMsg(''); 
-  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -83,267 +67,260 @@ export default function AdminProducts() {
 
   useEffect(() => {
     if (loading) return;
-    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'products'), orderBy('updatedAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
     });
     return () => unsub();
   }, [loading]);
 
-  const filteredProducts = products.filter(p => {
-    const matchSearch = (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || (p.barcode || "").includes(searchTerm);
-    const matchCategory = selectedCategory === 'Semua Kategori' || p.category === selectedCategory;
-    return matchSearch && matchCategory;
-  });
-
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
-
-  const addVariantField = () => {
-    setFormData({ ...formData, variants: [...formData.variants, { name: '', additionalPrice: 0 }] });
+  // ✅ FUNGSI SINKRONISASI DATABASE (INDONESIA - INGGRIS)
+  const handleSyncData = async () => {
+    if(!confirm("Sinkronkan semua data agar kompatibel dengan sistem baru (Mapping ID-EN)?")) return;
+    setIsMigrating(true);
+    try {
+        const batch = writeBatch(db);
+        products.forEach((p) => {
+            const docRef = doc(db, 'products', p.id);
+            batch.update(docRef, {
+                Nama: p.Nama || p.name || "", name: p.Nama || p.name || "",
+                Ecer: p.Ecer || p.price || 0, price: p.Ecer || p.price || 0,
+                Stok: p.Stok ?? p.stock ?? 0, stock: p.Stok ?? p.stock ?? 0,
+                Modal: p.Modal || p.purchasePrice || 0, purchasePrice: p.Modal || p.purchasePrice || 0,
+                Kategori: p.Kategori || p.category || "Umum", category: p.Kategori || p.category || "Umum",
+                Status: p.Status ?? 1,
+                updatedAt: serverTimestamp()
+            });
+        });
+        await batch.commit();
+        alert("Sinkronisasi Berhasil!");
+    } catch (err) { alert("Gagal Sinkron"); }
+    setIsMigrating(false);
   };
 
-  const removeVariantField = (index: number) => {
-    const newVariants = [...formData.variants];
-    newVariants.splice(index, 1);
-    setFormData({ ...formData, variants: newVariants });
+  // ✅ AKSI MASSAL: ARSIP / AKTIFKAN
+  const handleBulkStatus = async (newStatus: number) => {
+    if (!confirm(`${newStatus === 0 ? 'Arsipkan' : 'Aktifkan'} ${selectedIds.length} produk?`)) return;
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => {
+        batch.update(doc(db, 'products', id), { Status: newStatus, updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+      setSelectedIds([]);
+    } catch (err) { alert("Gagal memperbarui status"); }
   };
 
-  const updateVariant = (index: number, field: keyof Variant, value: string | number) => {
-    const newVariants = [...formData.variants];
-    newVariants[index] = { ...newVariants[index], [field]: value };
-    setFormData({ ...formData, variants: newVariants });
+  // ✅ LOGIKA FILTER & SORTING (Diterapkan Bersamaan)
+  const filteredAndSorted = useMemo(() => {
+    let result = products.filter(p => {
+      const n = (p.Nama || p.name || "").toLowerCase();
+      const b = (p.Barcode || p.barcode || "").toLowerCase();
+      const matchSearch = n.includes(searchTerm.toLowerCase()) || b.includes(searchTerm.toLowerCase());
+      const matchCategory = selectedCategory === 'Semua Kategori' || (p.Kategori || p.category) === selectedCategory;
+      const matchStatus = showInactive ? p.Status === 0 : p.Status !== 0;
+      return matchSearch && matchCategory && matchStatus;
+    });
+
+    result.sort((a, b) => {
+      let vA = a[sortBy] ?? 0;
+      let vB = b[sortBy] ?? 0;
+      if (typeof vA === 'string') {
+        return sortOrder === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+      }
+      return sortOrder === 'asc' ? (vA as number) - (vB as number) : (vB as number) - (vA as number);
+    });
+
+    return result;
+  }, [products, searchTerm, selectedCategory, showInactive, sortBy, sortOrder]);
+
+  const currentItems = filteredAndSorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
+
+  const totalAssetValue = products.reduce((acc, p) => acc + ((p.Stok || 0) * (p.Modal || 0)), 0);
+  const potentialProfit = products.reduce((acc, p) => acc + ((p.Stok || 0) * ((p.Ecer || 0) - (p.Modal || 0))), 0);
+
+  const toggleSort = (field: 'Nama' | 'Ecer' | 'Stok') => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const handleSelectAll = (e: any) => setSelectedIds(e.target.checked ? currentItems.map(p => p.id) : []);
+  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Hapus PERMANEN ${selectedIds.length} produk?`)) return;
+    const batch = writeBatch(db);
+    selectedIds.forEach(id => batch.delete(doc(db, 'products', id)));
+    await batch.commit();
+    setSelectedIds([]);
+  };
+
+  const handleExport = () => {
+    const data = products.map(p => ({ ID: p.ID, Nama: p.Nama, Stok: p.Stok, Modal: p.Modal, Ecer: p.Ecer, Status: p.Status === 0 ? "Non-Aktif" : "Aktif" }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Produk");
+    XLSX.writeFile(wb, `DATA_PRODUK.xlsx`);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-
-    const q = query(collection(db, 'products'), where('name', '==', formData.name));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      setErrorMsg(`Nama "${formData.name}" sudah ada!`);
-      return;
+    if (!formData.ID) return setErrorMsg("ID Wajib diisi!");
+    if ((formData.Ecer || 0) < (formData.Modal || 0)) {
+       if(!confirm("Peringatan: Harga Jual dibawah Modal. Lanjutkan?")) return;
     }
-
     try {
-      await addDoc(collection(db, 'products'), {
-        ...formData,
-        stockByWarehouse: { 'gudang-utama': formData.stock },
-        image: formData.image || "https://placehold.co/400x400/eeeeee/999999?text=No+Image",
-        profit_ecer: Number(formData.price) - Number(formData.purchasePrice),
-        profit_grosir: Number(formData.wholesalePrice) - Number(formData.purchasePrice),
-        createdAt: serverTimestamp()
-      });
+      await addDoc(collection(db, 'products'), { ...formData, updatedAt: serverTimestamp(), createdAt: serverTimestamp() });
       setShowAddModal(false);
-      resetForm();
-    } catch (err) { alert('Gagal menambah produk'); }
-  };
-
-  const resetForm = () => {
-    setFormData({ name: '', slug: '', price: 0, wholesalePrice: 0, minWholesaleQty: 1, minOrder: 1, purchasePrice: 0, stock: 0, category: '', unit: 'Pcs', barcode: '', image: '', variants: [] });
+      setFormData({ ID: '', Barcode: '', Nama: '', Kategori: 'Umum', Satuan: 'Pcs', Stok: 0, Modal: 0, Ecer: 0, Status: 1 });
+    } catch (err) { alert('Gagal Simpan'); }
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Hapus ${name}?`)) await deleteDoc(doc(db, 'products', id));
   };
 
-  const handleBulkDelete = async () => {
-    if (confirm(`Hapus ${selectedProducts.length} produk?`)) {
-      for (const id of selectedProducts) await deleteDoc(doc(db, 'products', id));
-      setSelectedProducts([]);
-    }
-  };
-
-  const handleExport = () => {
-    const data = products.map(p => ({ 
-      Barcode: p.barcode,
-      Nama: p.name, 
-      Kategori: p.category,
-      Satuan: p.unit,
-      Stok: p.stock, 
-      Modal: p.purchasePrice,
-      Ecer: p.price, 
-      Grosir: p.wholesalePrice,
-      Min_Grosir: p.minWholesaleQty,
-      Link_Foto: p.image 
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-    XLSX.writeFile(wb, 'Laporan_Inventaris_Ataya.xlsx');
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws);
-      
-      for (const row of data as any[]) {
-        const q = query(collection(db, 'products'), where('name', '==', (row.Nama || row.name)));
-        const snap = await getDocs(q);
-        if (snap.empty) {
-          await addDoc(collection(db, 'products'), {
-            name: row.Nama || row.name,
-            category: row.Kategori || row.category || 'Umum',
-            slug: (row.Nama || row.name || 'prod').toLowerCase().replace(/ /g, '-'),
-            barcode: String(row.Barcode || row.barcode || ''),
-            purchasePrice: Number(row.Modal || row.purchasePrice) || 0,
-            price: Number(row.Ecer || row.price) || 0,
-            wholesalePrice: Number(row.Grosir || row.wholesalePrice) || 0,
-            minWholesaleQty: Number(row.Min_Grosir || row.minWholesaleQty) || 1,
-            stock: Number(row.Stok || row.stock) || 0,
-            unit: row.Satuan || row.unit || 'Pcs',
-            image: row.Link_Foto || row.image || '',
-            profit_ecer: (Number(row.Ecer) || 0) - (Number(row.Modal) || 0),
-            createdAt: serverTimestamp()
-          });
-        }
-      }
-      alert('Import Selesai!');
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  if (loading) return <div className="p-10 text-center font-black animate-pulse">SISTEM MEMUAT...</div>;
+  if (loading) return <div className="p-10 text-center font-black animate-pulse text-gray-400">MEMPROSES DATABASE...</div>;
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black font-sans">
       
-      {/* 1. Header & Actions */}
+      {/* Header Nav */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg">
-            <LayoutDashboard size={14} /> Admin Panel
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link href="/admin" className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2">
+            <LayoutDashboard size={14} /> Panel
           </Link>
-          <h1 className="text-sm font-black text-gray-400 uppercase tracking-widest hidden md:block">/ Katalog & Inventaris</h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={handleExport} className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-gray-100 flex items-center gap-2 transition-all shadow-sm">
-            <Download size={14} /> Export
-          </button>
-          <label className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase cursor-pointer hover:bg-gray-100 flex items-center gap-2 transition-all shadow-sm">
-            <Upload size={14} /> Import <input type="file" className="hidden" accept=".xlsx" onChange={handleImport} />
-          </label>
-        </div>
-      </div>
-
-      {/* 2. Stats Profit */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="bg-emerald-600 text-white p-8 rounded-[2.5rem] shadow-2xl shadow-emerald-100 relative overflow-hidden">
-          <p className="opacity-70 text-[10px] font-black uppercase tracking-widest relative z-10">Valuasi Stok Modal</p>
-          <h2 className="text-4xl font-black mt-1 relative z-10">Rp {totalAssetValue.toLocaleString('id-ID')}</h2>
-          <TrendingUp size={100} className="absolute -right-4 -bottom-4 opacity-10 rotate-12" />
-        </div>
-        <div className="bg-blue-600 text-white p-8 rounded-[2.5rem] shadow-2xl shadow-blue-100 relative overflow-hidden">
-          <p className="opacity-70 text-[10px] font-black uppercase tracking-widest relative z-10">Potensi Keuntungan</p>
-          <h2 className="text-4xl font-black mt-1 relative z-10">Rp {potentialProfit.toLocaleString('id-ID')}</h2>
-          <Tag size={100} className="absolute -right-4 -bottom-4 opacity-10 rotate-12" />
-        </div>
-      </div>
-
-      {/* 3. Filter & Toolbar */}
-      <div className="flex flex-wrap gap-3 mb-6 items-center">
-        <div className="relative flex-1 min-w-[280px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-          <input type="text" placeholder="Cari Produk..." className="w-full pl-12 pr-4 py-4 rounded-3xl border-none shadow-sm bg-white font-bold outline-none focus:ring-2 focus:ring-black" value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}} />
-        </div>
-
-        <div className="relative min-w-[180px]">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <select 
-            className="w-full pl-10 pr-4 py-4 rounded-3xl border-none shadow-sm font-black text-[10px] uppercase appearance-none bg-white cursor-pointer outline-none focus:ring-2 focus:ring-black"
-            value={selectedCategory}
-            onChange={(e) => {setSelectedCategory(e.target.value); setCurrentPage(1);}}
+          
+          {/* ✅ TOMBOL SINKRON DATA */}
+          <button 
+            onClick={handleSyncData} 
+            disabled={isMigrating}
+            className="bg-orange-100 text-orange-600 border border-orange-200 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 hover:bg-orange-200 transition-all"
           >
-            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        </div>
+            <RefreshCw size={14} className={isMigrating ? 'animate-spin' : ''} /> 
+            {isMigrating ? 'Syncing...' : 'Sinkron'}
+          </button>
 
-        <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-8 py-4 rounded-3xl font-black text-[10px] uppercase flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-xl">
-          <Plus size={16} /> Tambah Produk
-        </button>
+          <button 
+            onClick={() => { setShowInactive(!showInactive); setSelectedIds([]); }}
+            className={`px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase border flex items-center gap-2 transition-all ${showInactive ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-400 border-gray-200'}`}
+          >
+            {showInactive ? <Eye size={14}/> : <EyeOff size={14}/>} {showInactive ? 'Lihat Aktif' : 'Arsip'}
+          </button>
+        </div>
+        
+        <div className="flex gap-2">
+          <button onClick={handleExport} className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 text-green-600 shadow-sm"><Download size={14} /> Export</button>
+          <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg hover:bg-emerald-600 transition-all"><Plus size={14} /> Item Baru</button>
+        </div>
       </div>
 
-      {/* 4. Bulk Delete */}
-      {selectedProducts.length > 0 && (
-        <div className="mb-4 p-4 bg-black text-white rounded-2xl flex items-center justify-between">
-          <span className="text-[10px] font-black uppercase tracking-widest ml-2">Terpilih: {selectedProducts.length}</span>
-          <button onClick={handleBulkDelete} className="bg-red-500 px-5 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-600">Hapus Masal</button>
+      {/* ✅ FLOATING ACTION MENU (BULK ACTIONS) */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] bg-black text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 border border-white/10">
+          <span className="text-[10px] font-black border-r border-white/20 pr-4">{selectedIds.length} TERPILIH</span>
+          <button onClick={() => handleBulkStatus(showInactive ? 1 : 0)} className="text-[10px] font-black uppercase flex items-center gap-2 hover:text-orange-400">
+            {showInactive ? <Eye size={16}/> : <EyeOff size={16}/>} {showInactive ? 'Aktifkan' : 'Arsip'}
+          </button>
+          <button onClick={handleBulkDelete} className="text-[10px] font-black uppercase flex items-center gap-2 hover:text-red-400">
+            <Trash2 size={16}/> Hapus
+          </button>
+          <button onClick={() => setSelectedIds([])} className="ml-2 p-1 bg-white/10 rounded-full hover:bg-white/20"><X size={14}/></button>
         </div>
       )}
 
-      {/* 5. Tabel dengan Pagination */}
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-emerald-600 text-white p-6 rounded-[2rem] shadow-xl shadow-emerald-100">
+          <p className="opacity-70 text-[10px] font-black uppercase">Total Aset Modal</p>
+          <h2 className="text-2xl font-black mt-1">Rp {totalAssetValue.toLocaleString()}</h2>
+        </div>
+        <div className="bg-blue-600 text-white p-6 rounded-[2rem] shadow-xl shadow-blue-100">
+          <p className="opacity-70 text-[10px] font-black uppercase">Potensi Profit</p>
+          <h2 className="text-2xl font-black mt-1">Rp {potentialProfit.toLocaleString()}</h2>
+        </div>
+        <div className="bg-black text-white p-6 rounded-[2rem] shadow-xl">
+          <p className="opacity-70 text-[10px] font-black uppercase">Total Produk</p>
+          <h2 className="text-2xl font-black mt-1">{products.length} <span className="text-xs opacity-50 font-bold">ITEM</span></h2>
+        </div>
+      </div>
+
+      {/* Search & Sorting Bar */}
+      <div className="flex flex-wrap gap-4 mb-6 items-center bg-white p-4 rounded-[2rem] shadow-sm">
+        <div className="relative flex-1 min-w-[280px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+          <input type="text" placeholder="Cari nama atau barcode..." className="w-full pl-12 pr-4 py-4 rounded-3xl bg-gray-50 font-bold outline-none border-none focus:ring-2 focus:ring-black" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        
+        <div className="flex gap-2 items-center">
+          <button onClick={() => toggleSort('Nama')} className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase border flex items-center gap-2 ${sortBy === 'Nama' ? 'bg-black text-white' : 'bg-gray-50 text-gray-400'}`}>
+            A-Z {sortBy === 'Nama' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </button>
+          <button onClick={() => toggleSort('Ecer')} className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase border flex items-center gap-2 ${sortBy === 'Ecer' ? 'bg-black text-white' : 'bg-gray-50 text-gray-400'}`}>
+            Harga {sortBy === 'Ecer' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </button>
+          <button onClick={() => toggleSort('Stok')} className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase border flex items-center gap-2 ${sortBy === 'Stok' ? 'bg-black text-white' : 'bg-gray-50 text-gray-400'}`}>
+            Stok {sortBy === 'Stok' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b">
+            <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase border-b">
               <tr>
                 <th className="p-6 w-10">
-                   <button onClick={() => setSelectedProducts(selectedProducts.length === currentItems.length ? [] : currentItems.map(p => p.id))}>
-                      {selectedProducts.length === currentItems.length ? <CheckSquare size={18} className="text-black"/> : <Square size={18} className="text-gray-200"/>}
-                   </button>
+                  <input type="checkbox" className="w-5 h-5 rounded accent-black" onChange={handleSelectAll} checked={selectedIds.length === currentItems.length && currentItems.length > 0} />
                 </th>
-                <th className="p-6">Produk & Satuan</th>
-                <th className="p-6">Kategori</th>
-                <th className="p-6">Harga (Ecer/Grosir)</th>
+                <th className="p-6">Produk</th>
+                <th className="p-6">Harga</th>
+                <th className="p-6 text-emerald-600">Profit</th>
                 <th className="p-6">Stok</th>
-                <th className="p-6 text-center">Tindakan</th>
+                <th className="p-6 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {currentItems.map(p => (
-                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
+                <tr key={p.id} className={`hover:bg-gray-50/50 transition-colors ${p.Status === 0 ? 'opacity-40 grayscale' : ''}`}>
                   <td className="p-6">
-                    <button onClick={() => setSelectedProducts(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])}>
-                      {selectedProducts.includes(p.id) ? <CheckSquare size={18} className="text-black"/> : <Square size={18} className="text-gray-200"/>}
-                    </button>
+                    <input type="checkbox" className="w-5 h-5 rounded accent-black" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} />
                   </td>
                   <td className="p-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border">
-                        {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Camera size={20} className="text-gray-300"/>}
+                      <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden border">
+                        {p.Link_Foto ? <img src={p.Link_Foto} className="w-full h-full object-cover" /> : <Camera size={14} className="m-auto mt-4 text-gray-300"/>}
                       </div>
                       <div>
-                        <div className="font-black text-gray-900 leading-tight uppercase">{p.name}</div>
-                        <div className="text-[9px] text-gray-400 font-black uppercase mt-1 flex items-center gap-2">
-                          <Barcode size={10} /> {p.barcode || 'NO-SKU'} | <span className="text-blue-500">{p.unit}</span>
+                        <div className="flex items-center gap-1">
+                          <div className={`w-1.5 h-1.5 rounded-full ${p.Status === 0 ? 'bg-red-500' : 'bg-green-500'}`} />
+                          <p className="text-[9px] font-black text-blue-600 uppercase">ID: {p.ID}</p>
                         </div>
+                        <p className="font-black text-gray-900 uppercase text-xs">{p.Nama || p.name}</p>
                       </div>
                     </div>
                   </td>
+                  <td className="p-6 font-black text-xs">
+                    Rp {(p.Ecer || 0).toLocaleString()}
+                    {p.Ecer < p.Modal && <p className="text-[8px] text-red-600 mt-1">!! RUGI !!</p>}
+                  </td>
+                  <td className="p-6 font-black text-[10px] text-emerald-600">+Rp {((p.Ecer || 0) - (p.Modal || 0)).toLocaleString()}</td>
                   <td className="p-6">
-                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                      {p.category || 'Umum'}
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${p.Stok <= (p.Min_Stok || 5) ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                      {p.Stok} {p.Satuan}
                     </span>
                   </td>
                   <td className="p-6">
-                    <div className="text-sm font-black text-gray-900">E: Rp {p.price?.toLocaleString()}</div>
-                    <div className="text-[10px] font-bold text-orange-600">G: Rp {p.wholesalePrice?.toLocaleString()} (min {p.minWholesaleQty})</div>
-                    <div className="text-emerald-600 text-[9px] font-black uppercase mt-1">
-                      Profit Ecer: +Rp {(p.price - (p.purchasePrice || 0)).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <div className={`text-xs font-black px-3 py-1 rounded-full inline-block ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-900'}`}>
-                      {p.stock} <span className="text-[9px] font-bold uppercase">{p.unit}</span>
-                    </div>
-                  </td>
-                  <td className="p-6 text-center">
                     <div className="flex justify-center gap-2">
-                      <Link href={`/admin/products/edit/${p.id}`} className="p-3 bg-gray-50 text-blue-600 rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm">
-                        <Edit size={16} />
-                      </Link>
-                      <button onClick={() => handleDelete(p.id, p.name)} className="p-3 bg-gray-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                        <Trash2 size={16} />
-                      </button>
+                      <Link href={`/admin/products/edit/${p.id}`} className="p-2 border rounded-xl hover:bg-black hover:text-white transition-all"><Edit size={14} /></Link>
+                      <button onClick={() => handleDelete(p.id, p.Nama)} className="p-2 border rounded-xl text-red-500 hover:bg-red-600 hover:text-white transition-all"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -351,125 +328,55 @@ export default function AdminProducts() {
             </tbody>
           </table>
         </div>
-
-        <div className="p-6 flex items-center justify-between bg-gray-50/50 border-t">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            Data {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredProducts.length)} Dari {filteredProducts.length}
-          </p>
-          <div className="flex gap-2">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-30 hover:bg-black hover:text-white transition-all"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex items-center px-4 font-black text-sm">{currentPage} / {totalPages || 1}</div>
-            <button 
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-30 hover:bg-black hover:text-white transition-all"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+        
+        {/* Pagination */}
+        <div className="p-6 bg-gray-50/50 flex justify-between items-center border-t">
+            <p className="text-[10px] font-black text-gray-400 uppercase">HALAMAN {currentPage} / {totalPages || 1} ({filteredAndSorted.length} ITEM)</p>
+            <div className="flex gap-2">
+                <button disabled={currentPage === 1} onClick={() => {setCurrentPage(v => v - 1); window.scrollTo(0,0)}} className="p-2 bg-white rounded-lg border shadow-sm disabled:opacity-30"><ChevronLeft size={16}/></button>
+                <button disabled={currentPage >= totalPages} onClick={() => {setCurrentPage(v => v + 1); window.scrollTo(0,0)}} className="p-2 bg-white rounded-lg border shadow-sm disabled:opacity-30"><ChevronRight size={16}/></button>
+            </div>
         </div>
       </div>
 
-      {/* 6. Modal Tambah Lengkap (Grosir & Satuan) */}
+      {/* Modal Add (Sama Seperti Sebelumnya) */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                <Plus size={20}/> Produk Lengkap Baru
-              </h2>
-              <button onClick={() => {setShowAddModal(false); resetForm();}} className="bg-gray-100 p-2 rounded-full hover:bg-red-500 hover:text-white transition-all"><X size={20}/></button>
+              <h2 className="text-xl font-black uppercase tracking-tighter">Tambah Produk</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-2 bg-gray-100 rounded-xl hover:bg-red-500 hover:text-white transition-all"><X size={20}/></button>
             </div>
-
-            {errorMsg && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-xs font-bold animate-bounce">
-                <AlertCircle size={18} /> {errorMsg}
-              </div>
-            )}
-            
-            <form onSubmit={handleCreate} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-3xl flex gap-4 items-center border">
-                  <div className="w-14 h-14 bg-white rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
-                    {formData.image ? <img src={formData.image} className="w-full h-full object-cover" /> : <Camera className="text-gray-200" />}
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">URL Foto</label>
-                    <input type="text" placeholder="https://..." className="w-full bg-white border-none p-2 rounded-lg text-[10px] font-bold outline-none" value={formData.image} onChange={(e) => setFormData({...formData, image: e.target.value})} />
-                  </div>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                  <input required className="w-full bg-gray-50 p-4 rounded-2xl font-bold outline-none border focus:border-black" value={formData.ID} onChange={e => setFormData({...formData, ID: e.target.value})} />
                 </div>
-                <div className="bg-gray-50 p-4 rounded-3xl border">
-                   <label className="text-[9px] font-black text-gray-400 uppercase block mb-1 flex items-center gap-1"><Layers size={10}/> Kategori & Satuan</label>
-                   <div className="flex gap-2">
-                     <input required type="text" placeholder="Kategori" className="w-full bg-white border-none p-3 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-black" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
-                     <input required type="text" placeholder="Pcs/Dus" className="w-24 bg-white border-none p-3 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-black" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} />
-                   </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode</label>
+                  <input className="w-full bg-gray-50 p-4 rounded-2xl font-bold outline-none border focus:border-black" value={formData.Barcode} onChange={e => setFormData({...formData, Barcode: e.target.value})} />
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nama Produk *</label>
-                  <input required type="text" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-black" value={formData.name} onChange={(e) => handleNameChange(e.target.value)} />
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Barang *</label>
+                <input required className="w-full bg-gray-50 p-4 rounded-2xl font-bold outline-none border focus:border-black uppercase" value={formData.Nama} onChange={e => setFormData({...formData, Nama: e.target.value.toUpperCase()})} />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Stok</label>
+                  <input type="number" className="w-full bg-gray-50 p-4 rounded-2xl font-bold outline-none border" value={formData.Stok} onChange={e => setFormData({...formData, Stok: Number(e.target.value)})} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Barcode SKU</label>
-                  <input type="text" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-black" value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} />
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Modal</label>
+                  <input type="number" className="w-full bg-gray-50 p-4 rounded-2xl font-bold outline-none border" value={formData.Modal} onChange={e => setFormData({...formData, Modal: Number(e.target.value)})} />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-black uppercase ml-1 ${(formData.Ecer || 0) < (formData.Modal || 0) ? 'text-red-600' : 'text-blue-600'}`}>Harga Ecer</label>
+                  <input type="number" className={`w-full p-4 rounded-2xl font-bold outline-none border ${(formData.Ecer || 0) < (formData.Modal || 0) ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100'}`} value={formData.Ecer} onChange={e => setFormData({...formData, Ecer: Number(e.target.value)})} />
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Modal</label>
-                  <input required type="number" className="w-full bg-gray-100 border-none p-4 rounded-2xl font-black outline-none" value={formData.purchasePrice} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Harga Ecer</label>
-                  <input required type="number" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" value={formData.price} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Stok Awal</label>
-                  <input required type="number" className="w-full bg-gray-50 border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" value={formData.stock} onChange={(e) => setFormData({...formData, stock: Number(e.target.value)})} />
-                </div>
-              </div>
-
-              {/* SECTION HARGA GROSIR */}
-              <div className="p-6 bg-orange-50/50 rounded-[2rem] border border-dashed border-orange-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-orange-600 uppercase ml-2 flex items-center gap-1"><ShoppingBag size={10}/> Harga Grosir</label>
-                  <input type="number" className="w-full bg-white border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" value={formData.wholesalePrice} onChange={(e) => setFormData({...formData, wholesalePrice: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-orange-600 uppercase ml-2">Min. Beli Grosir</label>
-                  <input type="number" className="w-full bg-white border-none p-4 rounded-2xl font-black outline-none focus:ring-2 focus:ring-orange-500 shadow-sm" value={formData.minWholesaleQty} onChange={(e) => setFormData({...formData, minWholesaleQty: Number(e.target.value)})} />
-                </div>
-              </div>
-
-              {/* SECTION VARIAN */}
-              <div className="space-y-3 p-6 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black text-gray-500 uppercase flex items-center gap-2"><Tag size={12}/> Varian (Opsional)</label>
-                  <button type="button" onClick={addVariantField} className="text-[9px] font-black text-blue-600 uppercase hover:underline">+ Tambah Varian</button>
-                </div>
-                {formData.variants.map((v, i) => (
-                  <div key={i} className="flex gap-3 animate-in fade-in zoom-in-95">
-                    <input type="text" placeholder="Ukuran/Warna" className="flex-1 bg-white border-none p-3 rounded-xl text-xs font-bold shadow-sm outline-none" value={v.name} onChange={(e) => updateVariant(i, 'name', e.target.value)} />
-                    <input type="number" placeholder="+ Harga" className="w-28 bg-white border-none p-3 rounded-xl text-xs font-bold shadow-sm outline-none" onChange={(e) => updateVariant(i, 'additionalPrice', Number(e.target.value))} />
-                    <button type="button" onClick={() => removeVariantField(i)} className="text-red-400"><X size={18}/></button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => {setShowAddModal(false); resetForm();}} className="px-6 py-4 text-gray-400 font-black uppercase text-[10px] tracking-widest">Batal</button>
-                <button type="submit" className="px-12 py-4 bg-black text-white rounded-3xl font-black shadow-2xl hover:bg-emerald-600 transition-all uppercase text-[10px] tracking-widest">Simpan Produk</button>
-              </div>
+              <button type="submit" className="w-full bg-black text-white p-5 rounded-2xl font-black uppercase text-[12px] shadow-xl hover:bg-emerald-600 transition-all">Simpan Produk</button>
             </form>
           </div>
         </div>

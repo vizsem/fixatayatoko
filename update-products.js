@@ -1,7 +1,6 @@
-// update-products.js
 const admin = require('firebase-admin');
 
-// Ganti dengan path file service account Anda
+// 1. Inisialisasi - Pastikan file JSON ada di folder yang sama!
 const serviceAccount = require('./atayatoko2-firebase-adminsdk.json');
 
 admin.initializeApp({
@@ -11,98 +10,57 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-async function updateProductsWithBarcode() {
-  console.log('Memperbarui produk dengan barcode dan harga beli...');
-
-  // Mapping produk dengan barcode & harga beli
-  const productUpdates = [
-    {
-      name: "Beras Premium 5kg",
-      barcode: "BR001",
-      purchasePrice: 50000
-    },
-    {
-      name: "Minyak Goreng 2L",
-      barcode: "MG002",
-      purchasePrice: 25000
-    },
-    {
-      name: "Gula Pasir 1kg",
-      barcode: "GP003",
-      purchasePrice: 14000
-    },
-    {
-      name: "Mie Instan 40pcs",
-      barcode: "MI004",
-      purchasePrice: 1500
-    },
-    {
-      name: "Sabun Mandi 120gr",
-      barcode: "SM005",
-      purchasePrice: 4800
-    },
-    {
-      name: "Tepung Terigu 1kg",
-      barcode: "TT006",
-      purchasePrice: 9500
-    },
-    {
-      name: "Kopi Sachet 20pcs",
-      barcode: "KS007",
-      purchasePrice: 12000
-    },
-    {
-      name: "Popok Bayi XL 30pcs",
-      barcode: "PB008",
-      purchasePrice: 70000
-    },
-    {
-      name: "Tisu Basah 80pcs",
-      barcode: "TB009",
-      purchasePrice: 8500
-    },
-    {
-      name: "Susu Bubuk 800gr",
-      barcode: "SB010",
-      purchasePrice: 95000
-    }
-  ];
+async function safeUpdateProducts() {
+  console.log('🚀 Memulai sinkronisasi field (Tanpa menghapus data lama)...');
 
   try {
-    // Ambil semua produk
     const productsSnapshot = await db.collection('products').get();
-    
-    for (const doc of productsSnapshot.docs) {
-      const product = doc.data();
-      const productName = product.name;
+    const batch = db.batch();
+
+    productsSnapshot.docs.forEach((doc) => {
+      const p = doc.data();
+      const docRef = db.collection('products').doc(doc.id);
       
-      // Cari mapping berdasarkan nama
-      const updateData = productUpdates.find(p => p.name === productName);
-      
-      if (updateData) {
-        // Update barcode & harga beli
-        await doc.ref.update({
-          barcode: updateData.barcode,
-          purchasePrice: updateData.purchasePrice
-        });
-        console.log(`✅ ${productName} → ${updateData.barcode} | Rp${updateData.purchasePrice.toLocaleString('id-ID')}`);
-      } else {
-        // Jika produk tidak ada di mapping, generate barcode otomatis
-        const autoBarcode = `AUTO${Date.now().toString().slice(-6)}`;
-        await doc.ref.update({
-          barcode: autoBarcode,
-          purchasePrice: product.price * 0.8 // Asumsi harga beli 80% harga jual
-        });
-        console.log(`⚠️  ${productName} → ${autoBarcode} | Generated`);
+      // Logika khusus untuk barcode Pop Ice sesuai permintaan Anda
+      let finalBarcode = p.barcode || p.Barcode || "";
+      if (doc.id === "00svHwNozsoP6kH4QjqK" || p.name === "Pop Ice renteng isi 10 pcs aneka macam pilihan rasa") {
+        finalBarcode = "BR014";
       }
-    }
-    
-    console.log('\n✅ Semua produk berhasil diperbarui!');
-    console.log('✅ Barcode unik ditambahkan untuk menghindari duplikasi');
-    console.log('✅ Harga beli ditambahkan untuk perhitungan profit');
+
+      // 2. Tambahkan Field Baru (Bahasa Indonesia) untuk Export
+      // Kita tetap mengambil data dari field lama (p.name, p.price, dll)
+      const syncData = {
+        ID: p.id || doc.id,
+        Barcode: finalBarcode,
+        Parent_ID: p.Parent_ID || p.parentId || "",
+        Nama: p.name || p.Nama || "",
+        Kategori: p.category || p.Kategori || "snack",
+        Satuan: p.unit || p.Satuan || "pcs",
+        Stok: Number(p.stock ?? p.Stok ?? 0),
+        Min_Stok: Number(p.Min_Stok || p.minStock || 5),
+        Modal: Number(p.purchasePrice || p.Modal || 0),
+        Ecer: Number(p.price || p.Ecer || 0),
+        Grosir: Number(p.wholesalePrice || p.Grosir || 0),
+        Min_Grosir: Number(p.minWholesaleQty || p.Min_Grosir || 1),
+        Link_Foto: p.image || p.Link_Foto || "",
+        Deskripsi: p.description || p.Deskripsi || "",
+        Expired: p.expiredDate || p.Expired || "",
+        Status: p.Status ?? 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // 3. Gunakan { merge: true } agar field lama (name, price, stock) TIDAK TERHAPUS
+      batch.set(docRef, syncData, { merge: true }); 
+      console.log(`✅ Sinkron Berhasil: ${syncData.Nama}`);
+    });
+
+    await batch.commit();
+    console.log('\n✨ Selesai! Field Indonesia sudah ditambahkan.');
+    console.log('Sekarang fitur Export Anda akan terbaca lengkap.');
+
   } catch (error) {
-    console.error('❌ Gagal memperbarui produk:', error);
+    console.error('❌ Terjadi kesalahan:', error);
   }
 }
 
-updateProductsWithBarcode();
+safeUpdateProducts();

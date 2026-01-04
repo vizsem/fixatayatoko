@@ -53,7 +53,6 @@ export default function Home() {
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- LOGIKA SINKRONISASI KERANJANG ---
   const updateCartCount = () => {
     if (typeof window !== 'undefined') {
       const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -63,13 +62,9 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Jalankan saat pertama kali muat
     updateCartCount();
-
-    // Dengar perubahan dari halaman lain (seperti /cart)
     window.addEventListener('cart-updated', updateCartCount);
     window.addEventListener('storage', updateCartCount);
-
     return () => {
       window.removeEventListener('cart-updated', updateCartCount);
       window.removeEventListener('storage', updateCartCount);
@@ -82,15 +77,18 @@ export default function Home() {
         const productsSnapshot = await getDocs(collection(db, 'products'));
         const productList = productsSnapshot.docs.map(doc => {
           const data = doc.data();
+          // ✅ SINKRONISASI FIELD DATABASE (SUPPORT INDO & ENG)
           return {
             id: doc.id,
             ...data,
-            price: Number(data.price) || 0,
-            wholesalePrice: Number(data.wholesalePrice) || Number(data.price) || 0,
-            minWholesale: Number(data.minWholesale) || 1,
-            unit: data.unit || 'pcs',
-            category: data.category || 'Umum',
-            image: data.image || '/logo-atayatoko.png',
+            name: data.Nama || data.name || "Produk",
+            price: Number(data.Ecer || data.price) || 0,
+            wholesalePrice: Number(data.Grosir || data.wholesalePrice) || Number(data.Ecer || data.price) || 0,
+            minWholesale: Number(data.Min_Stok_Grosir || data.Min_Grosir || data.minWholesale) || 1,
+            stock: Number(data.Stok || data.stock) || 0,
+            unit: data.Satuan || data.unit || 'pcs',
+            category: data.Kategori || data.category || 'Umum',
+            image: data.Link_Foto || data.image || '/logo-atayatoko.png',
             variant: data.variant || ''
           };
         }) as Product[];
@@ -164,8 +162,8 @@ export default function Home() {
   };
 
   const addToCart = (product: Product) => {
+    if (product.stock <= 0) return; // ✅ Proteksi Stok
     const { price } = getDiscountedPrice(product);
-    // GANTI KEY MENJADI 'cart'
     let cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const existingIndex = cart.findIndex((item: any) => (item.id === product.id || item.productId === product.id));
     const productToCart = { ...product, productId: product.id, price: price };
@@ -174,8 +172,6 @@ export default function Home() {
     else cart.push({ ...productToCart, quantity: 1 });
     
     localStorage.setItem('cart', JSON.stringify(cart));
-    
-    // Trigger sinkronisasi global
     updateCartCount();
     window.dispatchEvent(new Event('cart-updated'));
   };
@@ -205,8 +201,10 @@ export default function Home() {
           {items.slice(0, 10).map((product) => {
             const promoInfo = getDiscountedPrice(product);
             const isWishlisted = wishlist.includes(product.id);
+            const isOutOfStock = product.stock <= 0; // ✅ Cek Stok
+
             return (
-              <div key={product.id} className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm flex flex-col relative group transition-transform active:scale-95">
+              <div key={product.id} className={`min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm flex flex-col relative group transition-transform ${!isOutOfStock && 'active:scale-95'}`}>
                 <button 
                   onClick={() => toggleWishlist(product.id)}
                   className="absolute top-2 right-2 z-20 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md active:scale-75 transition-all"
@@ -215,15 +213,18 @@ export default function Home() {
                 </button>
 
                 <Link href={`/produk/${product.id}`} className="relative block aspect-square bg-gray-50 overflow-hidden">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <img src={product.image} alt={product.name} className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${isOutOfStock ? 'grayscale opacity-50' : ''}`} />
                   
-                  {promoInfo.hasPromo && (
+                  {isOutOfStock && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
+                      <span className="bg-white text-black text-[9px] font-black px-3 py-1 rounded-full uppercase">Stok Habis</span>
+                    </div>
+                  )}
+
+                  {promoInfo.hasPromo && !isOutOfStock && (
                     <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
                       <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase flex items-center gap-1 shadow-lg animate-pulse">
                         <Sparkles size={10} className="fill-white" /> Special Deal
-                      </div>
-                      <div className="bg-black/60 backdrop-blur-sm text-white text-[7px] font-bold px-1.5 py-0.5 rounded shadow-sm inline-block w-fit uppercase">
-                        {promoInfo.promoName}
                       </div>
                     </div>
                   )}
@@ -232,7 +233,7 @@ export default function Home() {
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="text-[10px] md:text-xs font-bold text-gray-700 line-clamp-1 uppercase leading-tight">{product.name}</h3>
                   <p className="text-[8px] font-bold text-gray-400 mb-2 uppercase tracking-tighter">
-                    {product.variant || 'Kemasan Standar'}
+                    {product.variant || (isOutOfStock ? 'Kosong' : 'Kemasan Standar')}
                   </p>
                   
                   <div className="mb-3 space-y-2">
@@ -249,6 +250,7 @@ export default function Home() {
                         <span className="text-[9px] font-bold text-gray-400">/{product.unit}</span>
                       </div>
                       
+                      {/* ✅ AREA GROSIR SINKRON DATABASE */}
                       <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex flex-col gap-0.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">Harga Grosir</span>
@@ -257,8 +259,8 @@ export default function Home() {
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
-                           <span className="bg-blue-50 text-blue-600 text-[7px] font-black px-1.5 py-0.5 rounded border border-blue-100">
-                             MIN. {product.minWholesale} {product.unit}
+                           <span className="bg-blue-50 text-blue-600 text-[7px] font-black px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">
+                             Min. {product.minWholesale} {product.unit}
                            </span>
                         </div>
                       </div>
@@ -266,9 +268,11 @@ export default function Home() {
                   </div>
                   <button 
                     onClick={() => addToCart(product)}
-                    className="mt-auto w-full py-2.5 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase active:bg-green-600 transition-colors shadow-lg shadow-gray-200"
+                    disabled={isOutOfStock}
+                    className={`mt-auto w-full py-2.5 text-[9px] font-black rounded-xl uppercase transition-colors shadow-lg shadow-gray-200
+                      ${isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white active:bg-green-600'}`}
                   >
-                    + Keranjang
+                    {isOutOfStock ? 'Stok Habis' : '+ Keranjang'}
                   </button>
                 </div>
               </div>
@@ -355,14 +359,20 @@ export default function Home() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {filteredProducts.map(p => {
                         const promoInfo = getDiscountedPrice(p);
+                        const outStock = p.stock <= 0;
                         return (
                           <div key={p.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col relative">
                               <button onClick={() => toggleWishlist(p.id)} className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 rounded-full shadow-sm">
                                 <Heart size={14} className={wishlist.includes(p.id) ? "fill-red-500 text-red-500" : "text-gray-400"} />
                               </button>
                               <Link href={`/produk/${p.id}`} className="relative block aspect-square mb-2">
-                                  <img src={p.image} alt={p.name} className="w-full h-full object-cover rounded-xl" />
-                                  {promoInfo.hasPromo && (
+                                  <img src={p.image} alt={p.name} className={`w-full h-full object-cover rounded-xl ${outStock ? 'grayscale opacity-50' : ''}`} />
+                                  {outStock && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+                                      <span className="bg-white text-black text-[7px] font-black px-2 py-0.5 rounded uppercase">Habis</span>
+                                    </div>
+                                  )}
+                                  {promoInfo.hasPromo && !outStock && (
                                     <div className="absolute top-2 left-2 bg-orange-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-1 shadow-lg">
                                        <Sparkles size={8} /> Promo
                                     </div>
@@ -374,10 +384,20 @@ export default function Home() {
                                       <span className={`text-[15px] font-black ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>
                                         Rp{promoInfo.price.toLocaleString('id-ID')}
                                       </span>
-                                      <span className="text-[9px] font-bold text-blue-600 tracking-tighter">Grosir: Rp{p.wholesalePrice?.toLocaleString()}</span>
+                                      <div className="flex flex-col mt-1 pt-1 border-t border-dashed border-gray-100">
+                                        <span className="text-[9px] font-bold text-blue-600 tracking-tighter uppercase italic">Grosir: Rp{p.wholesalePrice?.toLocaleString()}</span>
+                                        <span className="text-[7px] font-black text-gray-400 uppercase">Min. {p.minWholesale} {p.unit}</span>
+                                      </div>
                                   </div>
                               </div>
-                              <button onClick={() => addToCart(p)} className="mt-auto w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-lg uppercase shadow-md active:scale-95 transition-transform">+ Keranjang</button>
+                              <button 
+                                onClick={() => addToCart(p)} 
+                                disabled={outStock}
+                                className={`mt-auto w-full py-2 text-[9px] font-black rounded-lg uppercase shadow-md transition-all
+                                  ${outStock ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:scale-95'}`}
+                              >
+                                {outStock ? 'Habis' : '+ Keranjang'}
+                              </button>
                           </div>
                         )
                     })}

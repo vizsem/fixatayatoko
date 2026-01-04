@@ -1,224 +1,208 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, Package, Truck, Store, MapPin, CreditCard, Upload, User, Printer, Send, Bike, Box, Info, AlertCircle, CheckCircle2, ChevronLeft } from 'lucide-react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import Link from 'next/link';
+import { 
+  ChevronLeft, Save, Package, Tag, Truck, 
+  Barcode, Image as ImageIcon, AlertCircle, Layers 
+} from 'lucide-react';
 
-const TOKO_LAT = -7.8014;
-const TOKO_LNG = 111.8139;
-
-export default function CartPage() {
+export default function AddProductPage() {
   const router = useRouter();
-  const [cart, setCart] = useState<any[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  
-  // Data Pembeli
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
-  
-  // State Pengiriman & Pembayaran (Default sudah diisi agar tidak kosong)
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('delivery');
-  const [courierType, setCourierType] = useState<'toko' | 'ojol' | 'ekspedisi'>('toko');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
-  
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const [distance, setDistance] = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const mapRef = useRef<HTMLDivElement>(null);
-  const markerRef = useRef<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // Load Data awal
-  useEffect(() => {
-    const saved = localStorage.getItem('atayatoko-cart');
-    if (saved) setCart(JSON.parse(saved));
-    setCustomerName(localStorage.getItem('atayatoko-customer-name') || '');
-    setCustomerPhone(localStorage.getItem('atayatoko-customer-phone') || '');
-    setIsLoaded(true);
-  }, []);
+  const [formData, setFormData] = useState({
+    ID: '',
+    Barcode: '',
+    Parent_ID: '',
+    Nama: '',
+    Kategori: '',
+    Satuan: 'Pcs',
+    Stok: 0,
+    Min_Stok: 5,
+    Modal: 0,
+    Ecer: 0,
+    Harga_Coret: 0,
+    Grosir: 0,
+    Min_Grosir: 1,
+    Link_Foto: '',
+    Deskripsi: '',
+    Status: 1,
+    Supplier: '',
+    No_WA_Supplier: ''
+  });
 
-  // Inisialisasi Google Maps
-  useEffect(() => {
-    if (deliveryMethod === 'delivery' && courierType === 'toko' && isLoaded) {
-      const initMap = () => {
-        // PERBAIKAN: Cast window ke any untuk menghindari error TypeScript build
-        const googleObj = (window as any).google;
-        
-        if (!googleObj || !mapRef.current) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
 
-        const map = new googleObj.maps.Map(mapRef.current, {
-          center: { lat: TOKO_LAT, lng: TOKO_LNG },
-          zoom: 15,
-          disableDefaultUI: true,
-          zoomControl: true,
-        });
-
-        markerRef.current = new googleObj.maps.Marker({
-          position: { lat: TOKO_LAT, lng: TOKO_LNG },
-          map,
-          draggable: true
-        });
-
-        markerRef.current.addListener('dragend', () => {
-          const pos = markerRef.current.getPosition();
-          const dist = calculateDistance(TOKO_LAT, TOKO_LNG, pos.lat(), pos.lng());
-          setDistance(dist);
-        });
-      };
-
-      // PERBAIKAN: Cast window ke any di sini juga
-      if (!(window as any).google) {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDV5Oz_zphv8UatLlZssdLkrbHSIZ8fOZI`;
-        script.async = true;
-        script.onload = initMap;
-        document.head.appendChild(script);
-      } else {
-        initMap();
-      }
-    }
-  }, [deliveryMethod, courierType, isLoaded]);
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-  };
-
-  const subtotal = cart.reduce((t, i) => t + (i.price * i.quantity), 0);
-  const isGrosir = subtotal >= 500000;
-
-  const getStatus = () => {
-    if (deliveryMethod === 'pickup') return { ok: true, msg: "Ambil Sendiri ke Toko Ataya" };
-    if (courierType === 'toko') {
-      if (!distance) return { ok: false, msg: "Geser marker peta ke lokasi Anda" };
-      if (isGrosir) return distance <= 10 ? { ok: true, msg: "Lokasi Grosir Terjangkau (Max 10km)" } : { ok: false, msg: "Jarak Grosir maksimal 10km" };
-      if (subtotal < 100000) return { ok: false, msg: "Minimal belanja 100rb untuk kurir toko" };
-      return distance <= 3 ? { ok: true, msg: "Lokasi Ecer Terjangkau (Max 3km)" } : { ok: false, msg: "Jarak Ecer maksimal 3km" };
-    }
-    return { ok: true, msg: `Siap dikirim melalui ${courierType.toUpperCase()}` };
-  };
-
-  const status = getStatus();
-
-  const handleCheckout = async () => {
-    if (!customerName || !customerPhone) return alert("Isi Nama & No WA!");
-    setIsSubmitting(true);
     try {
-      let url = "";
-      if (paymentProof) {
-        const refFile = ref(storage, `bukti/${Date.now()}`);
-        await uploadBytes(refFile, paymentProof);
-        url = await getDownloadURL(refFile);
+      // 1. Validasi ID Duplikat (Wajib Unik untuk Sinkronisasi Excel)
+      const q = query(collection(db, 'products'), where('ID', '==', formData.ID));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        throw new Error(`ID Produk "${formData.ID}" sudah terdaftar di database!`);
       }
 
-      const listProduk = cart.map((i, index) => `${index+1}. ${i.name} (${i.quantity}x) = Rp${(i.price*i.quantity).toLocaleString()}`).join('\n');
-      const textWA = `*PESANAN BARU - ATAYATOKO*\n\n*Nama:* ${customerName}\n*WA:* ${customerPhone}\n*Metode:* ${deliveryMethod} (${courierType})\n*Pembayaran:* ${paymentMethod.toUpperCase()}\n\n*DAFTAR PRODUK:*\n${listProduk}\n\n*TOTAL: Rp${subtotal.toLocaleString()}*\n\nAlamat: ${customerAddress}`;
-
-      await addDoc(collection(db, 'orders'), { 
-        customerName, items: cart, total: subtotal, status: 'BARU', createdAt: serverTimestamp() 
+      // 2. Simpan ke Firestore
+      await addDoc(collection(db, 'products'), {
+        ...formData,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
       });
 
-      window.open(`https://wa.me/6285853161174?text=${encodeURIComponent(textWA)}`, '_blank');
-      localStorage.removeItem('atayatoko-cart');
-      router.push('/success');
-    } catch (e) { alert("Error simpan data"); } finally { setIsSubmitting(false); }
+      alert('Produk berhasil ditambahkan ke database!');
+      router.push('/admin/products');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!isLoaded) return null;
-
   return (
-    <div className="min-h-screen bg-gray-50 text-black pb-20">
-      <header className="bg-white p-4 shadow-sm flex items-center gap-4 sticky top-0 z-50 font-bold text-green-600">
-        <button onClick={() => router.back()} className="text-black"><ChevronLeft /></button>
-        KERANJANG SAYA
-      </header>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-24 text-black font-sans">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/products" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+              <ChevronLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tighter">Tambah Produk</h1>
+              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Database Inventaris Ataya</p>
+            </div>
+          </div>
+        </div>
 
-      <main className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* SECTION 1: PRODUK */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h2 className="font-bold flex items-center gap-2 mb-4 text-sm uppercase tracking-wider"><Package size={18}/> Produk</h2>
-          {cart.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center py-3 border-b last:border-0">
-              <div className="text-sm">
-                <p className="font-bold">{item.name}</p>
-                <p className="text-green-600 text-xs font-bold">Rp{item.price.toLocaleString()}</p>
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-xs font-black uppercase animate-bounce">
+            <AlertCircle size={18} /> {errorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* BAGIAN 1: IDENTITAS (ID & SKU) */}
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-blue-600">
+              <Barcode size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Identitas Produk</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">ID Produk (Unique) *</label>
+                <input required type="text" placeholder="Contoh: AT-001" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.ID} onChange={e => setFormData({...formData, ID: e.target.value})} />
               </div>
-              <p className="text-xs font-black bg-gray-100 px-3 py-1 rounded-full">{item.quantity} {item.unit}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* SECTION 2: PENGIRIMAN (3 PILIHAN KURIR) */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-          <h2 className="font-bold flex items-center gap-2 text-sm uppercase tracking-wider"><Truck size={18}/> Pengiriman</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <input placeholder="Nama Anda" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="p-3 bg-gray-50 border rounded-xl w-full" />
-            <input placeholder="No WhatsApp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="p-3 bg-gray-50 border rounded-xl w-full" />
-          </div>
-
-          <div className="flex bg-gray-100 p-1 rounded-xl">
-            <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-lg text-xs font-black ${deliveryMethod === 'pickup' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>AMBIL SENDIRI</button>
-            <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-lg text-xs font-black ${deliveryMethod === 'delivery' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>DIANTAR KURIR</button>
-          </div>
-
-          {deliveryMethod === 'delivery' && (
-            <div className="space-y-4 pt-2">
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={()=>setCourierType('toko')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'toko' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}><Truck size={20}/><span className="text-[10px] font-bold">Kurir Toko</span></button>
-                <button onClick={()=>setCourierType('ojol')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ojol' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}><Bike size={20}/><span className="text-[10px] font-bold">Ojol</span></button>
-                <button onClick={()=>setCourierType('ekspedisi')} className={`p-3 border rounded-xl flex flex-col items-center gap-1 ${courierType === 'ekspedisi' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}><Box size={20}/><span className="text-[10px] font-bold">Ekspedisi</span></button>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Barcode / SKU</label>
+                <input type="text" placeholder="Scan Barcode" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black font-bold" value={formData.Barcode} onChange={e => setFormData({...formData, Barcode: e.target.value})} />
               </div>
-              <textarea placeholder="Alamat lengkap & patokan..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full p-3 bg-gray-50 border rounded-xl h-20 text-sm" />
-              {courierType === 'toko' && <div ref={mapRef} className="h-48 bg-gray-200 rounded-xl overflow-hidden" />}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Parent ID (Untuk Varian)</label>
+                <input type="text" placeholder="Kosongkan jika bukan varian" className="w-full p-4 bg-purple-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500 font-bold text-purple-700" value={formData.Parent_ID} onChange={e => setFormData({...formData, Parent_ID: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Nama Produk *</label>
+                <input required type="text" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black font-bold" value={formData.Nama} onChange={e => setFormData({...formData, Nama: e.target.value})} />
+              </div>
             </div>
-          )}
-
-          <div className={`p-3 rounded-xl border flex items-center gap-2 ${status.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {status.ok ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>}
-            <span className="text-[10px] font-bold uppercase">{status.msg}</span>
-          </div>
-        </div>
-
-        {/* SECTION 3: PEMBAYARAN (COD, TRANSFER, QRIS) */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-          <h2 className="font-bold flex items-center gap-2 text-sm uppercase tracking-wider"><CreditCard size={18}/> Pembayaran</h2>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={()=>setPaymentMethod('cash')} className={`p-3 border rounded-xl text-[10px] font-black ${paymentMethod === 'cash' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}>COD / TUNAI</button>
-            <button onClick={()=>setPaymentMethod('transfer')} className={`p-3 border rounded-xl text-[10px] font-black ${paymentMethod === 'transfer' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}>TRANSFER</button>
-            <button onClick={()=>setPaymentMethod('qris')} className={`p-3 border rounded-xl text-[10px] font-black ${paymentMethod === 'qris' ? 'border-green-600 bg-green-50 text-green-600' : 'text-gray-400'}`}>QRIS</button>
           </div>
 
-          {paymentMethod !== 'cash' && (
-            <div className="border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-gray-400">
-              <Upload size={24} />
-              <p className="text-[10px] font-bold uppercase">Upload Bukti Bayar</p>
-              <input type="file" onChange={e=>setPaymentProof(e.target.files?.[0] || null)} className="text-[10px] w-full" />
+          {/* BAGIAN 2: STOK & KATEGORI */}
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-emerald-600">
+              <Layers size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Kategori & Stok</h3>
             </div>
-          )}
-        </div>
-
-        {/* SECTION 4: TOTAL & ORDER */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-green-100">
-          <div className="flex justify-between items-center mb-6">
-            <span className="font-bold text-gray-400 uppercase text-xs">Total Belanja</span>
-            <span className="text-2xl font-black text-green-600">Rp{subtotal.toLocaleString()}</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              <div className="col-span-2 md:col-span-1 space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Kategori</label>
+                <input required type="text" placeholder="Umum" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Kategori} onChange={e => setFormData({...formData, Kategori: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Satuan</label>
+                <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({...formData, Satuan: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Awal</label>
+                <input required type="number" className="w-full p-4 bg-emerald-50 rounded-2xl border-none font-black text-emerald-700" value={formData.Stok} onChange={e => setFormData({...formData, Stok: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
+                <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({...formData, Min_Stok: Number(e.target.value)})} />
+              </div>
+            </div>
           </div>
-          <button 
-            onClick={handleCheckout}
-            disabled={!status.ok || isSubmitting}
-            className="w-full bg-green-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-200 disabled:bg-gray-200"
-          >
-            {isSubmitting ? "SEDANG MEMPROSES..." : "PESAN SEKARANG VIA WA"}
-          </button>
-        </div>
-      </main>
+
+          {/* BAGIAN 3: HARGA & GROSIR */}
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-orange-600">
+              <Tag size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Struktur Harga</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Modal</label>
+                <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({...formData, Modal: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                <input required type="number" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600" value={formData.Ecer} onChange={e => setFormData({...formData, Ecer: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Coret</label>
+                <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({...formData, Harga_Coret: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({...formData, Grosir: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
+                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({...formData, Min_Grosir: Number(e.target.value)})} />
+              </div>
+            </div>
+          </div>
+
+          {/* BAGIAN 4: MEDIA & SUPPLIER */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
+              <h3 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><ImageIcon size={14}/> Media</h3>
+              <div className="space-y-4">
+                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => setFormData({...formData, Link_Foto: e.target.value})} />
+                <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({...formData, Deskripsi: e.target.value})}></textarea>
+              </div>
+            </div>
+            <div className="bg-blue-600 p-6 rounded-[2.5rem] shadow-xl text-white">
+              <h3 className="text-xs font-black uppercase text-blue-200 mb-4 flex items-center gap-2"><Truck size={14}/> Supplier</h3>
+              <div className="space-y-4">
+                <input type="text" placeholder="Nama Supplier" className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.Supplier} onChange={e => setFormData({...formData, Supplier: e.target.value})} />
+                <input type="text" placeholder="WA: 628..." className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.No_WA_Supplier} onChange={e => setFormData({...formData, No_WA_Supplier: e.target.value})} />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-6">
+            <button type="button" onClick={() => router.back()} className="flex-1 p-5 bg-white text-gray-400 font-black uppercase text-xs rounded-[2rem] shadow-sm border hover:bg-gray-100 transition-all">
+              Batal
+            </button>
+            <button type="submit" disabled={loading} className="flex-[2] p-5 bg-black text-white font-black uppercase text-xs rounded-[2rem] shadow-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-widest">
+              {loading ? 'SISTEM MENYIMPAN...' : <><Save size={18}/> Simpan Produk</>}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

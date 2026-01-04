@@ -1,34 +1,32 @@
-// src/lib/cart.ts
+import { db } from '@/lib/firebase';
 import { 
   collection, 
-  getDocs,
-  addDoc,
-  doc,
-  updateDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  where,
-  serverTimestamp,
-  getDoc
+  doc, 
+  serverTimestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
-// ✅ Tipe Product lengkap — sesuai dengan struktur Firestore ATAYATOKO2
+// ✅ Tipe Product disesuaikan dengan kolom Excel terbaru
 export type Product = {
-  id: string;
-  name: string;
-  price: number;
-  wholesalePrice?: number;
-  purchasePrice?: number;
-  stock: number;
-  stockByWarehouse?: Record<string, number>;
-  category: string;
-  unit: string;
-  barcode?: string;
-  image: string;
-  expiredDate?: string;
-  rating?: number; // ✅ Ditambahkan untuk kompatibilitas dengan StarRating
+  id: string;         // ID dokumen Firestore
+  ID: string;         // ID Unik (contoh: AT001)
+  Barcode: string;
+  Parent_ID: string;
+  Nama: string;
+  Kategori: string;
+  Satuan: string;
+  Stok: number;
+  Min_Stok: number;
+  Modal: number;
+  Ecer: number;       // Harga jual satuan
+  Harga_Coret: number;
+  Grosir: number;     // Harga jual grosir
+  Min_Grosir: number; // Minimal beli untuk harga grosir
+  Link_Foto: string;
+  Deskripsi: string;
+  Status: number;
+  Supplier: string;
+  No_WA_Supplier: string;
+  updatedAt?: any;
 };
 
 // ✅ Tipe CartItem = Product + quantity
@@ -80,11 +78,26 @@ export const removeItem = (id: string): void => {
   saveCart(cart);
 };
 
-// Fungsi untuk menghitung total
+// ✅ Fungsi Cerdas: Menghitung total harga dengan logika Grosir
+// Jika jumlah barang >= Min_Grosir, gunakan harga Grosir, jika tidak gunakan harga Ecer
+export const getItemPrice = (item: CartItem): number => {
+  if (item.Grosir > 0 && item.Min_Grosir > 0 && item.quantity >= item.Min_Grosir) {
+    return item.Grosir;
+  }
+  return item.Ecer;
+};
+
 export const getTotalPrice = (cart: CartItem[]): number => {
-  return cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  return cart.reduce((total, item) => total + getItemPrice(item) * item.quantity, 0);
 };
 
 export const getTotalItems = (cart: CartItem[]): number => {
   return cart.reduce((total, item) => total + item.quantity, 0);
+};
+
+// Fungsi tambahan untuk membersihkan keranjang setelah checkout
+export const clearCart = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('atayatoko-cart');
+  }
 };

@@ -9,9 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@opentelemetry/sdk-trace-base": "^2.2.0",
     "browser-image-compression": "^2.0.2",
     "dotenv": "^17.2.3",
     "firebase": "^12.7.0",
+    "firebase-admin": "^13.6.0",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
