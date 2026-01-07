@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'c.alfagift.id', // ✅ Ditambahkan untuk mengatasi error Alfagift
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'images.tokopedia.net',
         port: '',
         pathname: '/**',
@@ -15,9 +21,21 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      // Tambahkan domain lain di sini jika ada gambar dari sumber lain
+      {
+        protocol: 'https',
+        hostname: 'cf.shopee.co.id', // ✅ Tambahan umum untuk gambar Shopee
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'down-id.img.susercontent.com', // ✅ Tambahan Shopee versi baru
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
+  /* config options here */
 };
 
 export default nextConfig;
