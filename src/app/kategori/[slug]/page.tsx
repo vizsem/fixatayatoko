@@ -3,7 +3,11 @@
 import { useEffect, useState, Suspense, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Store, Package, ArrowLeft, ShoppingCart, Search, X, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
+import { 
+  ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
+  ChevronLeft, ChevronRight, Sparkles, Package 
+} from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import toast, { Toaster } from 'react-hot-toast';
@@ -30,13 +34,19 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categoryName, setCategoryName] = useState('');
   
-  // Fitur Pencarian & Tampilan
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
-  // Fitur Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 20;
+
+  // ✅ Fungsi Proxy Gambar agar gambar eksternal (Panen Square, dll) muncul
+  const getProxiedImage = (url: string) => {
+    if (!url || url.includes('firebasestorage.googleapis.com') || url.startsWith('data:')) {
+      return url || '/logo-atayatoko.png';
+    }
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&output=webp`;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,13 +70,18 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
         }) as Product[];
 
         const filtered = mapped.filter(p => {
-          const generatedSlug = p.category.toLowerCase().replace(/&/g, 'dan').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+          const generatedSlug = p.category.toLowerCase()
+            .replace(/&/g, 'dan')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
           return generatedSlug === slug;
         });
 
         if (filtered.length > 0) {
           setCategoryName(filtered[0].category);
           setAllCategoryProducts(filtered);
+        } else {
+          setCategoryName(slug.replace(/-/g, ' '));
         }
       } catch (error) {
         console.error(error);
@@ -78,16 +93,14 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     if (slug) fetchData();
   }, [slug]);
 
-  // Logic Filter Search & Pagination
   useEffect(() => {
     const searched = allCategoryProducts.filter(p => 
       p.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
     setFilteredProducts(searched);
-    setCurrentPage(1); // Reset ke hal 1 jika mencari
+    setCurrentPage(1);
   }, [searchQuery, allCategoryProducts]);
 
-  // Hitung Data Per Halaman
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
   const currentItems = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
@@ -104,116 +117,154 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     toast.success("Berhasil ditambah!");
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-green-600 animate-pulse">MEMUAT...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="w-12 h-12 border-4 border-green-100 border-t-green-600 rounded-full animate-spin mb-4"></div>
+      <p className="text-[10px] font-black uppercase tracking-widest text-green-600">Menyiapkan Produk...</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-white pb-32">
-      <Toaster position="top-center" />
+    <div className="min-h-screen bg-gray-50 pb-32">
+      <Toaster position="top-center" reverseOrder={false} />
       
-      {/* HEADER FIXED */}
-      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 px-4 py-4">
+      {/* HEADER MOBILE OPTIMIZED */}
+      <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-gray-100 px-4 py-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <button onClick={() => router.back()} className="p-2 bg-gray-50 rounded-full"><ArrowLeft size={18}/></button>
+              <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-transform">
+                <ArrowLeft size={18}/>
+              </button>
               <div>
-                <h1 className="text-[10px] font-black text-green-600 uppercase tracking-widest">{categoryName}</h1>
-                <p className="text-[12px] font-bold text-gray-400">{filteredProducts.length} Produk</p>
+                <h1 className="text-[11px] font-black text-green-600 uppercase tracking-tighter leading-none mb-1">{categoryName}</h1>
+                <p className="text-[10px] font-bold text-gray-400 uppercase">{filteredProducts.length} Produk Tersedia</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-2 bg-gray-50 rounded-lg text-gray-600">
+              <button 
+                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
+                className="p-2.5 bg-gray-50 rounded-2xl text-gray-600 active:scale-90 transition-all"
+              >
                 {viewMode === 'grid' ? <List size={20}/> : <LayoutGrid size={20}/>}
               </button>
-              <Link href="/cart" className="p-2 bg-green-50 text-green-600 rounded-full relative">
-                <ShoppingCart size={20}/>
-              </Link>
             </div>
           </div>
 
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
             <input 
-              type="text" placeholder="Cari di kategori ini..." value={searchQuery}
+              type="text" 
+              placeholder="Cari di kategori ini..." 
+              value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-2xl py-3 pl-12 pr-4 text-xs font-bold"
+              className="w-full bg-gray-100 border-none rounded-2xl py-3.5 pl-12 pr-4 text-xs font-bold focus:ring-2 focus:ring-green-500/20 transition-all"
             />
           </div>
         </div>
       </header>
 
-      {/* PRODUK LIST/GRID */}
+      {/* PRODUCT CONTENT */}
       <div className="max-w-7xl mx-auto px-4 mt-6">
         {currentItems.length === 0 ? (
-          <div className="text-center py-20 font-black text-gray-300 uppercase italic text-sm">Produk Tidak Ditemukan</div>
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Package size={48} className="text-gray-200 mb-4" />
+            <p className="font-black text-gray-300 uppercase italic text-xs tracking-widest">Produk Tidak Ditemukan</p>
+          </div>
         ) : (
-          <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" : "flex flex-col gap-3"}>
+          <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3" : "flex flex-col gap-3"}>
             {currentItems.map((product) => (
-              <div key={product.id} className={`bg-white border border-gray-100 shadow-sm transition-all ${viewMode === 'grid' ? 'rounded-[2.5rem] p-3' : 'rounded-3xl p-4 flex gap-4 items-center'}`}>
-                
-                {/* Image */}
-                <Link href={`/produk/${product.id}`} className={`${viewMode === 'grid' ? 'aspect-square w-full mb-3' : 'w-24 h-24'} block overflow-hidden rounded-[1.8rem] bg-gray-50 relative flex-shrink-0`}>
-                  <img src={product.image || '/logo-atayatoko.png'} alt="" className="w-full h-full object-cover"/>
+              <div 
+                key={product.id} 
+                className={`bg-white border border-gray-100 shadow-sm transition-all active:scale-[0.98] ${
+                  viewMode === 'grid' 
+                  ? 'rounded-[2rem] p-3 flex flex-col' 
+                  : 'rounded-[1.5rem] p-3 flex gap-4 items-center'
+                }`}
+              >
+                {/* Image Container */}
+                <Link 
+                  href={`/produk/${product.id}`} 
+                  className={`${viewMode === 'grid' ? 'aspect-square w-full mb-3' : 'w-24 h-24'} block overflow-hidden rounded-[1.5rem] bg-gray-50 relative flex-shrink-0`}
+                >
+                  <Image 
+                    src={getProxiedImage(product.image)} 
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes={viewMode === 'grid' ? "50vw" : "100px"}
+                  />
                   {product.wholesalePrice > 0 && (
-                    <div className="absolute top-2 left-2 bg-blue-600 text-[6px] text-white font-black px-2 py-1 rounded-full uppercase">Grosir</div>
+                    <div className="absolute top-2 left-2 bg-blue-600 text-[7px] text-white font-black px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
+                      <Sparkles size={8} /> Grosir
+                    </div>
                   )}
                 </Link>
 
-                {/* Info */}
-                <div className="flex-1">
+                {/* Info Container */}
+                <div className="flex-1 flex flex-col">
                   <h3 className="text-[10px] font-black text-gray-800 uppercase line-clamp-2 leading-tight mb-1">{product.name}</h3>
-                  <div className="mb-3">
-                    <p className="text-sm font-black text-green-600">Rp{product.price.toLocaleString()}</p>
-                    {product.wholesalePrice > 0 && <p className="text-[9px] font-bold text-gray-400 italic">Grosir: Rp{product.wholesalePrice.toLocaleString()}</p>}
+                  <div className="mb-3 mt-auto">
+                    <p className="text-[14px] font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Per {product.unit}</p>
                   </div>
-                  <button onClick={() => addToCart(product)} className="w-full py-2 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase tracking-widest active:bg-green-600">+ Keranjang</button>
+                  <button 
+                    onClick={() => addToCart(product)} 
+                    className="w-full py-3 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase tracking-widest active:bg-green-600 shadow-md"
+                  >
+                    + Keranjang
+                  </button>
                 </div>
-
               </div>
             ))}
           </div>
         )}
 
-        {/* PAGINATION NAVIGATION */}
+        {/* MODERN PAGINATION */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center mt-12 gap-4">
+          <div className="flex items-center justify-between mt-12 bg-white p-2 rounded-[2rem] border border-gray-100 shadow-sm">
             <button 
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-3 bg-white border border-gray-100 rounded-2xl disabled:opacity-30 shadow-sm"
+              onClick={() => {
+                setCurrentPage(prev => prev - 1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="p-4 bg-gray-50 rounded-full disabled:opacity-20 transition-all active:bg-green-100"
             >
               <ChevronLeft size={20}/>
             </button>
             
-            <div className="flex items-center gap-2">
-              {[...Array(totalPages)].map((_, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-10 h-10 rounded-xl font-black text-[10px] transition-all ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-gray-50 text-gray-400'}`}
-                >
-                  {i + 1}
-                </button>
-              ))}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-black uppercase text-gray-400">Halaman</span>
+              <span className="text-[12px] font-black text-green-600 mx-1">{currentPage}</span>
+              <span className="text-[10px] font-black uppercase text-gray-400">dari {totalPages}</span>
             </div>
 
             <button 
               disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-3 bg-white border border-gray-100 rounded-2xl disabled:opacity-30 shadow-sm"
+              onClick={() => {
+                setCurrentPage(prev => prev + 1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="p-4 bg-gray-50 rounded-full disabled:opacity-20 transition-all active:bg-green-100"
             >
               <ChevronRight size={20}/>
             </button>
           </div>
         )}
       </div>
+
+      {/* MOBILE FLOATING CART (Optional) */}
+      <Link href="/cart" className="fixed bottom-6 right-6 z-[60] bg-green-600 text-white p-5 rounded-full shadow-2xl active:scale-90 transition-all md:hidden">
+        <ShoppingCart size={24} />
+      </Link>
     </div>
   );
 }
 
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-black uppercase text-xs">Menghubungkan...</div>}>
       <CategoryContent params={params} />
     </Suspense>
   );

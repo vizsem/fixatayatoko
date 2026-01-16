@@ -5,37 +5,38 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'c.alfagift.id', // ✅ Ditambahkan untuk mengatasi error Alfagift
-        port: '',
-        pathname: '/**',
+        hostname: 'wsrv.nl',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.digitaloceanspaces.com', // ✅ Tambahkan ini untuk domain Reny Swalayan
+      },
+      {
+        protocol: 'https',
+        hostname: '**.panensquare.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.alfagift.id',
       },
       {
         protocol: 'https',
         hostname: 'images.tokopedia.net',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: 'cf.shopee.co.id', // ✅ Tambahan umum untuk gambar Shopee
-        port: '',
-        pathname: '/**',
+        hostname: '**.shopee.co.id',
       },
       {
         protocol: 'https',
-        hostname: 'down-id.img.susercontent.com', // ✅ Tambahan Shopee versi baru
-        port: '',
-        pathname: '/**',
+        hostname: '**.susercontent.com',
       },
     ],
   },
-  /* config options here */
 };
 
 export default nextConfig;

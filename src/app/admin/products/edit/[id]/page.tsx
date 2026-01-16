@@ -8,10 +8,12 @@ import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp } from 'fi
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   Package, Image as ImageIcon, Barcode, Warehouse, 
-  Save, ArrowLeft, Tag, Layers, 
-  DollarSign, Info, Loader2, Eye, EyeOff, AlertTriangle
+  Save, ArrowLeft, Tag, Layers, Calendar,
+  DollarSign, Loader2, Eye, EyeOff, AlertTriangle,
+  Truck, Bookmark
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import { toast } from 'react-hot-toast';
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -30,7 +32,6 @@ export default function EditProductPage() {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') return router.push('/profil');
-      
       await Promise.all([fetchProductData(), fetchWarehouses()]);
       setLoading(false);
     });
@@ -41,28 +42,32 @@ export default function EditProductPage() {
     try {
       const docSnap = await getDoc(doc(db, 'products', id));
       if (!docSnap.exists()) {
-        alert('Produk tidak ditemukan');
+        toast.error('Produk tidak ditemukan');
         return router.push('/admin/products');
       }
       const data = docSnap.data();
       setProduct({
         ...data,
         id: docSnap.id,
-        // Fallback Mapping (Pastikan data lama tetap terbaca)
         Nama: data.Nama || data.name || '',
-        Ecer: data.Ecer || data.price || 0,
-        Modal: data.Modal || data.purchasePrice || 0,
-        Grosir: data.Grosir || data.wholesalePrice || 0,
-        Stok: data.Stok ?? data.stock ?? 0,
-        Kategori: data.Kategori || data.category || 'Umum',
-        Satuan: data.Satuan || data.unit || 'Pcs',
-        Barcode: data.Barcode || data.barcode || '',
-        Status: data.Status ?? 1, // 1: Aktif, 0: Arsip
+        Ecer: data.Ecer || 0,
+        Modal: data.Modal || 0,
+        Grosir: data.Grosir || 0,
+        Stok: data.Stok ?? 0,
+        Kategori: data.Kategori || 'UMUM',
+        Satuan: data.Satuan || 'PCS',
+        Barcode: data.Barcode || '',
+        Brand: data.Brand || '',
+        Supplier: data.Supplier || '',
+        Min_Stok: data.Min_Stok || 5, // Default peringatan jika stok < 5
+        expired_date: data.expired_date || '', // Sinkron dengan tabel admin
+        Status: data.Status ?? 1,
         stockByWarehouse: data.stockByWarehouse || {},
       });
-      setImagePreview(data.Link_Foto || data.image || null);
+      const currentPhoto = data.URL_Produk || data.Link_Foto || data.image;
+      setImagePreview(currentPhoto || null);
     } catch (err) {
-      console.error(err);
+      toast.error("Gagal sinkron data");
     }
   };
 
@@ -74,252 +79,202 @@ export default function EditProductPage() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const options = {
-      maxSizeMB: 0.1, // Perkecil lagi ke 100KB agar loading dashboard cepat
-      maxWidthOrHeight: 800,
-      useWebWorker: true,
-    };
-
     try {
-      const compressedFile = await imageCompression(file, options);
+      const compressedFile = await imageCompression(file, { maxSizeMB: 0.2, maxWidthOrHeight: 1024 });
       setImageFile(compressedFile);
       setImagePreview(URL.createObjectURL(compressedFile));
-    } catch (error) {
-      alert("Gagal kompresi gambar");
-    }
+    } catch (error) { toast.error("Gagal proses gambar"); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Proteksi harga jual di bawah modal
-    if (product.Ecer < product.Modal) {
-      if (!confirm("Peringatan: Harga Jual (Ecer) lebih rendah dari Modal. Tetap simpan?")) return;
+  e.preventDefault();
+  setIsSubmitting(true);
+  const loadingToast = toast.loading("Sinkronisasi data & mencatat riwayat...");
+  
+  try {
+    // 1. Ambil data stok lama untuk dibandingkan
+    const oldDoc = await getDoc(doc(db, 'products', id));
+    const oldData = oldDoc.data();
+    const oldStocks = oldData?.stockByWarehouse || {};
+
+    // 2. Proses Gambar
+    let finalImageUrl = product.URL_Produk || product.Link_Foto || '';
+    if (imageFile) {
+      const imageRef = ref(storage, `products/${id}/main.jpg`);
+      await uploadBytes(imageRef, imageFile);
+      finalImageUrl = await getDownloadURL(imageRef);
     }
 
-    setIsSubmitting(true);
-    
-    try {
-      let finalImageUrl = product.Link_Foto || product.image || '';
+    const newStocks = product.stockByWarehouse || {};
+    const totalStock = Object.values(newStocks).reduce((a: any, b: any) => a + (Number(b) || 0), 0);
 
-      if (imageFile) {
-        const fileName = `products/${id}/main.jpg`;
-        const imageRef = ref(storage, fileName);
-        await uploadBytes(imageRef, imageFile);
-        finalImageUrl = await getDownloadURL(imageRef);
+    // 3. LOGIKA RIWAYAT STOK: Cek gudang mana yang angkanya berubah
+    const logEntries: any[] = [];
+    warehouses.forEach(wh => {
+      const oldVal = Number(oldStocks[wh.id] || 0);
+      const newVal = Number(newStocks[wh.id] || 0);
+      
+      if (oldVal !== newVal) {
+        logEntries.push({
+          productId: id,
+          productName: product.Nama.toUpperCase(),
+          warehouseId: wh.id,
+          warehouseName: wh.name,
+          previousStock: oldVal,
+          newStock: newVal,
+          change: newVal - oldVal,
+          type: 'EDIT_ADMIN', // Penanda bahwa diubah manual lewat menu edit
+          adminEmail: auth.currentUser?.email,
+          createdAt: serverTimestamp(),
+        });
       }
+    });
 
-      // Hitung total stok dari semua gudang
-      const totalStock = Object.values(product.stockByWarehouse || {}).reduce((a: any, b: any) => a + (Number(b) || 0), 0);
+    // 4. Update Dokumen Produk
+    const updatePayload = {
+      ...product,
+      Nama: product.Nama.toUpperCase(),
+      Stok: totalStock,
+      URL_Produk: finalImageUrl,
+      updatedAt: serverTimestamp()
+    };
 
-      const updatePayload = {
-        ...product,
-        // Update kedua versi (ID & EN) agar kompatibel dengan sistem lama & baru
-        Nama: product.Nama, name: product.Nama,
-        Ecer: Number(product.Ecer), price: Number(product.Ecer),
-        Modal: Number(product.Modal), purchasePrice: Number(product.Modal),
-        Grosir: Number(product.Grosir), wholesalePrice: Number(product.Grosir),
-        Stok: totalStock, stock: totalStock,
-        Kategori: product.Kategori, category: product.Kategori,
-        Satuan: product.Satuan, unit: product.Satuan,
-        Barcode: product.Barcode, barcode: product.Barcode,
-        Status: Number(product.Status),
-        Link_Foto: finalImageUrl, image: finalImageUrl,
-        updatedAt: serverTimestamp()
-      };
+    await updateDoc(doc(db, 'products', id), updatePayload);
 
-      await updateDoc(doc(db, 'products', id), updatePayload);
-      alert('Data Berhasil Disinkronkan!');
-      router.push('/admin/products');
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    } finally {
-      setIsSubmitting(false);
+    // 5. Simpan semua riwayat ke koleksi 'stock_logs'
+    if (logEntries.length > 0) {
+      const { addDoc, collection } = await import('firebase/firestore');
+      const logPromises = logEntries.map(log => addDoc(collection(db, 'stock_logs'), log));
+      await Promise.all(logPromises);
     }
-  };
 
-  if (loading) return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50">
-      <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
-      <p className="font-black uppercase text-[10px] tracking-widest text-gray-400">Sinkronisasi Database...</p>
-    </div>
-  );
+    toast.success('Database & Riwayat Berhasil Disinkronkan!', { id: loadingToast });
+    router.push('/admin/products');
+  } catch (err: any) {
+    toast.error("Gagal: " + err.message, { id: loadingToast });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
 
   return (
-    <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
+    <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans">
       <div className="max-w-6xl mx-auto">
         
-        {/* Header Navigation */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-4 bg-white shadow-sm rounded-2xl hover:bg-black hover:text-white transition-all">
-              <ArrowLeft size={20} />
-            </button>
+            <button onClick={() => router.back()} className="p-4 bg-white shadow-sm rounded-2xl hover:bg-black hover:text-white transition-all"><ArrowLeft size={20} /></button>
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter italic">Edit Produk</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Master Data / SKU: {product.ID || id}</p>
+              <h1 className="text-2xl font-black uppercase italic tracking-tighter">Edit Master Data</h1>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">SKU: {product.Barcode || id}</p>
             </div>
           </div>
-
-          {/* Toggle Status Aktif/Arsip */}
-          <div className="flex bg-white p-2 rounded-2xl shadow-sm self-start">
-            <button 
-              type="button"
-              onClick={() => setProduct({...product, Status: 1})}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 1 ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'text-gray-400'}`}
-            >
-              <Eye size={14} /> Aktif
-            </button>
-            <button 
-              type="button"
-              onClick={() => setProduct({...product, Status: 0})}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 0 ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'text-gray-400'}`}
-            >
-              <EyeOff size={14} /> Arsipkan
-            </button>
+          <div className="flex bg-white p-2 rounded-2xl shadow-sm">
+            <button type="button" onClick={() => setProduct({...product, Status: 1})} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 1 ? 'bg-green-600 text-white' : 'text-gray-400'}`}>Aktif</button>
+            <button type="button" onClick={() => setProduct({...product, Status: 0})} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 0 ? 'bg-red-600 text-white' : 'text-gray-400'}`}>Arsip</button>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Sisi Kiri: Foto */}
+          {/* KIRI: MEDIA & KONTROL */}
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <label className="text-[10px] font-black uppercase text-gray-400 mb-4 block tracking-widest text-center">Visual Produk</label>
-              
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 text-center">
+              <label className="text-[10px] font-black uppercase text-gray-400 mb-4 block tracking-widest">Foto Produk</label>
               <div className="relative group aspect-square rounded-[2rem] overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center transition-all hover:border-blue-400">
-                {imagePreview ? (
-                  <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
-                ) : (
-                  <div className="text-center p-6">
-                    <ImageIcon size={48} className="mx-auto text-gray-200 mb-2" />
-                    <p className="text-[9px] font-black text-gray-300 uppercase">Klik Tambah Foto</p>
-                  </div>
-                )}
+                {imagePreview ? <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" /> : <ImageIcon size={48} className="text-gray-200" />}
                 <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                   <p className="text-white text-[10px] font-black uppercase">Ganti Foto</p>
-                </div>
               </div>
             </div>
 
-            {product.Status === 0 && (
-              <div className="bg-red-50 p-6 rounded-[2rem] border border-red-100 flex items-start gap-3">
-                <AlertTriangle className="text-red-600 shrink-0" size={20} />
-                <p className="text-[10px] font-bold text-red-700 uppercase leading-relaxed">
-                  Produk ini diarsip. Tidak akan muncul di daftar POS penjualan atau pencarian toko online.
-                </p>
-              </div>
-            )}
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
+              <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-1">Batas Minimum Stok</label>
+              <input type="number" value={product.Min_Stok} onChange={e => setProduct({...product, Min_Stok: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-orange-400 transition-all" />
+              <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase italic">* Notifikasi akan muncul jika stok di bawah angka ini.</p>
+            </div>
           </div>
 
-          {/* Sisi Kanan: Detail Data */}
+          {/* KANAN: FORM LENGKAP */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Info Produk */}
+            {/* SPESIFIKASI */}
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4">
-                <Tag size={16} className="text-blue-600" /> Spesifikasi Produk
-              </h3>
-              
+              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600"><Tag size={16} /> Identitas Barang</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Barang</label>
-                  <input required type="text" value={product.Nama} onChange={e => setProduct({...product, Nama: e.target.value.toUpperCase()})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none focus:ring-2 focus:ring-black" />
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
+                  <input required type="text" value={product.Nama} onChange={e => setProduct({...product, Nama: e.target.value})} className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" />
                 </div>
-
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
-                  <div className="relative">
-                    <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input type="text" value={product.Kategori} onChange={e => setProduct({...product, Kategori: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" />
-                  </div>
+                  <input type="text" value={product.Kategori} onChange={e => setProduct({...product, Kategori: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Satuan (Pcs/Box/Kg)</label>
-                  <input type="text" value={product.Satuan} onChange={e => setProduct({...product, Satuan: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
+                  <input type="text" value={product.Brand} onChange={e => setProduct({...product, Brand: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
+                  <input type="text" value={product.Barcode} onChange={e => setProduct({...product, Barcode: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
                   <div className="relative">
-                    <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input type="text" value={product.Barcode} onChange={e => setProduct({...product, Barcode: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" />
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                    <input type="date" value={product.expired_date} onChange={e => setProduct({...product, expired_date: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Harga */}
+            {/* HARGA */}
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4">
-                <DollarSign size={16} className="text-emerald-600" /> Finansial
-              </h3>
+              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-emerald-600"><DollarSign size={16} /> Finansial</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-50 rounded-2xl">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Modal</label>
-                  <input type="number" value={product.Modal} onChange={e => setProduct({...product, Modal: Number(e.target.value)})} className="w-full bg-transparent font-black text-lg outline-none" />
+                <div className="p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-200 transition-all">
+                  <label className="text-[9px] font-black uppercase text-gray-400 block mb-1">Harga Modal</label>
+                  <input type="number" value={product.Modal} onChange={e => setProduct({...product, Modal: e.target.value})} className="w-full bg-transparent font-black text-lg outline-none" />
                 </div>
-                <div className="p-4 bg-blue-50 rounded-2xl">
-                  <label className="text-[10px] font-black uppercase text-blue-400 block mb-1">Harga Jual</label>
-                  <input type="number" value={product.Ecer} onChange={e => setProduct({...product, Ecer: Number(e.target.value)})} className={`w-full bg-transparent font-black text-lg outline-none ${product.Ecer < product.Modal ? 'text-red-600' : 'text-blue-600'}`} />
+                <div className="p-4 bg-blue-50 rounded-2xl border border-transparent hover:border-blue-200 transition-all">
+                  <label className="text-[9px] font-black uppercase text-blue-400 block mb-1">Harga Ecer</label>
+                  <input type="number" value={product.Ecer} onChange={e => setProduct({...product, Ecer: e.target.value})} className="w-full bg-transparent font-black text-lg text-blue-600 outline-none" />
                 </div>
-                <div className="p-4 bg-emerald-50 rounded-2xl">
-                  <label className="text-[10px] font-black uppercase text-emerald-400 block mb-1">Grosir</label>
-                  <input type="number" value={product.Grosir} onChange={e => setProduct({...product, Grosir: Number(e.target.value)})} className="w-full bg-transparent font-black text-lg text-emerald-600 outline-none" />
+                <div className="p-4 bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-200 transition-all">
+                  <label className="text-[9px] font-black uppercase text-emerald-400 block mb-1">Harga Grosir</label>
+                  <input type="number" value={product.Grosir} onChange={e => setProduct({...product, Grosir: e.target.value})} className="w-full bg-transparent font-black text-lg text-emerald-600 outline-none" />
                 </div>
               </div>
-              {product.Ecer < product.Modal && (
-                <p className="mt-3 text-[9px] font-black text-red-600 uppercase flex items-center gap-1">
-                  <AlertTriangle size={10} /> Harga jual lebih rendah dari modal!
-                </p>
-              )}
             </div>
 
-            {/* Stok per Gudang */}
-            <div className="bg-black p-8 rounded-[2.5rem] text-white shadow-xl shadow-gray-200">
+            {/* STOK PER GUDANG */}
+            <div className="bg-black p-8 rounded-[2.5rem] text-white shadow-xl">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xs font-black uppercase flex items-center gap-2">
-                  <Warehouse size={16} className="text-yellow-400" /> Stok di Gudang
-                </h3>
-                <div className="bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black">
-                   TOTAL: {(Object.values(product.stockByWarehouse || {}).reduce((a: any, b: any) => a + (Number(b) || 0), 0) as number)}
-                </div>
+                <h3 className="text-xs font-black uppercase flex items-center gap-2"><Warehouse size={16} className="text-yellow-400" /> Distribusi Stok</h3>
+                <div className="bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Total: {Object.values(product.stockByWarehouse || {}).reduce((a: any, b: any) => a + (Number(b) || 0), 0)}</div>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {warehouses.map(wh => (
-                  <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:border-white/20 transition-all">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black uppercase opacity-60 tracking-tighter">{wh.name}</span>
-                      <Package size={12} className="opacity-40" />
-                    </div>
+                  <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:bg-white/20 transition-all cursor-pointer">
+                    <span className="text-[9px] font-black uppercase opacity-60 block mb-2">{wh.name}</span>
                     <input 
                       type="number" 
-                      placeholder="0"
                       value={product.stockByWarehouse?.[wh.id] ?? ''} 
-                      onChange={e => {
-                        const val = e.target.value === '' ? 0 : Number(e.target.value);
-                        const newStocks = {...product.stockByWarehouse, [wh.id]: val};
-                        setProduct({...product, stockByWarehouse: newStocks});
-                      }}
-                      className="bg-transparent w-full font-black text-xl outline-none text-white placeholder:text-white/20"
+                      onChange={e => setProduct({...product, stockByWarehouse: {...product.stockByWarehouse, [wh.id]: e.target.value === '' ? 0 : Number(e.target.value)}})}
+                      className="bg-transparent w-full font-black text-xl outline-none text-white"
+                      placeholder="0"
                     />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Simpan */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-100 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-gray-300"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" /> : <Save size={20}/>}
-              {isSubmitting ? 'Mensinkronkan Data...' : 'Update & Simpan Produk'}
+            <button type="submit" disabled={isSubmitting} className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-[10px] shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-gray-300">
+              {isSubmitting ? <Loader2 className="animate-spin" /> : <Save size={18}/>}
+              {isSubmitting ? 'Sync Database...' : 'Update Master Data'}
             </button>
-
           </div>
         </form>
       </div>

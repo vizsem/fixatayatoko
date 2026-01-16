@@ -1,4 +1,3 @@
-// src/app/(admin)/warehouses/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,10 +8,8 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   deleteDoc,
   query,
-  where,
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -21,10 +18,10 @@ import {
   Plus, 
   Edit, 
   Trash2, 
-  Warehouse, 
+  Warehouse as WarehouseIcon, 
   MapPin,
-  Package,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Loader2
 } from 'lucide-react';
 
 type Warehouse = {
@@ -43,7 +40,7 @@ export default function WarehousesPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Proteksi admin
+  // 1. Proteksi Admin (Tetap Ada)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -62,28 +59,46 @@ export default function WarehousesPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Fetch gudang real-time
+  // 2. Fetch Gudang + Sinkronisasi Stok Produk (Logika Baru)
   useEffect(() => {
     if (loading) return;
 
+    // Listener Gudang
     const q = query(collection(db, 'warehouses'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const warehouseList: Warehouse[] = [];
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        warehouseList.push({
-          id: doc.id,
-          name: data.name || '',
-          location: data.location || '',
-          capacity: data.capacity || 0,
-          usedCapacity: data.usedCapacity || 0,
-          isActive: data.isActive !== false,
-          createdAt: data.createdAt || ''
+    const unsubscribe = onSnapshot(q, (wSnapshot) => {
+      
+      // Listener Produk untuk kalkulasi usedCapacity secara real-time
+      const unsubProducts = onSnapshot(collection(db, 'products'), (pSnapshot) => {
+        const stockMap: Record<string, number> = {};
+
+        pSnapshot.docs.forEach((pDoc) => {
+          const pData = pDoc.data();
+          const wId = pData.warehouseId; // Pastikan produk punya field warehouseId
+          const stok = Number(pData.Stok || pData.stock || 0);
+          if (wId) {
+            stockMap[wId] = (stockMap[wId] || 0) + stok;
+          }
         });
+
+        const warehouseList: Warehouse[] = wSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            location: data.location || '',
+            capacity: data.capacity || 0,
+            // SINKRONISASI: usedCapacity diambil dari kalkulasi produk
+            usedCapacity: stockMap[doc.id] || 0, 
+            isActive: data.isActive !== false,
+            createdAt: data.createdAt || ''
+          };
+        });
+
+        setWarehouses(warehouseList);
+        setError(null);
       });
-      // Hitung usedCapacity dari stok produk
-      setWarehouses(warehouseList);
-      setError(null);
+
+      return () => unsubProducts();
     }, (err) => {
       console.error('Gagal memuat gudang:', err);
       setError('Gagal memuat data gudang.');
@@ -92,6 +107,7 @@ export default function WarehousesPage() {
     return () => unsubscribe();
   }, [loading]);
 
+  // 3. Handle Delete (Tetap Ada)
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Hapus gudang "${name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
     try {
@@ -104,15 +120,15 @@ export default function WarehousesPage() {
 
   const utilizationRate = (used: number, capacity: number) => {
     if (capacity === 0) return 0;
-    return Math.round((used / capacity) * 100);
+    return Math.min(Math.round((used / capacity) * 100), 100);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat data gudang...</p>
+          <Loader2 className="animate-spin h-12 w-12 text-green-600 mx-auto" />
+          <p className="mt-4 text-black font-bold uppercase text-[10px] tracking-widest">Sinkronisasi Data...</p>
         </div>
       </div>
     );
@@ -123,137 +139,110 @@ export default function WarehousesPage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
-          <Warehouse className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Manajemen Multi-Gudang</h1>
+          <WarehouseIcon className="text-black" size={28} />
+          <h1 className="text-2xl font-black uppercase tracking-tighter text-black">Manajemen Multi-Gudang</h1>
         </div>
-        <p className="text-black">Kelola stok dan kapasitas gudang Anda</p>
+        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Pantau kapasitas dan mutasi stok secara real-time</p>
       </div>
 
-      {/* Error Banner */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-2xl border border-red-200 text-xs font-bold uppercase">
           {error}
         </div>
       )}
 
       {/* Aksi Header */}
       <div className="flex justify-between items-center mb-6">
-        <div className="text-sm text-black">
-          Total: <span className="font-medium">{warehouses.length} gudang</span>
+        <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+          Total: <span className="text-black">{warehouses.length} UNIT GUDANG</span>
         </div>
         <Link
           href="/admin/warehouses/add"
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-green-100 active:scale-95"
         >
-          <Plus size={18} />
+          <Plus size={18} strokeWidth={3} />
           Tambah Gudang
         </Link>
       </div>
 
       {/* Tabel Gudang */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Gudang
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Lokasi
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Kapasitas
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Aksi
-                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Gudang</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Kapasitas (Unit)</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {warehouses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-black">
-                    <Warehouse className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada gudang terdaftar</p>
-                    <Link
-                      href="/admin/warehouses/add"
-                      className="mt-2 inline-block text-green-600 hover:text-green-800 font-medium"
-                    >
-                      Tambah gudang sekarang
-                    </Link>
+                  <td colSpan={5} className="px-6 py-20 text-center">
+                    <WarehouseIcon className="mx-auto h-12 w-12 text-gray-200 mb-4" />
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Belum ada gudang terdaftar</p>
                   </td>
                 </tr>
               ) : (
                 warehouses.map((warehouse) => {
                   const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
                   const isFull = rate >= 90;
-                  const isEmpty = rate === 0;
 
                   return (
-                    <tr key={warehouse.id} className="hover:bg-gray-50">
+                    <tr key={warehouse.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-black">{warehouse.name}</div>
+                        <div className="font-black text-gray-900 uppercase text-sm tracking-tighter">{warehouse.name}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} className="text-gray-500" />
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-gray-500 font-bold text-[10px] uppercase">
+                          <MapPin size={14} className="text-gray-300" />
                           <span>{warehouse.location}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-black">
-                          {warehouse.usedCapacity.toLocaleString()} / {warehouse.capacity.toLocaleString()} unit
+                        <div className="text-[11px] font-black text-gray-900 mb-1">
+                          {warehouse.usedCapacity.toLocaleString()} <span className="text-gray-300">/</span> {warehouse.capacity.toLocaleString()}
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                        <div className="w-32 bg-gray-100 rounded-full h-1.5">
                           <div 
-                            className={`h-2 rounded-full ${
-                              isFull ? 'bg-red-600' : isEmpty ? 'bg-gray-400' : 'bg-green-600'
+                            className={`h-1.5 rounded-full transition-all duration-700 ${
+                              isFull ? 'bg-red-500' : 'bg-green-500'
                             }`}
                             style={{ width: `${rate}%` }}
                           ></div>
                         </div>
-                        <div className="text-xs text-black mt-1">
-                          {rate}% terisi
-                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {warehouse.isActive ? (
-                          <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                            Aktif
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
-                            Nonaktif
-                          </span>
-                        )}
+                        <span className={`px-3 py-1 text-[9px] font-black uppercase rounded-lg ${
+                          warehouse.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'
+                        }`}>
+                          {warehouse.isActive ? 'Aktif' : 'Nonaktif'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                        <div className="flex items-center gap-3">
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/admin/warehouses/mutasi/${warehouse.id}`}
+                            className="p-2 text-purple-600 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors"
+                            title="Mutasi Stok"
+                          >
+                            <ArrowRightLeft size={18} />
+                          </Link>
                           <Link
                             href={`/admin/warehouses/edit/${warehouse.id}`}
-                            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            className="p-2 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors"
                           >
-                            <Edit size={16} />
-                            Edit
+                            <Edit size={18} />
                           </Link>
                           <button
                             onClick={() => handleDelete(warehouse.id, warehouse.name)}
-                            className="text-red-600 hover:text-red-800 flex items-center gap-1"
+                            className="p-2 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"
                           >
-                            <Trash2 size={16} />
-                            Hapus
+                            <Trash2 size={18} />
                           </button>
-                          <Link
-                            href={`/admin/warehouses/mutasi/${warehouse.id}`}
-                            className="text-purple-600 hover:text-purple-800 flex items-center gap-1"
-                          >
-                            <ArrowRightLeft size={16} />
-                            Mutasi
-                          </Link>
                         </div>
                       </td>
                     </tr>
@@ -263,11 +252,6 @@ export default function WarehousesPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Catatan */}
-      <div className="mt-6 text-sm text-black text-center">
-        💡 Gudang dengan kapasitas &gt;90% ditandai merah. Segera lakukan mutasi stok!
       </div>
     </div>
   );

@@ -207,7 +207,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 text-black pb-24">
       <div className="bg-green-700 text-white py-1.5 overflow-hidden whitespace-nowrap">
         <div className="animate-marquee inline-block text-[10px] font-bold uppercase tracking-widest px-4">
-          🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYATOKO 🚚
+          🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYAMARKET 🚚
         </div>
       </div>
 
@@ -215,7 +215,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
              <Image src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
-             <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYATOKO</h1>
+             <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYAMARKET</h1>
           </Link>
           <div className="flex-1 relative max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -337,7 +337,7 @@ export default function Home() {
         </div>
         
         <div className="flex flex-col items-center opacity-50 border-t border-gray-50 pt-8">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Atayatoko Store Kediri • © 2026</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">ATAYAMARKET Store Kediri • © 2026</p>
         </div>
       </footer>
 

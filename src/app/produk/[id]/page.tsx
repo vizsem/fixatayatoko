@@ -1,19 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+// 1. Tambahkan usePathname di import next/navigation
+import { useRouter, useParams, usePathname } from 'next/navigation'; 
 import { 
-  ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2 
+  ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2, Sparkles, Info, ShieldCheck, Truck,
+  LayoutGrid,
+  ReceiptText,
+  User,
+  Home as HomeIcon // 2. Rename icon Home agar tidak bentrok
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { doc, getDoc, collection, getDocs, query, where, limit, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 
+// 3. Hapus import Home dari @/app/page karena menyebabkan konflik dan error
+
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
+  
+  // 4. Inisialisasi pathname disini
+  const pathname = usePathname(); 
+
   const productId = params?.id as string;
 
   const [product, setProduct] = useState<any | null>(null);
@@ -23,6 +35,14 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  // ✅ PROXY GAMBAR Agar Gambar Supplier Muncul
+  const getProxiedImage = (url: string) => {
+    if (!url || url.includes('firebasestorage.googleapis.com') || url.startsWith('data:')) {
+      return url || '/logo-atayatoko.png';
+    }
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=800&output=webp`;
+  };
 
   useEffect(() => {
     let tempId = localStorage.getItem('temp_user_id');
@@ -46,20 +66,22 @@ export default function ProductDetailPage() {
             name: data.Nama || data.name || "Produk",
             price: Number(data.Ecer || data.price) || 0,
             wholesalePrice: Number(data.Grosir || data.wholesalePrice) || 0,
-            minWholesale: Number(data.Min_Stok_Grosir || data.Min_Grosir || data.minWholesale) || 1,
+            minWholesale: Number(data.Min_Stok_Grosir || data.Min_Grosir || data.minWholesale) || 12,
             stock: Number(data.Stok || data.stock) || 0,
             unit: data.Satuan || data.unit || 'pcs',
             category: data.Kategori || data.category || 'Umum',
             image: data.Link_Foto || data.image || '/logo-atayatoko.png',
+            description: data.Deskripsi || data.description || ""
           };
           setProduct(mappedProduct);
 
-          const q = query(collection(db, 'products'), where('category', '==', mappedProduct.category), limit(8));
+          const q = query(collection(db, 'products'), where('Kategori', '==', mappedProduct.category), limit(8));
           const relatedSnap = await getDocs(q);
           setRelatedProducts(relatedSnap.docs.map(d => {
             const rData = d.data();
             return { 
               id: d.id, 
+              ...rData,
               name: rData.Nama || rData.name,
               price: Number(rData.Ecer || rData.price) || 0,
               image: rData.Link_Foto || rData.image
@@ -93,14 +115,13 @@ export default function ProductDetailPage() {
     } else {
       localCart.push({ 
         productId: idToMatch, id: idToMatch, name: p.name, price: finalPrice, 
-        image: p.image, unit: p.unit, quantity: q,
+        image: p.image, unit: p.unit || 'pcs', quantity: q,
         wholesalePrice: p.wholesalePrice, minWholesale: p.minWholesale
       });
     }
 
     localStorage.setItem('cart', JSON.stringify(localCart));
     window.dispatchEvent(new Event('cart-updated'));
-    window.dispatchEvent(new Event('storage'));
 
     if (userId) {
       try {
@@ -114,18 +135,14 @@ export default function ProductDetailPage() {
         } else {
           cloudItems.push({
             productId: idToMatch, name: p.name, price: finalPrice, 
-            image: p.image, unit: p.unit, quantity: q, addedAt: new Date().toISOString()
+            image: p.image, unit: p.unit || 'pcs', quantity: q, addedAt: new Date().toISOString()
           });
         }
         await setDoc(cartRef, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
-        toast.success(`${p.name} ditambah`, {
-          icon: '✅',
-          style: { borderRadius: '15px', background: '#1a1a1a', color: '#fff', fontSize: '11px', fontWeight: 'bold' }
-        });
+        toast.success(`${p.name} ditambah ke keranjang`);
       } catch (error) { console.error(error); } finally { setIsAdding(false); }
     } else {
       setIsAdding(false);
-      toast.success("Tersimpan di perangkat");
     }
   };
 
@@ -134,156 +151,203 @@ export default function ProductDetailPage() {
     if (type === 'minus' && quantity > 1) setQuantity(prev => prev - 1);
   };
 
-  if (loading || !product) return <div className="min-h-screen flex items-center justify-center font-black text-gray-300 animate-pulse uppercase tracking-widest">Memuat Produk...</div>;
+  if (loading || !product) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+      <Loader2 className="animate-spin text-green-600" size={40} />
+      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Menyiapkan Detail...</span>
+    </div>
+  );
 
   const isOutOfStock = product.stock <= 0;
   const isWholesaleEligible = product.wholesalePrice > 0 && quantity >= product.minWholesale;
   const currentPrice = isWholesaleEligible ? product.wholesalePrice : product.price;
 
   return (
-    <div className="min-h-screen bg-white pb-32">
+    <div className="min-h-screen bg-white pb-40">
       <Toaster position="top-center" />
       
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-50 px-4 py-4 flex items-center justify-between">
-          <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ArrowLeft size={20}/></button>
+          <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-all"><ArrowLeft size={20}/></button>
           <div className="flex flex-col items-center">
-            <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400">Atayatoko</h1>
-            <span className="text-[10px] font-bold text-green-600 uppercase">Product Gallery</span>
+            <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 leading-none mb-1">ATAYAMARKET</h1>
+            <span className="text-[10px] font-bold text-green-600 uppercase">Product Details</span>
           </div>
-          <Link href="/cart" className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ShoppingCart size={20} className="text-gray-700" /></Link>
+          <Link href="/cart" className="p-2.5 bg-green-50 text-green-600 rounded-2xl relative">
+            <ShoppingCart size={20} />
+          </Link>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 pt-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           <div className="relative">
-            <div className="aspect-square rounded-[3rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-2xl relative">
-              <img src={product.image} alt={product.name} className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`} />
+            <div className="aspect-square rounded-[2.5rem] md:rounded-[4rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-2xl relative">
+              <Image 
+                src={getProxiedImage(product.image)} 
+                alt={product.name} 
+                fill 
+                className={`object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
+                priority
+              />
               {isOutOfStock && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                  <span className="bg-white text-black px-6 py-2 rounded-full font-black uppercase text-xs shadow-xl">Stok Habis</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                  <span className="bg-white text-black px-6 py-2 rounded-full font-black uppercase text-[10px]">Stok Habis</span>
                 </div>
               )}
             </div>
-            <button onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} className="absolute top-6 right-6 p-4 bg-white/90 backdrop-blur shadow-2xl rounded-full active:scale-90 transition-all">
+            <button 
+              onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} 
+              className="absolute top-6 right-6 p-4 bg-white/90 backdrop-blur shadow-2xl rounded-full active:scale-75 transition-all"
+            >
               <Heart size={20} className={inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-300'} />
             </button>
           </div>
 
           <div className="flex flex-col">
             <div className="mb-6">
-              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-lg mb-4 inline-block">{product.category}</span>
-              <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-[0.85] mb-2">{product.name}</h1>
-              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">
-                Harga Per {product.unit} {isOutOfStock && <span className="text-red-500 ml-2">• Kosong</span>}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-[9px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-lg inline-block">{product.category}</span>
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-lg inline-block">Stok: {product.stock} {product.unit}</span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black text-gray-900 uppercase tracking-tighter leading-[0.85] mb-2">{product.name}</h1>
+              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                HARGA PER {product.unit} {isOutOfStock && <span className="text-red-500 font-black">• KOSONG</span>}
               </p>
             </div>
 
-            {/* BOX HARGA DENGAN INFO GROSIR */}
-            <div className={`rounded-[2.5rem] p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-50 border-orange-200 shadow-inner' : 'bg-gray-50 border-gray-100'}`}>
+            <div className={`rounded-[2.5rem] p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-600 text-white border-orange-700 shadow-xl scale-[1.02]' : 'bg-gray-50 border-gray-100'}`}>
               <div className="flex flex-col mb-4">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                  {isWholesaleEligible ? 'Harga Grosir Aktif' : 'Harga Eceran'}
+                <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-400'}`}>
+                  {isWholesaleEligible ? '✨ Harga Grosir Aktif' : 'Harga Eceran'}
                 </span>
                 <div className="flex items-end gap-2">
-                  <span className={`text-5xl font-black tracking-tighter transition-colors ${isWholesaleEligible ? 'text-orange-600' : 'text-gray-900'}`}>
+                  <span className="text-5xl font-black tracking-tighter">
                     Rp{currentPrice.toLocaleString('id-ID')}
                   </span>
-                  <span className="text-lg font-bold text-gray-400 mb-2">/{product.unit}</span>
+                  <span className={`text-lg font-bold mb-2 ${isWholesaleEligible ? 'text-orange-200' : 'text-gray-400'}`}>/{product.unit}</span>
                 </div>
               </div>
 
-              {product.wholesalePrice > 0 && (
-                <div className="pt-4 border-t border-dashed border-gray-300">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-black text-blue-600 uppercase italic">Promo Grosir</span>
-                      <p className="text-[10px] text-gray-500 font-bold uppercase">
-                        Min. <span className="text-gray-900">{product.minWholesale} {product.unit}</span>
-                      </p>
+              <div className={`pt-4 border-t border-dashed ${isWholesaleEligible ? 'border-orange-400' : 'border-gray-300'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className={`text-[11px] font-black uppercase italic ${isWholesaleEligible ? 'text-white' : 'text-blue-600'}`}>Target Grosir</span>
+                    <p className={`text-[10px] font-bold uppercase ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-500'}`}>
+                      Min. {product.minWholesale || 12} {product.unit}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-xl font-black ${isWholesaleEligible ? 'text-white' : 'text-gray-900'}`}>
+                      {product.wholesalePrice > 0 ? `Rp${product.wholesalePrice.toLocaleString('id-ID')}` : 'Tanya Admin'}
+                    </span>
+                  </div>
+                </div>
+                
+                {!isWholesaleEligible && (
+                  <div className="mt-4">
+                    <div className="bg-gray-200 h-2 rounded-full overflow-hidden p-0.5">
+                      <div 
+                        className="bg-blue-600 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
+                        style={{ width: `${Math.min((quantity / (product.minWholesale || 12)) * 100, 100)}%` }}
+                      ></div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xl font-black text-gray-900">
-                        Rp{product.wholesalePrice.toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-[10px] font-bold text-gray-400 ml-1">/{product.unit}</span>
+                    <p className="mt-2 text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 animate-pulse">
+                      <Sparkles size={10} /> Tambah {Math.max(0, (product.minWholesale || 12) - quantity)} lagi untuk grosir!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 mb-10">
+              <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-sm">
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                  <Info size={14} className="text-green-600" /> Deskripsi
+                </h3>
+                <p className="text-xs font-bold text-gray-600 leading-relaxed uppercase">
+                  {product.description || `Produk ${product.name} kualitas terbaik untuk kebutuhan Anda. Melayani pembelian ecer dan partai besar (grosir) dengan harga kompetitif.`}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Satuan', val: product.unit, icon: ShieldCheck },
+                  { label: 'Minimal Grosir', val: `${product.minWholesale || 12} ${product.unit}`, icon: Sparkles },
+                  { label: 'Pengiriman', val: 'Kediri Kota', icon: Truck },
+                  { label: 'Kondisi', val: 'Baru / Segel', icon: Info },
+                ].map((item, idx) => (
+                  <div key={idx} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center gap-3">
+                    <item.icon size={16} className="text-gray-300" />
+                    <div>
+                      <span className="text-[8px] font-black text-gray-400 uppercase block leading-none mb-1">{item.label}</span>
+                      <span className="text-[10px] font-black text-gray-800 uppercase leading-none">{item.val}</span>
                     </div>
                   </div>
-                  
-                  {!isWholesaleEligible && (
-                    <div className="mt-3">
-                      <div className="bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-blue-500 h-full transition-all duration-500" 
-                          style={{ width: `${Math.min((quantity / product.minWholesale) * 100, 100)}%` }}
-                        ></div>
-                      </div>
-                      <p className="mt-1.5 text-[9px] font-bold text-blue-500 uppercase animate-pulse">
-                        Tambah {product.minWholesale - quantity} lagi untuk harga grosir!
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+                ))}
+              </div>
             </div>
 
-            <div className="flex items-center gap-4 mb-8">
-              <div className="flex items-center bg-white border-2 border-gray-100 rounded-2xl p-1 shadow-sm">
-                <button onClick={() => handleQuantity('minus')} disabled={isOutOfStock} className="p-3 hover:text-red-500 disabled:opacity-30"><Minus size={18}/></button>
-                <span className="w-10 text-center font-black text-xl">{quantity}</span>
-                <button onClick={() => handleQuantity('plus')} disabled={isOutOfStock} className="p-3 hover:text-green-600 disabled:opacity-30"><Plus size={18}/></button>
-              </div>
-              <button 
-                onClick={() => syncToFirebaseCart(product, quantity)} 
-                disabled={isAdding || isOutOfStock}
-                className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase text-[11px] tracking-widest shadow-xl transition-all flex items-center justify-center gap-2
-                  ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-green-600 active:scale-95'}`}
-              >
-                {isAdding ? <Loader2 className="animate-spin" size={18} /> : (isOutOfStock ? 'Stok Habis' : 'Add To Cart')}
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* PRODUK SERUPA */}
-        <div className="mt-16">
-          <h2 className="text-[11px] font-black uppercase tracking-[0.3em] mb-6">Mungkin Anda Butuh</h2>
-          <div className="flex overflow-x-auto gap-4 pb-6 no-scrollbar snap-x">
-            {relatedProducts.map((item) => (
-              <div key={item.id} className="min-w-[160px] snap-start relative group">
-                <Link href={`/produk/${item.id}`}>
-                  <div className="aspect-square rounded-[2rem] overflow-hidden bg-gray-50 border border-gray-100 mb-3 group-hover:shadow-lg transition-all">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                  </div>
-                  <h3 className="text-[10px] font-black uppercase text-gray-800 truncate pr-10">{item.name}</h3>
-                  <p className="text-[11px] font-bold text-green-600 mt-1">Rp{item.price.toLocaleString('id-ID')}</p>
-                </Link>
-                <button 
-                  onClick={() => syncToFirebaseCart(item, 1)}
-                  className="absolute bottom-6 right-2 p-2.5 bg-green-600 text-white rounded-xl shadow-lg active:scale-90 transition-transform"
-                >
-                  <ShoppingCart size={14} strokeWidth={3} />
-                </button>
-              </div>
-            ))}
+        {relatedProducts.length > 0 && (
+          <div className="mt-20">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-gray-400 mb-8 px-2">Rekomendasi Serupa</h2>
+            <div className="flex overflow-x-auto gap-5 pb-10 no-scrollbar snap-x">
+              {relatedProducts.map((item) => (
+                <div key={item.id} className="min-w-[170px] snap-start">
+                  <Link href={`/produk/${item.id}`}>
+                    <div className="aspect-square rounded-[2.5rem] overflow-hidden bg-gray-50 border border-gray-100 mb-3 relative">
+                      <Image src={getProxiedImage(item.image)} alt="" fill className="object-cover" sizes="200px" />
+                    </div>
+                    <h3 className="text-[10px] font-black uppercase text-gray-800 line-clamp-1">{item.name}</h3>
+                    <p className="text-[11px] font-black text-green-600 mt-1">Rp{item.price.toLocaleString('id-ID')}</p>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 1. TOMBOL TAMBAH KERANJANG */}
+      <div className="md:hidden fixed bottom-24 left-0 right-0 z-[90] px-4 pointer-events-none">
+        <div className="max-w-md mx-auto pointer-events-auto">
+          <div className="bg-white/80 backdrop-blur-2xl border border-gray-100 p-3 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.1)] flex items-center gap-3">
+            <div className="flex items-center bg-gray-100 rounded-2xl p-1">
+               <button onClick={() => handleQuantity('minus')} className="p-2.5 text-gray-500"><Minus size={16}/></button>
+               <span className="w-8 text-center font-black text-sm">{quantity}</span>
+               <button onClick={() => handleQuantity('plus')} className="p-2.5 text-gray-500"><Plus size={16}/></button>
+            </div>
+            <button 
+              onClick={() => syncToFirebaseCart(product, quantity)}
+              disabled={isAdding || isOutOfStock}
+              className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              {isAdding ? <Loader2 className="animate-spin" size={16} /> : <><Plus size={16} strokeWidth={3} /> Tambah</>}
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="md:hidden fixed bottom-6 left-4 right-4 z-[100] flex gap-2">
-        <div className="bg-gray-900 p-2 rounded-2xl flex items-center text-white shadow-2xl">
-           <button onClick={() => handleQuantity('minus')} disabled={isOutOfStock} className="p-2"><Minus size={16}/></button>
-           <span className="w-8 text-center font-black">{quantity}</span>
-           <button onClick={() => handleQuantity('plus')} disabled={isOutOfStock} className="p-2"><Plus size={16}/></button>
+      {/* 2. BOTTOM NAVIGATION BAR */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-4 pb-6 pt-2 bg-gradient-to-t from-white via-white/80 to-transparent">
+        <div className="bg-gray-900 rounded-[2.5rem] shadow-2xl border border-white/10 p-2 flex items-center justify-between backdrop-blur-xl">
+          {[
+            { name: 'Home', icon: HomeIcon, path: '/' }, // Gunakan HomeIcon disini
+            { name: 'Kategori', icon: LayoutGrid, path: '/semua-kategori' },
+            { name: 'Pesanan', icon: ReceiptText, path: '/orders' },
+            { name: 'Profil', icon: User, path: '/profil' },
+          ].map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <Link key={item.name} href={item.path} className={`flex flex-col items-center justify-center py-2 px-5 rounded-full transition-all duration-300 ${isActive ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+                <item.icon size={20} strokeWidth={isActive ? 3 : 2} />
+                <span className={`text-[8px] font-black uppercase mt-1 tracking-widest ${isActive ? 'block' : 'hidden'}`}>{item.name}</span>
+              </Link>
+            );
+          })}
         </div>
-        <button 
-          onClick={() => syncToFirebaseCart(product, quantity)} 
-          disabled={isAdding || isOutOfStock}
-          className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2
-            ${isOutOfStock ? 'bg-gray-300 text-gray-500' : 'bg-green-500 text-white'}`}
-        >
-          {isAdding ? <Loader2 className="animate-spin" size={16} /> : (isOutOfStock ? 'Habis' : 'Masuk Keranjang')}
-        </button>
-      </div>
+      </nav>
     </div>
   );
 }
