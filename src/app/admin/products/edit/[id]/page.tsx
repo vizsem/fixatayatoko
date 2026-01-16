@@ -252,9 +252,17 @@ export default function EditProductPage() {
             {/* STOK PER GUDANG */}
             <div className="bg-black p-8 rounded-[2.5rem] text-white shadow-xl">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xs font-black uppercase flex items-center gap-2"><Warehouse size={16} className="text-yellow-400" /> Distribusi Stok</h3>
-                <div className="bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Total: {Object.values(product.stockByWarehouse || {}).reduce((a: any, b: any) => a + (Number(b) || 0), 0)}</div>
-              </div>
+  <h3 className="text-xs font-black uppercase flex items-center gap-2">
+    <Warehouse size={16} className="text-yellow-400" /> Distribusi Stok
+  </h3>
+  <div className="bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+    Total: {(() => {
+      const values = Object.values(product.stockByWarehouse || {});
+      const total = values.reduce((acc: number, curr: any) => acc + (Number(curr) || 0), 0);
+      return total.toLocaleString('id-ID'); // Menampilkan angka yang diformat
+    })()}
+  </div>
+</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {warehouses.map(wh => (
                   <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:bg-white/20 transition-all cursor-pointer">
