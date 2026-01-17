@@ -6,15 +6,15 @@ import {
   ShoppingCart, Trash2, Package, Truck, Store, MapPin, 
   CreditCard, Upload, User, Send, Bike, Box, Info, 
   AlertCircle, CheckCircle2, ChevronLeft, Plus, Minus, 
-  Clock, Loader2 
+  Clock, Loader2, Coins, Snowflake, AlertTriangle, Ticket, Tag
 } from 'lucide-react';
-import { addDoc, collection, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, getDoc, setDoc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore'; 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Fungsi Kompresi Gambar
+// ... (Fungsi compressImage dan generateOrderId tetap sama seperti sebelumnya) ...
 const compressImage = (file: File): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -49,6 +49,7 @@ export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -61,16 +62,15 @@ export default function CartPage() {
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   
-  const [distance, setDistance] = useState<number | null>(null);
+  // STATE POIN & VOUCHER
+  const [usePoints, setUsePoints] = useState(false);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- LOGIKA SINKRONISASI ---
   useEffect(() => {
     const fetchCombinedCart = async (uid: string | null) => {
-      // 1. Ambil data Lokal (Key 'cart')
       const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
-      
-      // 2. Ambil data Cloud
       let cloudItems: any[] = [];
       const currentUid = uid || localStorage.getItem('temp_user_id');
       if (currentUid) {
@@ -78,17 +78,16 @@ export default function CartPage() {
         try {
           const cartSnap = await getDoc(doc(db, 'carts', currentUid));
           if (cartSnap.exists()) cloudItems = cartSnap.data().items || [];
-        } catch (e) { console.error("Cloud error:", e); }
+          const userSnap = await getDoc(doc(db, 'users', currentUid));
+          if (userSnap.exists()) setUserData(userSnap.data());
+        } catch (e) { console.error(e); }
       }
-
-      // 3. Merging
       const merged = [...cloudItems];
       localCart.forEach((lItem: any) => {
         const idToMatch = lItem.id || lItem.productId;
         const exists = merged.find(m => (m.productId === idToMatch || m.id === idToMatch));
         if (!exists) merged.push({ ...lItem, productId: idToMatch });
       });
-
       setCart(merged);
       setIsLoaded(true);
     };
@@ -96,7 +95,10 @@ export default function CartPage() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userSnap.exists()) setSavedAddresses(userSnap.data().addresses || []);
+        if (userSnap.exists()) {
+            setSavedAddresses(userSnap.data().addresses || []);
+            setUserData(userSnap.data());
+        }
         fetchCombinedCart(firebaseUser.uid);
       } else {
         fetchCombinedCart(null);
@@ -105,34 +107,7 @@ export default function CartPage() {
     return () => unsubscribe();
   }, []);
 
-  // Helper Sync & Dispatch Event
-  const syncAndNotify = (newCart: any[]) => {
-    setCart(newCart);
-    localStorage.setItem('cart', JSON.stringify(newCart));
-    window.dispatchEvent(new Event('cart-updated')); // Kabari Beranda
-    
-    const currentUid = userId || localStorage.getItem('temp_user_id');
-    if (currentUid) {
-      setDoc(doc(db, 'carts', currentUid), {
-        userId: currentUid,
-        items: newCart,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    }
-  };
-
-  const updateQty = (index: number, delta: number) => {
-    const newCart = [...cart];
-    const newQty = newCart[index].quantity + delta;
-    if (newQty > 0) {
-      newCart[index].quantity = newQty;
-      syncAndNotify(newCart);
-    } else if (confirm("Hapus produk?")) {
-      newCart.splice(index, 1);
-      syncAndNotify(newCart);
-    }
-  };
-
+  // LOGIKA HITUNG HARGA
   const getItemPrice = (item: any) => {
     const priceGrosir = item.wholesalePrice || item.priceGrosir;
     const minGrosir = item.minWholesale || item.minGrosir || 10;
@@ -140,24 +115,65 @@ export default function CartPage() {
   };
 
   const subtotal = cart.reduce((t, i) => t + (getItemPrice(i) * i.quantity), 0);
-  const isGrosirTotal = subtotal >= 500000;
+  
+  const isGrosirTotal = cart.some(item => {
+    const minGrosir = item.minWholesale || item.minGrosir || 10;
+    return item.quantity >= minGrosir;
+  });
+  
+  // HITUNG DISKON POIN (Maks 50% dari Subtotal)
+  const userPoints = userData?.points || 0;
+  const isFrozen = userData?.isPointsFrozen || false;
+  const maxRedeemable = subtotal * 0.5;
+  const pointsToUse = usePoints ? Math.min(userPoints, maxRedeemable) : 0;
+  
+  // HITUNG DISKON VOUCHER
+  const voucherDiscount = appliedVoucher ? appliedVoucher.value : 0;
+  
+  // TOTAL AKHIR
+  const totalBayar = Math.max(0, subtotal - pointsToUse - voucherDiscount);
 
-  const opStatus = (() => {
-    const hour = new Date().getHours();
-    return (hour < 7 || hour >= 21) 
-      ? { ok: false, msg: "Toko Tutup (Buka 07:00-21:00)" } 
-      : { ok: true, msg: "Toko Buka & Siap Kirim" };
-  })();
+  // FUNGSI CEK VOUCHER
+  const handleCheckVoucher = async () => {
+    if (!voucherCode) return toast.error("Masukkan kode voucher!");
+    if (!userId) return toast.error("Silakan login untuk menggunakan voucher");
 
+    try {
+      const q = query(collection(db, 'user_vouchers'), 
+        where('userId', '==', userId), 
+        where('code', '==', voucherCode.toUpperCase()),
+        where('status', '==', 'ACTIVE')
+      );
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        toast.error("Voucher tidak valid atau sudah digunakan");
+      } else {
+        // TAMBAHKAN 'as any' ATAU DEFINISIKAN TIPENYA DI SINI
+        const docSnap = snap.docs[0];
+        const vData = { id: docSnap.id, ...docSnap.data() } as { id: string, name: string, value: number }; 
+        
+        setAppliedVoucher(vData);
+        toast.success(`Voucher Berhasil: ${vData.name}`);
+      }
+    } catch (e) {
+      toast.error("Gagal memeriksa voucher");
+    }
+  };
+// Tambahkan ini di dalam fungsi CartPage, sebelum bagian return
   const validation = (() => {
     if (cart.length === 0) return { ok: false, msg: "Keranjang Kosong" };
-    if (deliveryMethod === 'pickup') return { ok: true, msg: "Ambil di Toko Ataya" };
+    
+    // Validasi Pengiriman
     if (deliveryMethod === 'delivery' && courierType === 'toko') {
-      if (!isGrosirTotal && subtotal < 100000) return { ok: false, msg: "Min. Belanja Kurir Toko 100rb" };
+      if (!isGrosirTotal && subtotal < 100000) {
+        return { ok: false, msg: "Min. Belanja Kurir Toko 100rb" };
+      }
     }
+    
+    // Jika semua oke
     return { ok: true, msg: "Siap dipesan" };
   })();
-
   const handleCheckout = async () => {
     if (paymentMethod !== 'cash' && !paymentProof) return toast.error("Upload bukti transfer!");
     setIsSubmitting(true);
@@ -172,20 +188,32 @@ export default function CartPage() {
         proofUrl = await getDownloadURL(snap.ref);
       }
 
+      // 1. SIMPAN ORDER
       await addDoc(collection(db, 'orders'), {
         orderId, name: customerName || 'Pelanggan Umum', phone: customerPhone || '-', 
-        items: cart, total: subtotal,
+        items: cart, subtotal, pointsUsed: pointsToUse, voucherUsed: appliedVoucher?.id || null,
+        discountTotal: pointsToUse + voucherDiscount, total: totalBayar,
         delivery: { method: deliveryMethod, type: courierType, address: customerAddress || 'Ambil di Toko' },
         payment: { method: paymentMethod, proof: proofUrl },
         status: 'PENDING', createdAt: serverTimestamp(), userId: userId || 'guest'
       });
 
+      // 2. PROSES POTONG POIN
+      if (pointsToUse > 0 && userId) {
+          await updateDoc(doc(db, 'users', userId), { points: increment(-pointsToUse) });
+          await addDoc(collection(db, 'point_logs'), {
+              userId, pointsChanged: -pointsToUse, type: 'REDEEM', 
+              description: `Checkout Order #${orderId}`, createdAt: serverTimestamp()
+          });
+      }
+
+      // 3. MATIKAN VOUCHER (Burn Voucher)
+      if (appliedVoucher && userId) {
+          await updateDoc(doc(db, 'user_vouchers', appliedVoucher.id), { status: 'USED' });
+      }
+
+      // 4. CLEANUP
       if (userId) await setDoc(doc(db, 'carts', userId), { items: [], updatedAt: serverTimestamp() });
-
-      const itemText = cart.map(i => `• ${i.name}\n  ${i.quantity}x @Rp${getItemPrice(i).toLocaleString()} = Rp${(getItemPrice(i)*i.quantity).toLocaleString()}`).join('\n\n');
-      const waMsg = `*STRUK PESANAN ATAYA TOKO*\n------------------------------------------\n*ID:* ${orderId}\n*PELANGGAN:* ${customerName || 'Umum'}\n------------------------------------------\n\n*RINCIAN:*\n${itemText}\n\n*TOTAL: Rp${subtotal.toLocaleString()}*\n*METODE:* ${paymentMethod.toUpperCase()}\n\n_Mohon tunggu konfirmasi Admin._`;
-
-      window.open(`https://wa.me/6285853161174?text=${encodeURIComponent(waMsg)}`, '_blank');
       localStorage.removeItem('cart');
       window.dispatchEvent(new Event('cart-updated'));
       router.push(`/success?id=${orderId}`);
@@ -196,152 +224,171 @@ export default function CartPage() {
     }
   };
 
-  if (!isLoaded) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-green-600" /></div>;
+  if (!isLoaded) return <div className="min-h-screen flex items-center justify-center font-black italic">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24">
       <Toaster position="top-center" />
       <header className="bg-white/80 backdrop-blur-md p-4 shadow-sm flex items-center gap-4 sticky top-0 z-50 border-b">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><ChevronLeft /></button>
-        <h1 className="font-black text-green-600 uppercase text-sm tracking-widest">Konfirmasi Checkout</h1>
+        <h1 className="font-black text-green-600 uppercase text-sm tracking-widest italic underline decoration-yellow-400">Checkout</h1>
       </header>
 
       <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-5">
-          {/* Status Toko */}
-          <div className={`p-4 rounded-3xl flex items-center gap-4 border-2 ${opStatus.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
-            <Clock size={24} className="flex-shrink-0" />
-            <div className="text-xs uppercase font-black tracking-wider">
-                <p className="opacity-60 mb-0.5">Status Toko</p>
-                <p>{opStatus.msg}</p>
+          
+          {/* CART ITEMS (Tampilan ringkas) */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+            <h2 className="font-black mb-5 flex items-center gap-2 text-[10px] tracking-widest uppercase text-slate-400"><Package size={16}/> Daftar Belanja</h2>
+            <div className="space-y-4">
+                {cart.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                            <img src={item.image} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                            <div>
+                                <p className="text-[10px] font-black uppercase leading-tight">{item.name}</p>
+                                <p className="text-[9px] font-bold text-green-600 uppercase">Rp{getItemPrice(item).toLocaleString()} x {item.quantity}</p>
+                            </div>
+                        </div>
+                        <p className="text-xs font-black italic">Rp{(getItemPrice(item) * item.quantity).toLocaleString()}</p>
+                    </div>
+                ))}
             </div>
           </div>
 
-          {/* List Items */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200/60 overflow-hidden">
-            <h2 className="font-black mb-5 flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-slate-400"><Package size={16}/> Item Dalam Keranjang</h2>
-            {cart.length > 0 ? (
-              <div className="divide-y divide-slate-100">
-                  {cart.map((item, idx) => (
-                      <div key={idx} className="flex gap-4 py-4 items-center group">
-                          <div className="relative">
-                              <img src={item.image} className="w-16 h-16 rounded-2xl object-cover bg-slate-100" />
-                              <span className="absolute -top-2 -right-2 bg-green-600 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white">{item.quantity}</span>
-                          </div>
-                          <div className="flex-1">
-                              <h3 className="text-sm font-black text-slate-800 leading-tight mb-1">{item.name}</h3>
-                              <p className="font-black text-xs text-green-600">Rp{getItemPrice(item).toLocaleString()}</p>
-                          </div>
-                          <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1">
-                              <button onClick={()=>updateQty(idx, -1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-rose-500 shadow-sm"><Minus size={14}/></button>
-                              <button onClick={()=>updateQty(idx, 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-green-600 shadow-sm"><Plus size={14}/></button>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="py-10 text-center text-slate-400 text-xs font-bold uppercase">Keranjang Anda Kosong</div>
-            )}
-          </div>
-
-          {/* Informasi Pengiriman */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200/60 space-y-6">
-            <h2 className="font-black flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-slate-400"><Truck size={16}/> Informasi Pengiriman</h2>
-            
-            {savedAddresses.length > 0 && (
-              <div className="bg-emerald-50/60 p-5 rounded-3xl border border-emerald-100">
-                <p className="text-[10px] font-black text-emerald-700 uppercase mb-4 tracking-widest flex items-center gap-2"><MapPin size={12}/> Pilih Alamat Tersimpan</p>
-                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                  {savedAddresses.map((addr) => (
-                    <button key={addr.id} onClick={() => {
-                      setCustomerName(addr.receiverName);
-                      setCustomerPhone(addr.receiverPhone);
-                      setCustomerAddress(addr.address);
-                      setDeliveryMethod('delivery');
-                    }} className="flex-shrink-0 w-64 p-5 text-left bg-white border-2 border-transparent hover:border-green-500 rounded-[1.5rem] shadow-sm transition-all">
-                      <span className="text-[10px] font-black text-green-600 uppercase bg-green-50 px-2 py-1 rounded-md mb-2 inline-block">{addr.label}</span>
-                      <p className="text-xs font-black text-slate-800 uppercase mb-1">{addr.receiverName}</p>
-                      <p className="text-[10px] text-slate-500 font-bold line-clamp-2">{addr.address}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative flex items-center">
-                    <User size={16} className="absolute left-4 text-slate-400" />
-                    <input placeholder="Nama Penerima" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none" />
-                </div>
-                <div className="relative flex items-center">
-                    <Send size={16} className="absolute left-4 text-slate-400" />
-                    <input placeholder="No. WhatsApp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none" />
-                </div>
-            </div>
-
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
-              <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-[1rem] text-[10px] font-black tracking-widest transition-all ${deliveryMethod === 'pickup' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400'}`}>AMBIL SENDIRI</button>
-              <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-[1rem] text-[10px] font-black tracking-widest transition-all ${deliveryMethod === 'delivery' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400'}`}>DIANTAR</button>
-            </div>
-
-            {deliveryMethod === 'delivery' && (
-              <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-3 gap-2">
-                    {['toko', 'ojol', 'ekspedisi'].map((type) => (
-                        <button key={type} onClick={()=>setCourierType(type as any)} className={`p-4 border-2 rounded-2xl flex flex-col items-center gap-2 ${courierType === type ? 'border-green-500 bg-green-50 text-green-600' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
-                            {type === 'toko' ? <Truck size={20}/> : type === 'ojol' ? <Bike size={20}/> : <Box size={20}/>}
-                            <span className="text-[9px] font-black uppercase">{type}</span>
+          {/* WIDGET POIN & VOUCHER (Kombinasi Baru) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Box Poin */}
+              <div className={`p-6 rounded-[2rem] border-2 transition-all ${usePoints ? 'bg-blue-50 border-blue-200 shadow-lg shadow-blue-100' : 'bg-white border-slate-100'}`}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-2xl ${isFrozen ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {isFrozen ? <Snowflake size={20} /> : <Coins size={20} />}
+                        </div>
+                        <div>
+                            <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Saldo Poin</h3>
+                            <p className="text-sm font-black italic">{userPoints.toLocaleString()}</p>
+                        </div>
+                    </div>
+                    {!isFrozen && userId && (
+                        <button onClick={() => setUsePoints(!usePoints)} className={`w-12 h-6 rounded-full transition-all relative ${usePoints ? 'bg-blue-600 shadow-inner' : 'bg-slate-200'}`}>
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${usePoints ? 'left-7' : 'left-1'}`} />
                         </button>
-                    ))}
+                    )}
                 </div>
-                <textarea placeholder="Alamat Lengkap..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl h-32 text-xs font-black outline-none" />
+                {isFrozen && <p className="text-[8px] font-black text-red-500 uppercase italic mt-3">* Poin dibekukan Admin</p>}
               </div>
-            )}
 
-            <div className={`p-4 rounded-2xl border flex items-center gap-3 ${validation.ok ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}`}>
-              {validation.ok ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
-              <span className="text-[10px] font-black uppercase tracking-widest">{validation.msg}</span>
-            </div>
+              {/* Box Input Voucher */}
+              <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100">
+                <div className="flex items-center gap-3 mb-3 text-slate-400">
+                    <Ticket size={20} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Gunakan Voucher</span>
+                </div>
+                <div className="flex gap-2">
+                    <input 
+                        type="text" 
+                        placeholder="KODE..." 
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                        className="flex-1 bg-slate-50 border border-slate-100 p-3 rounded-xl text-xs font-black uppercase outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <button onClick={handleCheckVoucher} className="bg-black text-white px-4 rounded-xl text-[10px] font-black uppercase transition-transform active:scale-90">CEK</button>
+                </div>
+                {appliedVoucher && (
+                    <div className="mt-2 bg-emerald-50 p-2 rounded-xl flex items-center justify-between border border-emerald-100">
+                        <span className="text-[8px] font-black text-emerald-600 uppercase">🎟️ {appliedVoucher.name}</span>
+                        <button onClick={() => setAppliedVoucher(null)} className="text-[8px] font-black text-rose-500">BATAL</button>
+                    </div>
+                )}
+              </div>
+          </div>
+
+          {/* INFORMASI PENGIRIMAN (Form Ringkas) */}
+          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 space-y-6">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><MapPin size={16}/> Tujuan Pengantaran</h3>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Nama</label>
+                      <input value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-slate-50 focus:bg-white focus:border-green-400" />
+                  </div>
+                  <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 ml-2">WhatsApp</label>
+                      <input value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-slate-50 focus:bg-white focus:border-green-400" />
+                  </div>
+              </div>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+                <button onClick={() => setDeliveryMethod('pickup')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase ${deliveryMethod === 'pickup' ? 'bg-white shadow-md text-green-600' : 'text-slate-400'}`}>Ambil Sendiri</button>
+                <button onClick={() => setDeliveryMethod('delivery')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase ${deliveryMethod === 'delivery' ? 'bg-white shadow-md text-green-600' : 'text-slate-400'}`}>Kirim Ke Rumah</button>
+              </div>
+              {deliveryMethod === 'delivery' && (
+                  <textarea placeholder="Tulis alamat lengkap Anda..." value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full p-5 bg-slate-50 rounded-[1.5rem] text-xs font-black h-28 outline-none border border-slate-50 focus:bg-white focus:border-green-400" />
+              )}
           </div>
         </div>
 
-        {/* Sidebar Payment */}
+        {/* SIDEBAR PAYMENT & TOTAL */}
         <div className="space-y-5">
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl sticky top-24 border border-slate-100">
-            <h2 className="font-black flex items-center mb-8 text-slate-700 text-[10px] tracking-[0.2em] uppercase"><CreditCard size={18} className="mr-3 text-green-600"/> Metode Bayar</h2>
-            <div className="space-y-3 mb-8">
-              {['cash', 'transfer', 'qris'].map(m => (
-                <button key={m} onClick={()=>setPaymentMethod(m as any)} className={`w-full p-4 border-2 rounded-2xl text-left transition-all ${paymentMethod === m ? 'border-green-600 bg-green-50/50 text-green-700' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
-                  <span className="text-[10px] font-black uppercase tracking-widest">{m === 'cash' ? '💵 Bayar Ditempat' : m === 'transfer' ? '🏦 Transfer Bank' : '📱 QRIS / E-Wallet'}</span>
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 sticky top-24">
+                <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2"><CreditCard size={18}/> Metode Bayar</h2>
+                <div className="grid grid-cols-1 gap-2 mb-8">
+                    {['cash', 'transfer', 'qris'].map(m => (
+                        <button key={m} onClick={()=>setPaymentMethod(m as any)} className={`p-4 border-2 rounded-2xl text-left transition-all flex items-center justify-between ${paymentMethod === m ? 'border-green-600 bg-green-50 text-green-700' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
+                            <span className="text-[10px] font-black uppercase">{m}</span>
+                            {paymentMethod === m && <CheckCircle2 size={16} />}
+                        </button>
+                    ))}
+                </div>
+
+                {paymentMethod !== 'cash' && (
+                    <label className="block bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-4 text-center cursor-pointer mb-8">
+                        {proofPreview ? (
+                            <img src={proofPreview} className="h-32 mx-auto rounded-xl object-contain" />
+                        ) : (
+                            <div className="py-4">
+                                <Upload size={20} className="mx-auto text-slate-400 mb-2" />
+                                <span className="text-[9px] font-black uppercase text-slate-400">Bukti Transfer</span>
+                            </div>
+                        )}
+                        <input type="file" hidden accept="image/*" onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
+                        }} />
+                    </label>
+                )}
+
+                <div className="space-y-3 pt-6 border-t border-slate-50">
+                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                        <span>Subtotal</span>
+                        <span>Rp{subtotal.toLocaleString()}</span>
+                    </div>
+                    {pointsToUse > 0 && (
+                        <div className="flex justify-between text-[10px] font-black uppercase text-blue-600 italic">
+                            <span>- Diskon Poin</span>
+                            <span>Rp{pointsToUse.toLocaleString()}</span>
+                        </div>
+                    )}
+                    {voucherDiscount > 0 && (
+                        <div className="flex justify-between text-[10px] font-black uppercase text-emerald-600 italic">
+                            <span>- Voucher</span>
+                            <span>Rp{voucherDiscount.toLocaleString()}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between items-end pt-4">
+                        <span className="text-[11px] font-black uppercase italic">Total Akhir</span>
+                        <span className="text-3xl font-black text-green-600 italic tracking-tighter shadow-green-100 drop-shadow-sm">Rp{totalBayar.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <button 
+                    onClick={handleCheckout} 
+                    disabled={!validation.ok || isSubmitting}
+                    className="w-full bg-green-600 text-white py-5 rounded-[2rem] font-black mt-8 shadow-xl shadow-green-200 disabled:bg-slate-200 disabled:shadow-none transition-all flex items-center justify-center gap-3 uppercase text-xs"
+                >
+                    {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={18} />}
+                    {isSubmitting ? "Processing..." : "Konfirmasi & Bayar"}
                 </button>
-              ))}
             </div>
-            {paymentMethod !== 'cash' && (
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-[2rem] p-6 cursor-pointer h-44 mb-8 bg-slate-50/50">
-                {proofPreview ? <img src={proofPreview} className="h-full object-contain" /> : <><Upload size={20} className="text-slate-400 mb-3" /><span className="text-[9px] font-black text-slate-400 uppercase">Upload Bukti</span></>}
-                <input type="file" hidden accept="image/*" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setPaymentProof(file);
-                    setProofPreview(URL.createObjectURL(file));
-                  }
-                }} />
-              </label>
-            )}
-            <div className="space-y-4 border-t border-slate-50 pt-6">
-                <div className="flex justify-between items-center text-slate-400">
-                    <span className="text-[10px] font-black uppercase">Subtotal</span>
-                    <span className="text-xs font-bold">Rp{subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-end">
-                    <span className="text-[10px] font-black text-slate-900 uppercase">Total Bayar</span>
-                    <span className="text-3xl font-black text-green-600">Rp{subtotal.toLocaleString()}</span>
-                </div>
-            </div>
-            <button onClick={handleCheckout} disabled={!validation.ok || isSubmitting} className="w-full bg-green-600 text-white py-5 rounded-[1.5rem] font-black mt-8 shadow-lg disabled:bg-slate-200 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest">
-              {isSubmitting ? <><Loader2 className="animate-spin" size={20}/><span>Memproses...</span></> : <><Send size={18} /><span>Konfirmasi Pesanan</span></>}
-            </button>
-          </div>
         </div>
       </main>
     </div>

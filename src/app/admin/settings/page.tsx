@@ -11,8 +11,8 @@ import {
 import * as XLSX from 'xlsx';
 import { 
   Settings, CreditCard, Truck, Printer, Store,
-  Shield, AlertTriangle, Upload, Download,
-  Plus, Trash2, Users, Tag, Save, RefreshCcw, Sparkles, Package, ExternalLink
+  Shield, Upload, Download,
+  Plus, Trash2, Users, Tag, Save, Sparkles, Package, ExternalLink, Coins, CheckCircle2
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -20,6 +20,7 @@ type PaymentMethod = { id: string; name: string; enabled: boolean; requiresProof
 type DeliveryMethod = { id: string; name: string; enabled: boolean; cost: number; description: string; };
 type PrinterSettings = { type: 'ESC/POS' | 'Generic'; paperWidth: number; autoCut: boolean; characterSet: string; };
 type StoreSettings = { name: string; address: string; phone: string; email: string; footerMsg?: string; };
+type PointSettings = { earningRate: number; redemptionValue: number; minRedeem: number; isActive: boolean; };
 
 type SystemSettings = {
   store: StoreSettings;
@@ -52,29 +53,23 @@ const defaultSettings: SystemSettings = {
 
 export default function AdminSettings() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'employees' | 'banners'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'employees' | 'banners' | 'points'>('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
   // Data States
   const [settings, setSettings] = useState<SystemSettings>(defaultSettings);
+  const [pointConfig, setPointConfig] = useState<PointSettings>({ earningRate: 10000, redemptionValue: 100, minRedeem: 50, isActive: true });
   const [categories, setCategories] = useState<Category[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [newBanner, setNewBanner] = useState<Banner>({
-    title: '', subtitle: '', buttonText: 'Lihat',
-    gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true
-  });
-
-  // Backup/Restore States
-  const [backupStatus, setBackupStatus] = useState<string | null>(null);
-  const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
-
-  // Form Temp States
+  
+  // UI States
+  const [newBanner, setNewBanner] = useState<Banner>({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
   const [newCat, setNewCat] = useState('');
   const [newEmp, setNewEmp] = useState<Employee>({ name: '', role: 'kasir', phone: '', email: '', isActive: true });
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -82,7 +77,7 @@ export default function AdminSettings() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
       
-      await Promise.all([loadSettings(), loadCategories(), loadEmployees(), loadBanners()]);
+      await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners()]);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -91,6 +86,11 @@ export default function AdminSettings() {
   const loadSettings = async () => {
     const snap = await getDoc(doc(db, 'settings', 'system'));
     if (snap.exists()) setSettings(snap.data() as SystemSettings);
+  };
+
+  const loadPointSettings = async () => {
+    const snap = await getDoc(doc(db, 'settings', 'points'));
+    if (snap.exists()) setPointConfig(snap.data() as PointSettings);
   };
 
   const loadCategories = async () => {
@@ -108,20 +108,26 @@ export default function AdminSettings() {
     setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)));
   };
 
-  // --- HANDLERS ---
   const handleSaveSystem = async () => {
     setSaving(true);
     try {
       await setDoc(doc(db, 'settings', 'system'), { ...settings, updatedAt: new Date().toISOString() });
-      alert('Pengaturan sistem berhasil disimpan!');
-    } catch (err) { setError('Gagal menyimpan data.'); }
+      alert('Sistem diperbarui!');
+    } catch (err) { alert('Gagal menyimpan.'); }
     finally { setSaving(false); }
+  };
+
+  const handleSavePoints = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'points'), pointConfig);
+      alert('Konfigurasi Point disimpan!');
+    } finally { setSaving(false); }
   };
 
   const addCategory = async () => {
     if (!newCat) return;
-    const slug = newCat.toLowerCase().replace(/\s+/g, '-');
-    await addDoc(collection(db, 'categories'), { name: newCat, slug });
+    await addDoc(collection(db, 'categories'), { name: newCat, slug: newCat.toLowerCase().replace(/\s+/g, '-') });
     setNewCat('');
     loadCategories();
   };
@@ -140,9 +146,8 @@ export default function AdminSettings() {
     loadBanners();
   };
 
-  // --- BACKUP & RESTORE ---
   const handleBackup = async () => {
-    setBackupStatus('Membuat backup...');
+    setBackupStatus('Exporting...');
     try {
       const colls = ['products', 'orders', 'customers', 'suppliers', 'categories', 'employees', 'banners'];
       const wb = XLSX.utils.book_new();
@@ -151,135 +156,217 @@ export default function AdminSettings() {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         if (data.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), colName);
       }
-      XLSX.writeFile(wb, `ataya-backup-${new Date().getTime()}.xlsx`);
-      setBackupStatus('Selesai!');
-    } catch (e) { setBackupStatus('Gagal!'); }
+      XLSX.writeFile(wb, `ataya-backup-${new Date().toLocaleDateString()}.xlsx`);
+      setBackupStatus('Success!');
+    } catch (e) { setBackupStatus('Failed'); }
   };
 
   const handleRestore = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !confirm('⚠️ PERINGATAN: Ini akan menghapus data lama. Lanjutkan?')) return;
+    if (!file || !confirm('⚠️ PERINGATAN: Menghapus data lama! Lanjutkan?')) return;
     setIsRestoring(true);
-    setRestoreStatus('Membaca file...');
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const wb = XLSX.read(evt.target?.result, { type: 'binary' });
         for (const sheetName of wb.SheetNames) {
-          setRestoreStatus(`Memproses: ${sheetName}`);
           const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]) as any[];
           const oldSnap = await getDocs(collection(db, sheetName));
           const deleteBatch = writeBatch(db);
           oldSnap.docs.forEach(d => deleteBatch.delete(d.ref));
           await deleteBatch.commit();
-
           for (let i = 0; i < data.length; i += 500) {
             const batch = writeBatch(db);
             data.slice(i, i + 500).forEach(row => {
               const { id, ...rest } = row;
-              const ref = id ? doc(db, sheetName, id) : doc(collection(db, sheetName));
-              batch.set(ref, rest);
+              batch.set(id ? doc(db, sheetName, id) : doc(collection(db, sheetName)), rest);
             });
             await batch.commit();
           }
         }
         window.location.reload();
-      } catch (err) { setRestoreStatus('Gagal!'); setIsRestoring(false); }
+      } catch (err) { setIsRestoring(false); }
     };
     reader.readAsBinaryString(file);
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold">Memuat...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase text-xs tracking-widest animate-pulse">Initializing System...</div>;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto bg-white min-h-screen pb-24">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+      
       {/* HEADER NAV */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter flex items-center gap-2">
-            <Settings size={32} /> Control Panel
+          <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter flex items-center gap-3">
+            <Settings size={38} className="text-blue-600" /> Control Panel
           </h1>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2 italic">Terminal Pusat Pengaturan Toko</p>
         </div>
-        <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto overflow-x-auto">
+        <div className="flex bg-white shadow-sm border border-gray-100 p-1.5 rounded-[2rem] w-full md:w-auto overflow-x-auto no-scrollbar">
           {[
             { id: 'general', label: 'Sistem', icon: Settings },
+            { id: 'points', label: 'Loyalty', icon: Coins },
             { id: 'categories', label: 'Kategori', icon: Tag },
-            { id: 'employees', label: 'Karyawan', icon: Users },
-            { id: 'banners', label: 'Banner', icon: Sparkles },
+            { id: 'employees', label: 'Staff', icon: Users },
+            { id: 'banners', label: 'Ads', icon: Sparkles },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} 
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white shadow-md text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>
+              className={`flex items-center gap-2 px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>
               <tab.icon size={14}/> {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* 1. SISTEM TAB (IDENTITAS, PEMBAYARAN, PRINTER, BACKUP) */}
+      {/* --- TAB CONTENT --- */}
+      
       {activeTab === 'general' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in">
-          <div className="space-y-6">
-            <section className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-              <h2 className="font-black uppercase text-xs mb-4 flex items-center gap-2"><Store size={16}/> Toko</h2>
-              <div className="space-y-3">
-                <input type="text" value={settings.store.name} onChange={e => setSettings({...settings, store: {...settings.store, name: e.target.value}})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-bold text-sm" placeholder="Nama Toko" />
-                <textarea value={settings.store.address} onChange={e => setSettings({...settings, store: {...settings.store, address: e.target.value}})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-medium text-sm" rows={2} placeholder="Alamat" />
-                <input type="text" value={settings.store.phone} onChange={e => setSettings({...settings, store: {...settings.store, phone: e.target.value}})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-bold text-sm" placeholder="WhatsApp" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+          <div className="lg:col-span-2 space-y-8">
+            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
+              <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 mb-6 flex items-center gap-2"><Store size={16}/> Identitas Toko</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 px-2">Nama Bisnis</label>
+                  <input type="text" value={settings.store.name} onChange={e => setSettings({...settings, store: {...settings.store, name: e.target.value}})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 px-2">Hotline WhatsApp</label>
+                  <input type="text" value={settings.store.phone} onChange={e => setSettings({...settings, store: {...settings.store, phone: e.target.value}})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-sm" />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 px-2">Alamat Operasional</label>
+                  <textarea value={settings.store.address} onChange={e => setSettings({...settings, store: {...settings.store, address: e.target.value}})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-bold text-sm h-24" />
+                </div>
               </div>
             </section>
 
-            <section className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100">
-              <h2 className="font-black uppercase text-xs mb-4 text-blue-700 flex items-center gap-2"><Shield size={16}/> Data Management</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={handleBackup} className="bg-white p-4 rounded-2xl shadow-sm border border-blue-200 flex flex-col items-center gap-2 hover:bg-blue-100">
-                  <Download className="text-blue-600" />
-                  <span className="text-[10px] font-black uppercase">{backupStatus || 'Backup Excel'}</span>
-                </button>
-                <label className="bg-white p-4 rounded-2xl shadow-sm border border-blue-200 flex flex-col items-center gap-2 cursor-pointer hover:bg-orange-50">
-                  <Upload className="text-orange-600" />
-                  <span className="text-[10px] font-black uppercase">{isRestoring ? 'Wait...' : 'Restore'}</span>
-                  <input type="file" className="hidden" accept=".xlsx" onChange={handleRestore} disabled={isRestoring} />
-                </label>
-              </div>
+            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
+                <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 mb-6 flex items-center gap-2"><CreditCard size={16}/> Metode Pembayaran</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {settings.paymentMethods.map((pm, idx) => (
+                        <div key={pm.id} className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${pm.enabled ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+                            <span className="font-black uppercase text-[10px] text-gray-700">{pm.name}</span>
+                            <button 
+                                onClick={() => {
+                                    const newMethods = [...settings.paymentMethods];
+                                    newMethods[idx].enabled = !newMethods[idx].enabled;
+                                    setSettings({...settings, paymentMethods: newMethods});
+                                }}
+                                className={`w-10 h-5 rounded-full relative transition-all ${pm.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                            >
+                                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${pm.enabled ? 'right-1' : 'left-1'}`} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </section>
           </div>
 
-          <div className="space-y-6">
-            <section className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-              <h2 className="font-black uppercase text-xs mb-4 flex items-center gap-2"><Printer size={16}/> Printer</h2>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <select value={settings.printer.paperWidth} onChange={e => setSettings({...settings, printer: {...settings.printer, paperWidth: Number(e.target.value)}})} className="p-3 rounded-xl ring-1 ring-gray-200 border-none font-bold text-sm">
-                  <option value={58}>58mm</option>
-                  <option value={80}>80mm</option>
-                </select>
-                <div className="flex items-center gap-2 px-3 bg-white rounded-xl ring-1 ring-gray-200">
-                  <input type="checkbox" checked={settings.printer.autoCut} onChange={e => setSettings({...settings, printer: {...settings.printer, autoCut: e.target.checked}})} id="cut" />
-                  <label htmlFor="cut" className="text-xs font-bold">Auto Cut</label>
+          <div className="space-y-8">
+            <section className="bg-black text-white p-8 rounded-[3rem] shadow-xl">
+              <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-500 mb-6 flex items-center gap-2"><Printer size={16}/> Struk & Printer</h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <select value={settings.printer.paperWidth} onChange={e => setSettings({...settings, printer: {...settings.printer, paperWidth: Number(e.target.value)}})} className="bg-white/10 p-4 rounded-2xl border-none font-black text-xs">
+                        <option value={58} className="text-black">58mm</option>
+                        <option value={80} className="text-black">80mm</option>
+                    </select>
+                    <div className="flex items-center gap-2 p-4 bg-white/5 rounded-2xl">
+                        <input type="checkbox" checked={settings.printer.autoCut} onChange={e => setSettings({...settings, printer: {...settings.printer, autoCut: e.target.checked}})} className="w-4 h-4 rounded accent-blue-500" />
+                        <span className="text-[10px] font-black uppercase">Auto Cut</span>
+                    </div>
                 </div>
+                <button onClick={handleSaveSystem} className="w-full bg-blue-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 transition-all">Update System</button>
               </div>
-              <button onClick={handleSaveSystem} disabled={saving} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95">
-                {saving ? 'Saving...' : 'Simpan Sistem'}
-              </button>
+            </section>
+
+            <section className="bg-orange-50 p-8 rounded-[3rem] border border-orange-100">
+              <h2 className="font-black uppercase text-[10px] tracking-widest text-orange-700 mb-6 flex items-center gap-2"><Shield size={16}/> Keamanan Data</h2>
+              <div className="space-y-3">
+                <button onClick={handleBackup} className="w-full bg-white p-4 rounded-2xl shadow-sm border border-orange-200 flex items-center justify-between group hover:bg-orange-600 transition-all">
+                  <span className="text-[10px] font-black uppercase group-hover:text-white">{backupStatus || 'Download Backup'}</span>
+                  <Download className="text-orange-600 group-hover:text-white" size={16} />
+                </button>
+                <label className="w-full bg-white p-4 rounded-2xl shadow-sm border border-orange-200 flex items-center justify-between cursor-pointer hover:bg-black group transition-all">
+                  <span className="text-[10px] font-black uppercase group-hover:text-white">{isRestoring ? 'Restoring...' : 'Restore Data'}</span>
+                  <Upload className="text-black group-hover:text-white" size={16} />
+                  <input type="file" className="hidden" accept=".xlsx" onChange={handleRestore} />
+                </label>
+              </div>
             </section>
           </div>
         </div>
       )}
 
-      {/* 2. CATEGORIES TAB */}
-      {activeTab === 'categories' && (
-        <div className="max-w-2xl mx-auto animate-in slide-in-from-bottom-4">
-          <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-            <h2 className="font-black uppercase text-xs mb-6 text-green-700 flex items-center gap-2"><Tag size={16}/> Kelola Kategori</h2>
-            <div className="flex gap-2 mb-6">
-              <input type="text" value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 p-4 rounded-2xl border-none ring-1 ring-gray-200 font-bold" placeholder="Nama Kategori Baru" />
-              <button onClick={addCategory} className="bg-green-600 text-white px-6 rounded-2xl"><Plus/></button>
+      {/* 2. LOYALTY POINTS TAB */}
+      {activeTab === 'points' && (
+        <div className="max-w-2xl mx-auto animate-in slide-in-from-bottom-6 duration-500">
+          <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-gray-100 space-y-10 relative overflow-hidden">
+            <Coins className="absolute -right-10 -top-10 text-orange-50 opacity-50" size={250} />
+            <div className="relative z-10 flex justify-between items-center">
+                <h2 className="font-black uppercase text-sm text-gray-800 flex items-center gap-3">
+                    <div className="p-3 bg-orange-500 text-white rounded-2xl shadow-lg shadow-orange-200"><Sparkles size={20}/></div>
+                    Loyalty Point System
+                </h2>
+                <button 
+                    onClick={() => setPointConfig({...pointConfig, isActive: !pointConfig.isActive})}
+                    className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${pointConfig.isActive ? 'bg-green-500 text-white shadow-lg shadow-green-100' : 'bg-gray-100 text-gray-400'}`}
+                >
+                    {pointConfig.isActive ? 'Active' : 'Disabled'}
+                </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-2">Point Earning Rate</label>
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                        <p className="text-[9px] font-bold text-gray-400 mb-2 uppercase">Rp Spend per 1 Point</p>
+                        <input type="number" value={pointConfig.earningRate} onChange={e => setPointConfig({...pointConfig, earningRate: Number(e.target.value)})} className="bg-transparent text-2xl font-black w-full outline-none" />
+                    </div>
+                </div>
+                <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-2">Redemption Value</label>
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                        <p className="text-[9px] font-bold text-gray-400 mb-2 uppercase">IDR Value per 1 Point</p>
+                        <input type="number" value={pointConfig.redemptionValue} onChange={e => setPointConfig({...pointConfig, redemptionValue: Number(e.target.value)})} className="bg-transparent text-2xl font-black w-full outline-none text-orange-600" />
+                    </div>
+                </div>
+            </div>
+
+            <div className="relative z-10 bg-black text-white p-8 rounded-[2.5rem]">
+                <div className="flex justify-between items-center mb-6">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Minimum Redemption Threshold</label>
+                    <span className="text-xl font-black">{pointConfig.minRedeem} <span className="text-[10px] text-gray-500">PTS</span></span>
+                </div>
+                <input type="range" min="0" max="1000" step="10" value={pointConfig.minRedeem} onChange={e => setPointConfig({...pointConfig, minRedeem: Number(e.target.value)})} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-orange-500" />
+            </div>
+
+            <button onClick={handleSavePoints} className="relative z-10 w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-xl shadow-orange-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                <Save size={18} /> {saving ? 'Saving...' : 'Save Loyalty Rules'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. CATEGORIES TAB */}
+      {activeTab === 'categories' && (
+        <div className="max-w-3xl mx-auto animate-in slide-in-from-bottom-6">
+          <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
+            <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 mb-8 flex items-center gap-2"><Tag size={16}/> Master Kategori</h2>
+            <div className="flex gap-3 mb-10">
+              <input type="text" value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 p-5 rounded-3xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-sm outline-none focus:ring-green-500 transition-all" placeholder="Input Nama Kategori..." />
+              <button onClick={addCategory} className="bg-green-600 text-white px-8 rounded-3xl font-black uppercase text-xs shadow-lg shadow-green-100 active:scale-95 transition-all"><Plus/></button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {categories.map(cat => (
-                <div key={cat.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-gray-100 shadow-sm">
-                  <span className="font-black text-sm uppercase text-gray-700">{cat.name}</span>
-                  <button onClick={() => deleteDoc(doc(db, 'categories', cat.id!)).then(loadCategories)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                <div key={cat.id} className="bg-gray-50 p-5 rounded-3xl flex justify-between items-center group hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="font-black text-xs uppercase text-gray-700">{cat.name}</span>
+                  </div>
+                  <button onClick={() => deleteDoc(doc(db, 'categories', cat.id!)).then(loadCategories)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
                 </div>
               ))}
             </div>
@@ -287,34 +374,39 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* 3. EMPLOYEES TAB */}
+      {/* 4. EMPLOYEES TAB */}
       {activeTab === 'employees' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-4">
-          <div className="bg-gray-50 p-6 rounded-[2rem] h-fit">
-            <h2 className="font-black uppercase text-xs mb-6 text-blue-700">Tambah Staf</h2>
-            <div className="space-y-3">
-              <input type="text" placeholder="Nama Lengkap" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="w-full p-3 rounded-xl ring-1 ring-gray-200 border-none font-bold text-sm" />
-              <input type="email" placeholder="Email Staf" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="w-full p-3 rounded-xl ring-1 ring-gray-200 border-none font-bold text-sm" />
-              <select value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value as any})} className="w-full p-3 rounded-xl ring-1 ring-gray-200 border-none font-bold text-sm">
-                <option value="kasir">Kasir</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button onClick={addEmployee} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Daftarkan Staf</button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-6">
+          <div className="lg:col-span-4">
+            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 sticky top-10">
+                <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 mb-6">Registrasi Staff</h2>
+                <div className="space-y-4">
+                <input type="text" placeholder="Nama Lengkap" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs" />
+                <input type="email" placeholder="Email Akun" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs" />
+                <select value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value as any})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs">
+                    <option value="kasir">KASIR / SALES</option>
+                    <option value="admin">ADMINISTRATOR</option>
+                </select>
+                <button onClick={addEmployee} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-blue-100 active:scale-95 transition-all">Daftarkan Staff</button>
+                </div>
             </div>
           </div>
-          <div className="lg:col-span-2 space-y-3">
+          <div className="lg:col-span-8 space-y-4">
+            <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 px-4">Daftar Karyawan Aktif</h2>
             {employees.map(emp => (
-              <div key={emp.id} className="bg-white p-4 rounded-[1.5rem] border border-gray-100 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={20}/></div>
+              <div key={emp.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-all">
+                <div className="flex items-center gap-5">
+                  <div className={`p-4 rounded-2xl ${emp.role === 'admin' ? 'bg-black text-white' : 'bg-blue-50 text-blue-600'}`}>
+                    <Users size={24}/>
+                  </div>
                   <div>
-                    <p className="font-black uppercase text-sm">{emp.name}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{emp.role} • {emp.email}</p>
+                    <p className="font-black uppercase text-sm tracking-tighter">{emp.name}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">{emp.role} • {emp.email}</p>
                   </div>
                 </div>
                 <button onClick={() => updateDoc(doc(db, 'employees', emp.id!), { isActive: !emp.isActive }).then(loadEmployees)} 
-                  className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all ${emp.isActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                  {emp.isActive ? 'Aktif' : 'Non-aktif'}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-full text-[9px] font-black uppercase transition-all ${emp.isActive ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
+                  {emp.isActive ? <CheckCircle2 size={12}/> : null} {emp.isActive ? 'Active' : 'Banned'}
                 </button>
               </div>
             ))}
@@ -322,52 +414,48 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* 4. MULTI-BANNER TAB */}
+      {/* 5. MULTI-BANNER TAB */}
       {activeTab === 'banners' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-bottom-4">
-          <div className="lg:col-span-5 space-y-4">
-            <div className="bg-orange-50 p-6 rounded-[2.5rem] border border-orange-100 shadow-sm">
-              <h2 className="font-black uppercase text-xs mb-4 text-orange-700 flex items-center gap-2"><Plus size={18}/> Tambah Banner Baru ({banners.length}/5)</h2>
-              <div className="space-y-3">
-                <input type="text" placeholder="Judul Banner" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-bold text-sm" />
-                <input type="text" placeholder="Deskripsi Singkat" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-medium text-xs" />
-                <input type="text" placeholder="URL Foto Produk Banner" value={newBanner.imageUrl || ''} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} className="w-full p-3 rounded-xl border-none ring-1 ring-gray-200 font-medium text-xs text-blue-600" />
-                <input type="text" placeholder="Link Tujuan (cth: /kategori/beras)" value={newBanner.linkUrl} onChange={e => setNewBanner({...newBanner, linkUrl: e.target.value})} className="w-full p-3 rounded-xl border-none ring-1 ring-orange-200 font-bold text-xs text-orange-700 bg-white" />
-                
-                <div className="grid grid-cols-2 gap-2">
-                  <select value={newBanner.gradient} onChange={e => setNewBanner({...newBanner, gradient: e.target.value})} className="p-3 rounded-xl border-none ring-1 ring-gray-200 font-bold text-xs bg-white">
-                    <option value="from-green-600 to-emerald-800">Hijau</option>
-                    <option value="from-blue-600 to-indigo-800">Biru</option>
-                    <option value="from-orange-500 to-red-600">Orange</option>
-                    <option value="from-zinc-800 to-black">Hitam</option>
-                  </select>
-                  <button onClick={handleAddBanner} disabled={banners.length >= 5} className="bg-orange-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest disabled:bg-gray-300">Simpan Slot</button>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-6">
+          <div className="lg:col-span-4">
+            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 sticky top-10">
+              <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 mb-6 flex items-center gap-2">Ads Slot ({banners.length}/5)</h2>
+              <div className="space-y-4">
+                <input type="text" placeholder="Headline" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs" />
+                <input type="text" placeholder="Short Desc" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs" />
+                <input type="text" placeholder="Image URL" value={newBanner.imageUrl || ''} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-[9px]" />
+                <input type="text" placeholder="Redirect Link (ex: /shop)" value={newBanner.linkUrl} onChange={e => setNewBanner({...newBanner, linkUrl: e.target.value})} className="w-full p-4 rounded-2xl bg-blue-50 border-none ring-1 ring-blue-100 font-black text-[9px] text-blue-700 placeholder:text-blue-300" />
+                <select value={newBanner.gradient} onChange={e => setNewBanner({...newBanner, gradient: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-black text-xs">
+                    <option value="from-green-600 to-emerald-800">EMERALD GREEN</option>
+                    <option value="from-blue-600 to-indigo-800">DEEP BLUE</option>
+                    <option value="from-orange-500 to-red-600">VIBRANT ORANGE</option>
+                    <option value="from-zinc-800 to-black">NEO BLACK</option>
+                </select>
+                <button onClick={handleAddBanner} disabled={banners.length >= 5} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] disabled:opacity-30 active:scale-95 transition-all">Push Banner</button>
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-7 space-y-4">
-            <h2 className="font-black uppercase text-xs text-gray-400 mb-2 px-2">Daftar Banner Aktif</h2>
-            <div className="space-y-3">
-              {banners.map((bn, idx) => (
-                <div key={bn.id} className={`relative group overflow-hidden rounded-[2rem] bg-gradient-to-r ${bn.gradient} p-5 text-white shadow-md transition-all hover:scale-[1.01]`}>
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="max-w-[75%]">
-                      <span className="text-[9px] font-black bg-black/20 px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Slot {idx + 1}</span>
-                      <h3 className="font-black text-sm uppercase leading-tight mb-1">{bn.title}</h3>
-                      <div className="flex items-center gap-2 text-[9px] font-bold text-white/70 italic">
-                        <ExternalLink size={10}/> {bn.linkUrl || 'Tanpa Link'}
-                      </div>
+          <div className="lg:col-span-8 space-y-6">
+            <h2 className="font-black uppercase text-[10px] tracking-widest text-gray-400 px-4">Live Preview</h2>
+            {banners.map((bn, idx) => (
+              <div key={bn.id} className={`relative group overflow-hidden rounded-[3rem] bg-gradient-to-r ${bn.gradient} p-8 text-white shadow-xl transition-all hover:scale-[1.02]`}>
+                <div className="flex justify-between items-start relative z-10">
+                  <div className="max-w-[70%]">
+                    <span className="text-[9px] font-black bg-black/20 px-3 py-1 rounded-full uppercase mb-4 inline-block tracking-[0.2em]">SLOT 0{idx + 1}</span>
+                    <h3 className="font-black text-xl uppercase leading-none mb-2 tracking-tighter">{bn.title}</h3>
+                    <p className="text-xs font-medium opacity-80 mb-6">{bn.subtitle}</p>
+                    <div className="flex items-center gap-2 text-[9px] font-black bg-white/10 w-fit px-3 py-1 rounded-lg">
+                      <ExternalLink size={10}/> {bn.linkUrl || 'NO_LINK'}
                     </div>
-                    <button onClick={() => deleteDoc(doc(db, 'banners', bn.id!)).then(loadBanners)} className="bg-white/20 p-2 rounded-full hover:bg-red-500 transition-colors">
-                      <Trash2 size={16} />
-                    </button>
                   </div>
-                  {bn.imageUrl ? <img src={bn.imageUrl} className="absolute right-[-10px] bottom-[-10px] w-24 h-24 object-contain opacity-40" /> : <Package size={80} className="absolute right-[-10px] bottom-[-10px] opacity-10 rotate-12" />}
+                  <button onClick={() => deleteDoc(doc(db, 'banners', bn.id!)).then(loadBanners)} className="bg-red-500/20 p-3 rounded-full hover:bg-red-500 transition-all text-white">
+                    <Trash2 size={20} />
+                  </button>
                 </div>
-              ))}
-            </div>
+                {bn.imageUrl ? <img src={bn.imageUrl} className="absolute right-[-20px] bottom-[-20px] w-40 h-40 object-contain opacity-30 group-hover:opacity-50 transition-all" /> : <Package size={120} className="absolute right-[-20px] bottom-[-20px] opacity-10 rotate-12" />}
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -1,9 +1,8 @@
-// src/app/admin/customers/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -11,14 +10,12 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
-  orderBy,
-  onSnapshot
+  orderBy
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import Link from 'next/link';
 import { 
   Users, 
   User, 
@@ -32,9 +29,13 @@ import {
   Trash2,
   AlertTriangle,
   TrendingUp,
-  Link
+  Search,
+  X,
+  ChevronRight,
+  Activity
 } from 'lucide-react';
 
+// --- TYPES ---
 type Customer = {
   id: string;
   name: string;
@@ -78,7 +79,7 @@ export default function AdminCustomers() {
     notes: ''
   });
 
-  // Proteksi admin
+  // 1. Proteksi Admin
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -92,382 +93,252 @@ export default function AdminCustomers() {
         router.push('/profil');
         return;
       }
-      setLoading(false);
+      fetchData();
     });
     return () => unsubscribe();
   }, [router]);
 
-  // Fetch pelanggan & hitung piutang
-  useEffect(() => {
-    if (loading) return;
+  // 2. Sinkronisasi Data Pelanggan & Pesanan (Sinkron Total Spent & Debt)
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const customersSnapshot = await getDocs(collection(db, 'customers'));
+      const ordersSnapshot = await getDocs(collection(db, 'orders'));
+      
+      const orders = ordersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Order[];
 
-    const fetchCustomers = async () => {
-      try {
-        // Ambil data pelanggan
-        const customersSnapshot = await getDocs(collection(db, 'customers'));
-        const customerList: Customer[] = [];
+      const customerList: Customer[] = customersSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        const customerId = doc.id;
         
-        // Ambil data pesanan untuk hitung piutang & total
-        const ordersSnapshot = await getDocs(collection(db, 'orders'));
-        const orders = ordersSnapshot.docs.map(doc => ({
-          id: doc.id,
-          customerId: doc.data().customerId,
-          total: doc.data().total,
-          createdAt: doc.data().createdAt,
-          status: doc.data().status
-        })) as Order[];
+        // Filter pesanan khusus pelanggan ini
+        const customerOrders = orders.filter(o => o.customerId === customerId);
 
-        customersSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const customerId = doc.id;
-          
-          // Hitung piutang (pesanan belum lunas)
-          const outstandingOrders = orders.filter(
-            order => order.customerId === customerId && 
-                     (order.status === 'MENUNGGU' || order.status === 'DIPROSES')
-          );
-          const outstandingDebt = outstandingOrders.reduce((sum, order) => sum + order.total, 0);
-          
-          // Hitung total pengeluaran
-          const totalSpent = orders
-            .filter(order => order.customerId === customerId && order.status === 'SELESAI')
-            .reduce((sum, order) => sum + order.total, 0);
-          
-          // Tanggal pesanan terakhir
-          const customerOrders = orders.filter(order => order.customerId === customerId);
-          const lastOrderDate = customerOrders.length > 0 
-            ? customerOrders.reduce((latest, order) => 
-                new Date(order.createdAt) > new Date(latest) ? order.createdAt : latest
-              , customerOrders[0].createdAt)
-            : null;
+        // Hitung piutang (MENUNGGU, PENDING, atau DIPROSES)
+        const outstandingDebt = customerOrders
+          .filter(o => ['MENUNGGU', 'PENDING', 'DIPROSES'].includes(o.status?.toUpperCase()))
+          .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+        
+        // Hitung total pengeluaran (Hanya yang SELESAI / SUCCESS)
+        const totalSpent = customerOrders
+          .filter(o => ['SELESAI', 'SUCCESS'].includes(o.status?.toUpperCase()))
+          .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+        
+        // Cari tanggal pesanan terakhir
+        const lastOrderDate = customerOrders.length > 0 
+          ? customerOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].createdAt
+          : null;
 
-          customerList.push({
-            id: doc.id,
-            name: data.name || '',
-            phone: data.phone || '',
-            email: data.email,
-            address: data.address,
-            type: data.type || 'ecer',
-            creditLimit: data.creditLimit || 0,
-            outstandingDebt,
-            totalSpent,
-            notes: data.notes,
-            createdAt: data.createdAt || '',
-            lastOrderDate
-          });
-        });
+        return {
+          id: customerId,
+          name: data.name || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          address: data.address || '',
+          type: data.type || 'ecer',
+          creditLimit: Number(data.creditLimit) || 0,
+          outstandingDebt,
+          totalSpent,
+          notes: data.notes || '',
+          createdAt: data.createdAt || new Date().toISOString(),
+          lastOrderDate
+        };
+      });
 
-        setCustomers(customerList);
-        setFilteredCustomers(customerList);
-        setError(null);
-      } catch (err) {
-        console.error('Gagal memuat pelanggan:', err);
-        setError('Gagal memuat data pelanggan.');
-      }
-    };
+      setCustomers(customerList);
+      setFilteredCustomers(customerList);
+      setError(null);
+    } catch (err) {
+      console.error('Fetch Error:', err);
+      setError('Gagal sinkronisasi data server.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchCustomers();
-  }, [loading]);
-
-  // Filter pelanggan
+  // 3. Filter Search
   useEffect(() => {
-    const filtered = customers.filter(customer =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.includes(searchTerm) ||
-      (customer.email && customer.email.includes(searchTerm))
+    const filtered = customers.filter(c =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.phone.includes(searchTerm) ||
+      c.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredCustomers(filtered);
   }, [searchTerm, customers]);
 
+  // 4. Create Customer
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await addDoc(collection(db, 'customers'), {
         ...formData,
-        outstandingDebt: 0,
-        totalSpent: 0,
         createdAt: new Date().toISOString()
       });
       setShowAddModal(false);
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        type: 'ecer',
-        creditLimit: 0,
-        notes: ''
-      });
-      
-      // Refresh data
-      const customersSnapshot = await getDocs(collection(db, 'customers'));
-      const customerList: Customer[] = [];
-      customersSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        customerList.push({
-          id: doc.id,
-          name: data.name || '',
-          phone: data.phone || '',
-          email: data.email,
-          address: data.address,
-          type: data.type || 'ecer',
-          creditLimit: data.creditLimit || 0,
-          outstandingDebt: 0,
-          totalSpent: 0,
-          notes: data.notes,
-          createdAt: data.createdAt || '',
-          lastOrderDate: null
-        });
-      });
-      setCustomers(customerList);
+      setFormData({ name: '', phone: '', email: '', address: '', type: 'ecer', creditLimit: 0, notes: '' });
+      fetchData();
     } catch (err) {
       alert('Gagal menambahkan pelanggan.');
-      console.error(err);
     }
   };
 
+  // 5. Delete Customer
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus pelanggan "${name}"?`)) return;
+    if (!confirm(`Hapus permanen data "${name}"?`)) return;
     try {
       await deleteDoc(doc(db, 'customers', id));
       setCustomers(customers.filter(c => c.id !== id));
     } catch (err) {
-      alert('Gagal menghapus pelanggan.');
-      console.error(err);
+      alert('Gagal menghapus.');
     }
   };
 
   const isOverLimit = (customer: Customer) => {
-    return customer.outstandingDebt > customer.creditLimit && customer.creditLimit > 0;
+    return customer.creditLimit > 0 && customer.outstandingDebt > customer.creditLimit;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat data pelanggan...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600 mb-4"></div>
+      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Syncing Client Data...</p>
+    </div>
+  );
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Users className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Manajemen Pelanggan</h1>
-        </div>
-        <p className="text-black">Kelola data pelanggan, piutang, dan riwayat transaksi</p>
-      </div>
-
-      {/* Error Banner */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
-          {error}
-        </div>
-      )}
-
-      {/* Aksi Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="relative w-full md:w-64">
-          <input
-            type="text"
-            placeholder="Cari pelanggan..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-          />
-          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+    <div className="min-h-screen bg-[#FBFBFE] p-4 lg:p-10">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3">
+            <Users className="text-green-600" size={32} /> Client Database
+          </h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Manajemen Pelanggan & Piutang Berjalan</p>
         </div>
         
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Tambah Pelanggan
-        </button>
-      </div>
-
-      {/* Statistik */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-black">Total Pelanggan</p>
-              <p className="text-2xl font-bold mt-1">{customers.length}</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <Users className="text-blue-600" size={24} />
-            </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Cari nama/hp..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-[1.5rem] text-xs font-bold w-64 shadow-sm focus:ring-2 focus:ring-green-500 outline-none transition-all"
+            />
           </div>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-black">Pelanggan Grosir</p>
-              <p className="text-2xl font-bold mt-1">
-                {customers.filter(c => c.type === 'grosir').length}
-              </p>
-            </div>
-            <div className="bg-purple-100 p-3 rounded-full">
-              <Package className="text-purple-600" size={24} />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-black">Total Piutang</p>
-              <p className="text-2xl font-bold mt-1 text-red-600">
-                Rp{customers.reduce((sum, c) => sum + c.outstandingDebt, 0).toLocaleString('id-ID')}
-              </p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-full">
-              <CreditCard className="text-red-600" size={24} />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-black">Lewat Limit Kredit</p>
-              <p className="text-2xl font-bold mt-1 text-orange-600">
-                {customers.filter(isOverLimit).length}
-              </p>
-            </div>
-            <div className="bg-orange-100 p-3 rounded-full">
-              <AlertTriangle className="text-orange-600" size={24} />
-            </div>
-          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-black text-white px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-lg"
+          >
+            <Plus size={18} /> Tambah Client
+          </button>
         </div>
       </div>
 
-      {/* Tabel Pelanggan */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+        <StatBox label="Total Client" value={customers.length} icon={Users} color="text-blue-600" bg="bg-blue-50" />
+        <StatBox label="Tipe Grosir" value={customers.filter(c => c.type === 'grosir').length} icon={Package} color="text-purple-600" bg="bg-purple-50" />
+        <StatBox label="Total Piutang" value={`Rp${customers.reduce((s, c) => s + c.outstandingDebt, 0).toLocaleString()}`} icon={CreditCard} color="text-red-600" bg="bg-red-50" />
+        <StatBox label="Over Limit" value={customers.filter(isOverLimit).length} icon={AlertTriangle} color="text-orange-600" bg="bg-orange-50" />
+      </div>
+
+      {/* Main Table */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Pelanggan
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Kontak
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Jenis
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Piutang
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Total Belanja
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
-                  Aksi
-                </th>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Profil Pelanggan</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Detail Kontak</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Kategori</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status Piutang</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Omzet</th>
+                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Action</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-50">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-black">
-                    <Users className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada pelanggan terdaftar</p>
+                  <td colSpan={6} className="px-8 py-20 text-center">
+                    <Activity className="mx-auto text-gray-200 mb-4" size={40} />
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak ada data ditemukan</p>
                   </td>
                 </tr>
               ) : (
                 filteredCustomers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-black">{customer.name}</div>
-                      {customer.notes && (
-                        <div className="text-xs text-black mt-1 bg-gray-100 px-2 py-1 rounded inline-block">
-                          {customer.notes}
+                  <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-800 uppercase text-xs tracking-tight">{customer.name}</span>
+                        {customer.notes && (
+                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md mt-1 w-fit uppercase">
+                            {customer.notes}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-bold text-gray-400 mt-1 uppercase">
+                          Mulai: {new Date(customer.createdAt).toLocaleDateString('id-ID')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-600">
+                          <Phone size={12} className="text-green-500" /> {customer.phone}
                         </div>
-                      )}
-                      <div className="text-xs text-black mt-1">
-                        {new Date(customer.createdAt).toLocaleDateString('id-ID')}
-                        {customer.lastOrderDate && (
-                          <> • Terakhir: {new Date(customer.lastOrderDate).toLocaleDateString('id-ID')}</>
+                        {customer.email && (
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                            <Mail size={12} /> {customer.email}
+                          </div>
+                        )}
+                        {customer.address && (
+                          <div className="flex items-start gap-2 text-[10px] font-bold text-gray-400 max-w-[180px] leading-tight">
+                            <MapPin size={12} className="shrink-0 mt-0.5" /> {customer.address}
+                          </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Phone size={14} className="text-gray-500" />
-                        {customer.phone}
-                      </div>
-                      {customer.email && (
-                        <div className="flex items-center gap-1">
-                          <Mail size={14} className="text-gray-500" />
-                          {customer.email}
-                        </div>
-                      )}
-                      {customer.address && (
-                        <div className="flex items-start gap-1 mt-1">
-                          <MapPin size={14} className="text-gray-500 mt-0.5" />
-                          <span className="text-xs">{customer.address}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        customer.type === 'grosir' 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-green-100 text-green-800'
+                    <td className="px-6 py-6">
+                      <span className={`px-3 py-1 text-[9px] font-black rounded-full uppercase tracking-widest ${
+                        customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
                       }`}>
-                        {customer.type === 'grosir' ? 'Grosir' : 'Ecer'}
+                        {customer.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-6">
                       <div className="flex flex-col">
-                        <span className={`font-medium ${
-                          isOverLimit(customer) ? 'text-red-600' : 'text-black'
-                        }`}>
-                          Rp{customer.outstandingDebt.toLocaleString('id-ID')}
+                        <span className={`text-xs font-black ${isOverLimit(customer) ? 'text-red-600' : 'text-gray-800'}`}>
+                          Rp{customer.outstandingDebt.toLocaleString()}
                         </span>
                         {customer.creditLimit > 0 && (
-                          <span className="text-xs text-black">
-                            Limit: Rp{customer.creditLimit.toLocaleString('id-ID')}
-                          </span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase">Limit: Rp{customer.creditLimit.toLocaleString()}</span>
                         )}
                         {isOverLimit(customer) && (
-                          <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
-                            <AlertTriangle size={12} />
-                            Melebihi limit!
+                          <span className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1 mt-1">
+                            <AlertTriangle size={10} /> Limit Exceeded
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
-                      <div className="flex items-center gap-1">
-                        <TrendingUp size={16} className="text-green-600" />
-                        <span>Rp{customer.totalSpent.toLocaleString('id-ID')}</span>
+                    <td className="px-6 py-6">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp size={14} className="text-green-500" />
+                        <span className="text-xs font-black text-gray-800">Rp{customer.totalSpent.toLocaleString()}</span>
                       </div>
+                      {customer.lastOrderDate && (
+                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">Terakhir: {new Date(customer.lastOrderDate).toLocaleDateString('id-ID')}</p>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          href={`/admin/customers/edit/${customer.id}`}
-                          className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                        >
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/admin/customers/edit/${customer.id}`} className="p-3 bg-white border border-gray-100 rounded-xl text-blue-600 hover:shadow-md transition-all">
                           <Edit size={16} />
-                          Edit
                         </Link>
-                        <button
-                          onClick={() => handleDelete(customer.id, customer.name)}
-                          className="text-red-600 hover:text-red-800 flex items-center gap-1"
-                        >
+                        <button onClick={() => handleDelete(customer.id, customer.name)} className="p-3 bg-white border border-gray-100 rounded-xl text-red-500 hover:shadow-md transition-all">
                           <Trash2 size={16} />
-                          Hapus
                         </button>
                       </div>
                     </td>
@@ -479,141 +350,83 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      {/* Modal Tambah Pelanggan */}
+      {/* Modal Tambah Client */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-black">Tambah Pelanggan Baru</h2>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 lg:p-10 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">New Client</h2>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Entry Database Pelanggan Baru</p>
               </div>
-              
-              <form onSubmit={handleCreate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Nama Lengkap *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Jenis Pelanggan *
-                    </label>
-                    <select
-                      required
-                      value={formData.type}
-                      onChange={(e) => setFormData({...formData, type: e.target.value as any})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    >
-                      <option value="ecer">Eceran</option>
-                      <option value="grosir">Grosir</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Nomor Telepon *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="081234567890"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                    />
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Alamat
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="Jl. Raya No. 123, Kota"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Limit Kredit (Rp)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.creditLimit}
-                      onChange={(e) => setFormData({...formData, creditLimit: Number(e.target.value)})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-black mt-1">
-                      Untuk pelanggan tempo. Biarkan 0 jika tidak ada limit.
-                    </p>
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-black mb-2">
-                      Catatan Tambahan
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.notes}
-                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                      placeholder="Informasi penting tentang pelanggan"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-8 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-black hover:bg-gray-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Tambah Pelanggan
-                  </button>
-                </div>
-              </form>
+              <button onClick={() => setShowAddModal(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100"><X size={24} /></button>
             </div>
+            
+            <form onSubmit={handleCreate} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="col-span-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Nama Lengkap *</label>
+                  <input required className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="col-span-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Tipe Member *</label>
+                  <select required className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setFormData({...formData, type: e.target.value as any})}>
+                    <option value="ecer">ECERAN</option>
+                    <option value="grosir">GROSIR</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">WhatsApp / HP *</label>
+                  <input required type="tel" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    placeholder="08..." onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Email</label>
+                  <input type="email" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Alamat Lengkap</label>
+                  <textarea rows={2} className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    onChange={(e) => setFormData({...formData, address: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Limit Kredit (Rp)</label>
+                  <input type="number" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    placeholder="0" onChange={(e) => setFormData({...formData, creditLimit: Number(e.target.value)})} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Catatan Internal</label>
+                  <input className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                    placeholder="Misal: Pelanggan setia / pembayaran lancar" onChange={(e) => setFormData({...formData, notes: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="pt-6 flex gap-4">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all">Cancel</button>
+                <button type="submit" className="flex-1 py-5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-green-100 hover:bg-green-700 transition-all">Create Customer</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatBox({ label, value, icon: Icon, color, bg }: any) {
+  return (
+    <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all">
+      <div>
+        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{label}</p>
+        <p className="text-xl font-black text-gray-800 tracking-tighter">{value}</p>
+      </div>
+      <div className={`${bg} ${color} p-4 rounded-3xl group-hover:scale-110 transition-transform shadow-inner`}>
+        <Icon size={22} />
+      </div>
     </div>
   );
 }

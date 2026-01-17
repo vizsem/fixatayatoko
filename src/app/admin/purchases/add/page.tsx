@@ -1,444 +1,343 @@
-// src/app/(admin)/purchases/add/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  serverTimestamp
+import { auth, db } from '@/lib/firebase';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  serverTimestamp, 
+  query, 
+  orderBy 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { 
+  ChevronLeft, Search, Plus, Trash2, Save, 
+  Package, Store, Truck, CreditCard, Calculator,
+  AlertCircle, Info
+} from 'lucide-react';
+import Link from 'next/link';
 
-type Supplier = {
-  id: string;
-  name: string;
-};
-
-type Warehouse = {
-  id: string;
-  name: string;
-};
-
-type Product = {
-  id: string;
-  name: string;
-  unit: string;
-  purchasePrice: number;
-};
-
-type PurchaseItem = {
-  productId: string;
-  name: string;
-  purchasePrice: number;
-  quantity: number;
-  unit: string;
-};
-
-export default function AddPurchasePage() {
+export default function AddPurchase() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [items, setItems] = useState<PurchaseItem[]>([]);
+  const [loading, setLoading] = useState(false);
   
-  const [formData, setFormData] = useState({
-    supplierId: '',
-    warehouseId: '',
-    paymentMethod: 'CASH',
-    paymentStatus: 'LUNAS' as 'LUNAS' | 'HUTANG' | 'DP',
-    shippingCost: 0,
-    notes: '',
-    dueDate: ''
-  });
+  // Data References
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [searchProduct, setSearchProduct] = useState('');
 
-  // Proteksi admin
+  // Form States
+  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('LUNAS');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [shippingCost, setShippingCost] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [cart, setCart] = useState<any[]>([]);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
-        router.push('/profil');
-        return;
-      }
-
-      await loadSupportingData();
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  const loadSupportingData = async () => {
-    try {
-      // Load suppliers
-      const suppliersSnap = await getDocs(collection(db, 'suppliers'));
-      const supplierList = suppliersSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setSuppliers(supplierList);
-
-      // Load warehouses
-      const warehousesSnap = await getDocs(collection(db, 'warehouses'));
-      const warehouseList = warehousesSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setWarehouses(warehouseList);
-
-      // Load products
-      const productsSnap = await getDocs(collection(db, 'products'));
-      const productList = productsSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name,
-        unit: doc.data().unit || 'pcs',
-        purchasePrice: doc.data().purchasePrice || 0
-      }));
-      setProducts(productList);
-    } catch (err) {
-      console.error('Gagal memuat data pendukung:', err);
-    }
-  };
-
-  const addItem = () => {
-    const newItem: PurchaseItem = {
-      productId: '',
-      name: '',
-      purchasePrice: 0,
-      quantity: 1,
-      unit: 'pcs'
+    const fetchData = async () => {
+      const [supSnap, warSnap, prodSnap] = await Promise.all([
+        getDocs(collection(db, 'suppliers')),
+        getDocs(collection(db, 'warehouses')),
+        getDocs(query(collection(db, 'products'), orderBy('name', 'asc')))
+      ]);
+      setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
-    setItems([...items, newItem]);
-  };
+    fetchData();
+  }, []);
 
-  const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Jika productId berubah, update detail produk
-    if (field === 'productId' && value) {
-      const product = products.find(p => p.id === value);
-      if (product) {
-        newItems[index] = {
-          ...newItems[index],
-          name: product.name,
-          purchasePrice: product.purchasePrice,
-          unit: product.unit
-        };
-      }
+  const addToCart = (product: any) => {
+    const existing = cart.find(item => item.id === product.id);
+    if (existing) {
+      setCart(cart.map(item => 
+        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      ));
+    } else {
+      setCart([...cart, {
+        id: product.id,
+        name: product.name,
+        purchasePrice: product.purchasePrice || 0,
+        quantity: 1,
+        unit: product.unit || 'Pcs'
+      }]);
     }
-    
-    setItems(newItems);
+    setSearchProduct('');
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));
+
+  const updateCartItem = (id: string, field: string, value: any) => {
+    setCart(cart.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
-  const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + (item.purchasePrice * item.quantity), 0);
-  };
-
-  const calculateTotal = () => {
-    return calculateSubtotal() + formData.shippingCost;
-  };
+  const subtotal = cart.reduce((acc, item) => acc + (item.purchasePrice * item.quantity), 0);
+  const total = subtotal + shippingCost;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (items.length === 0) {
-      alert('Tambahkan minimal 1 produk!');
+    if (cart.length === 0 || !selectedSupplier || !selectedWarehouse) {
+      alert("Mohon lengkapi data supplier, gudang, dan produk.");
       return;
     }
 
-    if (!formData.supplierId || !formData.warehouseId) {
-      alert('Pilih supplier dan gudang tujuan!');
-      return;
-    }
-
+    setLoading(true);
     try {
-      const purchaseData = {
-        ...formData,
-        supplierName: suppliers.find(s => s.id === formData.supplierId)?.name || 'Supplier',
-        warehouseName: warehouses.find(w => w.id === formData.warehouseId)?.name || 'Gudang',
-        items: items.map(item => ({
-          id: item.productId,
-          name: item.name,
-          purchasePrice: item.purchasePrice,
-          quantity: item.quantity,
-          unit: item.unit
-        })),
-        subtotal: calculateSubtotal(),
-        total: calculateTotal(),
-        status: 'MENUNGGU',
-        createdAt: serverTimestamp()
-      };
+      const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
+      const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      await addDoc(collection(db, 'purchases'), purchaseData);
-      alert('Pembelian berhasil ditambahkan!');
+      await addDoc(collection(db, 'purchases'), {
+        supplierId: selectedSupplier,
+        supplierName,
+        warehouseId: selectedWarehouse,
+        warehouseName,
+        items: cart,
+        subtotal,
+        shippingCost,
+        total,
+        paymentStatus,
+        paymentMethod,
+        notes,
+        status: 'MENUNGGU', // Default status awal
+        createdAt: serverTimestamp(),
+      });
+
       router.push('/admin/purchases');
     } catch (err) {
-      console.error('Gagal menambahkan pembelian:', err);
-      alert('Gagal menambahkan pembelian. Silakan coba lagi.');
+      console.error(err);
+      alert("Gagal menyimpan transaksi.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-black">Memuat form pembelian...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredSearch = products.filter(p => 
+    p.name.toLowerCase().includes(searchProduct.toLowerCase()) || 
+    p.sku?.toLowerCase().includes(searchProduct.toLowerCase())
+  ).slice(0, 5);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-black">Tambah Pembelian Baru</h1>
-        <p className="text-black">Buat pembelian dari supplier & kelola stok masuk</p>
+    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+      
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-10">
+        <Link href="/admin/purchases" className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+          <ChevronLeft size={20} />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">New Purchase Order</h1>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">Input stok masuk dari supplier</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Informasi Supplier & Gudang */}
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Supplier *
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* LEFT: FORM INPUT */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* 1. Supplier & Warehouse */}
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                <Store size={14} /> Pilih Supplier
               </label>
-              <select
+              <select 
                 required
-                value={formData.supplierId}
-                onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
+                className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
               >
-                <option value="">Pilih supplier...</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
+                <option value="">Cari Supplier...</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Gudang Tujuan *
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                <Truck size={14} /> Gudang Tujuan
               </label>
-              <select
+              <select 
                 required
-                value={formData.warehouseId}
-                onChange={(e) => setFormData({...formData, warehouseId: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
+                className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                value={selectedWarehouse}
+                onChange={(e) => setSelectedWarehouse(e.target.value)}
               >
-                <option value="">Pilih gudang...</option>
-                {warehouses.map(warehouse => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </option>
-                ))}
+                <option value="">Pilih Gudang...</option>
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Metode Pembayaran *
-              </label>
-              <select
-                required
-                value={formData.paymentMethod}
-                onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-              >
-                <option value="CASH">Tunai</option>
-                <option value="TRANSFER">Transfer Bank</option>
-                <option value="QRIS">QRIS</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Status Pembayaran *
-              </label>
-              <select
-                required
-                value={formData.paymentStatus}
-                onChange={(e) => setFormData({...formData, paymentStatus: e.target.value as any})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-              >
-                <option value="LUNAS">Lunas</option>
-                <option value="HUTANG">Hutang</option>
-                <option value="DP">DP</option>
-              </select>
-            </div>
-
-            {formData.paymentStatus === 'HUTANG' && (
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Tanggal Jatuh Tempo
-                </label>
-                <input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Biaya Pengiriman (Rp)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.shippingCost}
-                onChange={(e) => setFormData({...formData, shippingCost: Number(e.target.value)})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Catatan
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-                rows={3}
-              />
             </div>
           </div>
 
-          {/* Detail Produk */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-black">Detail Produk</h2>
-              <button
-                type="button"
-                onClick={addItem}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-              >
-                + Tambah Produk
-              </button>
+          {/* 2. Product Search & Table */}
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-gray-50">
+               <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text"
+                  className="w-full bg-gray-50 pl-12 pr-6 py-5 rounded-2xl text-xs font-bold outline-none"
+                  placeholder="Ketik Nama Produk atau Scan Barcode..."
+                  value={searchProduct}
+                  onChange={(e) => setSearchProduct(e.target.value)}
+                />
+                {/* Search Results Dropdown */}
+                {searchProduct && (
+                  <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                    {filteredSearch.map(p => (
+                      <button 
+                        key={p.id} 
+                        type="button"
+                        onClick={() => addToCart(p)}
+                        className="w-full p-4 text-left hover:bg-gray-50 flex justify-between items-center group"
+                      >
+                        <div>
+                          <p className="text-xs font-black uppercase text-gray-800">{p.name}</p>
+                          <p className="text-[9px] font-bold text-gray-400">STOK SAAT INI: {p.stock} {p.unit}</p>
+                        </div>
+                        <Plus size={16} className="text-gray-300 group-hover:text-black" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {items.length === 0 ? (
-              <div className="text-center py-8 text-black">
-                Belum ada produk ditambahkan
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {items.map((item, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-600 mb-1">Produk</label>
-                        <select
-                          value={item.productId}
-                          onChange={(e) => updateItem(index, 'productId', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-black text-sm"
-                          required
-                        >
-                          <option value="">Pilih produk...</option>
-                          {products.map(product => (
-                            <option key={product.id} value={product.id}>
-                              {product.name} ({product.unit})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Harga Beli</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.purchasePrice}
-                          onChange={(e) => updateItem(index, 'purchasePrice', Number(e.target.value))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-black text-sm"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Qty</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-black text-sm"
-                          required
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Hapus
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50">
+                <tr>
+                  <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
+                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga Beli</th>
+                  <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {cart.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-8 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
+                        <button type="button" onClick={() => removeFromCart(item.id)} className="text-[9px] text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline">
+                          <Trash2 size={10} /> Hapus
                         </button>
                       </div>
-                    </div>
-                    {item.productId && (
-                      <div className="mt-2 text-xs text-black">
-                        Subtotal: Rp{(item.purchasePrice * item.quantity).toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center">
+                        <input 
+                          type="number" 
+                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none" 
+                          value={item.quantity}
+                          onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
+                        />
                       </div>
-                    )}
-                  </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <input 
+                        type="number" 
+                        className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none" 
+                        value={item.purchasePrice}
+                        onChange={(e) => updateCartItem(item.id, 'purchasePrice', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-8 py-4 text-right text-xs font-black text-gray-800">
+                      Rp {(item.quantity * item.purchasePrice).toLocaleString()}
+                    </td>
+                  </tr>
                 ))}
+              </tbody>
+            </table>
+            
+            {cart.length === 0 && (
+              <div className="p-20 text-center flex flex-col items-center gap-2">
+                <Package size={40} className="text-gray-100" />
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Keranjang Kosong</p>
               </div>
             )}
-
-            {/* Ringkasan */}
-            <div className="border-t pt-4">
-              <div className="flex justify-between mb-2">
-                <span className="text-black">Subtotal:</span>
-                <span className="font-medium text-black">Rp{calculateSubtotal().toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-black">Ongkir:</span>
-                <span className="font-medium text-black">Rp{formData.shippingCost.toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg text-black">
-                <span>Total:</span>
-                <span>Rp{calculateTotal().toLocaleString('id-ID')}</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="mt-8 flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/admin/purchases')}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-black hover:bg-gray-50"
-          >
-            Batal
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Simpan Pembelian
-          </button>
+        {/* RIGHT: SUMMARY & ACTIONS */}
+        <div className="space-y-6">
+          <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl space-y-6">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+              <Calculator size={14} /> Order Summary
+            </h3>
+            
+            <div className="space-y-4 border-b border-white/10 pb-6">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="opacity-60">SUBTOTAL</span>
+                <span>Rp {subtotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="opacity-60">SHIPPING</span>
+                <input 
+                  type="number" 
+                  className="bg-white/10 w-24 p-2 rounded-lg text-right outline-none focus:bg-white/20 transition-all"
+                  value={shippingCost}
+                  onChange={(e) => setShippingCost(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-end">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Grand Total</span>
+              <span className="text-2xl font-black text-green-400 italic">Rp {total.toLocaleString()}</span>
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setPaymentStatus('LUNAS')}
+                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                >
+                  Paid
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setPaymentStatus('HUTANG')}
+                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                >
+                  Debt
+                </button>
+              </div>
+
+              <select 
+                className="w-full bg-white/5 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <option value="CASH">CASH / TUNAI</option>
+                <option value="TRANSFER">BANK TRANSFER</option>
+                <option value="GIRO">GIRO / CEK</option>
+              </select>
+            </div>
+
+            <button 
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              <Save size={18} /> {loading ? 'Saving Order...' : 'Post Purchase Order'}
+            </button>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+              <Info size={14} /> Additional Notes
+            </h3>
+            <textarea 
+              className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none h-32 resize-none"
+              placeholder="Tambahkan instruksi pengiriman atau catatan nota..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
         </div>
+
       </form>
     </div>
   );
