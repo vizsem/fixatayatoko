@@ -7,15 +7,15 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   GoogleAuthProvider,
-  signInWithRedirect, // Diganti dari Popup untuk stabilitas COOP
-  getRedirectResult,  // Untuk menangkap hasil login setelah redirect
+  signInWithRedirect, 
+  getRedirectResult,  
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail
 } from 'firebase/auth';
 
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { Store, Phone, Eye, EyeOff, Mail, Chrome, Loader2 } from 'lucide-react';
+import { Store, Phone, Eye, EyeOff, Chrome, Loader2, ArrowLeft, SendHorizontal } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -38,22 +38,18 @@ export default function LoginProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Menangani Hasil Redirect Google (PENTING untuk Vercel)
+  // 1. Menangani Hasil Redirect Google (Wajib untuk Vercel/Produksi)
   useEffect(() => {
     const checkRedirect = async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (result) {
+        if (result?.user) {
           setLoading(true);
           await initializeUserProfile(result.user);
         }
       } catch (err: any) {
-        console.error("Error Redirect:", err);
-        if (err.code === 'auth/account-exists-with-different-credential') {
-          setError('Email sudah terdaftar dengan metode login lain.');
-        } else {
-          setError('Gagal login dengan Google. Pastikan domain sudah diizinkan.');
-        }
+        console.error("Redirect Error:", err);
+        setError('Gagal masuk via Google. Periksa Authorized Domains di Firebase.');
       } finally {
         setLoading(false);
       }
@@ -61,23 +57,55 @@ export default function LoginProfilePage() {
     checkRedirect();
   }, []);
 
-  // 2. reCAPTCHA Setup
+  // 2. reCAPTCHA Setup untuk WhatsApp/Phone OTP
   useEffect(() => {
-    let verifier: any;
-    if (view === 'phone' && typeof window !== 'undefined') {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-        });
-      }
+    if (view === 'phone' && typeof window !== 'undefined' && !window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      });
     }
-    return () => {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-    };
   }, [view]);
+
+  // 3. Fungsi Inisialisasi User & Role (Admin/User)
+  const initializeUserProfile = async (user: any, displayName?: string) => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const isFirstUser = usersSnapshot.empty;
+
+        const userData = {
+          name: displayName || user.displayName || 'Pelanggan',
+          email: user.email || '',
+          whatsapp: user.phoneNumber || '',
+          avatar: user.photoURL || '',
+          role: isFirstUser ? 'admin' : 'user',
+          createdAt: new Date().toISOString(),
+        };
+
+        await setDoc(userRef, userData);
+        
+        if (userData.role === 'admin') {
+          await setAdminSession(user);
+          router.push('/admin');
+        } else {
+          router.push('/profil');
+        }
+      } else {
+        const userData = userSnap.data();
+        if (userData?.role === 'admin') {
+          await setAdminSession(user);
+          router.push('/admin');
+        } else {
+          router.push('/profil');
+        }
+      }
+    } catch (err) {
+      setError("Gagal sinkronisasi data profil.");
+    }
+  };
 
   const setAdminSession = async (user: any) => {
     const token = await user.getIdToken();
@@ -88,53 +116,16 @@ export default function LoginProfilePage() {
     });
   };
 
-  const initializeUserProfile = async (user: any, displayName?: string) => {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
+  // ===== HANDLERS =====
 
-    if (!userSnap.exists()) {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const isFirstUser = usersSnapshot.empty;
-
-      const userData = {
-        name: displayName || user.displayName || 'Pelanggan',
-        email: user.email || '',
-        whatsapp: user.phoneNumber || '',
-        avatar: user.photoURL || '',
-        role: isFirstUser ? 'admin' : 'user',
-        createdAt: new Date().toISOString(),
-        addresses: [],
-      };
-
-      await setDoc(userRef, userData);
-      if (isFirstUser || userData.role === 'admin') {
-        await setAdminSession(user);
-        router.push('/admin');
-      } else {
-        router.push('/profil');
-      }
-    } else {
-      const userData = userSnap.data();
-      if (userData?.role === 'admin') {
-        await setAdminSession(user);
-        router.push('/admin');
-      } else {
-        router.push('/profil');
-      }
-    }
-  };
-
-  // Login Google dengan Redirect (Solusi COOP)
   const handleGoogleLogin = async () => {
     setError('');
-    setLoading(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
       await signInWithRedirect(auth, provider);
     } catch (err) {
-      setError('Gagal memulai login Google');
-      setLoading(false);
+      setError('Browser memblokir login Google.');
     }
   };
 
@@ -145,29 +136,77 @@ export default function LoginProfilePage() {
     try {
       const res = await signInWithEmailAndPassword(auth, email, password);
       await initializeUserProfile(res.user);
-    } catch (err: any) {
+    } catch {
       setError('Email atau password salah');
       setLoading(false);
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      await initializeUserProfile(res.user, name);
+    } catch {
+      setError('Email sudah digunakan atau data tidak valid');
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const formattedPhone = phoneNumber.startsWith('0') ? `+62${phoneNumber.slice(1)}` : `+62${phoneNumber}`;
+      const result = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+      setConfirmationResult(result);
+      setView('otp');
+    } catch {
+      setError('Gagal mengirim OTP. Gunakan nomor WhatsApp aktif.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await confirmationResult.confirm(otp);
+      await initializeUserProfile(res.user);
+    } catch {
+      setError('Kode OTP salah');
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
+        
+        {/* Header */}
         <div className="text-center mb-8">
           <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Store className="text-green-600" size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 tracking-tight">ATAYATOKO</h1>
-          <p className="text-gray-500 text-sm mt-1">Masuk untuk mulai belanja</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {view === 'login' && 'Masuk untuk belanja'}
+            {view === 'register' && 'Buat akun baru'}
+            {view === 'phone' && 'Masuk dengan WhatsApp'}
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 mb-6 rounded text-sm flex items-center gap-2">
-            <span>{error}</span>
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 mb-6 rounded text-sm">
+            {error}
           </div>
         )}
 
+        {/* --- VIEW: LOGIN --- */}
         {view === 'login' && (
           <div className="space-y-4">
             <button
@@ -176,7 +215,7 @@ export default function LoginProfilePage() {
               className="w-full flex items-center justify-center gap-3 border border-gray-300 py-2.5 rounded-xl hover:bg-gray-50 transition-all font-medium text-gray-700"
             >
               {loading ? <Loader2 className="animate-spin" size={20} /> : <Chrome size={20} className="text-blue-500" />}
-              Google
+              Lanjutkan dengan Google
             </button>
 
             <div className="relative flex items-center py-2">
@@ -186,51 +225,63 @@ export default function LoginProfilePage() {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
-              <input
-                type="email"
-                placeholder="Email"
-                required
-                className="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <input type="email" placeholder="Email" required className="w-full border border-gray-300 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-green-500" value={email} onChange={(e) => setEmail(e.target.value)} />
               <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Password"
-                  required
-                  className="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-3 text-gray-400"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                <input type={showPassword ? 'text' : 'password'} placeholder="Password" required className="w-full border border-gray-300 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-green-500" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <button type="button" className="absolute right-3 top-3 text-gray-400" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
-              <button 
-                disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-2"
-              >
-                {loading && <Loader2 className="animate-spin" size={20} />}
-                Masuk ke Akun
+              <button disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-green-100 flex items-center justify-center gap-2">
+                {loading && <Loader2 className="animate-spin" size={20} />} Masuk
               </button>
             </form>
 
             <div className="flex justify-between items-center pt-4 text-sm">
-              <button onClick={() => setView('register')} className="text-green-600 font-semibold hover:underline">Daftar Akun Baru</button>
-              <button onClick={() => setView('phone')} className="flex items-center gap-1 text-gray-500 hover:text-green-600 transition-colors">
-                <Phone size={14} /> WhatsApp OTP
-              </button>
+              <button onClick={() => setView('register')} className="text-green-600 font-semibold">Daftar Akun</button>
+              <button onClick={() => setView('phone')} className="flex items-center gap-1 text-gray-500"><Phone size={14} /> WhatsApp</button>
             </div>
           </div>
         )}
 
-        {/* View Register & Phone disingkat, tambahkan styling serupa di atas */}
-        
+        {/* --- VIEW: REGISTER --- */}
+        {view === 'register' && (
+          <form onSubmit={handleRegister} className="space-y-3">
+            <input placeholder="Nama Lengkap" required className="w-full border border-gray-300 p-2.5 rounded-xl" value={name} onChange={(e) => setName(e.target.value)} />
+            <input type="email" placeholder="Email" required className="w-full border border-gray-300 p-2.5 rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="password" placeholder="Password Minimal 6 Karakter" required className="w-full border border-gray-300 p-2.5 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button disabled={loading} className="w-full bg-green-600 text-white py-2.5 rounded-xl font-bold">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Buat Akun'}
+            </button>
+            <button type="button" onClick={() => setView('login')} className="w-full flex items-center justify-center gap-2 text-gray-500 text-sm mt-2">
+              <ArrowLeft size={16} /> Kembali ke Login
+            </button>
+          </form>
+        )}
+
+        {/* --- VIEW: PHONE --- */}
+        {view === 'phone' && (
+          <form onSubmit={handleSendOtp} className="space-y-4">
+            <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden px-3 focus-within:ring-2 focus-within:ring-green-500">
+              <span className="text-gray-500 font-medium">+62</span>
+              <input placeholder="8xxxxxxxxxx" required className="w-full p-2.5 outline-none" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+            </div>
+            <button disabled={loading} className="w-full bg-green-600 text-white py-2.5 rounded-xl font-bold flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="animate-spin" size={20} /> : <><SendHorizontal size={18} /> Kirim Kode OTP</>}
+            </button>
+            <button type="button" onClick={() => setView('login')} className="w-full text-gray-500 text-sm">Kembali</button>
+          </form>
+        )}
+
+        {/* --- VIEW: OTP --- */}
+        {view === 'otp' && (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <p className="text-center text-sm text-gray-500">Masukkan kode OTP yang dikirim ke WhatsApp Anda</p>
+            <input placeholder="6 Digit Kode" required className="w-full border border-gray-300 p-2.5 rounded-xl text-center text-xl tracking-widest" value={otp} onChange={(e) => setOtp(e.target.value)} />
+            <button disabled={loading} className="w-full bg-green-600 text-white py-2.5 rounded-xl font-bold">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Verifikasi & Masuk'}
+            </button>
+          </form>
+        )}
+
         <div id="recaptcha-container"></div>
       </div>
     </div>
