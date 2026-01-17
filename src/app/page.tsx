@@ -6,7 +6,8 @@ import Image from 'next/image';
 import { 
   Search, ShoppingCart, User, Heart, Package, 
   ShieldCheck, Printer, ArrowRight, Info, Phone,
-  Home as HomeIcon, Grid, Inbox, Sparkles, Gift, RefreshCw, Flame
+  Home as HomeIcon, Grid, Inbox, Sparkles, Gift, RefreshCw, Flame,
+  FileText
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -355,7 +356,10 @@ export default function Home() {
           </div>
           <span className="text-[8px] font-black uppercase">Keranjang</span>
         </Link>
-        <Link href="/profil/login" className="flex flex-col items-center gap-1 text-gray-400">
+        <Link href="/orders" className="flex flex-col items-center gap-1 text-gray-400">
+          <FileText size={20} /><span className="text-[8px] font-black uppercase">Pesanan</span>
+        </Link>
+        <Link href="/profil" className="flex flex-col items-center gap-1 text-gray-400">
           <User size={20} /><span className="text-[8px] font-black uppercase">Akun</span>
         </Link>
       </nav>
