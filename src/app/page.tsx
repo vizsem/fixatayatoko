@@ -327,7 +327,7 @@ export default function Home() {
           </div>
           <div className="space-y-3">
             <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Internal</h3>
-            <Link href="/profil/profil" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-orange-600 transition-colors">
+            <Link href="/profil/login" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-orange-600 transition-colors">
               <ShieldCheck size={14} /> Panel Admin
             </Link>
             <Link href="/cashier" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-blue-600 transition-colors">
@@ -355,7 +355,7 @@ export default function Home() {
           </div>
           <span className="text-[8px] font-black uppercase">Keranjang</span>
         </Link>
-        <Link href="/profil" className="flex flex-col items-center gap-1 text-gray-400">
+        <Link href="/profil/login" className="flex flex-col items-center gap-1 text-gray-400">
           <User size={20} /><span className="text-[8px] font-black uppercase">Akun</span>
         </Link>
       </nav>
