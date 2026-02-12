@@ -5,14 +5,16 @@ import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
-  doc, getDoc, updateDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove 
+  doc, updateDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove 
 } from 'firebase/firestore';
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
-  Bell, X, Info, Zap, Ticket, Snowflake, CheckCircle
+  Bell, X, Zap, Ticket, Snowflake
 } from 'lucide-react';
 import Link from 'next/link';
+
+import { User as FirebaseUser } from 'firebase/auth';
 
 // --- TYPES ---
 type Address = {
@@ -23,20 +25,36 @@ type Address = {
   address: string;
 };
 
+interface CartItem {
+  id?: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 type Order = {
   id: string;
   orderId?: string;
-  items: any[];
+  items: CartItem[];
   total: number;
   status: string;
-  createdAt: any;
+  createdAt: { toDate: () => Date } | null;
   pointsUsed?: number;
 };
 
+interface UserProfile {
+  name: string;
+  email: string;
+  role: string;
+  addresses: Address[];
+  points?: number;
+  isPointsFrozen?: boolean;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<string>('customer');
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -84,7 +102,7 @@ export default function ProfilePage() {
       // Real-time Listener Data User
       const unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (doc) => {
         if (doc.exists()) {
-          const userData = doc.data();
+          const userData = doc.data() as UserProfile;
           setProfile(userData);
           setNewName(userData.name || '');
           setUserRole(userData.role || 'customer');
@@ -138,7 +156,7 @@ export default function ProfilePage() {
     try {
       await updateDoc(doc(db, 'users', user.uid), { name: newName.trim() });
       setIsEditingName(false);
-    } catch (err) {
+    } catch {
       alert("Gagal memperbarui nama");
     } finally {
       setIsSaving(false);
@@ -167,7 +185,7 @@ export default function ProfilePage() {
       setNewLabel('');
       setNewReceiverName('');
       setNewReceiverPhone('');
-    } catch (err) {
+    } catch {
       alert("Gagal menambah alamat");
     } finally {
       setIsSaving(false);
@@ -183,7 +201,7 @@ export default function ProfilePage() {
       await updateDoc(doc(db, 'users', user.uid), {
         addresses: arrayRemove(addrToDelete)
       });
-    } catch (err) {
+    } catch {
       alert("Gagal menghapus alamat");
     }
   };

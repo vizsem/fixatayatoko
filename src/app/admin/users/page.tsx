@@ -1,7 +1,8 @@
 // src/app/(admin)/users/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -12,20 +13,20 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
-  query,
-  where
+  query
 } from 'firebase/firestore';
+
 import { db } from '@/lib/firebase';
-import { 
-  Users, 
+import {
+  Users,
   Shield,
-  Mail,
   Phone,
   UserCheck,
   UserX,
   User,
   AlertTriangle
 } from 'lucide-react';
+
 
 type UserDoc = {
   id: string;
@@ -42,6 +43,32 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'users'));
+      const querySnapshot = await getDocs(q);
+      const userList: UserDoc[] = [];
+
+      querySnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        userList.push({
+          id: doc.id,
+          email: data.email || '',
+          name: data.name || '–',
+          phone: data.phone,
+          role: data.role || 'user',
+          createdAt: data.createdAt || ''
+        });
+      });
+
+      setUsers(userList);
+      setError(null);
+    } catch (err) {
+      console.error('Gagal memuat pengguna:', err);
+      setError('Gagal memuat daftar pengguna.');
+    }
+  }, []);
 
   // Proteksi: hanya admin yang bisa akses
   useEffect(() => {
@@ -63,40 +90,15 @@ export default function AdminUsers() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, fetchUsers]);
 
-  const fetchUsers = async () => {
-    try {
-      const q = query(collection(db, 'users'));
-      const querySnapshot = await getDocs(q);
-      const userList: UserDoc[] = [];
-      
-      querySnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        userList.push({
-          id: doc.id,
-          email: data.email || '',
-          name: data.name || '–',
-          phone: data.phone,
-          role: data.role || 'user',
-          createdAt: data.createdAt || ''
-        });
-      });
-      
-      setUsers(userList);
-      setError(null);
-    } catch (err) {
-      console.error('Gagal memuat pengguna:', err);
-      setError('Gagal memuat daftar pengguna.');
-    }
-  };
 
   const handleUpdateRole = async (userId: string, newRole: 'admin' | 'cashier' | 'user') => {
     if (userId === currentUser) {
       alert('Anda tidak bisa mengubah role diri sendiri.');
       return;
     }
-    
+
     if (newRole === 'admin' && !confirm('Yakin memberikan akses admin?')) {
       return;
     }
@@ -115,7 +117,7 @@ export default function AdminUsers() {
       alert('Anda tidak bisa menghapus akun sendiri.');
       return;
     }
-    
+
     if (!confirm(`Hapus pengguna "${userName}"? Tindakan ini tidak bisa dikembalikan.`)) {
       return;
     }
@@ -123,7 +125,7 @@ export default function AdminUsers() {
     try {
       // Hapus dari Firestore
       await deleteDoc(doc(db, 'users', userId));
-      
+
       // Catatan: Firebase Auth tidak dihapus otomatis — opsional jika perlu
       setUsers(users.filter(u => u.id !== userId));
     } catch (err) {
@@ -273,17 +275,17 @@ export default function AdminUsers() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
                       {user.id !== currentUser && (
                         <div className="flex items-center gap-2">
-                          {/* Ubah Role */}
                           <select
                             value={user.role}
-                            onChange={(e) => handleUpdateRole(user.id, e.target.value as any)}
+                            onChange={(e) => handleUpdateRole(user.id, e.target.value as UserDoc['role'])}
                             className="text-sm border border-gray-300 rounded px-2 py-1"
                           >
+
                             <option value="admin">Admin</option>
                             <option value="cashier">Kasir</option>
                             <option value="user">Pelanggan</option>
                           </select>
-                          
+
                           {/* Hapus */}
                           <button
                             onClick={() => handleDeleteUser(user.id, user.name)}

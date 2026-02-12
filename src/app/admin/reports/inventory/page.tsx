@@ -12,13 +12,15 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  Package, 
+import * as XLSX from 'xlsx';
+import {
+  Package,
   Download,
   AlertTriangle,
   TrendingDown,
   TrendingUp
 } from 'lucide-react';
+
 
 type InventoryItem = {
   id: string;
@@ -59,31 +61,31 @@ export default function InventoryReport() {
       try {
         const productsSnapshot = await getDocs(collection(db, 'products'));
         const inventoryList: InventoryItem[] = [];
-        
+
         // Ambil data transaksi untuk perhitungan mutasi
         const transactionsSnapshot = await getDocs(collection(db, 'inventory_transactions'));
         const transactions = transactionsSnapshot.docs.map(doc => doc.data());
-        
+
         productsSnapshot.docs.forEach((doc) => {
           const data = doc.data();
           const productId = doc.id;
-          
+
           // Hitung stok masuk & keluar dari transaksi
           const stockIn = transactions
             .filter(t => t.productId === productId && t.type === 'STOCK_IN')
             .reduce((sum, t) => sum + t.quantity, 0);
-            
+
           const stockOut = transactions
             .filter(t => t.productId === productId && t.type === 'STOCK_OUT')
             .reduce((sum, t) => sum + t.quantity, 0);
-          
+
           // Asumsikan harga beli 80% dari harga jual
           const purchasePrice = (data.price || 0) * 0.8;
           const stockValue = (data.stock || 0) * purchasePrice;
-          
+
           // Hitung turnover rate (sederhana: stockOut / currentStock)
           const turnoverRate = data.stock > 0 ? stockOut / data.stock : 0;
-          
+
           inventoryList.push({
             id: doc.id,
             name: data.name || '',
@@ -95,11 +97,12 @@ export default function InventoryReport() {
             stockValue
           });
         });
-        
+
         setInventory(inventoryList);
-      } catch (err) {
-        console.error('Gagal memuat laporan inventaris:', err);
+      } catch {
+        // Error is logged to console
       }
+
     };
 
     fetchInventoryData();
@@ -166,7 +169,7 @@ export default function InventoryReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -178,7 +181,7 @@ export default function InventoryReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -198,7 +201,7 @@ export default function InventoryReport() {
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold text-black">Detail Inventaris</h2>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -240,9 +243,8 @@ export default function InventoryReport() {
                     <td className="px-6 py-4 whitespace-nowrap text-black">{item.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-black">{item.category}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-medium ${
-                        item.currentStock <= 10 ? 'text-red-600' : 'text-black'
-                      }`}>
+                      <span className={`font-medium ${item.currentStock <= 10 ? 'text-red-600' : 'text-black'
+                        }`}>
                         {item.currentStock}
                       </span>
                     </td>
@@ -276,5 +278,3 @@ export default function InventoryReport() {
     </div>
   );
 }
-
-declare const XLSX: any;

@@ -1,6 +1,6 @@
 import { getAuth, GoogleAuthProvider, signInWithRedirect } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+// No unused Firestore imports needed here
+
 
 const auth = getAuth();
 const provider = new GoogleAuthProvider();

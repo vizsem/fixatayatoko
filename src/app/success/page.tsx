@@ -7,12 +7,15 @@ import Link from 'next/link';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import * as htmlToImage from 'html-to-image';
+import { Order, OrderItem } from '@/lib/types';
+
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('id');
   const [loading, setLoading] = useState(true);
-  const [orderData, setOrderData] = useState<any>(null);
+  const [orderData, setOrderData] = useState<Order | null>(null);
+
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
@@ -27,15 +30,15 @@ function SuccessContent() {
         // PERBAIKAN: Menggunakan Query where('orderId') 
         // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
         const q = query(
-          collection(db, 'orders'), 
+          collection(db, 'orders'),
           where('orderId', '==', orderId),
           limit(1)
         );
-        
+
         const querySnapshot = await getDocs(q);
-        
+
         if (!querySnapshot.empty) {
-          setOrderData(querySnapshot.docs[0].data());
+          setOrderData({ id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Order);
         } else {
           console.warn("Pesanan tidak ditemukan di database.");
         }
@@ -51,16 +54,17 @@ function SuccessContent() {
   // Logic mapping data agar fleksibel
   const displayTotal = orderData?.total || 0;
   const displayItems = orderData?.items || [];
-  const displayMethod = orderData?.delivery?.method || orderData?.deliveryMethod || 'Ambil di Toko';
-  const displayPayment = orderData?.payment?.method || orderData?.paymentMethod || 'CASH';
+  const displayMethod = orderData?.delivery?.method || 'Ambil di Toko';
+  const displayPayment = orderData?.payment?.method || 'CASH';
   const displayCustomer = orderData?.name || orderData?.customerName || 'Pelanggan';
+
 
   const printThermal = () => {
     if (!orderData) return;
     const w = window.open('', '_blank');
     if (!w) return;
 
-    const itemsHtml = displayItems.map((item: any) => `
+    const itemsHtml = displayItems.map((item: OrderItem) => `
       <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
         <span style="text-transform: uppercase; flex: 1;">${item.name || 'Produk'}</span>
         <span style="width: 40px; text-align: center;">${item.quantity || 0}x</span>
@@ -161,7 +165,7 @@ function SuccessContent() {
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Pesanan Diterima!</h1>
           <p className="text-gray-600 mb-6 text-sm md:text-base">
-            Terima kasih, <span className="font-semibold text-gray-900">{displayCustomer}</span>. 
+            Terima kasih, <span className="font-semibold text-gray-900">{displayCustomer}</span>.
             Pesanan Anda sedang diproses.
           </p>
 
@@ -178,7 +182,7 @@ function SuccessContent() {
           <div className="text-left mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
             <h3 className="font-black text-gray-400 text-[10px] uppercase tracking-widest border-b pb-2 mb-3">Rincian Pesanan</h3>
             <div className="space-y-3">
-              {displayItems.map((item: any, idx: number) => (
+              {displayItems.map((item: OrderItem, idx: number) => (
                 <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-50 pb-2">
                   <div className="pr-4">
                     <p className="font-bold text-gray-800 uppercase text-[11px] leading-tight">{item.name}</p>
@@ -208,7 +212,7 @@ function SuccessContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <button 
+            <button
               onClick={saveInvoiceAsImage}
               disabled={isDownloading}
               className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg active:scale-95 disabled:bg-gray-400"
@@ -226,9 +230,9 @@ function SuccessContent() {
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100">
-             <a href="https://wa.me/6285853161174" target="_blank" className="inline-flex items-center gap-2 text-green-600 font-bold hover:underline text-sm">
-               <MessageCircle size={18} /> Hubungi Admin Ataya
-             </a>
+            <a href="https://wa.me/6285853161174" target="_blank" className="inline-flex items-center gap-2 text-green-600 font-bold hover:underline text-sm">
+              <MessageCircle size={18} /> Hubungi Admin Ataya
+            </a>
           </div>
         </div>
       </div>
@@ -255,7 +259,7 @@ function SuccessContent() {
               </tr>
             </thead>
             <tbody>
-              {displayItems.map((item: any, idx: number) => (
+              {displayItems.map((item: OrderItem, idx: number) => (
                 <tr key={idx} className="border-b border-gray-100">
                   <td className="py-2 text-[12px] uppercase">{item.name}</td>
                   <td className="text-center">{item.quantity}</td>

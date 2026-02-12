@@ -14,14 +14,15 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  CreditCard, 
+import * as XLSX from 'xlsx';
+import {
+  CreditCard,
   Download,
   TrendingUp,
   TrendingDown,
-  Calendar,
   Package
 } from 'lucide-react';
+
 
 type FinancialRecord = {
   id: string;
@@ -68,7 +69,7 @@ export default function FinanceReport() {
         const startDate = new Date(dateRange.startDate);
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
-        
+
         // Ambil data penjualan
         const salesSnapshot = await getDocs(
           query(
@@ -78,33 +79,33 @@ export default function FinanceReport() {
             where('status', '==', 'SELESAI')
           )
         );
-        
+
         // Ambil data produk untuk harga beli
         const productsSnapshot = await getDocs(collection(db, 'products'));
         const productsMap = new Map();
         productsSnapshot.docs.forEach(doc => {
           productsMap.set(doc.id, doc.data());
         });
-        
+
         const financeRecords: FinancialRecord[] = [];
-        
+
         // Proses penjualan dengan perhitungan profit
         for (const orderDoc of salesSnapshot.docs) {
           const order = orderDoc.data();
           let totalCost = 0;
           let totalProfit = 0;
-          
+
           // Hitung biaya & profit berdasarkan harga beli
           for (const item of order.items || []) {
             const product = productsMap.get(item.id) || productsMap.get(item.productId);
             const purchasePrice = product?.purchasePrice || (item.price * 0.8); // fallback 80%
             const itemCost = purchasePrice * item.quantity;
             const itemProfit = (item.price * item.quantity) - itemCost;
-            
+
             totalCost += itemCost;
             totalProfit += itemProfit;
           }
-          
+
           financeRecords.push({
             id: orderDoc.id,
             date: order.createdAt,
@@ -117,7 +118,7 @@ export default function FinanceReport() {
             paymentMethod: order.paymentMethod
           });
         }
-        
+
         // Ambil data pembelian (pengeluaran)
         const purchasesSnapshot = await getDocs(
           query(
@@ -126,7 +127,7 @@ export default function FinanceReport() {
             where('createdAt', '<=', endDate.toISOString())
           )
         );
-        
+
         purchasesSnapshot.docs.forEach(doc => {
           const data = doc.data();
           financeRecords.push({
@@ -139,13 +140,14 @@ export default function FinanceReport() {
             paymentMethod: data.paymentMethod
           });
         });
-        
+
         // Urutkan berdasarkan tanggal (terbaru dulu)
         financeRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setRecords(financeRecords);
-      } catch (err) {
-        console.error('Gagal memuat laporan keuangan:', err);
+      } catch {
+        // Error is logged to console
       }
+
     };
 
     fetchFinanceData();
@@ -184,19 +186,19 @@ export default function FinanceReport() {
   const totalIncome = records
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + r.amount, 0);
-    
+
   const totalCost = records
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + (r.cost || 0), 0);
-    
+
   const totalProfit = records
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + (r.profit || 0), 0);
-    
+
   const totalExpense = records
     .filter(r => r.type === 'expense')
     .reduce((sum, r) => sum + r.amount, 0);
-    
+
   const netProfit = totalProfit - totalExpense;
 
   return (
@@ -213,7 +215,7 @@ export default function FinanceReport() {
             <input
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -222,7 +224,7 @@ export default function FinanceReport() {
             <input
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -253,7 +255,7 @@ export default function FinanceReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -267,25 +269,23 @@ export default function FinanceReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-black">Laba Kotor</p>
-              <p className={`text-2xl font-bold mt-1 ${
-                totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'
-              }`}>
+              <p className={`text-2xl font-bold mt-1 ${totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'
+                }`}>
                 Rp{totalProfit.toLocaleString('id-ID')}
               </p>
             </div>
-            <div className={`p-3 rounded-full ${
-              totalProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'
-            }`}>
+            <div className={`p-3 rounded-full ${totalProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'
+              }`}>
               <Package className="text-blue-600" size={24} />
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -299,20 +299,18 @@ export default function FinanceReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-black">Laba Bersih</p>
-              <p className={`text-2xl font-bold mt-1 ${
-                netProfit >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <p className={`text-2xl font-bold mt-1 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
                 Rp{netProfit.toLocaleString('id-ID')}
               </p>
             </div>
-            <div className={`p-3 rounded-full ${
-              netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'
-            }`}>
+            <div className={`p-3 rounded-full ${netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'
+              }`}>
               {netProfit >= 0 ? (
                 <TrendingUp className="text-green-600" size={24} />
               ) : (
@@ -327,7 +325,7 @@ export default function FinanceReport() {
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold text-black">Detail Transaksi</h2>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -378,9 +376,8 @@ export default function FinanceReport() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {record.profit ? (
-                        <span className={`font-medium ${
-                          record.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <span className={`font-medium ${record.profit >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
                           Rp{record.profit.toLocaleString('id-ID')}
                         </span>
                       ) : '–'}
@@ -414,5 +411,3 @@ export default function FinanceReport() {
     </div>
   );
 }
-
-declare const XLSX: any;

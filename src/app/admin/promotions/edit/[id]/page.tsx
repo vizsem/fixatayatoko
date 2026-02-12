@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  ArrowLeft, Save, Trash2, Calendar, 
+import {
+  ArrowLeft, Save, Trash2, Calendar,
   Tag, Percent, Database, CheckCircle2 // 'percent' diubah menjadi 'Percent'
 } from 'lucide-react';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ export default function EditPromotion() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
-  
+
   const [formData, setFormData] = useState<Promotion>({
     name: '',
     type: 'product',
@@ -59,7 +59,7 @@ export default function EditPromotion() {
         const productsSnapshot = await getDocs(collection(db, 'products'));
         const cats = new Set(productsSnapshot.docs.map(doc => doc.data().category));
         setCategories(Array.from(cats) as string[]);
-        
+
       } catch (error) {
         console.error("Error loading data:", error);
         toast.error("Gagal memuat data");
@@ -82,11 +82,12 @@ export default function EditPromotion() {
       });
       toast.success("Promosi berhasil diperbarui!");
       setTimeout(() => router.push('/admin/promotions'), 1500);
-    } catch (error) {
+    } catch {
       toast.error("Gagal menyimpan perubahan");
     } finally {
       setSaving(false);
     }
+
   };
 
   if (loading) return (
@@ -98,7 +99,7 @@ export default function EditPromotion() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Toaster position="top-right" />
-      
+
       {/* Header Admin */}
       <div className="bg-white border-b sticky top-0 z-10 px-4 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
@@ -108,7 +109,7 @@ export default function EditPromotion() {
             </Link>
             <h1 className="text-lg font-black text-gray-800 uppercase tracking-tight">Edit Program Promo</h1>
           </div>
-          <button 
+          <button
             onClick={handleSubmit}
             disabled={saving}
             className="flex items-center gap-2 bg-orange-600 text-white px-5 py-2 rounded-xl text-xs font-bold uppercase shadow-lg shadow-orange-100 active:scale-95 disabled:opacity-50 transition-all"
@@ -120,21 +121,21 @@ export default function EditPromotion() {
 
       <div className="max-w-3xl mx-auto px-4 mt-6">
         <form onSubmit={handleSubmit} className="space-y-4">
-          
+
           {/* Section: Info Dasar */}
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
             <div className="flex items-center gap-2 text-orange-600 mb-2">
               <Tag size={18} />
               <h2 className="text-sm font-black uppercase">Informasi Utama</h2>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Nama Promo (Contoh: Promo Ramadhan)</label>
-              <input 
+              <input
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
                 placeholder="Masukkan nama promo..."
               />
@@ -143,10 +144,11 @@ export default function EditPromotion() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Tipe Promo</label>
-                <select 
+                <select
                   value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value as any})}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'product' | 'category' | 'coupon' })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none appearance-none"
+
                 >
                   <option value="product">Per Produk</option>
                   <option value="category">Per Kategori</option>
@@ -157,7 +159,7 @@ export default function EditPromotion() {
                 <div className="flex items-center h-[44px]">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, isActive: !formData.isActive})}
+                    onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${formData.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
                   >
                     <CheckCircle2 size={14} /> {formData.isActive ? 'Aktif' : 'Non-Aktif'}
@@ -177,10 +179,11 @@ export default function EditPromotion() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Jenis Potongan</label>
-                <select 
+                <select
                   value={formData.discountType}
-                  onChange={(e) => setFormData({...formData, discountType: e.target.value as any})}
+                  onChange={(e) => setFormData({ ...formData, discountType: e.target.value as 'percentage' | 'fixed' })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm outline-none"
+
                 >
                   <option value="percentage">Persentase (%)</option>
                   <option value="fixed">Nominal Tetap (Rp)</option>
@@ -188,11 +191,11 @@ export default function EditPromotion() {
               </div>
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Nilai Potongan</label>
-                <input 
+                <input
                   type="number"
                   required
                   value={formData.discountValue}
-                  onChange={(e) => setFormData({...formData, discountValue: Number(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm font-bold text-orange-600 outline-none"
                 />
               </div>
@@ -202,18 +205,18 @@ export default function EditPromotion() {
             {formData.type === 'category' ? (
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Pilih Kategori Target</label>
-                <select 
+                <select
                   value={formData.targetName}
-                  onChange={(e) => setFormData({...formData, targetName: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, targetName: e.target.value })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm outline-none"
                 >
                   <option value="">-- Pilih Kategori --</option>
                   {categories.map((cat, index) => (
-  // Gunakan gabungan nama dan index agar benar-benar unik
-  <option key={`${cat}-${index}`} value={cat}>
-    {cat}
-  </option>
-))}
+                    // Gunakan gabungan nama dan index agar benar-benar unik
+                    <option key={`${cat}-${index}`} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
             ) : (
@@ -233,25 +236,25 @@ export default function EditPromotion() {
               <Calendar size={18} />
               <h2 className="text-sm font-black uppercase">Periode Promo</h2>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Tanggal Mulai</label>
-                <input 
+                <input
                   type="date"
                   required
                   value={formData.startDate}
-                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm outline-none"
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 ml-1">Tanggal Berakhir</label>
-                <input 
+                <input
                   type="date"
                   required
                   value={formData.endDate}
-                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                   className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-sm outline-none"
                 />
               </div>

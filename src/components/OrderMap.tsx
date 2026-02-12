@@ -3,16 +3,17 @@
 import { useEffect, useRef } from 'react';
 import { MapPin } from 'lucide-react';
 
-export default function OrderMap({ 
-  lat, 
-  lng, 
-  address 
-}: { 
-  lat: number; 
-  lng: number; 
-  address: string; 
+export default function OrderMap({
+  lat,
+  lng,
+  address
+}: {
+  lat: number;
+  lng: number;
+  address: string;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const googleMapRef = useRef<any>(null); // Menyimpan instance peta agar bisa di-update
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function OrderMap({
 
     // Fungsi Inisialisasi Peta
     const initMap = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!mapRef.current || !(window as any).google?.maps) return;
 
       const position = { lat: Number(lat), lng: Number(lng) };
@@ -39,6 +41,7 @@ export default function OrderMap({
       }
 
       // Buat instance peta baru
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const map = new (window as any).google.maps.Map(mapRef.current, {
         zoom: 15,
         center: position,
@@ -48,10 +51,12 @@ export default function OrderMap({
       });
 
       // Tambahkan Marker
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       new (window as any).google.maps.Marker({
         position: position,
         map: map,
         title: address,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         animation: (window as any).google.maps.Animation.DROP
       });
 
@@ -59,6 +64,7 @@ export default function OrderMap({
     };
 
     // Logika Pemuatan Script
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!(window as any).google?.maps) {
       if (!document.getElementById(scriptId)) {
         const script = document.createElement('script');
@@ -71,6 +77,7 @@ export default function OrderMap({
       } else {
         // Jika script sedang dimuat oleh komponen lain, tunggu sebentar
         const check = setInterval(() => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if ((window as any).google?.maps) {
             clearInterval(check);
             initMap();

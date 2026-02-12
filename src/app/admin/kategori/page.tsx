@@ -13,24 +13,25 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp
+  serverTimestamp,
+  Timestamp
 } from 'firebase/firestore';
-import { 
-  Grid, 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Package, 
-  ChevronRight, 
-  X, 
+
+
+
+import {
+  Grid,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Package,
+  ChevronRight,
+  X,
   Download,
-  MoreVertical,
-  Layers, Save,
-  Archive
+  Layers, Save
 } from 'lucide-react';
+
 import * as XLSX from 'xlsx';
 
 // --- TYPES ---
@@ -40,8 +41,9 @@ type Category = {
   slug: string;
   description?: string;
   productCount: number;
-  createdAt: any;
+  createdAt: Timestamp | { toDate: () => Date } | null;
 };
+
 
 export default function AdminCategories() {
   const router = useRouter();
@@ -76,22 +78,22 @@ export default function AdminCategories() {
   }, [router]);
 
   // 2. Fetch Data & Sinkronisasi Jumlah Produk
-const fetchData = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       // GANTI BARIS INI:
-      const catSnap = await getDocs(collection(db, 'categories')); 
+      const catSnap = await getDocs(collection(db, 'categories'));
       const prodSnap = await getDocs(collection(db, 'products'));
-      
+
       const products = prodSnap.docs.map(d => d.data());
-      
+
       const categoryList = catSnap.docs.map(doc => {
         const data = doc.data();
         // Gunakan toLowerCase agar sinkronisasi nama kategori lebih akurat
-        const count = products.filter(p => 
+        const count = products.filter(p =>
           p.category?.toLowerCase() === data.name?.toLowerCase()
         ).length;
-        
+
         return {
           id: doc.id,
           name: data.name || 'Tanpa Nama',
@@ -135,8 +137,9 @@ const fetchData = async () => {
       setEditId(null);
       setShowModal(false);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Gagal menyimpan kategori");
+
     } finally {
       setIsSaving(false);
     }
@@ -152,8 +155,9 @@ const fetchData = async () => {
       try {
         await deleteDoc(doc(db, 'categories', id));
         setCategories(prev => prev.filter(c => c.id !== id));
-      } catch (err) {
+      } catch {
         alert("Gagal menghapus");
+
       }
     }
   };
@@ -172,14 +176,15 @@ const fetchData = async () => {
     XLSX.writeFile(wb, "Data_Kategori_AtayaToko.xlsx");
   };
 
-  const filtered = categories.filter(c => 
+  const filtered = categories.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
       <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-green-600 mb-4"></div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading Categories...</p>
+      <p className="text-[10px] font-black tracking-widest text-gray-400">Loading categories...</p>
+
     </div>
   );
 
@@ -188,31 +193,33 @@ const fetchData = async () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3">
-            <Layers className="text-green-600" size={32} /> Inventory Categories
+          <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
+            <Layers className="text-green-600" size={32} /> Inventory categories
           </h1>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Pengelompokan Produk & Struktur Stok</p>
+          <p className="text-gray-400 text-xs font-bold tracking-widest mt-1">Pengelompokan produk & struktur stok</p>
         </div>
+
 
         <div className="flex gap-3">
           <button onClick={handleExport} className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-green-600 transition-all shadow-sm">
             <Download size={20} />
           </button>
-          <button 
-            onClick={() => { setEditId(null); setFormData({name:'', description:''}); setShowModal(true); }}
-            className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 shadow-xl"
+          <button
+            onClick={() => { setEditId(null); setFormData({ name: '', description: '' }); setShowModal(true); }}
+            className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-gray-800 shadow-xl"
           >
-            <Plus size={18} /> Add Category
+            <Plus size={18} /> Tambah kategori
           </button>
+
         </div>
       </div>
 
       {/* Filter & Search */}
       <div className="relative mb-8">
         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input 
-          type="text" 
-          placeholder="Cari kategori produk..." 
+        <input
+          type="text"
+          placeholder="Cari kategori produk..."
           className="w-full pl-14 pr-6 py-5 bg-white border border-gray-100 rounded-[2rem] text-xs font-bold shadow-sm outline-none focus:ring-2 focus:ring-green-500 transition-all"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -228,13 +235,13 @@ const fetchData = async () => {
                 <Grid size={24} />
               </div>
               <div className="flex gap-1">
-                <button 
-                  onClick={() => { setEditId(cat.id); setFormData({name: cat.name, description: cat.description || ''}); setShowModal(true); }}
+                <button
+                  onClick={() => { setEditId(cat.id); setFormData({ name: cat.name, description: cat.description || '' }); setShowModal(true); }}
                   className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                 >
                   <Edit size={18} />
                 </button>
-                <button 
+                <button
                   onClick={() => handleDelete(cat.id, cat.name, cat.productCount)}
                   className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                 >
@@ -244,18 +251,20 @@ const fetchData = async () => {
             </div>
 
             <div className="relative z-10">
-              <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter mb-1">{cat.name}</h3>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">slug: {cat.slug}</p>
+              <h3 className="text-xl font-black text-gray-800 tracking-tighter mb-1">{cat.name}</h3>
+              <p className="text-[10px] font-bold text-gray-400 tracking-widest mb-4">slug: {cat.slug}</p>
+
               <p className="text-xs text-gray-500 font-medium line-clamp-2 mb-6 h-8">{cat.description || 'Tidak ada deskripsi.'}</p>
-              
+
               <div className="flex items-center justify-between pt-6 border-t border-gray-50">
                 <div className="flex items-center gap-2">
                   <Package size={14} className="text-gray-400" />
-                  <span className="text-xs font-black text-gray-800">{cat.productCount} <span className="text-gray-400 font-bold uppercase text-[9px]">Items</span></span>
+                  <span className="text-xs font-black text-gray-800">{cat.productCount} <span className="text-gray-400 font-bold text-[9px]">Items</span></span>
                 </div>
-                <Link href={`/admin/produk?category=${cat.name}`} className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
-                  View Stock <ChevronRight size={14} />
+                <Link href={`/admin/produk?category=${cat.name}`} className="text-[10px] font-black text-green-600 tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
+                  Lihat stok <ChevronRight size={14} />
                 </Link>
+
               </div>
             </div>
 
@@ -274,45 +283,49 @@ const fetchData = async () => {
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 lg:p-10 relative z-10 shadow-2xl">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
-                  {editId ? 'Edit Category' : 'New Category'}
+                <h2 className="text-2xl font-black text-gray-800 tracking-tighter">
+                  {editId ? 'Edit category' : 'New category'}
                 </h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Master Data Kategori Produk</p>
+                <p className="text-[10px] font-bold text-gray-400 tracking-widest">Master data kategori produk</p>
+
               </div>
               <button onClick={() => setShowModal(false)} className="p-2 bg-gray-50 rounded-full"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Nama Kategori *</label>
-                <input 
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Nama kategori *</label>
+
+                <input
                   required
                   placeholder="Contoh: ATK, Sembako, dll"
-                  className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                  className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Deskripsi Singkat</label>
-                <textarea 
+                <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Deskripsi singkat</label>
+
+                <textarea
                   rows={3}
-                  className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
+                  className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
 
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 rounded-2xl">Cancel</button>
-                <button 
-                  type="submit" 
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-[10px] font-black tracking-widest text-gray-400 bg-gray-50 rounded-2xl">Batal</button>
+                <button
+                  type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-4 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-green-100 hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-4 bg-green-600 text-white rounded-2xl text-[10px] font-black tracking-widest shadow-xl shadow-green-100 hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                 >
-                  {isSaving ? 'Saving...' : <><Save size={16} /> Save Category</>}
+                  {isSaving ? 'Menyimpan...' : <><Save size={16} /> Simpan kategori</>}
                 </button>
               </div>
+
             </form>
           </div>
         </div>

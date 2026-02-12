@@ -13,7 +13,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { 
-  Settings, 
   Download,
   Users,
   Warehouse,
@@ -391,4 +390,4 @@ export default function OperationsReport() {
 
 // Icon tambahan yang dibutuhkan
 import { ShoppingCart, Database } from 'lucide-react';
-declare const XLSX: any;
+import * as XLSX from 'xlsx';

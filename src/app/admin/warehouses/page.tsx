@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
+  Timestamp,
   collection,
   doc,
   getDoc,
@@ -13,31 +14,33 @@ import {
   onSnapshot,
   orderBy
 } from 'firebase/firestore';
+
 import Link from 'next/link';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Warehouse as WarehouseIcon, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Warehouse as WarehouseIcon,
   MapPin,
   ArrowRightLeft,
   Loader2,
   AlertTriangle,
   Package,
-  ChevronRight,
   Activity
 } from 'lucide-react';
 
+
 // --- TYPES ---
-type Warehouse = {
+interface Warehouse {
   id: string;
   name: string;
   location: string;
   capacity: number;
   usedCapacity: number;
   isActive: boolean;
-  createdAt: any;
-};
+  createdAt: Timestamp | null;
+}
+
 
 export default function WarehousesPage() {
   const router = useRouter();
@@ -62,10 +65,11 @@ export default function WarehousesPage() {
           return;
         }
         setAuthLoading(false);
-      } catch (err) {
+      } catch {
         setError('Gagal verifikasi hak akses.');
         setAuthLoading(false);
       }
+
     });
     return () => unsubscribe();
   }, [router]);
@@ -76,7 +80,7 @@ export default function WarehousesPage() {
 
     // Listener Utama Gudang
     const qWarehouses = query(collection(db, 'warehouses'), orderBy('name', 'asc'));
-    
+
     const unsubscribe = onSnapshot(qWarehouses, (wSnapshot) => {
       // Listener Produk untuk kalkulasi usedCapacity (Stok total per Gudang)
       const unsubProducts = onSnapshot(collection(db, 'products'), (pSnapshot) => {
@@ -85,9 +89,9 @@ export default function WarehousesPage() {
         pSnapshot.docs.forEach((pDoc) => {
           const pData = pDoc.data();
           // Mendukung field 'warehouseId' atau fallback ke pencocokan nama gudang
-          const wId = pData.warehouseId || pData.warehouse; 
+          const wId = pData.warehouseId || pData.warehouse;
           const stok = Number(pData.Stok || pData.stock || 0);
-          
+
           if (wId) {
             stockMap[wId] = (stockMap[wId] || 0) + stok;
           }
@@ -96,7 +100,7 @@ export default function WarehousesPage() {
         const warehouseList: Warehouse[] = wSnapshot.docs.map((doc) => {
           const data = doc.data();
           const currentId = doc.id;
-          
+
           // Sinkronisasi: Ambil dari map atau cari berdasarkan nama jika ID tidak cocok
           const usedCapacity = stockMap[currentId] || stockMap[data.name] || 0;
 
@@ -114,10 +118,10 @@ export default function WarehousesPage() {
         setWarehouses(warehouseList);
         setLoading(false);
         setError(null);
-      }, (err) => {
-        console.error("Error products listener:", err);
+      }, () => {
         setError("Gagal sinkronisasi stok produk.");
       });
+
 
       return () => unsubProducts();
     }, (err) => {
@@ -135,14 +139,15 @@ export default function WarehousesPage() {
       alert(`Gudang "${name}" tidak bisa dihapus karena masih berisi ${used} unit barang. Kosongkan stok terlebih dahulu.`);
       return;
     }
-    
+
     if (!confirm(`Hapus gudang "${name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
-    
+
     try {
       await deleteDoc(doc(db, 'warehouses', id));
-    } catch (err) {
+    } catch {
       alert('Gagal menghapus gudang.');
     }
+
   };
 
   const utilizationRate = (used: number, capacity: number) => {
@@ -253,21 +258,19 @@ export default function WarehousesPage() {
                             </span>
                           </div>
                           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                                isCritical ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-green-500'
-                              }`}
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ease-out ${isCritical ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-green-500'
+                                }`}
                               style={{ width: `${rate}%` }}
                             ></div>
                           </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <span className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-xl inline-flex items-center gap-1.5 ${
-                          warehouse.isActive 
-                          ? 'bg-green-50 text-green-700 border border-green-100' 
+                        <span className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-xl inline-flex items-center gap-1.5 ${warehouse.isActive
+                          ? 'bg-green-50 text-green-700 border border-green-100'
                           : 'bg-gray-100 text-gray-400'
-                        }`}>
+                          }`}>
                           <div className={`w-1.5 h-1.5 rounded-full ${warehouse.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
                           {warehouse.isActive ? 'Online' : 'Offline'}
                         </span>

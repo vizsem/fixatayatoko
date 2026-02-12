@@ -14,13 +14,13 @@ export const importFromExcel = async (file: File): Promise<string> => {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
-        
+
         // Ambil sheet pertama
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
+
         // Ubah sheet menjadi array JSON
-        const excelData: any[] = XLSX.utils.sheet_to_json(worksheet);
+        const excelData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
 
         if (excelData.length === 0) {
           return reject("File Excel kosong atau format tidak sesuai.");
@@ -34,24 +34,33 @@ export const importFromExcel = async (file: File): Promise<string> => {
 
           // Referensi dokumen berdasarkan ID dari Excel
           const docRef = doc(db, "products", String(item.ID));
-          
+
           // Format data agar sesuai tipe data Firestore (terutama angka)
+          // MAPPING: Excel (Indonesian) -> Firestore (English Standard)
           const formattedData = {
             ID: String(item.ID),
-            Barcode: String(item.Barcode || ""),
+            barcode: String(item.Barcode || ""),
             Parent_ID: String(item.Parent_ID || ""),
+            
+            // Primary Fields (English)
+            name: String(item.Nama || ""),
+            category: String(item.Kategori || ""),
+            unit: String(item.Satuan || ""),
+            stock: Number(item.Stok) || 0,
+            price: Number(item.Ecer) || 0,
+            wholesalePrice: Number(item.Grosir) || 0,
+            minWholesale: Number(item.Min_Grosir) || 0,
+            purchasePrice: Number(item.Modal) || 0,
+            minStock: Number(item.Min_Stok) || 0,
+            image: String(item.Link_Foto || ""),
+            description: String(item.Deskripsi || ""),
+            
+            // Keep Legacy Keys for backup (optional)
             Nama: String(item.Nama || ""),
-            Kategori: String(item.Kategori || ""),
-            Satuan: String(item.Satuan || ""),
             Stok: Number(item.Stok) || 0,
-            Min_Stok: Number(item.Min_Stok) || 0,
-            Modal: Number(item.Modal) || 0,
             Ecer: Number(item.Ecer) || 0,
+
             Harga_Coret: Number(item.Harga_Coret) || 0,
-            Grosir: Number(item.Grosir) || 0,
-            Min_Grosir: Number(item.Min_Grosir) || 0,
-            Link_Foto: String(item.Link_Foto || ""),
-            Deskripsi: String(item.Deskripsi || ""),
             Status: Number(item.Status) || 1,
             Supplier: String(item.Supplier || ""),
             No_WA_Supplier: String(item.No_WA_Supplier || ""),
@@ -82,10 +91,11 @@ export const exportToExcel = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, "products"));
     const products = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        // Hapus field timestamp agar tidak error saat dikonversi ke Excel
-        const { updatedAt, createdAt, ...rest } = data;
-        return rest;
+      const data = doc.data();
+      // Hapus field timestamp agar tidak error saat dikonversi ke Excel
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { updatedAt, createdAt, ...rest } = data;
+      return rest;
     });
 
     if (products.length === 0) {

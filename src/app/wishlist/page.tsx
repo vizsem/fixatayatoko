@@ -2,18 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, where, documentId, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Product } from '@/lib/types';
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-  unit: string;
-};
 
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
@@ -25,18 +19,18 @@ export default function WishlistPage() {
       try {
         const localWishlist = localStorage.getItem('atayatoko-wishlist');
         const wishlistIds = localWishlist ? JSON.parse(localWishlist) : [];
-        
+
         // 1. Ambil Produk Wishlist
         if (wishlistIds.length > 0) {
           const qWishlist = query(
-            collection(db, 'products'), 
-            where(documentId(), 'in', wishlistIds.slice(0, 30)) 
+            collection(db, 'products'),
+            where(documentId(), 'in', wishlistIds.slice(0, 30))
           );
           const wishlistSnap = await getDocs(qWishlist);
           const products = wishlistSnap.docs.map(doc => {
             const data = doc.data();
-            return { 
-              id: doc.id, 
+            return {
+              id: doc.id,
               name: data.name || 'Produk Tanpa Nama',
               price: Number(data.price) || 0,
               image: data.image && data.image !== "" ? data.image : "/logo-atayatoko.png",
@@ -48,13 +42,13 @@ export default function WishlistPage() {
         }
 
         // 2. Ambil Rekomendasi Produk
-        const qRec = query(collection(db, 'products'), limit(20)); 
+        const qRec = query(collection(db, 'products'), limit(20));
         const recSnap = await getDocs(qRec);
         const allRecs = recSnap.docs
           .map(doc => {
             const data = doc.data();
-            return { 
-              id: doc.id, 
+            return {
+              id: doc.id,
               name: data.name || 'Produk Tanpa Nama',
               price: Number(data.price) || 0,
               image: data.image && data.image !== "" ? data.image : "/logo-atayatoko.png",
@@ -62,9 +56,9 @@ export default function WishlistPage() {
               unit: data.unit || 'pcs'
             } as Product;
           })
-          .filter(p => !wishlistIds.includes(p.id)) 
-          .slice(0, 10); 
-        
+          .filter(p => !wishlistIds.includes(p.id))
+          .slice(0, 10);
+
         setRecommendedProducts(allRecs);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -79,14 +73,14 @@ export default function WishlistPage() {
   const handleAddToCart = (product: Product) => {
     const cart = localStorage.getItem('atayatoko-cart');
     const cartItems = cart ? JSON.parse(cart) : [];
-    const existingItem = cartItems.find((item: any) => item.id === product.id);
-    
+    const existingItem = cartItems.find((item: Product & { quantity: number }) => item.id === product.id);
+
     if (existingItem) {
       existingItem.quantity += 1;
     } else {
       cartItems.push({ ...product, quantity: 1 });
     }
-    
+
     localStorage.setItem('atayatoko-cart', JSON.stringify(cartItems));
     window.dispatchEvent(new Event('cart-updated'));
     alert(`Berhasil ditambah ke keranjang!`);
@@ -117,7 +111,7 @@ export default function WishlistPage() {
             </Link>
             <h1 className="text-sm font-black text-gray-800 uppercase tracking-tighter">Wishlist Saya</h1>
           </div>
-          <img src="/logo-atayatoko.png" alt="Logo" className="h-6 w-auto" />
+          <Image src="/logo-atayatoko.png" alt="Logo" width={100} height={24} className="h-6 w-auto" />
         </div>
       </header>
 
@@ -140,7 +134,7 @@ export default function WishlistPage() {
         <section>
           <div className="flex items-center gap-2 mb-6">
             <div className="bg-yellow-100 p-2 rounded-xl text-yellow-600">
-              <Sparkles size={18} />
+              <Heart size={18} fill="currentColor" />
             </div>
             <div>
               <h2 className="text-sm font-black text-gray-800 uppercase tracking-tight">Rekomendasi Untukmu</h2>
@@ -159,18 +153,29 @@ export default function WishlistPage() {
   );
 }
 
-function ProductCard({ product, onRemove, onAdd, isWishlist }: any) {
+function ProductCard({
+  product,
+  onRemove,
+  onAdd,
+  isWishlist
+}: {
+  product: Product;
+  onRemove?: () => void;
+  onAdd: (p: Product) => void;
+  isWishlist?: boolean;
+}) {
   // Validasi Gambar: Jika kosong atau null, gunakan logo default
   const imgFallback = product.image && product.image !== "" ? product.image : "/logo-atayatoko.png";
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
       <div className="relative">
-        <Link href={`/produk/${product.id}`}>
-          <img 
-            src={imgFallback} 
-            alt={product.name || 'Produk'} 
-            className="w-full aspect-square object-cover" 
+        <Link href={`/produk/${product.id}`} className="block relative aspect-square">
+          <Image
+            src={imgFallback}
+            alt={product.name || 'Produk'}
+            fill
+            className="object-cover"
           />
         </Link>
         {isWishlist && (
@@ -186,8 +191,8 @@ function ProductCard({ product, onRemove, onAdd, isWishlist }: any) {
         <p className="text-green-600 font-black text-sm mb-3">
           Rp{(Number(product.price) || 0).toLocaleString('id-ID')}
         </p>
-        <button 
-          onClick={() => onAdd(product)} 
+        <button
+          onClick={() => onAdd(product)}
           className="mt-auto w-full bg-gray-50 hover:bg-green-600 hover:text-white text-green-600 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1 border border-transparent hover:border-green-600"
         >
           <ShoppingCart size={12} /> + Keranjang

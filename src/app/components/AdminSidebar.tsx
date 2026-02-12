@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package, Users, CreditCard, Settings } from 'lucide-react';
+import { Package } from 'lucide-react';
 
 export default function AdminSidebar() {
   return (

@@ -17,6 +17,34 @@ import { db } from '@/lib/firebase';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  wholesalePrice: number;
+  minWholesale: number;
+  stock: number;
+  unit: string;
+  category: string;
+  image: string;
+  description?: string;
+};
+
+type RelatedProduct = Pick<Product, 'id' | 'name' | 'price' | 'image'>;
+
+type CartItem = {
+  productId: string;
+  id: string;
+  name: string;
+  price: number;
+  image?: string;
+  unit: string;
+  quantity: number;
+  wholesalePrice?: number;
+  minWholesale?: number;
+  addedAt?: string;
+};
+
 // 3. Hapus import Home dari @/app/page karena menyebabkan konflik dan error
 
 export default function ProductDetailPage() {
@@ -28,8 +56,8 @@ export default function ProductDetailPage() {
 
   const productId = params?.id as string;
 
-  const [product, setProduct] = useState<any | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -60,9 +88,8 @@ export default function ProductDetailPage() {
         
         if (docSnap.exists()) {
           const data = docSnap.data();
-          const mappedProduct = {
+          const mappedProduct: Product = {
             id: docSnap.id,
-            ...data,
             name: data.Nama || data.name || "Produk",
             price: Number(data.Ecer || data.price) || 0,
             wholesalePrice: Number(data.Grosir || data.wholesalePrice) || 0,
@@ -80,11 +107,10 @@ export default function ProductDetailPage() {
           setRelatedProducts(relatedSnap.docs.map(d => {
             const rData = d.data();
             return { 
-              id: d.id, 
-              ...rData,
-              name: rData.Nama || rData.name,
+              id: d.id,
+              name: rData.Nama || rData.name || "Produk",
               price: Number(rData.Ecer || rData.price) || 0,
-              image: rData.Link_Foto || rData.image
+              image: rData.Link_Foto || rData.image || '/logo-atayatoko.png'
             };
           }).filter(p => p.id !== productId));
 
@@ -96,18 +122,18 @@ export default function ProductDetailPage() {
     fetchData();
   }, [productId]);
 
-  const syncToFirebaseCart = async (p: any, q: number) => {
+  const syncToFirebaseCart = async (p: Product, q: number) => {
     if (p.stock <= 0) {
       toast.error("Maaf, stok barang sedang habis");
       return;
     }
     setIsAdding(true);
-    const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const localCart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
     const idToMatch = p.id;
     const isWholesale = p.wholesalePrice > 0 && q >= p.minWholesale;
     const finalPrice = isWholesale ? p.wholesalePrice : p.price;
 
-    const localIdx = localCart.findIndex((item: any) => (item.productId === idToMatch || item.id === idToMatch));
+    const localIdx = localCart.findIndex((item) => (item.productId === idToMatch || item.id === idToMatch));
     if (localIdx > -1) {
       localCart[localIdx].quantity += q;
       const totalQ = localCart[localIdx].quantity;
@@ -127,14 +153,14 @@ export default function ProductDetailPage() {
       try {
         const cartRef = doc(db, 'carts', userId);
         const cartSnap = await getDoc(cartRef);
-        let cloudItems = cartSnap.exists() ? cartSnap.data().items : [];
-        const existingIndex = cloudItems.findIndex((item: any) => item.productId === idToMatch);
+        const cloudItems = (cartSnap.exists() ? (cartSnap.data().items as CartItem[]) : []) ?? [];
+        const existingIndex = cloudItems.findIndex((item) => item.productId === idToMatch);
         if (existingIndex > -1) {
           cloudItems[existingIndex].quantity += q;
           cloudItems[existingIndex].price = finalPrice;
         } else {
           cloudItems.push({
-            productId: idToMatch, name: p.name, price: finalPrice, 
+            productId: idToMatch, id: idToMatch, name: p.name, price: finalPrice, 
             image: p.image, unit: p.unit || 'pcs', quantity: q, addedAt: new Date().toISOString()
           });
         }

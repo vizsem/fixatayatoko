@@ -1,11 +1,10 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { 
-  getFirestore, 
-  Firestore, 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+import {
+  Firestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 

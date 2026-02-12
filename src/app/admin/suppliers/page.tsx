@@ -9,27 +9,26 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   orderBy,
   onSnapshot
 } from 'firebase/firestore';
+
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Users, 
-  Phone, 
-  MapPin, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Users,
+  Phone,
+  MapPin,
   Mail,
-  Building,
   Search
 } from 'lucide-react';
+
 
 type Supplier = {
   id: string;
@@ -50,7 +49,7 @@ export default function AdminSuppliers() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -312,7 +311,7 @@ export default function AdminSuppliers() {
                   ✕
                 </button>
               </div>
-              
+
               <form onSubmit={handleCreate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -323,12 +322,12 @@ export default function AdminSuppliers() {
                       type="text"
                       required
                       value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Contoh: PT. Sembako Jaya"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Penanggung Jawab *
@@ -337,12 +336,12 @@ export default function AdminSuppliers() {
                       type="text"
                       required
                       value={formData.contactPerson}
-                      onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Nama kontak"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Telepon *
@@ -351,12 +350,12 @@ export default function AdminSuppliers() {
                       type="tel"
                       required
                       value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="081234567890"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email
@@ -364,12 +363,12 @@ export default function AdminSuppliers() {
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="supplier@email.com"
                     />
                   </div>
-                  
+
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Kategori Produk
@@ -377,12 +376,12 @@ export default function AdminSuppliers() {
                     <input
                       type="text"
                       value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Contoh: Beras, Minyak, Bumbu"
                     />
                   </div>
-                  
+
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Alamat Lengkap
@@ -390,12 +389,12 @@ export default function AdminSuppliers() {
                     <textarea
                       rows={3}
                       value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Jl. Raya No. 123, Kota"
                     />
                   </div>
-                  
+
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Catatan Tambahan
@@ -403,13 +402,13 @@ export default function AdminSuppliers() {
                     <textarea
                       rows={2}
                       value={formData.notes}
-                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Informasi tambahan tentang supplier"
                     />
                   </div>
                 </div>
-                
+
                 <div className="mt-8 flex justify-end gap-3">
                   <button
                     type="button"

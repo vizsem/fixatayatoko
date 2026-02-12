@@ -4,8 +4,8 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { Printer, MapPin, Truck, CreditCard, Clock } from 'lucide-react';
+import { Timestamp, doc, getDoc } from 'firebase/firestore';
+
 
 type Order = {
   id: string;
@@ -17,8 +17,9 @@ type Order = {
   paymentMethod: string;
   deliveryMethod: string;
   deliveryAddress?: string;
-  createdAt: any;
+  createdAt: Timestamp | null;
 };
+
 
 export default function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
     <div className="bg-white min-h-screen text-black font-mono p-2 sm:p-0">
       {/* Container Khusus Printer Thermal (Lebar Maksimal 80mm biasanya) */}
       <div className="max-w-[400px] mx-auto p-4 border border-dashed border-gray-200">
-        
+
         {/* Header Struk */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-black tracking-tighter uppercase italic">Ataya Toko</h1>
@@ -142,7 +143,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
 
       {/* Kontrol Navigasi (Hanya muncul di Layar) */}
       <div className="fixed bottom-6 right-6 no-print">
-        <button 
+        <button
           onClick={() => router.back()}
           className="bg-black text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-emerald-600 transition-all"
         >

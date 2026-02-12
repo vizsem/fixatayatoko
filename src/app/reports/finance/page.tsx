@@ -18,8 +18,7 @@ import {
   CreditCard, 
   Download,
   TrendingUp,
-  TrendingDown,
-  Calendar
+  TrendingDown
 } from 'lucide-react';
 
 type FinancialRecord = {
@@ -327,4 +326,4 @@ export default function FinanceReport() {
   );
 }
 
-declare const XLSX: any;
+import * as XLSX from 'xlsx';

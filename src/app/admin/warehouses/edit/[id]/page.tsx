@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { 
-  ArrowLeft, Save, Warehouse, MapPin, 
-  Phone, User, Package, Loader2 
+import {
+  ArrowLeft, Save, Warehouse, MapPin,
+  Phone, User, Package, Loader2
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -63,10 +63,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
           toast.error('Gudang tidak ditemukan');
           router.push('/admin/warehouses');
         }
-      } catch (error) {
-        console.error(error);
+      } catch {
         toast.error('Gagal mengambil data');
       } finally {
+
         setLoading(false);
       }
     };
@@ -88,9 +88,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
       });
       toast.success('Data gudang berhasil diperbarui');
       setTimeout(() => router.push('/admin/warehouses'), 1500);
-    } catch (error) {
+    } catch {
       toast.error('Gagal menyimpan perubahan');
     } finally {
+
       setIsSaving(false);
     }
   };
@@ -106,11 +107,11 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <Toaster position="top-right" />
-      
+
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <button 
+          <button
             onClick={() => router.back()}
             className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all"
           >
@@ -142,7 +143,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                   required
                   type="text"
                   value={formData?.name || ''}
-                  onChange={(e) => setFormData(prev => prev ? {...prev, name: e.target.value} : null)}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, name: e.target.value } : null)}
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all"
                   placeholder="Contoh: Gudang Pusat Jakarta"
                 />
@@ -159,7 +160,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                     required
                     type="text"
                     value={formData?.contactPerson || ''}
-                    onChange={(e) => setFormData(prev => prev ? {...prev, contactPerson: e.target.value} : null)}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, contactPerson: e.target.value } : null)}
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all"
                     placeholder="Nama Staff"
                   />
@@ -175,7 +176,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                     required
                     type="tel"
                     value={formData?.phone || ''}
-                    onChange={(e) => setFormData(prev => prev ? {...prev, phone: e.target.value} : null)}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, phone: e.target.value } : null)}
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all"
                     placeholder="0812..."
                   />
@@ -192,7 +193,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
                   required
                   rows={3}
                   value={formData?.address || ''}
-                  onChange={(e) => setFormData(prev => prev ? {...prev, address: e.target.value} : null)}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, address: e.target.value } : null)}
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all resize-none"
                   placeholder="Alamat lengkap lokasi gudang..."
                 />
@@ -204,7 +205,8 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
               <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Status Operasional</label>
               <select
                 value={formData?.status || 'AKTIF'}
-                onChange={(e) => setFormData(prev => prev ? {...prev, status: e.target.value as any} : null)}
+                onChange={(e) => setFormData(prev => prev ? { ...prev, status: e.target.value as 'AKTIF' | 'NONAKTIF' } : null)}
+
                 className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all appearance-none cursor-pointer text-sm"
               >
                 <option value="AKTIF">AKTIF</option>

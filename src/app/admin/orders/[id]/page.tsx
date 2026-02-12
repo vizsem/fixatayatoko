@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { 
-  AlertTriangle, Package, MapPin, CreditCard, 
-  User, Printer, ArrowLeft, CheckCircle, Truck, Phone, MessageSquare
+import { Timestamp, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  MapPin, CreditCard,
+  Printer, ArrowLeft, Truck, MessageSquare
 } from 'lucide-react';
+
 import toast, { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
@@ -28,8 +30,9 @@ type Order = {
   deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
   deliveryAddress?: string;
   deliveryLocation?: DeliveryLocation;
-  createdAt: any;
+  createdAt: Timestamp | null;
   notes?: string;
+
 };
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -64,15 +67,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const fetchOrder = async () => {
       try {
         const docSnap = await getDoc(doc(db, 'orders', id));
-        if (!docSnap.exists()) { 
-          setError('Pesanan tidak ditemukan.'); 
-          return; 
+        if (!docSnap.exists()) {
+          setError('Pesanan tidak ditemukan.');
+          return;
         }
         setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
-      } catch (err) { 
-        setError('Gagal memuat data.'); 
-      } finally { 
-        setLoading(false); 
+
+      } catch {
+        console.error("Gagal bayar hutang");
+      } finally {
+        setLoading(false);
       }
     };
     fetchOrder();
@@ -90,14 +94,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setIsUpdating(true);
     try {
       const orderRef = doc(db, 'orders', order.id);
-      await updateDoc(orderRef, { 
+      await updateDoc(orderRef, {
         status: newStatus,
-        updatedAt: serverTimestamp() 
+        updatedAt: serverTimestamp()
       });
       setOrder(prev => prev ? { ...prev, status: newStatus } : null);
       toast.success(`Status: ${newStatus}`, { icon: '🚀' });
-    } catch (err) {
+    } catch {
       toast.error('Gagal memperbarui status');
+
     } finally {
       setIsUpdating(false);
     }
@@ -106,7 +111,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const sendWhatsApp = () => {
     if (!order) return;
     const phone = order.customerPhone.startsWith('0') ? '62' + order.customerPhone.slice(1) : order.customerPhone;
-    const message = `Halo ${order.customerName}, pesanan Anda *#${order.id.substring(0,8)}* sedang dalam status: *${order.status}*.`;
+    const message = `Halo ${order.customerName}, pesanan Anda *#${order.id.substring(0, 8)}* sedang dalam status: *${order.status}*.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -127,7 +132,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     <div className="min-h-screen bg-slate-50 md:p-8 pb-24">
       <Toaster position="top-right" />
       <div className="max-w-4xl mx-auto bg-white shadow-2xl md:rounded-[3rem] overflow-hidden border border-white">
-        
+
         <div className="p-6 border-b flex justify-between items-center no-print">
           <button onClick={() => router.back()} className="p-3 bg-slate-100 rounded-2xl hover:bg-black hover:text-white transition-all">
             <ArrowLeft size={20} />
@@ -228,12 +233,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl bg-black/90 backdrop-blur-xl p-4 rounded-[2.5rem] shadow-2xl z-[100] no-print">
-         <div className="flex gap-2 overflow-x-auto no-scrollbar justify-center">
-            <button onClick={() => updateStatus('DIPROSES')} className="px-6 py-3 rounded-2xl bg-amber-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Proses</button>
-            <button onClick={() => updateStatus('DIKIRIM')} className="px-6 py-3 rounded-2xl bg-blue-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Kirim</button>
-            <button onClick={() => updateStatus('SELESAI')} className="px-6 py-3 rounded-2xl bg-emerald-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Selesai</button>
-            <button onClick={() => updateStatus('DIBATALKAN')} className="px-6 py-3 rounded-2xl bg-rose-600 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Batal</button>
-         </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar justify-center">
+          <button onClick={() => updateStatus('DIPROSES')} className="px-6 py-3 rounded-2xl bg-amber-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Proses</button>
+          <button onClick={() => updateStatus('DIKIRIM')} className="px-6 py-3 rounded-2xl bg-blue-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Kirim</button>
+          <button onClick={() => updateStatus('SELESAI')} className="px-6 py-3 rounded-2xl bg-emerald-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Selesai</button>
+          <button onClick={() => updateStatus('DIBATALKAN')} className="px-6 py-3 rounded-2xl bg-rose-600 text-[10px] font-black uppercase text-white hover:scale-105 transition-all">Batal</button>
+        </div>
       </div>
 
       <style jsx global>{`

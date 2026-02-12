@@ -1,22 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { 
-  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch 
+import {
+  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp
 } from 'firebase/firestore';
-import { 
+import {
   ShoppingCart, Search, Truck, Printer, XCircle,
-  LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft, Clock,
-  CheckCircle2 // Import icon tambahan
+  LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
+  Clock, CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
 
 type Order = {
   id: string;
-  createdAt: any;
+  createdAt: Timestamp | null;
   customerName?: string;
   customerPhone?: string;
   total: number;
@@ -24,14 +25,17 @@ type Order = {
   deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
 };
 
+
+
 export default function AdminOrders() {
   const router = useRouter();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'SEMUA' | 'MENUNGGU' | 'DIPROSES' | 'SELESAI'>('SEMUA');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -77,18 +81,19 @@ export default function AdminOrders() {
       await batch.commit();
       setSelectedOrders([]);
       alert('Berhasil diperbarui!');
-    } catch (err) {
+    } catch {
       alert('Gagal memperbarui status.');
     }
+
   };
 
   // FITUR TANDAI SEMUA (Sesuai Filter yang sedang aktif)
   const handleSelectAll = () => {
     const filteredIds = currentItems.map(order => order.id);
-    
+
     // Jika semua item di halaman ini sudah terpilih, maka kosongkan (unselect all)
     const isAllSelected = filteredIds.every(id => selectedOrders.includes(id));
-    
+
     if (isAllSelected) {
       setSelectedOrders(prev => prev.filter(id => !filteredIds.includes(id)));
     } else {
@@ -120,7 +125,7 @@ export default function AdminOrders() {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
-      
+
       {/* Header Navigasi */}
       <div className="mb-6 flex items-center justify-between no-print">
         <Link href="/admin" className="flex items-center gap-2 text-[10px] font-black bg-white border px-4 py-2 rounded-2xl hover:bg-black hover:text-white transition shadow-sm uppercase tracking-widest">
@@ -130,60 +135,59 @@ export default function AdminOrders() {
       </div>
 
       <div className="mb-8">
-          <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">List Pesanan</h1>
-          <p className="text-gray-400 text-xs font-bold uppercase">Update status dan kelola invoice pelanggan</p>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">List Pesanan</h1>
+        <p className="text-gray-400 text-xs font-bold uppercase">Update status dan kelola invoice pelanggan</p>
       </div>
 
       {/* Toolbar Cari & Filter */}
       <div className="flex flex-wrap gap-3 mb-6 no-print items-center">
         <div className="flex-1 min-w-[300px] relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-            <input
-              type="text"
-              placeholder="Cari ID atau Nama..."
-              className="w-full pl-12 pr-4 py-4 bg-white border-none shadow-sm rounded-[1.5rem] font-bold focus:ring-2 focus:ring-black outline-none"
-              value={searchTerm}
-              onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
-            />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+          <input
+            type="text"
+            placeholder="Cari ID atau Nama..."
+            className="w-full pl-12 pr-4 py-4 bg-white border-none shadow-sm rounded-[1.5rem] font-bold focus:ring-2 focus:ring-black outline-none"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
         </div>
-        
+
         {/* TOMBOL TANDAI SEMUA */}
-        <button 
+        <button
           onClick={handleSelectAll}
-          className={`flex items-center gap-2 px-6 py-4 rounded-[1.5rem] text-[10px] font-black transition-all border tracking-widest uppercase ${
-            currentItems.length > 0 && currentItems.every(id => selectedOrders.includes(id.id))
+          className={`flex items-center gap-2 px-6 py-4 rounded-[1.5rem] text-[10px] font-black transition-all border tracking-widest uppercase ${currentItems.length > 0 && currentItems.every(id => selectedOrders.includes(id.id))
             ? 'bg-emerald-600 text-white border-emerald-600'
             : 'bg-white text-black border-gray-100 shadow-sm'
-          }`}
+            }`}
         >
           <CheckCircle2 size={16} /> Tandai Hal Ini
         </button>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            {['SEMUA', 'MENUNGGU', 'DIPROSES', 'SELESAI'].map((tab) => (
-                <button
-                    key={tab}
-                    onClick={() => {setActiveTab(tab as any); setCurrentPage(1);}}
-                    className={`px-6 py-4 rounded-[1.5rem] text-[10px] font-black transition-all whitespace-nowrap tracking-widest ${
-                        activeTab === tab ? 'bg-black text-white shadow-xl' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'
-                    }`}
-                >
-                    {tab}
-                </button>
-            ))}
+          {['SEMUA', 'MENUNGGU', 'DIPROSES', 'SELESAI'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => { setActiveTab(tab as 'SEMUA' | 'MENUNGGU' | 'DIPROSES' | 'SELESAI'); setCurrentPage(1); }}
+              className={`px-6 py-4 rounded-[1.5rem] text-[10px] font-black transition-all whitespace-nowrap tracking-widest ${activeTab === tab ? 'bg-black text-white shadow-xl' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'
+                }`}
+            >
+              {tab}
+            </button>
+          ))}
+
         </div>
       </div>
 
       {/* Floating Bulk Action */}
       {selectedOrders.length > 0 && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-5 rounded-[2rem] shadow-2xl z-50 flex items-center gap-6 border border-white/10 no-print">
-            <div className="text-xs font-black uppercase tracking-widest">{selectedOrders.length} Dipilih</div>
-            <div className="flex gap-2">
-                <button onClick={() => handleBulkUpdate('DIPROSES')} className="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Proses</button>
-                <button onClick={() => handleBulkUpdate('DIKIRIM')} className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Kirim</button>
-                <button onClick={() => handleBulkUpdate('SELESAI')} className="bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Selesai</button>
-                <button onClick={() => setSelectedOrders([])} className="bg-white/10 p-2 rounded-xl"><XCircle size={18} /></button>
-            </div>
+          <div className="text-xs font-black uppercase tracking-widest">{selectedOrders.length} Dipilih</div>
+          <div className="flex gap-2">
+            <button onClick={() => handleBulkUpdate('DIPROSES')} className="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Proses</button>
+            <button onClick={() => handleBulkUpdate('DIKIRIM')} className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Kirim</button>
+            <button onClick={() => handleBulkUpdate('SELESAI')} className="bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Selesai</button>
+            <button onClick={() => setSelectedOrders([])} className="bg-white/10 p-2 rounded-xl"><XCircle size={18} /></button>
+          </div>
         </div>
       )}
 
@@ -195,10 +199,9 @@ export default function AdminOrders() {
           <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-gray-100 font-bold text-gray-400 uppercase italic">Kosong</div>
         ) : (
           currentItems.map((order) => (
-            <div 
-                key={order.id} 
-                className={`group bg-white rounded-[2rem] p-5 border shadow-sm transition-all flex flex-col md:flex-row items-center gap-5 ${
-                    selectedOrders.includes(order.id) ? 'border-black ring-1 ring-black bg-gray-50' : 'border-gray-50'
+            <div
+              key={order.id}
+              className={`group bg-white rounded-[2rem] p-5 border shadow-sm transition-all flex flex-col md:flex-row items-center gap-5 ${selectedOrders.includes(order.id) ? 'border-black ring-1 ring-black bg-gray-50' : 'border-gray-50'
                 }`}
             >
               {/* Checkbox */}
@@ -236,17 +239,17 @@ export default function AdminOrders() {
 
               {/* Tombol Aksi */}
               <div className="flex gap-2 shrink-0 w-full md:w-auto">
-                <Link 
-                    href={`/admin/orders/${order.id}`}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black text-white hover:bg-emerald-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
+                <Link
+                  href={`/admin/orders/${order.id}`}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black text-white hover:bg-emerald-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg"
                 >
-                    Invoice <ChevronRight size={14} />
+                  Invoice <ChevronRight size={14} />
                 </Link>
-                <button 
+                <button
                   onClick={() => handlePrint(order.id)}
                   className="p-3 bg-white text-gray-400 hover:text-black rounded-2xl border border-gray-100 shadow-sm transition-all"
                 >
-                    <Printer size={20} />
+                  <Printer size={20} />
                 </button>
               </div>
             </div>
@@ -257,9 +260,9 @@ export default function AdminOrders() {
       {/* Pagination Nav */}
       {totalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-4 no-print">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-20"><ChevronLeft size={20}/></button>
-            <span className="text-xs font-black uppercase tracking-widest">Hal {currentPage} / {totalPages}</span>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-20"><ChevronRight size={20}/></button>
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-20"><ChevronLeft size={20} /></button>
+          <span className="text-xs font-black uppercase tracking-widest">Hal {currentPage} / {totalPages}</span>
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 rounded-2xl bg-white border shadow-sm disabled:opacity-20"><ChevronRight size={20} /></button>
         </div>
       )}
 

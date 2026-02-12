@@ -7,6 +7,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import Image from 'next/image';
 import { User, Lock, Mail, MapPin, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -46,14 +47,15 @@ export default function RegisterPage() {
       
       toast.success('Registrasi berhasil! Silakan login.');
       router.push('/profil/login');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Register error:', error);
       let message = 'Gagal registrasi';
-      if (error.code === 'auth/email-already-in-use') {
+      const errorCode = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+      if (errorCode === 'auth/email-already-in-use') {
         message = 'Email sudah terdaftar';
-      } else if (error.code === 'auth/invalid-email') {
+      } else if (errorCode === 'auth/invalid-email') {
         message = 'Email tidak valid';
-      } else if (error.code === 'auth/weak-password') {
+      } else if (errorCode === 'auth/weak-password') {
         message = 'Password minimal 6 karakter';
       }
       toast.error(message);
@@ -66,8 +68,14 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <img src="/logo-atayatoko.png" alt="ATAYATOKO" className="h-12 w-auto" />
+          <div className="flex items-center justify-center mb-4 relative h-12">
+            <Image 
+              src="/logo-atayatoko.png" 
+              alt="ATAYATOKO" 
+              width={100}
+              height={48}
+              className="h-12 w-auto object-contain" 
+            />
           </div>
           <h1 className="text-2xl font-bold text-black">Daftar Akun Baru</h1>
           <p className="text-gray-600 mt-2">Buat akun untuk belanja lebih mudah</p>

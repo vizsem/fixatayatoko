@@ -1,7 +1,7 @@
 // src/app/(admin)/reports/sales/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -16,11 +16,9 @@ import {
 import { db } from '@/lib/firebase';
 import { 
   TrendingUp, 
-  Calendar,
   Download,
   Package,
-  CreditCard,
-  User
+  CreditCard
 } from 'lucide-react';
 
 type SaleItem = {
@@ -102,8 +100,8 @@ export default function SalesReport() {
     fetchSalesData();
   }, [dateRange]);
 
-  useEffect(() => {
-    const sorted = [...sales].sort((a, b) => {
+  const sortedSales = useMemo(() => {
+    return [...sales].sort((a, b) => {
       const valA = a[sortBy];
       const valB = b[sortBy];
       if (sortOrder === 'asc') {
@@ -112,11 +110,10 @@ export default function SalesReport() {
         return valA < valB ? 1 : -1;
       }
     });
-    setSales(sorted);
-  }, [sortBy, sortOrder]);
+  }, [sales, sortBy, sortOrder]);
 
   const handleExport = () => {
-    const exportData = sales.map(sale => ({
+    const exportData = sortedSales.map(sale => ({
       Tanggal: new Date(sale.date).toLocaleDateString('id-ID'),
       Produk: sale.productName,
       Kuantitas: sale.quantity,
@@ -142,8 +139,8 @@ export default function SalesReport() {
     );
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalItems = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+  const totalSales = sortedSales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalItems = sortedSales.reduce((sum, sale) => sum + sale.quantity, 0);
 
   return (
     <div className="p-6">
@@ -186,7 +183,7 @@ export default function SalesReport() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-black">Total Penjualan</p>
               <p className="text-2xl font-bold mt-1 text-green-600">
@@ -200,7 +197,7 @@ export default function SalesReport() {
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-black">Total Item Terjual</p>
               <p className="text-2xl font-bold mt-1">{totalItems}</p>
@@ -232,7 +229,7 @@ export default function SalesReport() {
               <label className="text-sm text-black">Urutkan:</label>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'date' | 'total' | 'quantity')}
                 className="text-sm border border-gray-300 rounded px-2 py-1 text-black"
               >
                 <option value="date">Tanggal</option>
@@ -274,7 +271,7 @@ export default function SalesReport() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sales.length === 0 ? (
+              {sortedSales.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-black">
                     <TrendingUp className="mx-auto h-10 w-10 text-gray-400 mb-3" />
@@ -282,7 +279,7 @@ export default function SalesReport() {
                   </td>
                 </tr>
               ) : (
-                sales.map((sale, index) => (
+                sortedSales.map((sale, index) => (
                   <tr key={index} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-black">
                       {new Date(sale.date).toLocaleDateString('id-ID')}
@@ -305,4 +302,4 @@ export default function SalesReport() {
   );
 }
 
-declare const XLSX: any;
+declare const XLSX: typeof import('xlsx');

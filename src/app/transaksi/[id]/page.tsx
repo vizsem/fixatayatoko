@@ -4,19 +4,21 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { 
-  AlertTriangle, Package, Clock, CreditCard, ChevronLeft, 
-  MapPin, Phone, User, Calendar, Truck, CheckCircle2, 
+import {
+  AlertTriangle, Package, CreditCard, ChevronLeft,
+  MapPin, Phone, User, CheckCircle2,
   Zap, Ticket, Printer, MessageCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { Order, OrderItem } from '@/lib/types';
+
 
 export default function DetailTransaksiPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +29,7 @@ export default function DetailTransaksiPage() {
       try {
         const docSnap = await getDoc(doc(db, 'orders', id));
         if (docSnap.exists()) {
-          setOrder({ id: docSnap.id, ...docSnap.data() });
+          setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
         } else {
           setError('Data pesanan tidak ditemukan di sistem kami.');
         }
@@ -71,27 +73,29 @@ export default function DetailTransaksiPage() {
     }
   };
 
-  const formattedDate = order.createdAt?.toDate 
-    ? order.createdAt.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const dateObj = order.createdAt as { toDate?: () => Date } | null;
+  const formattedDate = dateObj && typeof dateObj.toDate === 'function'
+    ? dateObj.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '-';
+
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans">
       <div className="max-w-2xl mx-auto px-4 pt-8">
-        
+
         {/* TOP ACTION */}
         <div className="flex justify-between items-center mb-6">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-green-600 transition-all">
             <ChevronLeft size={18} /> Kembali
           </button>
           <div className="flex gap-2">
-             <button onClick={() => window.print()} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-slate-900 shadow-sm border border-slate-100"><Printer size={18}/></button>
+            <button onClick={() => window.print()} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-slate-900 shadow-sm border border-slate-100"><Printer size={18} /></button>
           </div>
         </div>
 
         {/* MAIN RECEIPT CARD */}
         <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-white overflow-hidden print:shadow-none print:border-none">
-          
+
           {/* RECEIPT HEADER */}
           <div className="p-10 text-center border-b border-dashed border-slate-100 relative">
             <div className={`absolute top-0 right-10 px-6 py-2 rounded-b-2xl text-[10px] font-black uppercase tracking-widest ${getStatusStyle(order.status)}`}>
@@ -101,7 +105,7 @@ export default function DetailTransaksiPage() {
               <CheckCircle2 size={40} className="text-green-600" />
             </div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic">
-              {order.orderId || `INV-${order.id.slice(0,8).toUpperCase()}`}
+              {order.orderId || `INV-${order.id.slice(0, 8).toUpperCase()}`}
             </h1>
             <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-[0.2em]">{formattedDate} WIB</p>
           </div>
@@ -110,14 +114,14 @@ export default function DetailTransaksiPage() {
           <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50/50">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><User size={16}/></div>
+                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><User size={16} /></div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Penerima</p>
                   <p className="text-xs font-black text-slate-900 uppercase italic">{order.name || order.customerName}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><Phone size={16}/></div>
+                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><Phone size={16} /></div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Kontak</p>
                   <p className="text-xs font-black text-slate-900">{order.phone || order.customerPhone || '-'}</p>
@@ -126,7 +130,7 @@ export default function DetailTransaksiPage() {
             </div>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><MapPin size={16}/></div>
+                <div className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><MapPin size={16} /></div>
                 <div className="flex-1">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Alamat Pengiriman</p>
                   <p className="text-xs font-bold text-slate-600 uppercase leading-relaxed">
@@ -143,7 +147,7 @@ export default function DetailTransaksiPage() {
               <Package size={16} className="text-green-600" /> Rincian Belanja
             </h3>
             <div className="space-y-6">
-              {order.items?.map((item: any, idx: number) => (
+              {order.items?.map((item: OrderItem, idx: number) => (
                 <div key={idx} className="flex justify-between items-center group">
                   <div className="flex gap-4 items-center">
                     <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-[10px] font-black text-slate-400 uppercase italic">
@@ -166,7 +170,7 @@ export default function DetailTransaksiPage() {
               <span>Subtotal</span>
               <span className="text-slate-900">Rp{(order.subtotal || 0).toLocaleString()}</span>
             </div>
-            
+
             {order.shippingCost > 0 && (
               <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <span>Ongkos Kirim</span>
@@ -178,8 +182,8 @@ export default function DetailTransaksiPage() {
             {(order.pointsUsed > 0) && (
               <div className="flex justify-between items-center bg-blue-50 p-4 rounded-2xl border border-blue-100">
                 <div className="flex items-center gap-2 text-blue-600">
-                   <Zap size={14} fill="currentColor"/>
-                   <span className="text-[9px] font-black uppercase italic tracking-widest">Potongan Poin</span>
+                  <Zap size={14} fill="currentColor" />
+                  <span className="text-[9px] font-black uppercase italic tracking-widest">Potongan Poin</span>
                 </div>
                 <span className="text-xs font-black text-blue-600 italic">-Rp{order.pointsUsed.toLocaleString()}</span>
               </div>
@@ -188,8 +192,8 @@ export default function DetailTransaksiPage() {
             {order.appliedVoucher && (
               <div className="flex justify-between items-center bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
                 <div className="flex items-center gap-2 text-emerald-600">
-                   <Ticket size={14} fill="currentColor"/>
-                   <span className="text-[9px] font-black uppercase italic tracking-widest">Voucher: {order.appliedVoucher.name}</span>
+                  <Ticket size={14} fill="currentColor" />
+                  <span className="text-[9px] font-black uppercase italic tracking-widest">Voucher: {order.appliedVoucher.name}</span>
                 </div>
                 <span className="text-xs font-black text-emerald-600 italic">-Rp{(order.voucherDiscount || 0).toLocaleString()}</span>
               </div>
@@ -200,8 +204,8 @@ export default function DetailTransaksiPage() {
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Total Pembayaran</p>
                 <div className="flex items-center gap-2">
-                   <CreditCard size={16} className="text-green-600" />
-                   <span className="text-xs font-black text-slate-800 uppercase italic">{order.payment?.method || 'CASH'}</span>
+                  <CreditCard size={16} className="text-green-600" />
+                  <span className="text-xs font-black text-slate-800 uppercase italic">{order.payment?.method || 'CASH'}</span>
                 </div>
               </div>
               <h2 className="text-4xl font-black text-slate-900 italic tracking-tighter">Rp{order.total?.toLocaleString()}</h2>
@@ -210,18 +214,18 @@ export default function DetailTransaksiPage() {
 
           {/* FOOTER MESSAGE */}
           <div className="p-10 bg-slate-900 text-white text-center">
-             <p className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 opacity-50">ATAYAMARKET • Hemat Terpercaya</p>
-             <Link 
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 opacity-50">ATAYAMARKET • Hemat Terpercaya</p>
+            <Link
               href={`https://wa.me/6285790565666?text=Halo Admin, Saya ingin bertanya tentang pesanan ${order.orderId || order.id}`}
               className="inline-flex items-center gap-2 bg-green-600 px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-green-500 transition-all active:scale-95"
-             >
+            >
               <MessageCircle size={16} /> Hubungi Admin
-             </Link>
+            </Link>
           </div>
         </div>
 
         <div className="mt-10 text-center">
-           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Simpan struk digital ini sebagai bukti transaksi yang sah</p>
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Simpan struk digital ini sebagai bukti transaksi yang sah</p>
         </div>
       </div>
     </div>

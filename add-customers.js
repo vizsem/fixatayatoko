@@ -1,9 +1,10 @@
 // add-customers.js
+/* eslint-disable @typescript-eslint/no-require-imports */
 const admin = require('firebase-admin');
 
 // 👉 Ganti dengan path ke file service account Anda
-const serviceAccount = 
-require('./atayatoko2-firebase-adminsdk.json');
+const serviceAccount =
+  require('./atayatoko2-firebase-adminsdk.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -72,8 +73,8 @@ async function addSampleCustomers() {
     for (const customer of customers) {
       await db.collection('customers').add(customer);
     }
-    console.log('✅ Berhasil menambahkan', customers.length, 
-'pelanggan contoh!');
+    console.log('✅ Berhasil menambahkan', customers.length,
+      'pelanggan contoh!');
   } catch (error) {
     console.error('❌ Gagal menambahkan pelanggan:', error);
   }

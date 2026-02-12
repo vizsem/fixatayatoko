@@ -2,16 +2,29 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { auth, db, storage } from '@/lib/firebase';
-import { 
-  collection, doc, getDoc, getDocs, query, where, 
-  runTransaction, serverTimestamp 
+import { auth, db } from '@/lib/firebase';
+import {
+  collection, doc, getDoc, getDocs, query, where,
+  runTransaction, serverTimestamp
 } from 'firebase/firestore';
-import { 
-  ArrowLeft, ArrowRightLeft, Warehouse, Package, 
-  Loader2, AlertTriangle, Search 
+import {
+  ArrowLeft, ArrowRightLeft, Warehouse as WarehouseIcon, Package,
+  Loader2, AlertTriangle, Search
 } from 'lucide-react';
+
 import toast, { Toaster } from 'react-hot-toast';
+
+interface Warehouse {
+  id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  stok: number;
+  unit: string;
+}
 
 export default function MutasiGudangPage() {
   const router = useRouter();
@@ -20,10 +33,11 @@ export default function MutasiGudangPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [sourceWarehouse, setSourceWarehouse] = useState<any>(null);
-  const [targetWarehouses, setTargetWarehouses] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  
+  const [sourceWarehouse, setSourceWarehouse] = useState<Warehouse | null>(null);
+  const [targetWarehouses, setTargetWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+
   // Form State
   const [selectedProductId, setSelectedProductId] = useState('');
   const [targetWarehouseId, setTargetWarehouseId] = useState('');
@@ -35,31 +49,32 @@ export default function MutasiGudangPage() {
       try {
         // 1. Ambil Detail Gudang Asal
         const wDoc = await getDoc(doc(db, 'warehouses', sourceWarehouseId));
-        if (wDoc.exists()) setSourceWarehouse({ id: wDoc.id, ...wDoc.data() });
+        if (wDoc.exists()) setSourceWarehouse({ id: wDoc.id, ...wDoc.data() } as Warehouse);
 
         // 2. Ambil Daftar Gudang Tujuan (Semua kecuali asal)
         const wSnap = await getDocs(collection(db, 'warehouses'));
         setTargetWarehouses(wSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
+          .map(d => ({ id: d.id, ...d.data() } as Warehouse))
           .filter(d => d.id !== sourceWarehouseId)
         );
+
 
         // 3. Ambil Produk yang ada di Gudang Asal ini
         const pQuery = query(collection(db, 'products'), where('warehouseId', '==', sourceWarehouseId));
         const pSnap = await getDocs(pQuery);
-        setProducts(pSnap.docs.map(d => ({ 
-          id: d.id, 
-          name: d.data().Nama || d.data().name, 
+        setProducts(pSnap.docs.map(d => ({
+          id: d.id,
+          name: d.data().Nama || d.data().name,
           stok: Number(d.data().Stok || d.data().stock || 0),
           unit: d.data().Satuan || d.data().unit || 'pcs'
         })));
 
-      } catch (err) {
-        console.error(err);
+      } catch {
         toast.error("Gagal memuat data inventory");
       } finally {
         setLoading(false);
       }
+
     };
     fetchData();
   }, [sourceWarehouseId]);
@@ -72,10 +87,16 @@ export default function MutasiGudangPage() {
     }
 
     const selectedProduct = products.find(p => p.id === selectedProductId);
+    if (!selectedProduct) {
+      toast.error("Produk tidak ditemukan");
+      return;
+    }
+
     if (amount > selectedProduct.stok) {
       toast.error("Stok gudang asal tidak cukup!");
       return;
     }
+
 
     setSubmitting(true);
 
@@ -107,15 +128,15 @@ export default function MutasiGudangPage() {
 
       toast.success("Mutasi Berhasil Disinkronkan");
       router.push('/admin/warehouses');
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Gagal melakukan mutasi");
     } finally {
       setSubmitting(false);
     }
+
   };
 
-  const filteredProducts = products.filter(p => 
+  const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -128,7 +149,7 @@ export default function MutasiGudangPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Toaster position="top-center" />
-      
+
       {/* HEADER */}
       <div className="bg-white border-b border-gray-100 px-6 py-6 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -145,29 +166,30 @@ export default function MutasiGudangPage() {
         <div className="flex items-center justify-center gap-4 mb-10">
           <div className="text-center">
             <div className="w-12 h-12 bg-gray-900 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-xl shadow-gray-200">
-              <Warehouse size={20} />
+              <WarehouseIcon size={20} />
             </div>
             <span className="text-[10px] font-black uppercase text-gray-900">{sourceWarehouse?.name}</span>
           </div>
           <ArrowRightLeft className="text-gray-300 animate-pulse" size={24} />
           <div className="text-center">
             <div className="w-12 h-12 bg-green-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-xl shadow-green-100">
-              <Warehouse size={20} />
+              <WarehouseIcon size={20} />
             </div>
             <span className="text-[10px] font-black uppercase text-gray-400">Gudang Tujuan</span>
           </div>
         </div>
 
+
         <form onSubmit={handleMutation} className="space-y-6">
           {/* PILIH PRODUK DARI INVENTORY */}
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">1. Pilih Produk dari {sourceWarehouse?.name}</label>
-            
+
             <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-              <input 
-                type="text" 
-                placeholder="Cari nama produk..." 
+              <input
+                type="text"
+                placeholder="Cari nama produk..."
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -176,12 +198,11 @@ export default function MutasiGudangPage() {
 
             <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-2 no-scrollbar">
               {filteredProducts.map(p => (
-                <div 
+                <div
                   key={p.id}
                   onClick={() => setSelectedProductId(p.id)}
-                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex justify-between items-center ${
-                    selectedProductId === p.id ? 'border-green-600 bg-green-50' : 'border-gray-50 bg-gray-50/50'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex justify-between items-center ${selectedProductId === p.id ? 'border-green-600 bg-green-50' : 'border-gray-50 bg-gray-50/50'
+                    }`}
                 >
                   <div>
                     <p className="text-xs font-black uppercase text-gray-900">{p.name}</p>
@@ -196,10 +217,10 @@ export default function MutasiGudangPage() {
           {/* PILIH TUJUAN & JUMLAH */}
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">2. Tujuan & Volume</label>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <select 
+                <select
                   className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-green-600"
                   value={targetWarehouseId}
                   onChange={(e) => setTargetWarehouseId(e.target.value)}
@@ -211,8 +232,8 @@ export default function MutasiGudangPage() {
                 </select>
               </div>
               <div className="relative">
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   placeholder="Jumlah"
                   className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-green-600"
                   value={amount || ''}
@@ -223,7 +244,7 @@ export default function MutasiGudangPage() {
           </div>
 
           {/* ACTION BUTTON */}
-          <button 
+          <button
             type="submit"
             disabled={submitting || !selectedProductId || !targetWarehouseId}
             className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.3em] text-[11px] shadow-2xl shadow-gray-200 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3"

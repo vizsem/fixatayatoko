@@ -2,30 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  serverTimestamp, 
-  query, 
-  orderBy 
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy
 } from 'firebase/firestore';
-import { 
-  ChevronLeft, Search, Plus, Trash2, Save, 
-  Package, Store, Truck, CreditCard, Calculator,
-  AlertCircle, Info
+
+import {
+  ChevronLeft, Search, Plus, Trash2, Save,
+  Package, Store, Truck, Calculator,
+  Info
 } from 'lucide-react';
 import Link from 'next/link';
+
+
+interface Supplier { id: string; name: string; }
+interface Warehouse { id: string; name: string; }
+interface Product { id: string; name: string; purchasePrice: number; unit?: string; stock?: number; sku?: string; }
+interface CartItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
 
 export default function AddPurchase() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  
+
   // Data References
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchProduct, setSearchProduct] = useState('');
 
   // Form States
@@ -35,7 +42,8 @@ export default function AddPurchase() {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [shippingCost, setShippingCost] = useState(0);
   const [notes, setNotes] = useState('');
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,17 +52,18 @@ export default function AddPurchase() {
         getDocs(collection(db, 'warehouses')),
         getDocs(query(collection(db, 'products'), orderBy('name', 'asc')))
       ]);
-      setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier)));
+      setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
+      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
     };
+
     fetchData();
   }, []);
 
-  const addToCart = (product: any) => {
+  const addToCart = (product: Product) => {
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
-      setCart(cart.map(item => 
+      setCart(cart.map(item =>
         item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
       ));
     } else {
@@ -69,11 +78,13 @@ export default function AddPurchase() {
     setSearchProduct('');
   };
 
+
   const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));
 
-  const updateCartItem = (id: string, field: string, value: any) => {
+  const updateCartItem = (id: string, field: keyof CartItem, value: string | number) => {
     setCart(cart.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
+
 
   const subtotal = cart.reduce((acc, item) => acc + (item.purchasePrice * item.quantity), 0);
   const total = subtotal + shippingCost;
@@ -115,14 +126,14 @@ export default function AddPurchase() {
     }
   };
 
-  const filteredSearch = products.filter(p => 
-    p.name.toLowerCase().includes(searchProduct.toLowerCase()) || 
+  const filteredSearch = products.filter(p =>
+    p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchProduct.toLowerCase())
   ).slice(0, 5);
 
   return (
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
-      
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-10">
         <Link href="/admin/purchases" className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
@@ -135,17 +146,17 @@ export default function AddPurchase() {
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* LEFT: FORM INPUT */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* 1. Supplier & Warehouse */}
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
                 <Store size={14} /> Pilih Supplier
               </label>
-              <select 
+              <select
                 required
                 className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                 value={selectedSupplier}
@@ -159,7 +170,7 @@ export default function AddPurchase() {
               <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
                 <Truck size={14} /> Gudang Tujuan
               </label>
-              <select 
+              <select
                 required
                 className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                 value={selectedWarehouse}
@@ -174,9 +185,9 @@ export default function AddPurchase() {
           {/* 2. Product Search & Table */}
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-8 border-b border-gray-50">
-               <div className="relative">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input 
+                <input
                   type="text"
                   className="w-full bg-gray-50 pl-12 pr-6 py-5 rounded-2xl text-xs font-bold outline-none"
                   placeholder="Ketik Nama Produk atau Scan Barcode..."
@@ -187,8 +198,8 @@ export default function AddPurchase() {
                 {searchProduct && (
                   <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
                     {filteredSearch.map(p => (
-                      <button 
-                        key={p.id} 
+                      <button
+                        key={p.id}
                         type="button"
                         onClick={() => addToCart(p)}
                         className="w-full p-4 text-left hover:bg-gray-50 flex justify-between items-center group"
@@ -227,18 +238,18 @@ export default function AddPurchase() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center">
-                        <input 
-                          type="number" 
-                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none" 
+                        <input
+                          type="number"
+                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
                           value={item.quantity}
                           onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
                         />
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <input 
-                        type="number" 
-                        className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none" 
+                      <input
+                        type="number"
+                        className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
                         value={item.purchasePrice}
                         onChange={(e) => updateCartItem(item.id, 'purchasePrice', Number(e.target.value))}
                       />
@@ -250,7 +261,7 @@ export default function AddPurchase() {
                 ))}
               </tbody>
             </table>
-            
+
             {cart.length === 0 && (
               <div className="p-20 text-center flex flex-col items-center gap-2">
                 <Package size={40} className="text-gray-100" />
@@ -266,7 +277,7 @@ export default function AddPurchase() {
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
               <Calculator size={14} /> Order Summary
             </h3>
-            
+
             <div className="space-y-4 border-b border-white/10 pb-6">
               <div className="flex justify-between text-xs font-bold">
                 <span className="opacity-60">SUBTOTAL</span>
@@ -274,8 +285,8 @@ export default function AddPurchase() {
               </div>
               <div className="flex justify-between items-center text-xs font-bold">
                 <span className="opacity-60">SHIPPING</span>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   className="bg-white/10 w-24 p-2 rounded-lg text-right outline-none focus:bg-white/20 transition-all"
                   value={shippingCost}
                   onChange={(e) => setShippingCost(Number(e.target.value))}
@@ -290,14 +301,14 @@ export default function AddPurchase() {
 
             <div className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-2">
-                <button 
+                <button
                   type="button"
                   onClick={() => setPaymentStatus('LUNAS')}
                   className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
                 >
                   Paid
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={() => setPaymentStatus('HUTANG')}
                   className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
@@ -306,7 +317,7 @@ export default function AddPurchase() {
                 </button>
               </div>
 
-              <select 
+              <select
                 className="w-full bg-white/5 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
@@ -317,7 +328,7 @@ export default function AddPurchase() {
               </select>
             </div>
 
-            <button 
+            <button
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
@@ -329,7 +340,7 @@ export default function AddPurchase() {
             <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
               <Info size={14} /> Additional Notes
             </h3>
-            <textarea 
+            <textarea
               className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none h-32 resize-none"
               placeholder="Tambahkan instruksi pengiriman atau catatan nota..."
               value={notes}

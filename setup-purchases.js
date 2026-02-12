@@ -1,4 +1,5 @@
 // setup-purchases.js
+/* eslint-disable @typescript-eslint/no-require-imports */
 const admin = require('firebase-admin');
 
 // Ganti dengan path file service account Anda

@@ -1,8 +1,8 @@
 // src/app/tentang/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Image from 'next/image';
+
 
 export default function TentangPage() {
   return (
@@ -34,8 +34,9 @@ export default function TentangPage() {
           </div>
 
           <div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <img src="/logo-atayatoko.png" alt="ATAYATOKO" className="h-20 w-auto mx-auto mb-4" />
+            <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <Image src="/logo-atayatoko.png" alt="ATAYATOKO" width={200} height={80} className="h-20 w-auto mx-auto mb-4" />
+
               <h3 className="text-xl font-bold text-gray-900 mb-2">Visi</h3>
               <p className="text-gray-600 mb-4">
                 Menjadi toko sembako terpercaya di Indonesia dengan layanan terbaik dan harga paling kompetitif.

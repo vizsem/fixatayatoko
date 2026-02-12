@@ -11,7 +11,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { User, Mail, Phone, MapPin, Lock } from 'lucide-react';
+import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function EditProfilePage() {

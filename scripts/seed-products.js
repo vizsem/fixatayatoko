@@ -31,6 +31,7 @@ async function seedProducts() {
         minWholesaleQty: product.minWholesaleQty || 1,
         description: product.description || '',
         image: product.image || '',
+        Status: 1, // Active by default
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });

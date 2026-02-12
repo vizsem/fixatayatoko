@@ -1,4 +1,5 @@
 // setup-firestore.js
+/* eslint-disable @typescript-eslint/no-require-imports */
 const admin = require('firebase-admin');
 
 // Ganti dengan path ke service account key Anda

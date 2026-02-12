@@ -1,25 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
+
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { LucideIcon } from 'lucide-react';
+
 import {
   collection,
   doc,
   getDoc,
   getDocs,
   addDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy
+  deleteDoc
 } from 'firebase/firestore';
+
 import Link from 'next/link';
-import { 
-  Users, 
-  User, 
-  Phone, 
+import {
+  Users,
+  Phone,
   Mail,
   MapPin,
   CreditCard,
@@ -31,9 +32,9 @@ import {
   TrendingUp,
   Search,
   X,
-  ChevronRight,
   Activity
 } from 'lucide-react';
+
 
 // --- TYPES ---
 type Customer = {
@@ -66,8 +67,8 @@ export default function AdminCustomers() {
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
+
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -104,7 +105,7 @@ export default function AdminCustomers() {
       setLoading(true);
       const customersSnapshot = await getDocs(collection(db, 'customers'));
       const ordersSnapshot = await getDocs(collection(db, 'orders'));
-      
+
       const orders = ordersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -113,7 +114,7 @@ export default function AdminCustomers() {
       const customerList: Customer[] = customersSnapshot.docs.map((doc) => {
         const data = doc.data();
         const customerId = doc.id;
-        
+
         // Filter pesanan khusus pelanggan ini
         const customerOrders = orders.filter(o => o.customerId === customerId);
 
@@ -121,14 +122,14 @@ export default function AdminCustomers() {
         const outstandingDebt = customerOrders
           .filter(o => ['MENUNGGU', 'PENDING', 'DIPROSES'].includes(o.status?.toUpperCase()))
           .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-        
+
         // Hitung total pengeluaran (Hanya yang SELESAI / SUCCESS)
         const totalSpent = customerOrders
           .filter(o => ['SELESAI', 'SUCCESS'].includes(o.status?.toUpperCase()))
           .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-        
+
         // Cari tanggal pesanan terakhir
-        const lastOrderDate = customerOrders.length > 0 
+        const lastOrderDate = customerOrders.length > 0
           ? customerOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].createdAt
           : null;
 
@@ -150,11 +151,11 @@ export default function AdminCustomers() {
 
       setCustomers(customerList);
       setFilteredCustomers(customerList);
-      setError(null);
     } catch (err) {
+
       console.error('Fetch Error:', err);
-      setError('Gagal sinkronisasi data server.');
     } finally {
+
       setLoading(false);
     }
   };
@@ -180,8 +181,8 @@ export default function AdminCustomers() {
       setShowAddModal(false);
       setFormData({ name: '', phone: '', email: '', address: '', type: 'ecer', creditLimit: 0, notes: '' });
       fetchData();
-    } catch (err) {
-      alert('Gagal menambahkan pelanggan.');
+    } catch {
+      toast.error("Gagal menambah data");
     }
   };
 
@@ -191,9 +192,11 @@ export default function AdminCustomers() {
     try {
       await deleteDoc(doc(db, 'customers', id));
       setCustomers(customers.filter(c => c.id !== id));
-    } catch (err) {
+    } catch {
       alert('Gagal menghapus.');
     }
+
+
   };
 
   const isOverLimit = (customer: Customer) => {
@@ -203,7 +206,8 @@ export default function AdminCustomers() {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
       <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600 mb-4"></div>
-      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Syncing Client Data...</p>
+      <p className="text-[10px] font-black tracking-[0.3em] text-gray-400">Syncing client data...</p>
+
     </div>
   );
 
@@ -212,12 +216,13 @@ export default function AdminCustomers() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3">
-            <Users className="text-green-600" size={32} /> Client Database
+          <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
+            <Users className="text-green-600" size={32} /> Client database
           </h1>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Manajemen Pelanggan & Piutang Berjalan</p>
+          <p className="text-gray-400 text-xs font-bold tracking-widest mt-1">Manajemen pelanggan & piutang berjalan</p>
         </div>
-        
+
+
         <div className="flex flex-wrap gap-3">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -231,10 +236,11 @@ export default function AdminCustomers() {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-black text-white px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-lg"
+            className="bg-black text-white px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-lg"
           >
-            <Plus size={18} /> Tambah Client
+            <Plus size={18} /> Tambah client
           </button>
+
         </div>
       </div>
 
@@ -252,20 +258,22 @@ export default function AdminCustomers() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Profil Pelanggan</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Detail Kontak</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Kategori</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status Piutang</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Omzet</th>
-                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Action</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Profil pelanggan</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Detail kontak</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Kategori</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Status piutang</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Omzet</th>
+                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 tracking-[0.2em]">Action</th>
               </tr>
+
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-8 py-20 text-center">
                     <Activity className="mx-auto text-gray-200 mb-4" size={40} />
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak ada data ditemukan</p>
+                    <p className="text-[10px] font-black text-gray-400 tracking-widest">Tidak ada data ditemukan</p>
+
                   </td>
                 </tr>
               ) : (
@@ -273,15 +281,17 @@ export default function AdminCustomers() {
                   <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
-                        <span className="font-black text-gray-800 uppercase text-xs tracking-tight">{customer.name}</span>
+                        <span className="font-black text-gray-800 text-xs tracking-tight">{customer.name}</span>
+
                         {customer.notes && (
-                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md mt-1 w-fit uppercase">
+                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md mt-1 w-fit">
                             {customer.notes}
                           </span>
                         )}
-                        <span className="text-[9px] font-bold text-gray-400 mt-1 uppercase">
+                        <span className="text-[9px] font-bold text-gray-400 mt-1">
                           Mulai: {new Date(customer.createdAt).toLocaleDateString('id-ID')}
                         </span>
+
                       </div>
                     </td>
                     <td className="px-6 py-6">
@@ -302,25 +312,26 @@ export default function AdminCustomers() {
                       </div>
                     </td>
                     <td className="px-6 py-6">
-                      <span className={`px-3 py-1 text-[9px] font-black rounded-full uppercase tracking-widest ${
-                        customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
-                      }`}>
+                      <span className={`px-3 py-1 text-[9px] font-black rounded-full tracking-widest ${customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
+                        }`}>
                         {customer.type}
                       </span>
                     </td>
+
                     <td className="px-6 py-6">
                       <div className="flex flex-col">
                         <span className={`text-xs font-black ${isOverLimit(customer) ? 'text-red-600' : 'text-gray-800'}`}>
                           Rp{customer.outstandingDebt.toLocaleString()}
                         </span>
                         {customer.creditLimit > 0 && (
-                          <span className="text-[9px] font-bold text-gray-400 uppercase">Limit: Rp{customer.creditLimit.toLocaleString()}</span>
+                          <span className="text-[9px] font-bold text-gray-400">Limit: Rp{customer.creditLimit.toLocaleString()}</span>
                         )}
                         {isOverLimit(customer) && (
-                          <span className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1 mt-1">
-                            <AlertTriangle size={10} /> Limit Exceeded
+                          <span className="text-[8px] font-black text-red-500 flex items-center gap-1 mt-1">
+                            <AlertTriangle size={10} /> Limit exceeded
                           </span>
                         )}
+
                       </div>
                     </td>
                     <td className="px-6 py-6">
@@ -329,8 +340,9 @@ export default function AdminCustomers() {
                         <span className="text-xs font-black text-gray-800">Rp{customer.totalSpent.toLocaleString()}</span>
                       </div>
                       {customer.lastOrderDate && (
-                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">Terakhir: {new Date(customer.lastOrderDate).toLocaleDateString('id-ID')}</p>
+                        <p className="text-[8px] font-bold text-gray-400 mt-1">Terakhir: {new Date(customer.lastOrderDate).toLocaleDateString('id-ID')}</p>
                       )}
+
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -357,58 +369,68 @@ export default function AdminCustomers() {
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 lg:p-10 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">New Client</h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Entry Database Pelanggan Baru</p>
+                <h2 className="text-2xl font-black text-gray-800 tracking-tighter">New client</h2>
+                <p className="text-[10px] font-bold text-gray-400 tracking-widest">Entry database pelanggan baru</p>
               </div>
+
               <button onClick={() => setShowAddModal(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100"><X size={24} /></button>
             </div>
-            
+
             <form onSubmit={handleCreate} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="col-span-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Nama Lengkap *</label>
-                  <input required className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Nama lengkap *</label>
+                  <input required className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                 </div>
+
                 <div className="col-span-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Tipe Member *</label>
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Tipe member *</label>
                   <select required className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
-                    onChange={(e) => setFormData({...formData, type: e.target.value as any})}>
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'grosir' | 'ecer' })}>
+
+
                     <option value="ecer">ECERAN</option>
                     <option value="grosir">GROSIR</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">WhatsApp / HP *</label>
-                  <input required type="tel" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    placeholder="08..." onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">WhatsApp / HP *</label>
+                  <input required type="tel" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="08..." onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
                 </div>
+
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Email</label>
-                  <input type="email" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Email</label>
+                  <input type="email" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                 </div>
+
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Alamat Lengkap</label>
-                  <textarea rows={2} className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    onChange={(e) => setFormData({...formData, address: e.target.value})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Alamat lengkap</label>
+                  <textarea rows={2} className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
                 </div>
+
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Limit Kredit (Rp)</label>
-                  <input type="number" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    placeholder="0" onChange={(e) => setFormData({...formData, creditLimit: Number(e.target.value)})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Limit kredit (Rp)</label>
+                  <input type="number" className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="0" onChange={(e) => setFormData({ ...formData, creditLimit: Number(e.target.value) })} />
                 </div>
+
                 <div className="col-span-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Catatan Internal</label>
-                  <input className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500" 
-                    placeholder="Misal: Pelanggan setia / pembayaran lancar" onChange={(e) => setFormData({...formData, notes: e.target.value})} />
+                  <label className="text-[10px] font-black text-gray-400 tracking-widest ml-1">Catatan internal</label>
+                  <input className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-2 outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Misal: Pelanggan setia / pembayaran lancar" onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
                 </div>
+
               </div>
 
               <div className="pt-6 flex gap-4">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all">Cancel</button>
-                <button type="submit" className="flex-1 py-5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-green-100 hover:bg-green-700 transition-all">Create Customer</button>
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-5 text-[10px] font-black tracking-widest text-gray-400 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all">Batal</button>
+                <button type="submit" className="flex-1 py-5 bg-green-600 text-white rounded-2xl text-[10px] font-black tracking-widest shadow-xl shadow-green-100 hover:bg-green-700 transition-all">Simpan client</button>
               </div>
+
             </form>
           </div>
         </div>
@@ -417,11 +439,21 @@ export default function AdminCustomers() {
   );
 }
 
-function StatBox({ label, value, icon: Icon, color, bg }: any) {
+interface StatBoxProps {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  color: string;
+  bg: string;
+}
+
+function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
+
   return (
     <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all">
       <div>
-        <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{label}</p>
+        <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-1">{label}</p>
+
         <p className="text-xl font-black text-gray-800 tracking-tighter">{value}</p>
       </div>
       <div className={`${bg} ${color} p-4 rounded-3xl group-hover:scale-110 transition-transform shadow-inner`}>

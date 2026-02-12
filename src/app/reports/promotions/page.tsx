@@ -16,11 +16,16 @@ import {
 import { db } from '@/lib/firebase';
 import { 
   Gift, 
-  Download,
-  Percent,
-  TrendingUp,
-  Calendar
+  Download
 } from 'lucide-react';
+
+type Order = {
+  id: string;
+  promoId?: string;
+  promoCode?: string;
+  discountAmount?: number;
+  [key: string]: unknown;
+};
 
 type PromotionRecord = {
   id: string;
@@ -71,7 +76,7 @@ export default function PromotionsReport() {
         const ordersSnapshot = await getDocs(
           query(collection(db, 'orders'), where('status', '==', 'SELESAI'))
         );
-        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
         const promoList: PromotionRecord[] = promotionsSnapshot.docs.map(doc => {
           const data = doc.data();

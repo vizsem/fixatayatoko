@@ -1,7 +1,8 @@
 // src/app/(admin)/purchases/add/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -47,7 +48,7 @@ export default function AddPurchasePage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [items, setItems] = useState<PurchaseItem[]>([]);
-  
+
   const [formData, setFormData] = useState({
     supplierId: '',
     warehouseId: '',
@@ -58,28 +59,7 @@ export default function AddPurchasePage() {
     dueDate: ''
   });
 
-  // Proteksi admin
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
-        router.push('/profil');
-        return;
-      }
-
-      await loadSupportingData();
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  const loadSupportingData = async () => {
+  const loadSupportingData = useCallback(async () => {
     try {
       // Load suppliers
       const suppliersSnap = await getDocs(collection(db, 'suppliers'));
@@ -109,7 +89,29 @@ export default function AddPurchasePage() {
     } catch (err) {
       console.error('Gagal memuat data pendukung:', err);
     }
-  };
+  }, []);
+
+  // Proteksi admin
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/profil/login');
+        return;
+      }
+
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+        alert('Akses ditolak! Anda bukan admin.');
+        router.push('/profil');
+        return;
+      }
+
+      await loadSupportingData();
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [router, loadSupportingData]);
+
 
   const addItem = () => {
     const newItem: PurchaseItem = {
@@ -122,25 +124,30 @@ export default function AddPurchasePage() {
     setItems([...items, newItem]);
   };
 
-  const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
+  const updateItem = (index: number, field: keyof PurchaseItem, value: string | number) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
+    const updatedItem = { ...newItems[index] };
+
+    if (field === 'purchasePrice' || field === 'quantity') {
+      updatedItem[field] = Number(value);
+    } else if (field === 'productId' || field === 'name' || field === 'unit') {
+      updatedItem[field] = String(value);
+    }
+
     // Jika productId berubah, update detail produk
     if (field === 'productId' && value) {
       const product = products.find(p => p.id === value);
       if (product) {
-        newItems[index] = {
-          ...newItems[index],
-          name: product.name,
-          purchasePrice: product.purchasePrice,
-          unit: product.unit
-        };
+        updatedItem.name = product.name;
+        updatedItem.purchasePrice = product.purchasePrice;
+        updatedItem.unit = product.unit;
       }
     }
-    
+
+    newItems[index] = updatedItem;
     setItems(newItems);
   };
+
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
@@ -156,7 +163,7 @@ export default function AddPurchasePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (items.length === 0) {
       alert('Tambahkan minimal 1 produk!');
       return;
@@ -223,7 +230,7 @@ export default function AddPurchasePage() {
               <select
                 required
                 value={formData.supplierId}
-                onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               >
                 <option value="">Pilih supplier...</option>
@@ -242,7 +249,7 @@ export default function AddPurchasePage() {
               <select
                 required
                 value={formData.warehouseId}
-                onChange={(e) => setFormData({...formData, warehouseId: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               >
                 <option value="">Pilih gudang...</option>
@@ -261,7 +268,7 @@ export default function AddPurchasePage() {
               <select
                 required
                 value={formData.paymentMethod}
-                onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               >
                 <option value="CASH">Tunai</option>
@@ -277,7 +284,8 @@ export default function AddPurchasePage() {
               <select
                 required
                 value={formData.paymentStatus}
-                onChange={(e) => setFormData({...formData, paymentStatus: e.target.value as any})}
+                onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value as 'LUNAS' | 'HUTANG' | 'DP' })}
+
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               >
                 <option value="LUNAS">Lunas</option>
@@ -294,7 +302,7 @@ export default function AddPurchasePage() {
                 <input
                   type="date"
                   value={formData.dueDate}
-                  onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
                 />
               </div>
@@ -308,7 +316,7 @@ export default function AddPurchasePage() {
                 type="number"
                 min="0"
                 value={formData.shippingCost}
-                onChange={(e) => setFormData({...formData, shippingCost: Number(e.target.value)})}
+                onChange={(e) => setFormData({ ...formData, shippingCost: Number(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               />
             </div>
@@ -319,7 +327,7 @@ export default function AddPurchasePage() {
               </label>
               <textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
                 rows={3}
               />

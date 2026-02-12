@@ -277,4 +277,4 @@ export default function InventoryReport() {
   );
 }
 
-declare const XLSX: any;
+import * as XLSX from 'xlsx';

@@ -15,20 +15,19 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Gift, 
-  Tag, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Gift,
+  Tag,
   Calendar,
-  Percent,
-  CheckCircle,
   AlertTriangle,
   Zap,
   Layers,
   Clock
 } from 'lucide-react';
+
 
 // Update Tipe Data untuk Mendukung Flash Sale & Bundle
 type Promotion = {
@@ -81,13 +80,13 @@ export default function PromotionsPage() {
         id: doc.id,
         ...doc.data()
       })) as Promotion[];
-      
+
       setPromotions(promoList);
       setError(null);
-    }, (err) => {
-      console.error('Gagal memuat promosi:', err);
+    }, () => {
       setError('Gagal memuat data promosi.');
     });
+
 
     return () => unsubscribe();
   }, [loading]);
@@ -96,10 +95,10 @@ export default function PromotionsPage() {
     if (!confirm(`Hapus promosi "${name}"?`)) return;
     try {
       await deleteDoc(doc(db, 'promotions', id));
-    } catch (err) {
+    } catch {
       alert('Gagal menghapus promosi.');
-      console.error(err);
     }
+
   };
 
   const isExpired = (endDate: string) => {
@@ -132,13 +131,13 @@ export default function PromotionsPage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <div className="bg-black p-2 rounded-lg text-white">
-                <Gift size={24} />
+              <Gift size={24} />
             </div>
             <h1 className="text-2xl font-black text-black uppercase tracking-tight">Marketing Center</h1>
           </div>
           <p className="text-gray-500 text-sm">Kelola diskon, Flash Sale, dan promo kategori untuk meningkatkan penjualan.</p>
         </div>
-        
+
         <Link
           href="/admin/promotions/add"
           className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-100 flex items-center justify-center gap-2"
@@ -159,12 +158,12 @@ export default function PromotionsPage() {
       {/* Stats Mini */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-2xl border border-gray-100">
-            <p className="text-[10px] font-black text-gray-400 uppercase">Total Program</p>
-            <p className="text-xl font-black text-black">{promotions.length}</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase">Total Program</p>
+          <p className="text-xl font-black text-black">{promotions.length}</p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-gray-100">
-            <p className="text-[10px] font-black text-gray-400 uppercase">Aktif Sekarang</p>
-            <p className="text-xl font-black text-green-600">{promotions.filter(p => isActiveNow(p)).length}</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase">Aktif Sekarang</p>
+          <p className="text-xl font-black text-green-600">{promotions.filter(p => isActiveNow(p)).length}</p>
         </div>
       </div>
 
@@ -187,8 +186,8 @@ export default function PromotionsPage() {
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center opacity-20">
-                        <Gift size={48} className="mb-4" />
-                        <p className="text-sm font-black uppercase tracking-widest">Belum ada promo aktif</p>
+                      <Gift size={48} className="mb-4" />
+                      <p className="text-sm font-black uppercase tracking-widest">Belum ada promo aktif</p>
                     </div>
                   </td>
                 </tr>
@@ -196,7 +195,7 @@ export default function PromotionsPage() {
                 promotions.map((promo) => {
                   const expired = isExpired(promo.endDate);
                   const activeNow = isActiveNow(promo);
-                  
+
                   return (
                     <tr key={promo.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
@@ -221,9 +220,9 @@ export default function PromotionsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-black text-green-600">
-                            {promo.discountType === 'percentage' 
-                              ? `${promo.discountValue}%` 
-                              : `Rp${(promo.discountValue || 0).toLocaleString('id-ID')}`}
+                          {promo.discountType === 'percentage'
+                            ? `${promo.discountValue}%`
+                            : `Rp${(promo.discountValue || 0).toLocaleString('id-ID')}`}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -283,7 +282,7 @@ export default function PromotionsPage() {
       </div>
 
       <div className="mt-8 text-center">
-         <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.3em]">Atayatoko Marketing Engine v2.0</p>
+        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.3em]">Atayatoko Marketing Engine v2.0</p>
       </div>
     </div>
   );

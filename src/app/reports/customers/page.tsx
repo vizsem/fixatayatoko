@@ -25,6 +25,15 @@ import {
 // 🔴 PERBAIKAN 1: Import XLSX secara dinamis (SSR-safe)
 import * as XLSX from 'xlsx';
 
+type Order = {
+  id: string;
+  customerId: string;
+  total: number;
+  status: string;
+  createdAt: string;
+  [key: string]: unknown;
+};
+
 type Customer = {
   id: string;
   name: string;
@@ -92,14 +101,16 @@ export default function CustomerReport() {
             where('createdAt', '<=', endDate.toISOString())
           )
         );
-        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
         const customerList: Customer[] = customersSnapshot.docs.map(doc => {
           const data = doc.data();
           const customerId = doc.id;
 
-          const customerOrders = orders.filter(order => order.customerId === customerId);
-          const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          const customerOrders = orders.filter((order) => order.customerId === customerId);
+          const totalSpent = customerOrders
+            .filter((order) => order.status === 'SELESAI')
+            .reduce((sum, order) => sum + (order.total || 0), 0);
           const orderCount = customerOrders.length;
 
           const outstandingOrders = customerOrders.filter(
@@ -111,7 +122,7 @@ export default function CustomerReport() {
           let lastOrderDate: string | undefined;
           if (customerOrders.length > 0) {
             lastOrderDate = customerOrders
-              .map(o => o.createdAt)
+              .map((o) => o.createdAt)
               .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
           }
 
@@ -176,7 +187,7 @@ export default function CustomerReport() {
     }));
 
     // 🔴 PERBAIKAN 3: Pastikan di sisi klien & XLSX tersedia
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && XLSX) {
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Laporan Pelanggan');
@@ -318,7 +329,7 @@ export default function CustomerReport() {
               <label className="text-sm text-black">Urutkan berdasarkan:</label>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'totalSpent' | 'outstandingDebt' | 'orderCount')}
                 className="text-sm border border-gray-300 rounded px-2 py-1 text-black"
               >
                 <option value="totalSpent">Total Belanja</option>

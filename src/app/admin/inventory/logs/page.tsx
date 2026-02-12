@@ -3,17 +3,32 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
-import { 
-  History, ArrowLeft, Search, Filter, 
-  ArrowUpCircle, ArrowDownCircle, User, Warehouse, Package 
+import {
+  ArrowLeft, Search,
+  ArrowUpCircle, ArrowDownCircle, User, Warehouse, Package
 } from 'lucide-react';
+
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
+interface StockLog {
+  id: string;
+  adminEmail: string;
+  productName: string;
+  warehouseName: string;
+  change: number;
+  previousStock: number;
+  newStock: number;
+  type?: string;
+  createdAt?: Timestamp;
+}
+
+
 export default function StockLogsPage() {
   const router = useRouter();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<StockLog[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -29,7 +44,8 @@ export default function StockLogsPage() {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as StockLog[];
+
       setLogs(data);
       setLoading(false);
     });
@@ -37,7 +53,7 @@ export default function StockLogsPage() {
     return () => unsubscribe();
   }, []);
 
-  const filteredLogs = logs.filter(log => 
+  const filteredLogs = logs.filter(log =>
     log.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     log.adminEmail?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -45,12 +61,12 @@ export default function StockLogsPage() {
   return (
     <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.back()} 
+            <button
+              onClick={() => router.back()}
               className="p-4 bg-white shadow-sm rounded-2xl hover:bg-black hover:text-white transition-all"
             >
               <ArrowLeft size={20} />
@@ -63,8 +79,8 @@ export default function StockLogsPage() {
 
           <div className="relative group w-full md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="CARI PRODUK ATAU ADMIN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

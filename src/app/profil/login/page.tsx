@@ -64,9 +64,10 @@ export default function LoginPage() {
       // Berhasil, pindah ke profil
       router.push('/profil');
       
-    } catch (error: any) {
+    } catch (error) {
       console.error("Google Login Error:", error);
-      alert("Gagal Login Google: " + error.message);
+      const message = error instanceof Error ? error.message : 'Terjadi kesalahan';
+      alert("Gagal Login Google: " + message);
     } finally {
       setLoading(false);
     }
@@ -93,7 +94,8 @@ export default function LoginPage() {
       }
 
       router.push('/profil');
-    } catch (error: any) {
+    } catch (error) {
+      console.error(error);
       alert("Email/Password salah!");
     } finally {
       setLoading(false);

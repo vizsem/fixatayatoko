@@ -1,36 +1,7 @@
-import { db } from '@/lib/firebase';
-import { 
-  collection, 
-  doc, 
-  serverTimestamp 
-} from 'firebase/firestore';
+import { Product, CartItem } from './types';
 
-// ✅ Tipe Product disesuaikan dengan kolom Excel terbaru
-export type Product = {
-  id: string;         // ID dokumen Firestore
-  ID: string;         // ID Unik (contoh: AT001)
-  Barcode: string;
-  Parent_ID: string;
-  Nama: string;
-  Kategori: string;
-  Satuan: string;
-  Stok: number;
-  Min_Stok: number;
-  Modal: number;
-  Ecer: number;       // Harga jual satuan
-  Harga_Coret: number;
-  Grosir: number;     // Harga jual grosir
-  Min_Grosir: number; // Minimal beli untuk harga grosir
-  Link_Foto: string;
-  Deskripsi: string;
-  Status: number;
-  Supplier: string;
-  No_WA_Supplier: string;
-  updatedAt?: any;
-};
+// No unused imports needed here
 
-// ✅ Tipe CartItem = Product + quantity
-export type CartItem = Product & { quantity: number };
 
 // Fungsi untuk mengambil keranjang dari localStorage
 export const getCart = (): CartItem[] => {
@@ -52,13 +23,13 @@ export const saveCart = (cart: CartItem[]): void => {
 export const addToCart = (product: Product): void => {
   const cart = getCart();
   const existingItem = cart.find(item => item.id === product.id);
-  
+
   if (existingItem) {
     existingItem.quantity += 1;
   } else {
     cart.push({ ...product, quantity: 1 });
   }
-  
+
   saveCart(cart);
 };
 
@@ -68,7 +39,7 @@ export const updateQuantity = (id: string, quantity: number): void => {
   const updatedCart = cart
     .map(item => item.id === id ? { ...item, quantity } : item)
     .filter(item => item.quantity > 0);
-  
+
   saveCart(updatedCart);
 };
 

@@ -1,4 +1,5 @@
 // generate-pages.js
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const path = require('path');
 
@@ -50,7 +51,7 @@ export default function Admin${folder.charAt(0).toUpperCase() + folder.slice(1)}
 
   // Tulis file
   fs.writeFileSync(filePath, content);
-  console.log(\`✅ Created: \${filePath}\`);
+  console.log(`✅ Created: ${filePath}`);
 });
 
 console.log('✅ Semua halaman telah dibuat!');

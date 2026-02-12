@@ -1,26 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  addDoc, 
-  serverTimestamp 
+
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { 
-  ArrowLeft, 
-  RotateCcw, 
-  Search, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  RotateCcw,
+  Search,
+  AlertCircle,
   CheckCircle2,
-  Package,
   ClipboardCheck,
-  Plus,
-  Minus
+  Plus
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -32,16 +30,16 @@ type Product = {
 };
 
 export default function StockOpnamePage() {
-  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
+
   // Form State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [physicalStock, setPhysicalStock] = useState<number>(0);
   const [note, setNote] = useState('');
-  const [status, setStatus] = useState<{type: 'success' | 'error', msg: string} | null>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
   // 1. Fetch Produk dengan Proteksi Data
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function StockOpnamePage() {
 
     try {
       const productRef = doc(db, 'products', selectedProduct.id);
-      
+
       // A. Update stok di tabel produk sesuai fisik
       await updateDoc(productRef, {
         stock: physicalStock
@@ -103,12 +101,12 @@ export default function StockOpnamePage() {
       });
 
       setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });
-      
+
       // Update state lokal agar UI sinkron
-      setProducts(prev => prev.map(p => 
+      setProducts(prev => prev.map(p =>
         p.id === selectedProduct.id ? { ...p, stock: physicalStock } : p
       ));
-      
+
       // Reset Form
       setTimeout(() => {
         setSelectedProduct(null);
@@ -117,9 +115,10 @@ export default function StockOpnamePage() {
         setNote('');
       }, 1500);
 
-    } catch (error) {
+    } catch {
       setStatus({ type: 'error', msg: 'Gagal memproses opname.' });
     } finally {
+
       setLoading(false);
     }
   };
@@ -127,7 +126,7 @@ export default function StockOpnamePage() {
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black font-sans">
       <div className="max-w-2xl mx-auto">
-        
+
         <div className="flex items-center gap-4 mb-8">
           <Link href="/admin/inventory" className="p-2 bg-white rounded-xl border hover:bg-gray-100 transition shadow-sm">
             <ArrowLeft size={20} />
@@ -138,9 +137,8 @@ export default function StockOpnamePage() {
         </div>
 
         {status && (
-          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm border animate-in fade-in ${
-            status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
-          }`}>
+          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm border animate-in fade-in ${status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
+            }`}>
             {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
             {status.msg}
           </div>
@@ -148,14 +146,14 @@ export default function StockOpnamePage() {
 
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
           <form onSubmit={handleOpname} className="space-y-6">
-            
+
             {/* CARI PRODUK */}
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Cari Produk yang akan dicek</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Ketik nama barang..."
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-black"
                   value={searchTerm}
@@ -180,39 +178,39 @@ export default function StockOpnamePage() {
               <div className="space-y-6 animate-in slide-in-from-top-2">
                 {/* Info Komparasi */}
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase">Stok di Sistem</p>
-                        <p className="text-xl font-black">{selectedProduct.stock} <span className="text-xs">{selectedProduct.unit}</span></p>
-                    </div>
-                    <div className={`p-4 rounded-2xl border ${diff === 0 ? 'bg-gray-50 border-gray-100' : diff > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                        <p className="text-[9px] font-black text-gray-400 uppercase">Selisih Fisik</p>
-                        <p className={`text-xl font-black flex items-center gap-1 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                            {diff > 0 && <Plus size={16}/>} {diff} <span className="text-xs">{selectedProduct.unit}</span>
-                        </p>
-                    </div>
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <p className="text-[9px] font-black text-gray-400 uppercase">Stok di Sistem</p>
+                    <p className="text-xl font-black">{selectedProduct.stock} <span className="text-xs">{selectedProduct.unit}</span></p>
+                  </div>
+                  <div className={`p-4 rounded-2xl border ${diff === 0 ? 'bg-gray-50 border-gray-100' : diff > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                    <p className="text-[9px] font-black text-gray-400 uppercase">Selisih Fisik</p>
+                    <p className={`text-xl font-black flex items-center gap-1 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {diff > 0 && <Plus size={16} />} {diff} <span className="text-xs">{selectedProduct.unit}</span>
+                    </p>
+                  </div>
                 </div>
 
                 {/* Input Fisik */}
                 <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Masukkan Jumlah Fisik Sebenarnya</label>
-                    <input 
-                        type="number" 
-                        required
-                        className="w-full p-5 bg-orange-50 border-2 border-orange-100 rounded-3xl text-3xl font-black text-center outline-none focus:border-orange-500 transition-all"
-                        value={physicalStock}
-                        onChange={(e) => setPhysicalStock(Number(e.target.value))}
-                    />
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Masukkan Jumlah Fisik Sebenarnya</label>
+                  <input
+                    type="number"
+                    required
+                    className="w-full p-5 bg-orange-50 border-2 border-orange-100 rounded-3xl text-3xl font-black text-center outline-none focus:border-orange-500 transition-all"
+                    value={physicalStock}
+                    onChange={(e) => setPhysicalStock(Number(e.target.value))}
+                  />
                 </div>
 
                 {/* Catatan */}
                 <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Keterangan Selisih (Opsional)</label>
-                    <textarea 
-                        placeholder="Contoh: Barang pecah di rak, atau bonus dari supplier..."
-                        className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-medium outline-none focus:ring-2 focus:ring-black h-24"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                    />
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Keterangan Selisih (Opsional)</label>
+                  <textarea
+                    placeholder="Contoh: Barang pecah di rak, atau bonus dari supplier..."
+                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-medium outline-none focus:ring-2 focus:ring-black h-24"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
                 </div>
 
                 <button

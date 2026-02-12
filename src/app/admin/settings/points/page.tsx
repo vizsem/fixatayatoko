@@ -4,23 +4,30 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ticket, Save, Info, ArrowRightLeft, Coins } from 'lucide-react';
 
+interface PointConfig {
+  earningRate: number;
+  redemptionValue: number;
+  minRedeem: number;
+}
+
 export default function PointSettings() {
-  const [config, setConfig] = useState({ earningRate: 0, redemptionValue: 0, minRedeem: 0 });
-  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState<PointConfig>({ earningRate: 0, redemptionValue: 0, minRedeem: 0 });
 
   useEffect(() => {
     const fetchConfig = async () => {
       const snap = await getDoc(doc(db, 'settings', 'points'));
-      if (snap.exists()) setConfig(snap.data() as any);
-      setLoading(false);
+      if (snap.exists()) setConfig(snap.data() as PointConfig);
     };
     fetchConfig();
   }, []);
 
+
   const handleSave = async () => {
-    await updateDoc(doc(db, 'settings', 'points'), config);
+    await updateDoc(doc(db, 'settings', 'points'), config as unknown as { [key: string]: number });
     alert("Pengaturan point disimpan!");
   };
+
+
 
   return (
     <div className="p-10 bg-[#FBFBFE] min-h-screen">
@@ -38,11 +45,11 @@ export default function PointSettings() {
             <div className="flex items-center gap-4 bg-gray-50 p-6 rounded-3xl">
               <div className="flex-1">
                 <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Setiap Belanja</p>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   className="bg-transparent text-xl font-black outline-none w-full"
                   value={config.earningRate}
-                  onChange={(e) => setConfig({...config, earningRate: Number(e.target.value)})}
+                  onChange={(e) => setConfig({ ...config, earningRate: Number(e.target.value) })}
                 />
               </div>
               <ArrowRightLeft className="text-gray-300" />
@@ -62,19 +69,19 @@ export default function PointSettings() {
               <div className="flex-1">
                 <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">1 Point Sama Dengan</p>
                 <div className="flex items-center gap-2">
-                   <span className="text-xl font-black text-orange-500">Rp</span>
-                   <input 
-                    type="number" 
+                  <span className="text-xl font-black text-orange-500">Rp</span>
+                  <input
+                    type="number"
                     className="bg-transparent text-xl font-black outline-none w-full"
                     value={config.redemptionValue}
-                    onChange={(e) => setConfig({...config, redemptionValue: Number(e.target.value)})}
+                    onChange={(e) => setConfig({ ...config, redemptionValue: Number(e.target.value) })}
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleSave}
             className="w-full bg-black text-white py-6 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
           >

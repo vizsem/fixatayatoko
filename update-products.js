@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const admin = require('firebase-admin');
 
 // 1. Inisialisasi - Pastikan file JSON ada di folder yang sama!
@@ -20,7 +21,7 @@ async function safeUpdateProducts() {
     productsSnapshot.docs.forEach((doc) => {
       const p = doc.data();
       const docRef = db.collection('products').doc(doc.id);
-      
+
       // Logika khusus untuk barcode Pop Ice sesuai permintaan Anda
       let finalBarcode = p.barcode || p.Barcode || "";
       if (doc.id === "00svHwNozsoP6kH4QjqK" || p.name === "Pop Ice renteng isi 10 pcs aneka macam pilihan rasa") {
@@ -50,7 +51,7 @@ async function safeUpdateProducts() {
       };
 
       // 3. Gunakan { merge: true } agar field lama (name, price, stock) TIDAK TERHAPUS
-      batch.set(docRef, syncData, { merge: true }); 
+      batch.set(docRef, syncData, { merge: true });
       console.log(`✅ Sinkron Berhasil: ${syncData.Nama}`);
     });
 

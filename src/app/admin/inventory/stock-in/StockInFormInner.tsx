@@ -1,7 +1,9 @@
 // src/app/admin/inventory/stock-in/StockInFormInner.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+
+
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -15,8 +17,9 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import Link from 'next/link';
 import { ArrowDown, Plus } from 'lucide-react';
+
+
 
 type Product = {
   id: string;
@@ -43,31 +46,13 @@ export default function StockInFormInner({ productId }: { productId: string }) {
     purchasePrice: 0,
     expiredDate: ''
   });
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // Proteksi admin
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+  const selectedProduct = useMemo(() => {
+    return products.find(p => p.id === formData.productId) || null;
+  }, [formData.productId, products]);
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
-        router.push('/profil');
-        return;
-      }
 
-      // Load data
-      await loadSupportingData();
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router, productId]);
-
-  const loadSupportingData = async () => {
+  const loadSupportingData = useCallback(async () => {
     try {
       // Load products
       const productsSnap = await getDocs(collection(db, 'products'));
@@ -89,27 +74,42 @@ export default function StockInFormInner({ productId }: { productId: string }) {
 
       // Set default product if provided
       if (productId) {
-        const product = productList.find(p => p.id === productId);
-        if (product) {
-          setSelectedProduct(product);
-          setFormData(prev => ({ ...prev, productId }));
-        }
+        setFormData(prev => ({ ...prev, productId }));
       }
+
     } catch (err) {
       console.error('Gagal memuat data:', err);
     }
-  };
+  }, [productId]);
 
+  // Proteksi admin
   useEffect(() => {
-    if (formData.productId) {
-      const product = products.find(p => p.id === formData.productId);
-      setSelectedProduct(product || null);
-    }
-  }, [formData.productId, products]);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/profil/login');
+        return;
+      }
+
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+        alert('Akses ditolak! Anda bukan admin.');
+        router.push('/profil');
+        return;
+      }
+
+      // Load data
+      await loadSupportingData();
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [router, loadSupportingData]);
+
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.quantity <= 0) {
       alert('Jumlah harus lebih dari 0');
       return;
@@ -129,7 +129,8 @@ export default function StockInFormInner({ productId }: { productId: string }) {
         createdAt: serverTimestamp()
       };
 
-      const transactionRef = await addDoc(collection(db, 'inventory_transactions'), transactionData);
+      await addDoc(collection(db, 'inventory_transactions'), transactionData);
+
 
       // 2. Update stok produk
       const productRef = doc(db, 'products', formData.productId);
@@ -180,7 +181,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           <select
             required
             value={formData.productId}
-            onChange={(e) => setFormData({...formData, productId: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
           >
             <option value="">Pilih produk...</option>
@@ -199,7 +200,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           <select
             required
             value={formData.supplierId}
-            onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
           >
             <option value="">Pilih supplier...</option>
@@ -221,12 +222,12 @@ export default function StockInFormInner({ productId }: { productId: string }) {
               required
               min="1"
               value={formData.quantity}
-              onChange={(e) => setFormData({...formData, quantity: Number(e.target.value)})}
+              onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               placeholder="100"
             />
           </div>
-          
+
           <div>
             <label className="block text-black text-sm font-medium mb-2">
               Harga Beli (Rp) *
@@ -236,7 +237,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
               required
               min="0"
               value={formData.purchasePrice}
-              onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})}
+              onChange={(e) => setFormData({ ...formData, purchasePrice: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               placeholder="10000"
             />
@@ -250,7 +251,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           <input
             type="date"
             value={formData.expiredDate}
-            onChange={(e) => setFormData({...formData, expiredDate: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, expiredDate: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
           />
         </div>

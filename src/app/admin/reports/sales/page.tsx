@@ -1,7 +1,8 @@
 // src/app/(admin)/reports/sales/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -14,13 +15,12 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  TrendingUp, 
-  Calendar,
+import * as XLSX from 'xlsx';
+import {
+  TrendingUp,
   Download,
   Package,
-  CreditCard,
-  User
+  CreditCard
 } from 'lucide-react';
 
 type SaleItem = {
@@ -43,6 +43,19 @@ export default function SalesReport() {
   });
   const [sortBy, setSortBy] = useState<'date' | 'total' | 'quantity'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const sortedSales = useMemo(() => {
+    return [...sales].sort((a, b) => {
+      const valA = a[sortBy];
+      const valB = b[sortBy];
+      if (sortOrder === 'asc') {
+        return valA > valB ? 1 : -1;
+      } else {
+        return valA < valB ? 1 : -1;
+      }
+    });
+  }, [sales, sortBy, sortOrder]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -68,7 +81,7 @@ export default function SalesReport() {
         const startDate = new Date(dateRange.startDate);
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
-        
+
         const ordersSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
@@ -102,21 +115,11 @@ export default function SalesReport() {
     fetchSalesData();
   }, [dateRange]);
 
-  useEffect(() => {
-    const sorted = [...sales].sort((a, b) => {
-      const valA = a[sortBy];
-      const valB = b[sortBy];
-      if (sortOrder === 'asc') {
-        return valA > valB ? 1 : -1;
-      } else {
-        return valA < valB ? 1 : -1;
-      }
-    });
-    setSales(sorted);
-  }, [sortBy, sortOrder]);
+
 
   const handleExport = () => {
-    const exportData = sales.map(sale => ({
+    const exportData = sortedSales.map(sale => ({
+
       Tanggal: new Date(sale.date).toLocaleDateString('id-ID'),
       Produk: sale.productName,
       Kuantitas: sale.quantity,
@@ -142,8 +145,9 @@ export default function SalesReport() {
     );
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalItems = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+  const totalSales = sortedSales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalItems = sortedSales.reduce((sum, sale) => sum + sale.quantity, 0);
+
 
   return (
     <div className="p-6">
@@ -159,7 +163,7 @@ export default function SalesReport() {
             <input
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -168,7 +172,7 @@ export default function SalesReport() {
             <input
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -198,7 +202,7 @@ export default function SalesReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -210,12 +214,13 @@ export default function SalesReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-black">Jumlah Transaksi</p>
-              <p className="text-2xl font-bold mt-1">{new Set(sales.map(s => s.id)).size}</p>
+              <p className="text-2xl font-bold mt-1">{new Set(sortedSales.map(s => s.id)).size}</p>
+
             </div>
             <div className="bg-purple-100 p-3 rounded-full">
               <CreditCard className="text-purple-600" size={24} />
@@ -232,8 +237,9 @@ export default function SalesReport() {
               <label className="text-sm text-black">Urutkan:</label>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'date' | 'total' | 'quantity')}
                 className="text-sm border border-gray-300 rounded px-2 py-1 text-black"
+
               >
                 <option value="date">Tanggal</option>
                 <option value="total">Total</option>
@@ -248,7 +254,7 @@ export default function SalesReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -274,7 +280,8 @@ export default function SalesReport() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sales.length === 0 ? (
+              {sortedSales.length === 0 ? (
+
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-black">
                     <TrendingUp className="mx-auto h-10 w-10 text-gray-400 mb-3" />
@@ -282,7 +289,8 @@ export default function SalesReport() {
                   </td>
                 </tr>
               ) : (
-                sales.map((sale, index) => (
+                sortedSales.map((sale, index) => (
+
                   <tr key={index} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-black">
                       {new Date(sale.date).toLocaleDateString('id-ID')}
@@ -304,5 +312,3 @@ export default function SalesReport() {
     </div>
   );
 }
-
-declare const XLSX: any;

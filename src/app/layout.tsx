@@ -1,40 +1,22 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
+import MobileNav from '@/components/MobileNav';
 
-/* =========================
-   GLOBAL TYPE (SheetJS)
-========================= */
 declare global {
   interface Window {
-    XLSX: any;
+    XLSX: typeof import('xlsx');
   }
 }
-export {}; // ⬅️ WAJIB agar declare global valid di module
+export {};
 
-/* =========================
-   FONTS
-========================= */
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-
-/* =========================
-   METADATA BISNIS
-========================= */
 export const metadata: Metadata = {
   title: 'ATAYATOKO2 - Sembako Grosir & Ecer',
   description:
     'Lengkap • Hemat • Terpercaya. Belanja sembako grosir & ecer online atau langsung di toko.',
   keywords: 'sembako, grosir, ecer, kediri, toko sembako, ATAYATOKO2',
   authors: [{ name: 'ATAYATOKO2 Team' }],
+  manifest: '/site.webmanifest',
   openGraph: {
     title: 'ATAYATOKO2 - Sembako Grosir & Ecer',
     description: 'Lengkap • Hemat • Terpercaya',
@@ -61,21 +43,10 @@ export default function RootLayout({
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
       </head>
 
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         {children}
-
-        {/* 
-          ✅ SheetJS XLSX
-          - Client only
-          - Tidak bikin hydration error
-          - File di /public/xlsx.full.min.js
-        */}
-        <Script
-          src="/xlsx.full.min.js"
-          strategy="afterInteractive"
-        />
+        <MobileNav />
+        <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
       </body>
     </html>
   );

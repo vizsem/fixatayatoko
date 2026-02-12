@@ -1,9 +1,9 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
   deleteDoc,
   getDocs,
   query,
@@ -12,37 +12,15 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// Sesuaikan interface dengan kolom Excel terbaru Anda
-export interface Product {
-  id: string; // ID Firestore
-  ID: string; // ID dari Excel/Manual
-  Barcode: string;
-  Parent_ID: string;
-  Nama: string;
-  Kategori: string;
-  Satuan: string;
-  Stok: number;
-  Min_Stok: number;
-  Modal: number;
-  Ecer: number;
-  Harga_Coret: number;
-  Grosir: number;
-  Min_Grosir: number;
-  Link_Foto: string;
-  Deskripsi: string;
-  Status: number;
-  Supplier: string;
-  No_WA_Supplier: string;
-  updatedAt?: any;
-  createdAt?: any;
-}
+import { Product } from './types';
+
 
 // ✅ Membuat Produk Baru
 export async function createProduct(product: Omit<Product, 'id'>): Promise<string> {
   // Gunakan ID dari Excel sebagai ID dokumen jika tersedia, jika tidak generate otomatis
   const customId = product.ID || undefined;
   const docRef = customId ? doc(db, 'products', customId) : doc(collection(db, 'products'));
-  
+
   await setDoc(docRef, {
     ...product,
     createdAt: serverTimestamp(),
@@ -76,11 +54,11 @@ export async function deleteProduct(id: string): Promise<void> {
 // ✅ Ambil Semua Produk (Bisa difilter yang aktif saja)
 export async function getProducts(onlyActive = false): Promise<Product[]> {
   let q = query(collection(db, 'products'));
-  
+
   if (onlyActive) {
     q = query(collection(db, 'products'), where("Status", "==", 1));
   }
-  
+
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({
     id: doc.id,

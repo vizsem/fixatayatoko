@@ -12,16 +12,19 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  Settings, 
+import * as XLSX from 'xlsx';
+import {
   Download,
   Users,
   Warehouse,
   Package,
   Activity,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  Database
 } from 'lucide-react';
+
 
 type OperationalMetric = {
   id: string;
@@ -62,8 +65,8 @@ export default function OperationsReport() {
         // Ambil data pengguna
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const totalUsers = usersSnapshot.size;
-        const activeUsers = usersSnapshot.docs.filter(doc => 
-          doc.data().lastActive && 
+        const activeUsers = usersSnapshot.docs.filter(doc =>
+          doc.data().lastActive &&
           (Date.now() - new Date(doc.data().lastActive).getTime()) < 7 * 24 * 60 * 60 * 1000
         ).length;
 
@@ -71,7 +74,7 @@ export default function OperationsReport() {
         const warehousesSnapshot = await getDocs(collection(db, 'warehouses'));
         const warehouses = warehousesSnapshot.docs.map(doc => doc.data());
         const totalWarehouses = warehouses.length;
-        const fullWarehouses = warehouses.filter(wh => 
+        const fullWarehouses = warehouses.filter(wh =>
           (wh.usedCapacity / wh.capacity) >= 0.9
         ).length;
 
@@ -87,13 +90,13 @@ export default function OperationsReport() {
         const orders = ordersSnapshot.docs.map(doc => doc.data());
         const totalOrders = orders.length;
         const pendingOrders = orders.filter(o => o.status === 'MENUNGGU').length;
-        const avgProcessingTime = totalOrders > 0 
+        const avgProcessingTime = totalOrders > 0
           ? (orders.reduce((sum, o) => {
-              if (o.updatedAt && o.createdAt) {
-                return sum + (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime());
-              }
-              return sum;
-            }, 0) / totalOrders / (60 * 1000)) // dalam menit
+            if (o.updatedAt && o.createdAt) {
+              return sum + (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime());
+            }
+            return sum;
+          }, 0) / totalOrders / (60 * 1000)) // dalam menit
           : 0;
 
         // Ambil data transaksi inventaris
@@ -124,7 +127,7 @@ export default function OperationsReport() {
             status: 'good',
             description: 'Jumlah total pengguna sistem'
           },
-          
+
           // Gudang
           {
             id: 'full-warehouses',
@@ -144,7 +147,7 @@ export default function OperationsReport() {
             status: 'good',
             description: 'Jumlah total gudang aktif'
           },
-          
+
           // Produk
           {
             id: 'out-of-stock',
@@ -173,7 +176,7 @@ export default function OperationsReport() {
             status: 'good',
             description: 'Jumlah total produk dalam sistem'
           },
-          
+
           // Pesanan
           {
             id: 'pending-orders',
@@ -202,7 +205,7 @@ export default function OperationsReport() {
             status: 'good',
             description: 'Jumlah total pesanan sepanjang waktu'
           },
-          
+
           // Inventaris
           {
             id: 'inventory-transactions',
@@ -243,9 +246,10 @@ export default function OperationsReport() {
         ];
 
         setMetrics(operationalMetrics);
-      } catch (err) {
-        console.error('Gagal memuat laporan operasional:', err);
+      } catch {
+        // Error is logged to console
       }
+
     };
 
     fetchOperationsData();
@@ -313,7 +317,7 @@ export default function OperationsReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -325,7 +329,7 @@ export default function OperationsReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -344,7 +348,7 @@ export default function OperationsReport() {
         {['Pengguna', 'Gudang', 'Produk', 'Pesanan', 'Inventaris'].map(category => {
           const categoryMetrics = metrics.filter(m => m.category === category);
           if (categoryMetrics.length === 0) return null;
-          
+
           return (
             <div key={category} className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
               <div className="p-4 border-b bg-gray-50">
@@ -357,20 +361,19 @@ export default function OperationsReport() {
                   {category}
                 </h2>
               </div>
-              
+
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {categoryMetrics.map(metric => (
                     <div key={metric.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-black">{metric.name}</h3>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          metric.status === 'good' ? 'bg-green-100 text-green-800' :
-                          metric.status === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {metric.status === 'good' ? 'Baik' : 
-                           metric.status === 'warning' ? 'Peringatan' : 'Kritis'}
+                        <span className={`px-2 py-1 text-xs rounded-full ${metric.status === 'good' ? 'bg-green-100 text-green-800' :
+                            metric.status === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
+                          {metric.status === 'good' ? 'Baik' :
+                            metric.status === 'warning' ? 'Peringatan' : 'Kritis'}
                         </span>
                       </div>
                       <div className="text-2xl font-bold text-black mb-1">
@@ -388,7 +391,3 @@ export default function OperationsReport() {
     </div>
   );
 }
-
-// Icon tambahan yang dibutuhkan
-import { ShoppingCart, Database } from 'lucide-react';
-declare const XLSX: any;

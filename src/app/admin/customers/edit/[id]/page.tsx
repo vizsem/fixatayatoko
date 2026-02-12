@@ -5,14 +5,14 @@ import { useRouter, useParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { 
-  User, 
-  ArrowLeft, 
-  Save, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  CreditCard, 
+import {
+  User,
+  ArrowLeft,
+  Save,
+  Phone,
+  Mail,
+  MapPin,
+  CreditCard,
   FileText,
   CheckCircle2
 } from 'lucide-react';
@@ -23,7 +23,7 @@ export default function EditCustomer() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -89,10 +89,11 @@ export default function EditCustomer() {
       setTimeout(() => {
         router.push('/admin/customers');
       }, 1500);
-    } catch (err) {
+    } catch {
       alert("Gagal memperbarui data");
       setSaving(false);
     }
+
   };
 
   if (loading) return (
@@ -106,7 +107,7 @@ export default function EditCustomer() {
       {/* Header */}
       <div className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => router.back()}
             className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-black transition-all shadow-sm"
           >
@@ -124,17 +125,17 @@ export default function EditCustomer() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
             <div className="flex items-center gap-2 mb-2 text-green-600">
-                <User size={18} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Identitas Dasar</span>
+              <User size={18} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Identitas Dasar</span>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1">Nama Lengkap</label>
-                <input 
+                <input
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-1 outline-none focus:ring-2 focus:ring-green-500 transition-all"
                 />
               </div>
@@ -142,23 +143,23 @@ export default function EditCustomer() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 text-green-500 flex items-center gap-1">
-                    <Phone size={10}/> WhatsApp
+                    <Phone size={10} /> WhatsApp
                   </label>
-                  <input 
+                  <input
                     required
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-1 outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div>
                   <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
-                    <Mail size={10}/> Email
+                    <Mail size={10} /> Email
                   </label>
-                  <input 
+                  <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-1 outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
@@ -166,12 +167,12 @@ export default function EditCustomer() {
 
               <div>
                 <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
-                    <MapPin size={10}/> Alamat Pengiriman
+                  <MapPin size={10} /> Alamat Pengiriman
                 </label>
-                <textarea 
+                <textarea
                   rows={3}
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold mt-1 outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
@@ -180,13 +181,13 @@ export default function EditCustomer() {
 
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 mb-6 text-blue-600">
-                <FileText size={18} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Catatan Tambahan</span>
+              <FileText size={18} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Catatan Tambahan</span>
             </div>
-            <textarea 
+            <textarea
               placeholder="Tambahkan info spesifik pelanggan di sini..."
               value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500"
               rows={4}
             />
@@ -197,17 +198,18 @@ export default function EditCustomer() {
         <div className="space-y-6">
           <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl">
             <div className="flex items-center gap-2 mb-8 text-green-400">
-                <CreditCard size={18} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Financial Settings</span>
+              <CreditCard size={18} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Financial Settings</span>
             </div>
 
             <div className="space-y-6">
               <div>
                 <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Tipe Member</label>
-                <select 
+                <select
                   value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value as any})}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'ecer' | 'grosir' })}
                   className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-xs font-bold mt-2 outline-none focus:bg-white/20"
+
                 >
                   <option value="ecer" className="text-black">ECERAN</option>
                   <option value="grosir" className="text-black">GROSIR</option>
@@ -216,10 +218,10 @@ export default function EditCustomer() {
 
               <div>
                 <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Limit Kredit (IDR)</label>
-                <input 
+                <input
                   type="number"
                   value={formData.creditLimit}
-                  onChange={(e) => setFormData({...formData, creditLimit: Number(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, creditLimit: Number(e.target.value) })}
                   className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-xs font-bold mt-2 outline-none focus:bg-white/20"
                 />
                 <p className="text-[8px] text-gray-500 mt-2 italic font-bold uppercase tracking-tighter">* Set 0 jika pembayaran harus cash</p>
@@ -227,21 +229,20 @@ export default function EditCustomer() {
             </div>
           </div>
 
-          <button 
+          <button
             type="submit"
             disabled={saving}
-            className={`w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all font-black text-[10px] uppercase tracking-[0.2em] shadow-lg ${
-              success 
-              ? 'bg-green-500 text-white' 
+            className={`w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all font-black text-[10px] uppercase tracking-[0.2em] shadow-lg ${success
+              ? 'bg-green-500 text-white'
               : 'bg-green-600 hover:bg-green-700 text-white shadow-green-100'
-            }`}
+              }`}
           >
             {success ? (
-              <><CheckCircle2 size={18}/> Updated!</>
+              <><CheckCircle2 size={18} /> Updated!</>
             ) : saving ? (
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
             ) : (
-              <><Save size={18}/> Update Database</>
+              <><Save size={18} /> Update Database</>
             )}
           </button>
         </div>

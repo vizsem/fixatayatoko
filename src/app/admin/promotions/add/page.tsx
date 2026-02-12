@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -37,6 +38,21 @@ type Product = {
 
 /* ================= INTERNAL COMPONENT ================= */
 
+const getInitialPromotion = (): Promotion => {
+  const now = new Date();
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return {
+    code: '',
+    name: '',
+    type: 'product',
+    discountType: 'percentage',
+    discountValue: 0,
+    startDate: now.toISOString().split('T')[0],
+    endDate: nextWeek.toISOString().split('T')[0],
+    isActive: true,
+  };
+};
+
 function AddPromotionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,18 +63,26 @@ function AddPromotionContent() {
   const [categories, setCategories] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Promotion>({
-    code: '',
-    name: '',
-    type: 'product',
-    discountType: 'percentage',
-    discountValue: 0,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0],
-    isActive: true,
-  });
+  const [formData, setFormData] = useState<Promotion>(getInitialPromotion());
+
+
+  /* ================= LOAD SUPPORT DATA ================= */
+
+  const loadSupportingData = useCallback(async () => {
+    const snap = await getDocs(collection(db, 'products'));
+    const list: Product[] = snap.docs.map((d) => ({
+      id: d.id,
+      name: d.data().name,
+      category: d.data().category,
+    }));
+
+    setProducts(list);
+
+    const uniqueCategories = new Set(
+      list.map((p) => p.category).filter(Boolean)
+    );
+    setCategories(Array.from(uniqueCategories) as string[]);
+  }, []);
 
   /* ================= AUTH & INIT ================= */
 
@@ -81,25 +105,8 @@ function AddPromotionContent() {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, loadSupportingData]);
 
-  /* ================= LOAD SUPPORT DATA ================= */
-
-  const loadSupportingData = async () => {
-    const snap = await getDocs(collection(db, 'products'));
-    const list: Product[] = snap.docs.map((d) => ({
-      id: d.id,
-      name: d.data().name,
-      category: d.data().category,
-    }));
-
-    setProducts(list);
-
-    const uniqueCategories = new Set(
-      list.map((p) => p.category).filter(Boolean)
-    );
-    setCategories(Array.from(uniqueCategories) as string[]);
-  };
 
   /* ================= LOAD EDIT DATA ================= */
 
@@ -215,7 +222,7 @@ function AddPromotionContent() {
         {/* Nama */}
         <input
           required
-          
+
           value={formData.name}
           onChange={(e) =>
             setFormData({ ...formData, name: e.target.value })
@@ -234,13 +241,13 @@ function AddPromotionContent() {
             <button
               key={t.id}
               type="button"
-              onClick={() => handleTypeChange(t.id as any)}
-              className={`p-3 border rounded ${
-                formData.type === t.id
+              onClick={() => handleTypeChange(t.id as Promotion['type'])}
+              className={`p-3 border rounded ${formData.type === t.id
                   ? 'border-green-600 bg-green-50'
                   : ''
-              }`}
+                }`}
             >
+
               <div className="flex gap-2 items-center text-black">
                 {t.icon}
                 {t.label}
@@ -262,15 +269,15 @@ function AddPromotionContent() {
             <option value="">Pilih...</option>
             {formData.type === 'product'
               ? products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
               : categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
           </select>
         )}
 
@@ -297,9 +304,10 @@ function AddPromotionContent() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                discountType: e.target.value as any,
+                discountType: e.target.value as Promotion['discountType'],
               })
             }
+
             className="px-3 py-2 border rounded text-black"
           >
             <option value="percentage">Persentase (%)</option>

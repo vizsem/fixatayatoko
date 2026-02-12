@@ -1,0 +1,826 @@
+
+> marketpleace-new@0.1.0 lint
+> eslint
+
+[BABEL] Note: The code generator has deoptimised the styling of /Users/hadzikoh/marketpleace-new/public/xlsx.full.min.js as it exceeds the max of 500KB.
+
+/Users/hadzikoh/marketpleace-new/public/xlsx.full.min.js
+   7:31410  warning  'v' is defined but never used                                          @typescript-eslint/no-unused-vars
+   8:13154  warning  'r' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:12556  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:12721  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:12869  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:15409  warning  'f' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  10:19935  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:20038  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  10:20141  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  11:9046   warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  11:9115   warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  12:1547   warning  'r' is defined but never used                                          @typescript-eslint/no-unused-vars
+  12:1549   warning  't' is defined but never used                                          @typescript-eslint/no-unused-vars
+  12:15390  warning  'p' is defined but never used                                          @typescript-eslint/no-unused-vars
+  12:21555  warning  'i' is defined but never used                                          @typescript-eslint/no-unused-vars
+  13:2487   warning  's' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  13:2838   warning  'u' is defined but never used                                          @typescript-eslint/no-unused-vars
+  13:13701  warning  't' is defined but never used                                          @typescript-eslint/no-unused-vars
+  14:12649  warning  's' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  14:13703  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  14:26544  warning  'r' is defined but never used                                          @typescript-eslint/no-unused-vars
+  15:23720  warning  'f' is defined but never used                                          @typescript-eslint/no-unused-vars
+  15:30004  warning  't' is defined but never used                                          @typescript-eslint/no-unused-vars
+  15:30601  warning  't' is defined but never used                                          @typescript-eslint/no-unused-vars
+  16:7613   warning  'tu' is defined but never used                                         @typescript-eslint/no-unused-vars
+  16:19635  warning  'k' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  17:19745  warning  'o' is defined but never used                                          @typescript-eslint/no-unused-vars
+  18:12519  warning  'l' is defined but never used                                          @typescript-eslint/no-unused-vars
+  18:24041  warning  'o' is defined but never used                                          @typescript-eslint/no-unused-vars
+  18:24052  warning  'o' is defined but never used                                          @typescript-eslint/no-unused-vars
+  18:26798  warning  'a' is defined but never used                                          @typescript-eslint/no-unused-vars
+  21:4454   warning  'u' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  21:14619  warning  'o' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  21:15930  warning  'ne' is defined but never used                                         @typescript-eslint/no-unused-vars
+  22:2744   warning  'e' is defined but never used                                          @typescript-eslint/no-unused-vars
+  22:4827   warning  'rw' is defined but never used                                         @typescript-eslint/no-unused-vars
+  22:11462  warning  'n' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  22:11816  warning  'p' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  22:11870  warning  'v' is assigned a value but never used                                 @typescript-eslint/no-unused-vars
+  22:29748  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  22:30854  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  23:1478   warning  'r' is defined but never used                                          @typescript-eslint/no-unused-vars
+  23:1769   warning  'r' is defined but never used                                          @typescript-eslint/no-unused-vars
+  23:8745   warning  't' is defined but never used                                          @typescript-eslint/no-unused-vars
+  23:11394  warning  'n' is defined but never used                                          @typescript-eslint/no-unused-vars
+  23:14963  warning  'f' is defined but never used                                          @typescript-eslint/no-unused-vars
+  23:30313  warning  'd' is defined but never used                                          @typescript-eslint/no-unused-vars
+  24:9029   warning  'tu' is defined but never used                                         @typescript-eslint/no-unused-vars
+  24:9393   warning  'e' is defined but never used                                          @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/scripts/seed-products.js
+  2:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  4:22  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/customers/edit/[id]/page.tsx
+   92:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  209:86  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/customers/page.tsx
+   14:3   warning  'query' is defined but never used           @typescript-eslint/no-unused-vars
+   15:3   warning  'where' is defined but never used           @typescript-eslint/no-unused-vars
+   16:3   warning  'orderBy' is defined but never used         @typescript-eslint/no-unused-vars
+   21:3   warning  'User' is defined but never used            @typescript-eslint/no-unused-vars
+   34:3   warning  'ChevronRight' is defined but never used    @typescript-eslint/no-unused-vars
+   69:10  warning  'error' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  183:14  warning  'err' is defined but never used             @typescript-eslint/no-unused-vars
+  194:14  warning  'err' is defined but never used             @typescript-eslint/no-unused-vars
+  376:88  error    Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  420:59  error    Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/employees/page.tsx
+    4:10   warning  'useRouter' is defined but never used     @typescript-eslint/no-unused-vars
+    7:21   warning  'Wallet' is defined but never used        @typescript-eslint/no-unused-vars
+    8:12   warning  'Phone' is defined but never used         @typescript-eslint/no-unused-vars
+    8:19   warning  'Mail' is defined but never used          @typescript-eslint/no-unused-vars
+   54:14   warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+   78:14   warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+   98:14   warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  108:14   warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  257:116  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/history/page.tsx
+  19:3  warning  'Filter' is defined but never used        @typescript-eslint/no-unused-vars
+  36:9  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/logs/page.tsx
+   5:57  warning  'Timestamp' is defined but never used     @typescript-eslint/no-unused-vars
+   7:3   warning  'History' is defined but never used       @typescript-eslint/no-unused-vars
+   7:31  warning  'Filter' is defined but never used        @typescript-eslint/no-unused-vars
+  16:36  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/opname/page.tsx
+   20:3   warning  'Package' is defined but never used          @typescript-eslint/no-unused-vars
+   23:3   warning  'Minus' is defined but never used            @typescript-eslint/no-unused-vars
+   35:9   warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  120:14  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/page.tsx
+   23:19  warning  'AlertCircle' is defined but never used  @typescript-eslint/no-unused-vars
+  132:14  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+  170:14  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/stock-out/page.tsx
+  33:9  warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/transfer/page.tsx
+   21:3   warning  'Warehouse' is defined but never used        @typescript-eslint/no-unused-vars
+   40:9   warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  113:14  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/kategori/page.tsx
+   16:3   warning  'query' is defined but never used         @typescript-eslint/no-unused-vars
+   17:3   warning  'orderBy' is defined but never used       @typescript-eslint/no-unused-vars
+   30:3   warning  'MoreVertical' is defined but never used  @typescript-eslint/no-unused-vars
+   32:3   warning  'Archive' is defined but never used       @typescript-eslint/no-unused-vars
+   43:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  138:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  155:16  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/layout.tsx
+  9:15  warning  'Store' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/orders/[id]/page.tsx
+   9:3   warning  'AlertTriangle' is defined but never used  @typescript-eslint/no-unused-vars
+   9:18  warning  'Package' is defined but never used        @typescript-eslint/no-unused-vars
+  10:3   warning  'User' is defined but never used           @typescript-eslint/no-unused-vars
+  10:29  warning  'CheckCircle' is defined but never used    @typescript-eslint/no-unused-vars
+  10:49  warning  'Phone' is defined but never used          @typescript-eslint/no-unused-vars
+  31:14  error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  72:16  warning  'err' is defined but never used            @typescript-eslint/no-unused-vars
+  99:14  warning  'err' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/orders/page.tsx
+   19:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  166:57  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/orders/print/[id]/page.tsx
+   8:10  warning  'Printer' is defined but never used       @typescript-eslint/no-unused-vars
+   8:19  warning  'MapPin' is defined but never used        @typescript-eslint/no-unused-vars
+   8:27  warning  'Truck' is defined but never used         @typescript-eslint/no-unused-vars
+   8:34  warning  'CreditCard' is defined but never used    @typescript-eslint/no-unused-vars
+   8:46  warning  'Clock' is defined but never used         @typescript-eslint/no-unused-vars
+  20:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx
+    9:32  warning  'FileText' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   32:11  warning  'Stats' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  245:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:245:16
+  243 |           <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+  244 |             <ul className="space-y-1">
+> 245 |               <NavItem href="/admin" icon={TrendingUp} label="Dashboard" colorClass="bg-green-50 text-green-700" isActive={pathname === '/admin'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  246 |
+  247 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Katalog & Stok</div>
+  248 |               <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/products'} onClick={() => setIsMobileMenuOpen(false)} />
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                                                                                                                                                                                                                                                                         react-hooks/static-components
+  248:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:248:16
+  246 |
+  247 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Katalog & Stok</div>
+> 248 |               <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/products'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  249 |               <NavItem href="/admin/kategori" icon={Tag} label="Kategori" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/kategori'} onClick={() => setIsMobileMenuOpen(false)} />
+  250 |               <NavItem href="/admin/warehouses" icon={Warehouse} label="Gudang" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/warehouses'} onClick={() => setIsMobileMenuOpen(false)} />
+  251 |               <NavItem href="/admin/inventory" icon={History} label="Riwayat Stok" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/inventory'} onClick={() => setIsMobileMenuOpen(false)} />
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (   react-hooks/static-components
+  249:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:249:16
+  247 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Katalog & Stok</div>
+  248 |               <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/products'} onClick={() => setIsMobileMenuOpen(false)} />
+> 249 |               <NavItem href="/admin/kategori" icon={Tag} label="Kategori" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/kategori'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  250 |               <NavItem href="/admin/warehouses" icon={Warehouse} label="Gudang" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/warehouses'} onClick={() => setIsMobileMenuOpen(false)} />
+  251 |               <NavItem href="/admin/inventory" icon={History} label="Riwayat Stok" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/inventory'} onClick={() => setIsMobileMenuOpen(false)} />
+  252 |
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (   react-hooks/static-components
+  250:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:250:16
+  248 |               <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/products'} onClick={() => setIsMobileMenuOpen(false)} />
+  249 |               <NavItem href="/admin/kategori" icon={Tag} label="Kategori" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/kategori'} onClick={() => setIsMobileMenuOpen(false)} />
+> 250 |               <NavItem href="/admin/warehouses" icon={Warehouse} label="Gudang" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/warehouses'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  251 |               <NavItem href="/admin/inventory" icon={History} label="Riwayat Stok" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/inventory'} onClick={() => setIsMobileMenuOpen(false)} />
+  252 |
+  253 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaksi</div>
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (        react-hooks/static-components
+  251:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:251:16
+  249 |               <NavItem href="/admin/kategori" icon={Tag} label="Kategori" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/kategori'} onClick={() => setIsMobileMenuOpen(false)} />
+  250 |               <NavItem href="/admin/warehouses" icon={Warehouse} label="Gudang" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/warehouses'} onClick={() => setIsMobileMenuOpen(false)} />
+> 251 |               <NavItem href="/admin/inventory" icon={History} label="Riwayat Stok" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/inventory'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  252 |
+  253 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaksi</div>
+  254 |               <NavItem href="/admin/orders" icon={ShoppingCart} label="Pesanan" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/orders'} onClick={() => setIsMobileMenuOpen(false)} />
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (  react-hooks/static-components
+  254:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:254:16
+  252 |
+  253 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaksi</div>
+> 254 |               <NavItem href="/admin/orders" icon={ShoppingCart} label="Pesanan" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/orders'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  255 |               <NavItem href="/admin/purchases" icon={Truck} label="Pembelian" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/purchases'} onClick={() => setIsMobileMenuOpen(false)} />
+  256 |
+  257 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">SDM & CRM</div>
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                                                                                                                                                                                                                                          react-hooks/static-components
+  255:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:255:16
+  253 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaksi</div>
+  254 |               <NavItem href="/admin/orders" icon={ShoppingCart} label="Pesanan" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/orders'} onClick={() => setIsMobileMenuOpen(false)} />
+> 255 |               <NavItem href="/admin/purchases" icon={Truck} label="Pembelian" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/purchases'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  256 |
+  257 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">SDM & CRM</div>
+  258 |               <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/customers'} onClick={() => setIsMobileMenuOpen(false)} />
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                         react-hooks/static-components
+  258:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:258:16
+  256 |
+  257 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">SDM & CRM</div>
+> 258 |               <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/customers'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  259 |               <NavItem href="/admin/employees" icon={UsersRound} label="Karyawan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/employees'} onClick={() => setIsMobileMenuOpen(false)} />
+  260 |               <NavItem href="/admin/promotions" icon={Gift} label="Promo & Poin" colorClass="bg-pink-50 text-pink-700" isActive={pathname === '/admin/promotions'} onClick={() => setIsMobileMenuOpen(false)} />
+  261 |
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                                                                                                                                                 react-hooks/static-components
+  259:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:259:16
+  257 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">SDM & CRM</div>
+  258 |               <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/customers'} onClick={() => setIsMobileMenuOpen(false)} />
+> 259 |               <NavItem href="/admin/employees" icon={UsersRound} label="Karyawan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/employees'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  260 |               <NavItem href="/admin/promotions" icon={Gift} label="Promo & Poin" colorClass="bg-pink-50 text-pink-700" isActive={pathname === '/admin/promotions'} onClick={() => setIsMobileMenuOpen(false)} />
+  261 |
+  262 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Laporan</div>
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                      react-hooks/static-components
+  260:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:260:16
+  258 |               <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/customers'} onClick={() => setIsMobileMenuOpen(false)} />
+  259 |               <NavItem href="/admin/employees" icon={UsersRound} label="Karyawan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/employees'} onClick={() => setIsMobileMenuOpen(false)} />
+> 260 |               <NavItem href="/admin/promotions" icon={Gift} label="Promo & Poin" colorClass="bg-pink-50 text-pink-700" isActive={pathname === '/admin/promotions'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  261 |
+  262 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Laporan</div>
+  263 |               <NavItem href="/admin/reports" icon={BarChart3} label="Statistik" colorClass="bg-red-50 text-red-700" isActive={pathname === '/admin/reports'} onClick={() => setIsMobileMenuOpen(false)} />
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (        react-hooks/static-components
+  263:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:263:16
+  261 |
+  262 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Laporan</div>
+> 263 |               <NavItem href="/admin/reports" icon={BarChart3} label="Statistik" colorClass="bg-red-50 text-red-700" isActive={pathname === '/admin/reports'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  264 |               <NavItem href="/admin/settings" icon={Settings} label="Konfigurasi" colorClass="bg-slate-50 text-slate-700" isActive={pathname === '/admin/settings'} onClick={() => setIsMobileMenuOpen(false)} />
+  265 |
+  266 |             </ul>
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/static-components
+  264:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:264:16
+  262 |               <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Laporan</div>
+  263 |               <NavItem href="/admin/reports" icon={BarChart3} label="Statistik" colorClass="bg-red-50 text-red-700" isActive={pathname === '/admin/reports'} onClick={() => setIsMobileMenuOpen(false)} />
+> 264 |               <NavItem href="/admin/settings" icon={Settings} label="Konfigurasi" colorClass="bg-slate-50 text-slate-700" isActive={pathname === '/admin/settings'} onClick={() => setIsMobileMenuOpen(false)} />
+      |                ^^^^^^^ This component is created during render
+  265 |
+  266 |             </ul>
+  267 |           </nav>
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx:197:19
+  195 |   }
+  196 |
+> 197 |   const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      | ^^^^^^^^^^^^
+> 199 |       <li>
+      …
+      | ^^^^^^^^^^^^
+> 213 |     );
+      | ^^^^^^^^^^^^
+> 214 |   };
+      | ^^^^ The component is created during render here
+  215 |
+  216 |
+  217 |   return (                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/static-components
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/points/page.tsx
+   10:3   warning  'Trophy' is defined but never used                  @typescript-eslint/no-unused-vars
+   14:3   warning  'Search' is defined but never used                  @typescript-eslint/no-unused-vars
+   16:3   warning  'TrendingUp' is defined but never used              @typescript-eslint/no-unused-vars
+   18:3   warning  'Calendar' is defined but never used                @typescript-eslint/no-unused-vars
+   19:3   warning  'ArrowUpRight' is defined but never used            @typescript-eslint/no-unused-vars
+   20:3   warning  'ArrowDownLeft' is defined but never used           @typescript-eslint/no-unused-vars
+   34:36  error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
+   35:44  error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
+   37:10  warning  'loading' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   38:10  warning  'searchTerm' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   38:22  warning  'setSearchTerm' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   92:14  warning  'e' is defined but never used                       @typescript-eslint/no-unused-vars
+  104:14  warning  'e' is defined but never used                       @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/products/add/page.tsx
+   9:22  warning  'Package' is defined but never used       @typescript-eslint/no-unused-vars
+  61:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/products/edit/[id]/page.tsx
+   10:3   warning  'Package' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   10:32  warning  'Barcode' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   11:25  warning  'Layers' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   12:24  warning  'Eye' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   12:29  warning  'EyeOff' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   12:37  warning  'AlertTriangle' is defined but never used                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   13:3   warning  'Truck' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   13:10  warning  'Bookmark' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   25:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   26:48  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   39:6   warning  React Hook useEffect has missing dependencies: 'fetchProductData' and 'router'. Either include them or remove the dependency array                                                                                                                                                       react-hooks/exhaustive-deps
+   69:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   86:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  109:60  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  109:68  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  112:23  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  153:17  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  188:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  261:55  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/products/page.tsx
+    4:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   11:20  warning  'getDoc' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   26:53  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   62:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   65:7   warning  'handleSync' is assigned a value but never used                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  130:12  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  134:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  135:48  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  137:10  warning  'showAddModal' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  138:72  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  143:20  warning  'setFormData' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  143:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  198:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  209:32  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  220:29  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  228:16  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  233:9   warning  'handleCreate' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  233:34  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  239:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  391:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  467:24  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  470:25  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  474:25  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  478:26  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/promotions/edit/[id]/page.tsx
+   85:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  148:86  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  182:94  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/promotions/page.tsx
+  25:3  warning  'Percent' is defined but never used      @typescript-eslint/no-unused-vars
+  26:3  warning  'CheckCircle' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/[id]/page.tsx
+   6:23  warning  'updateDoc' is defined but never used                                                                      @typescript-eslint/no-unused-vars
+   6:34  warning  'serverTimestamp' is defined but never used                                                                @typescript-eslint/no-unused-vars
+   9:40  warning  'XCircle' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+  10:3   warning  'Download' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+  17:44  error    Unexpected any. Specify a different type                                                                   @typescript-eslint/no-explicit-any
+  37:6   warning  React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  96:47  error    Unexpected any. Specify a different type                                                                   @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/add/page.tsx
+   5:10  warning  'auth' is defined but never used          @typescript-eslint/no-unused-vars
+  16:26  warning  'CreditCard' is defined but never used    @typescript-eslint/no-unused-vars
+  17:3   warning  'AlertCircle' is defined but never used   @typescript-eslint/no-unused-vars
+  26:46  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:48  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:44  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  38:36  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:31  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:61  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/page.tsx
+   22:22  warning  'Trash2' is defined but never used                               @typescript-eslint/no-unused-vars
+   22:30  warning  'Truck' is defined but never used                                @typescript-eslint/no-unused-vars
+   22:37  warning  'User' is defined but never used                                 @typescript-eslint/no-unused-vars
+   23:12  warning  'AlertTriangle' is defined but never used                        @typescript-eslint/no-unused-vars
+   23:27  warning  'TrendingDown' is defined but never used                         @typescript-eslint/no-unused-vars
+   24:3   warning  'Filter' is defined but never used                               @typescript-eslint/no-unused-vars
+  130:14  warning  'err' is defined but never used                                  @typescript-eslint/no-unused-vars
+  263:28  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  263:35  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/customers/page.tsx
+   23:3   warning  'Package' is defined but never used       @typescript-eslint/no-unused-vars
+   25:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  318:62  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/finance/page.tsx
+   22:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  418:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/inventory/page.tsx
+  280:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/operations/page.tsx
+   16:3   warning  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  394:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/page.tsx
+   21:3   warning  'Package' is defined but never used       @typescript-eslint/no-unused-vars
+   31:3   warning  'Percent' is defined but never used       @typescript-eslint/no-unused-vars
+   32:3   warning  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  177:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  372:9   error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  403:9   error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/promotions/page.tsx
+  347:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/settings/page.tsx
+   15:25   warning  'Truck' is defined but never used         @typescript-eslint/no-unused-vars
+  118:14   warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  163:14   warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  195:16   warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  394:107  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/settings/points/page.tsx
+   9:10  warning  'loading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  14:51  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/suppliers/page.tsx
+  12:3  warning  'getDocs' is defined but never used    @typescript-eslint/no-unused-vars
+  14:3  warning  'updateDoc' is defined but never used  @typescript-eslint/no-unused-vars
+  30:3  warning  'Building' is defined but never used   @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/users/page.tsx
+  23:3  warning  'Mail' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/edit/[id]/page.tsx
+   91:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  207:97  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/mutasi/[id]/page.tsx
+   5:20  warning  'storage' is defined but never used       @typescript-eslint/no-unused-vars
+  23:58  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:60  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:44  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/page.tsx
+   27:3   warning  'ChevronRight' is defined but never used  @typescript-eslint/no-unused-vars
+   39:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   65:16  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  143:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/cart/page.tsx
+    7:3   warning  'ShoppingCart' is defined but never used              @typescript-eslint/no-unused-vars
+    7:17  warning  'Trash2' is defined but never used                    @typescript-eslint/no-unused-vars
+    7:34  warning  'Truck' is defined but never used                     @typescript-eslint/no-unused-vars
+    7:41  warning  'Store' is defined but never used                     @typescript-eslint/no-unused-vars
+    8:23  warning  'User' is defined but never used                      @typescript-eslint/no-unused-vars
+    8:35  warning  'Bike' is defined but never used                      @typescript-eslint/no-unused-vars
+    8:41  warning  'Box' is defined but never used                       @typescript-eslint/no-unused-vars
+    8:46  warning  'Info' is defined but never used                      @typescript-eslint/no-unused-vars
+    9:3   warning  'AlertCircle' is defined but never used               @typescript-eslint/no-unused-vars
+   67:10  warning  '_savedAddresses' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   74:23  warning  'setCourierType' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  247:14  warning  'e' is defined but never used                         @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/cashier/page.tsx
+   10:3   warning  'addDoc' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   30:46  warning  'QrCode' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   63:14  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   83:10  warning  'showNotification' is assigned a value but never used                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+   90:26  warning  'setDeliveryMethod' is assigned a value but never used                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  348:32  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  348:32  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  415:39  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  415:39  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/Users/hadzikoh/marketpleace-new/src/app/components/AdminSidebar.tsx
+  5:19  warning  'Users' is defined but never used       @typescript-eslint/no-unused-vars
+  5:26  warning  'CreditCard' is defined but never used  @typescript-eslint/no-unused-vars
+  5:38  warning  'Settings' is defined but never used    @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/kategori/[slug]/page.tsx
+  111:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/layout.tsx
+  11:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/orders/[id]/page.tsx
+  7:34  warning  'Clock' is defined but never used       @typescript-eslint/no-unused-vars
+  7:41  warning  'CreditCard' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/orders/page.tsx
+    8:18  warning  'Tag' is defined but never used           @typescript-eslint/no-unused-vars
+   16:40  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:58  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/page.tsx
+  10:27  warning  'Inbox' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/products/edit/[id]/page.tsx
+   23:3   warning  'Package' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   82:6   warning  React Hook useEffect has a missing dependency: 'fetchProductData'. Either include it or remove the dependency array                                                                                                                                                                      react-hooks/exhaustive-deps
+  277:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/hadzikoh/marketpleace-new/src/app/produk/[id]/page.tsx
+   31:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   32:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   99:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/profil/edit/page.tsx
+  14:37  warning  'Lock' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/profil/login/page.tsx
+  67:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  96:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  96:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/profil/page.tsx
+    8:8   warning  'getDoc' is defined but never used        @typescript-eslint/no-unused-vars
+   13:12  warning  'Info' is defined but never used          @typescript-eslint/no-unused-vars
+   13:42  warning  'CheckCircle' is defined but never used   @typescript-eslint/no-unused-vars
+   29:10  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   32:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   38:36  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   39:42  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  141:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  170:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  186:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/profil/register/page.tsx
+  49:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  70:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/hadzikoh/marketpleace-new/src/app/promo/page.tsx
+  4:10  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+  4:21  warning  'useState' is defined but never used   @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/purchases/add/page.tsx
+  132:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  134:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/customers/page.tsx
+   95:89  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  321:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/finance/page.tsx
+   22:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  330:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/inventory/page.tsx
+  280:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/operations/page.tsx
+   16:3   warning  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  394:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/page.tsx
+  383:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/promotions/page.tsx
+  20:3   warning  'Percent' is defined but never used       @typescript-eslint/no-unused-vars
+  21:3   warning  'TrendingUp' is defined but never used    @typescript-eslint/no-unused-vars
+  22:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  74:89  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/sales/page.tsx
+   19:3   warning  'Calendar' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   23:3   warning  'User' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  115:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/hadzikoh/marketpleace-new/src/app/reports/sales/page.tsx:115:5
+  113 |       }
+  114 |     });
+> 115 |     setSales(sorted);
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  116 |   }, [sortBy, sortOrder]);
+  117 |
+  118 |   const handleExport = () => {  react-hooks/set-state-in-effect
+  116:6   warning  React Hook useEffect has a missing dependency: 'sales'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+  235:62  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  308:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+
+✖ 331 problems (100 errors, 231 warnings)
+

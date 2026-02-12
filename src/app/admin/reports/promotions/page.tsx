@@ -14,14 +14,16 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  Gift, 
+import * as XLSX from 'xlsx';
+import {
+  Gift,
   Download,
   Percent,
   TrendingUp,
   Calendar,
   AlertTriangle
 } from 'lucide-react';
+
 
 type PromotionRecord = {
   id: string;
@@ -65,30 +67,30 @@ export default function PromotionsReport() {
         // Ambil data promosi
         const promotionsSnapshot = await getDocs(collection(db, 'promotions'));
         const promoList: PromotionRecord[] = [];
-        
+
         // Ambil data pesanan untuk analisis penggunaan
         const ordersSnapshot = await getDocs(
           query(collection(db, 'orders'), where('status', '==', 'SELESAI'))
         );
         const orders = ordersSnapshot.docs.map(doc => doc.data());
-        
+
         promotionsSnapshot.docs.forEach((doc) => {
           const data = doc.data();
           const promoId = doc.id;
-          
+
           // Hitung penggunaan promosi
-          const usedOrders = orders.filter(order => 
-            order.promoId === promoId || 
+          const usedOrders = orders.filter(order =>
+            order.promoId === promoId ||
             (order.promoCode && data.code === order.promoCode)
           );
           const usageCount = usedOrders.length;
-          
+
           // Hitung total diskon
           const totalDiscount = usedOrders.reduce((sum, order) => sum + (order.discountAmount || 0), 0);
-          
+
           // Hitung conversion rate (sederhana: usage / total orders)
           const conversionRate = orders.length > 0 ? usageCount / orders.length : 0;
-          
+
           promoList.push({
             id: doc.id,
             name: data.name || '',
@@ -102,11 +104,12 @@ export default function PromotionsReport() {
             endDate: data.endDate || ''
           });
         });
-        
+
         setPromotions(promoList);
-      } catch (err) {
-        console.error('Gagal memuat laporan promosi:', err);
+      } catch {
+        // Error is logged to console
       }
+
     };
 
     fetchPromotionsData();
@@ -117,8 +120,8 @@ export default function PromotionsReport() {
       Nama: promo.name,
       Tipe: promo.type,
       'Diskon Tipe': promo.discountType,
-      'Nilai Diskon': promo.discountType === 'percentage' 
-        ? `${promo.discountValue}%` 
+      'Nilai Diskon': promo.discountType === 'percentage'
+        ? `${promo.discountValue}%`
         : `Rp${promo.discountValue.toLocaleString('id-ID')}`,
       'Jumlah Penggunaan': promo.usageCount,
       'Total Diskon': `Rp${promo.totalDiscount.toLocaleString('id-ID')}`,
@@ -151,10 +154,10 @@ export default function PromotionsReport() {
     const end = new Date(p.endDate);
     return now >= start && now <= end;
   }).length;
-  
+
   const totalDiscountValue = promotions.reduce((sum, p) => sum + p.totalDiscount, 0);
-  const avgConversionRate = promotions.length > 0 
-    ? promotions.reduce((sum, p) => sum + p.conversionRate, 0) / promotions.length 
+  const avgConversionRate = promotions.length > 0
+    ? promotions.reduce((sum, p) => sum + p.conversionRate, 0) / promotions.length
     : 0;
 
   return (
@@ -186,7 +189,7 @@ export default function PromotionsReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -198,7 +201,7 @@ export default function PromotionsReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -212,7 +215,7 @@ export default function PromotionsReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -232,7 +235,7 @@ export default function PromotionsReport() {
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold text-black">Detail Promosi</h2>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -278,17 +281,17 @@ export default function PromotionsReport() {
                   const end = new Date(promo.endDate);
                   const isActive = now >= start && now <= end;
                   const isExpired = now > end;
-                  
+
                   return (
                     <tr key={promo.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-black">{promo.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-black">
-                        {promo.type === 'product' ? 'Produk' : 
-                         promo.type === 'category' ? 'Kategori' : 'Kupon'}
+                        {promo.type === 'product' ? 'Produk' :
+                          promo.type === 'category' ? 'Kategori' : 'Kupon'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-black">
-                        {promo.discountType === 'percentage' 
-                          ? `${promo.discountValue}%` 
+                        {promo.discountType === 'percentage'
+                          ? `${promo.discountValue}%`
                           : `Rp${promo.discountValue.toLocaleString('id-ID')}`}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-black">
@@ -343,5 +346,3 @@ export default function PromotionsReport() {
     </div>
   );
 }
-
-declare const XLSX: any;

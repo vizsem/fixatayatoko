@@ -1,7 +1,8 @@
 // src/app/admin/reports/customers/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -15,15 +16,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import * as XLSX from 'xlsx';
-import { 
-  Users, 
-  TrendingUp, 
+import {
+  Users,
+  TrendingUp,
   CreditCard,
-  Package,
   Download,
-  Calendar,
   AlertTriangle
 } from 'lucide-react';
+
 
 type Customer = {
   id: string;
@@ -41,7 +41,7 @@ export default function CustomerReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
@@ -49,6 +49,29 @@ export default function CustomerReport() {
   const [customerType, setCustomerType] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'totalSpent' | 'outstandingDebt' | 'orderCount'>('totalSpent');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const filteredCustomers = useMemo(() => {
+    let result = [...customers];
+
+    // Filter berdasarkan tipe
+    if (customerType !== 'all') {
+      result = result.filter(c => c.type === customerType);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      const valA = a[sortBy];
+      const valB = b[sortBy];
+      if (sortOrder === 'asc') {
+        return valA > valB ? 1 : -1;
+      } else {
+        return valA < valB ? 1 : -1;
+      }
+    });
+
+    return result;
+  }, [customerType, sortBy, sortOrder, customers]);
+
 
   // Proteksi admin
   useEffect(() => {
@@ -76,12 +99,12 @@ export default function CustomerReport() {
         // Ambil data pelanggan
         const customersSnapshot = await getDocs(collection(db, 'customers'));
         const customerList: Customer[] = [];
-        
+
         // Ambil data pesanan untuk analisis
         const startDate = new Date(dateRange.startDate);
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
-        
+
         const ordersSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
@@ -94,12 +117,12 @@ export default function CustomerReport() {
         customersSnapshot.docs.forEach((doc) => {
           const data = doc.data();
           const customerId = doc.id;
-          
+
           // Filter pesanan berdasarkan periode & pelanggan
           const customerOrders = orders.filter(order => order.customerId === customerId);
           const totalSpent = customerOrders.reduce((sum, order) => sum + order.total, 0);
           const orderCount = customerOrders.length;
-          
+
           // Piutang (pesanan belum selesai)
           const outstandingOrders = customerOrders.filter(
             order => order.status !== 'SELESAI' && order.status !== 'DIBATALKAN'
@@ -107,9 +130,9 @@ export default function CustomerReport() {
           const outstandingDebt = outstandingOrders.reduce((sum, order) => sum + order.total, 0);
 
           // Tanggal pesanan terakhir
-          const lastOrderDate = customerOrders.length > 0 
-            ? customerOrders.reduce((latest, order) => 
-                new Date(order.createdAt) > new Date(latest) ? order.createdAt : latest
+          const lastOrderDate = customerOrders.length > 0
+            ? customerOrders.reduce((latest, order) =>
+              new Date(order.createdAt) > new Date(latest) ? order.createdAt : latest
               , customerOrders[0].createdAt)
             : undefined;
 
@@ -127,7 +150,7 @@ export default function CustomerReport() {
         });
 
         setCustomers(customerList);
-        setFilteredCustomers(customerList);
+
       } catch (err) {
         console.error('Gagal memuat laporan:', err);
       }
@@ -136,28 +159,7 @@ export default function CustomerReport() {
     fetchReportData();
   }, [dateRange]);
 
-  // Filter & sort
-  useEffect(() => {
-    let result = customers;
-    
-    // Filter berdasarkan tipe
-    if (customerType !== 'all') {
-      result = result.filter(c => c.type === customerType);
-    }
-    
-    // Sort
-    result.sort((a, b) => {
-      const valA = a[sortBy];
-      const valB = b[sortBy];
-      if (sortOrder === 'asc') {
-        return valA > valB ? 1 : -1;
-      } else {
-        return valA < valB ? 1 : -1;
-      }
-    });
-    
-    setFilteredCustomers(result);
-  }, [customerType, sortBy, sortOrder, customers]);
+
 
   // Ekspor ke Excel
   const handleExport = () => {
@@ -209,7 +211,7 @@ export default function CustomerReport() {
             <input
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -218,7 +220,7 @@ export default function CustomerReport() {
             <input
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded text-black"
             />
           </div>
@@ -259,7 +261,7 @@ export default function CustomerReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -273,7 +275,7 @@ export default function CustomerReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -287,7 +289,7 @@ export default function CustomerReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -312,7 +314,8 @@ export default function CustomerReport() {
               <label className="text-sm text-black">Urutkan berdasarkan:</label>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'totalSpent' | 'outstandingDebt' | 'orderCount')}
+
                 className="text-sm border border-gray-300 rounded px-2 py-1 text-black"
               >
                 <option value="totalSpent">Total Belanja</option>
@@ -328,7 +331,7 @@ export default function CustomerReport() {
             </div>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -372,11 +375,10 @@ export default function CustomerReport() {
                       <div className="text-sm text-black">{customer.phone}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        customer.type === 'grosir' 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${customer.type === 'grosir'
+                        ? 'bg-purple-100 text-purple-800'
+                        : 'bg-green-100 text-green-800'
+                        }`}>
                         {customer.type === 'grosir' ? 'Grosir' : 'Ecer'}
                       </span>
                     </td>
@@ -390,14 +392,13 @@ export default function CustomerReport() {
                       {customer.orderCount}x
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-medium ${
-                        isOverLimit(customer) ? 'text-red-600' : 'text-black'
-                      }`}>
+                      <span className={`font-medium ${isOverLimit(customer) ? 'text-red-600' : 'text-black'
+                        }`}>
                         Rp{customer.outstandingDebt.toLocaleString('id-ID')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-black">
-                      {customer.creditLimit > 0 
+                      {customer.creditLimit > 0
                         ? `Rp${customer.creditLimit.toLocaleString('id-ID')}`
                         : '–'
                       }

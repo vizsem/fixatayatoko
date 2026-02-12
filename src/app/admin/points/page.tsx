@@ -2,40 +2,41 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { 
-  collection, query, orderBy, limit, onSnapshot, 
-  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp 
+import {
+  collection, query, orderBy, limit, onSnapshot,
+  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp
 } from 'firebase/firestore';
-import { 
-  Trophy, 
-  Users, // <--- TAMBAHKAN INI
-  History, 
-  ArrowLeft, 
-  Search, 
-  Coins, 
-  TrendingUp, 
-  User as UserIcon, 
-  Calendar,
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  PlusCircle, 
-  MinusCircle, 
-  AlertTriangle, 
-  Snowflake, 
-  ShieldCheck 
+
+import {
+  Users,
+  History,
+  ArrowLeft,
+  Coins,
+  User as UserIcon,
+  PlusCircle,
+  MinusCircle,
+  AlertTriangle,
+  Snowflake,
+  ShieldCheck
 } from 'lucide-react';
+
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 
+interface PointLog { id: string; userId: string; pointsChanged: number; type: string; description: string; createdAt: Timestamp | { toDate: () => Date } | null; }
+
+
+
+interface UserWithPoints { id: string; displayName?: string; email?: string; points: number; isPointsFrozen: boolean; }
+
 export default function AdminPointsDashboard() {
   const router = useRouter();
-  const [logs, setLogs] = useState<any[]>([]);
-  const [topUsers, setTopUsers] = useState<any[]>([]);
+  const [logs, setLogs] = useState<PointLog[]>([]);
+  const [topUsers, setTopUsers] = useState<UserWithPoints[]>([]);
   const [stats, setStats] = useState({ totalPoints: 0, totalRedeemed: 0 });
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+
 
   // State untuk Modal Adjustment
   const [showModal, setShowModal] = useState(false);
@@ -44,14 +45,15 @@ export default function AdminPointsDashboard() {
   useEffect(() => {
     const qLogs = query(collection(db, 'point_logs'), orderBy('createdAt', 'desc'), limit(50));
     const unsubLogs = onSnapshot(qLogs, (snapshot) => {
-      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PointLog)));
     });
+
 
     const qUsers = query(collection(db, 'users'), orderBy('points', 'desc'), limit(10));
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
-      setTopUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTopUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserWithPoints)));
     });
+
 
     const fetchStats = async () => {
       const logsSnap = await getDocs(collection(db, 'point_logs'));
@@ -89,9 +91,10 @@ export default function AdminPointsDashboard() {
       toast.success("Berhasil memperbarui poin");
       setShowModal(false);
       setAdjustData({ userId: '', amount: 0, reason: '', type: 'BONUS' });
-    } catch (e) {
+    } catch {
       toast.error("Gagal memproses data");
     }
+
   };
 
   // FUNGSI BEKUKAN/AKTIFKAN POIN
@@ -101,15 +104,16 @@ export default function AdminPointsDashboard() {
         isPointsFrozen: !currentStatus
       });
       toast.success(!currentStatus ? "Poin user dibekukan!" : "Poin user diaktifkan!");
-    } catch (e) {
+    } catch {
       toast.error("Gagal mengubah status");
     }
+
   };
 
   return (
     <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
           <div className="flex items-center gap-4">
@@ -121,7 +125,7 @@ export default function AdminPointsDashboard() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Keamanan & Audit Poin</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-2 bg-red-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg"
           >
@@ -147,7 +151,7 @@ export default function AdminPointsDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* USER LIST & FREEZE CONTROL */}
           <div className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
             <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 tracking-widest text-blue-600">
@@ -155,47 +159,47 @@ export default function AdminPointsDashboard() {
             </h3>
             <div className="space-y-3">
               {topUsers.map((user) => (
-                     <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.isPointsFrozen ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-transparent'}`}>
-                    <div className="flex items-center gap-3 overflow-hidden">
+                <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${user.isPointsFrozen ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-transparent'}`}>
+                  <div className="flex items-center gap-3 overflow-hidden">
                     <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center ${user.isPointsFrozen ? 'bg-red-200 text-red-600' : 'bg-white text-gray-400'}`}>
-                        {user.isPointsFrozen ? <Snowflake size={18} /> : <UserIcon size={18} />}
+                      {user.isPointsFrozen ? <Snowflake size={18} /> : <UserIcon size={18} />}
                     </div>
                     <div className="overflow-hidden">
-                        <p className="text-[10px] font-black uppercase truncate">{user.displayName || user.email?.split('@')[0]}</p>
-                        
-                        {/* BAGIAN UID PELANGGAN */}
-                        <div 
+                      <p className="text-[10px] font-black uppercase truncate">{user.displayName || user.email?.split('@')[0]}</p>
+
+                      {/* BAGIAN UID PELANGGAN */}
+                      <div
                         className="flex items-center gap-1 cursor-pointer group"
                         onClick={() => {
-                            navigator.clipboard.writeText(user.id);
-                            toast.success("UID Berhasil disalin!");
+                          navigator.clipboard.writeText(user.id);
+                          toast.success("UID Berhasil disalin!");
                         }}
-                        >
+                      >
                         <p className="text-[8px] font-bold text-blue-500 uppercase font-mono tracking-tighter">
-                            UID: {user.id}
+                          UID: {user.id}
                         </p>
                         <span className="text-[7px] bg-blue-100 text-blue-600 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">Copy</span>
-                        </div>
+                      </div>
 
-                        <p className={`text-[8px] font-bold uppercase mt-1 ${user.isPointsFrozen ? 'text-red-500' : 'text-gray-400'}`}>
+                      <p className={`text-[8px] font-bold uppercase mt-1 ${user.isPointsFrozen ? 'text-red-500' : 'text-gray-400'}`}>
                         {user.isPointsFrozen ? 'Status: Dibekukan' : 'Status: Aktif'}
-                        </p>
+                      </p>
                     </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 ml-2">
+                  </div>
+
+                  <div className="flex items-center gap-4 ml-2">
                     <div className="text-right">
-                        <p className="text-xs font-black text-blue-600">{user.points?.toLocaleString()}</p>
-                        <p className="text-[8px] font-bold text-gray-300 uppercase italic">Points</p>
+                      <p className="text-xs font-black text-blue-600">{user.points?.toLocaleString()}</p>
+                      <p className="text-[8px] font-bold text-gray-300 uppercase italic">Points</p>
                     </div>
-                    <button 
-                        onClick={() => toggleFreeze(user.id, user.isPointsFrozen)}
-                        className={`p-2 rounded-xl transition-all ${user.isPointsFrozen ? 'bg-green-500 text-white' : 'bg-red-100 text-red-600'}`}
-                        title={user.isPointsFrozen ? "Aktifkan Kembali" : "Bekukan Poin"}
+                    <button
+                      onClick={() => toggleFreeze(user.id, user.isPointsFrozen)}
+                      className={`p-2 rounded-xl transition-all ${user.isPointsFrozen ? 'bg-green-500 text-white' : 'bg-red-100 text-red-600'}`}
+                      title={user.isPointsFrozen ? "Aktifkan Kembali" : "Bekukan Poin"}
                     >
-                        {user.isPointsFrozen ? <ShieldCheck size={16} /> : <Snowflake size={16} />}
+                      {user.isPointsFrozen ? <ShieldCheck size={16} /> : <Snowflake size={16} />}
                     </button>
-                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -218,9 +222,8 @@ export default function AdminPointsDashboard() {
                         <p className="text-[10px] font-black uppercase">UID: {log.userId?.slice(0, 8)}</p>
                       </td>
                       <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${
-                          log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                          }`}>
                           {log.type}
                         </span>
                         <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase italic leading-tight">{log.description}</p>
@@ -246,19 +249,19 @@ export default function AdminPointsDashboard() {
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400">Target User ID</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none border-2 border-transparent focus:border-black"
                     placeholder="Masukkan UID Pelanggan..."
-                    onChange={(e) => setAdjustData({...adjustData, userId: e.target.value})}
+                    onChange={(e) => setAdjustData({ ...adjustData, userId: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => setAdjustData({...adjustData, type: 'BONUS'})}
+                  <button onClick={() => setAdjustData({ ...adjustData, type: 'BONUS' })}
                     className={`p-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${adjustData.type === 'BONUS' ? 'bg-green-50 border-green-600 text-green-600' : 'border-gray-100 text-gray-400'}`}>
                     <PlusCircle className="mx-auto mb-1" size={18} /> Bonus
                   </button>
-                  <button onClick={() => setAdjustData({...adjustData, type: 'PENALTY'})}
+                  <button onClick={() => setAdjustData({ ...adjustData, type: 'PENALTY' })}
                     className={`p-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${adjustData.type === 'PENALTY' ? 'bg-red-50 border-red-600 text-red-600' : 'border-gray-100 text-gray-400'}`}>
                     <MinusCircle className="mx-auto mb-1" size={18} /> Penalti
                   </button>
@@ -266,13 +269,13 @@ export default function AdminPointsDashboard() {
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400">Nominal Poin</label>
                   <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-black outline-none" placeholder="0"
-                    onChange={(e) => setAdjustData({...adjustData, amount: Number(e.target.value)})} />
+                    onChange={(e) => setAdjustData({ ...adjustData, amount: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400">Alasan Penyesuaian</label>
                   <textarea className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none resize-none" rows={3}
                     placeholder="Contoh: Temuan transaksi fiktif..."
-                    onChange={(e) => setAdjustData({...adjustData, reason: e.target.value})} />
+                    onChange={(e) => setAdjustData({ ...adjustData, reason: e.target.value })} />
                 </div>
                 <div className="flex gap-4 mt-6">
                   <button onClick={() => setShowModal(false)} className="flex-1 p-4 font-black text-[10px] uppercase text-gray-400 hover:text-black">Batal</button>

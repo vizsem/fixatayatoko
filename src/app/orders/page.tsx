@@ -1,19 +1,49 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  ShoppingBag, Clock, ChevronRight, Package, 
-  Truck, CheckCircle2, AlertCircle, Loader2, 
+import {
+  ShoppingBag, Clock, ChevronRight, Package,
+  Truck, CheckCircle2, AlertCircle,
   HomeIcon, LayoutGrid, ReceiptText, User,
-  Coins, Ticket, Tag // Ikon tambahan untuk rincian diskon
+  Coins, Ticket
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { EmptyState, SkeletonList } from '@/components/UIState';
+
+type FirebaseOrder = {
+  status?: string;
+  createdAt?: { toDate: () => Date } | string;
+  items?: { name?: string; quantity?: number }[];
+  pointsUsed?: number;
+  voucherDiscount?: number;
+  voucherUsed?: boolean;
+  total?: number;
+  orderId?: string;
+  payment?: {
+    method?: string;
+  };
+};
+
+type UserOrder = {
+  id: string;
+  status: string;
+  createdAt: Date;
+  items: { name: string; quantity: number }[];
+  pointsUsed: number;
+  voucherDiscount: number;
+  voucherUsed: boolean;
+  total: number;
+  orderId?: string;
+  payment?: {
+    method?: string;
+  };
+};
 
 export default function UserOrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -36,11 +66,35 @@ export default function UserOrdersPage() {
         );
         
         const querySnapshot = await getDocs(q);
-        const ordersList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt)
-        }));
+        const ordersList: UserOrder[] = querySnapshot.docs.map(doc => {
+          const data = doc.data() as FirebaseOrder;
+          const rawCreatedAt = data.createdAt;
+          const createdAt =
+            rawCreatedAt &&
+            typeof rawCreatedAt === 'object' &&
+            'toDate' in rawCreatedAt
+              ? (rawCreatedAt as { toDate: () => Date }).toDate()
+              : new Date(rawCreatedAt ?? new Date().toISOString());
+
+          const items =
+            data.items?.map(item => ({
+              name: item.name ?? '',
+              quantity: item.quantity ?? 0,
+            })) ?? [];
+
+          return {
+            id: doc.id,
+            status: data.status ?? 'PENDING',
+            createdAt,
+            items,
+            pointsUsed: data.pointsUsed ?? 0,
+            voucherDiscount: data.voucherDiscount ?? 0,
+            voucherUsed: data.voucherUsed ?? false,
+            total: data.total ?? 0,
+            orderId: data.orderId,
+            payment: data.payment,
+          };
+        });
         
         setOrders(ordersList);
       } catch (error) {
@@ -69,15 +123,8 @@ export default function UserOrdersPage() {
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <Loader2 className="animate-spin text-green-600 mb-4" size={32} />
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Memuat Pesanan Anda...</p>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-24 font-sans page-fade">
       {/* HEADER */}
       <div className="bg-white px-8 py-10 border-b border-gray-100">
         <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic underline decoration-green-500 decoration-4 underline-offset-4">Pesanan Saya</h1>
@@ -85,21 +132,31 @@ export default function UserOrdersPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
-        {orders.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-gray-200">
-            <ShoppingBag className="mx-auto text-gray-200 mb-4" size={60} />
-            <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Belum ada pesanan</p>
-            <Link href="/" className="text-green-600 text-[10px] font-black uppercase mt-4 block underline">Mulai Belanja Sekarang</Link>
-          </div>
+        {loading ? (
+          <SkeletonList lines={4} />
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag className="mx-auto text-slate-200" size={56} />}
+            title="Belum ada pesanan"
+            description="Saat Anda berbelanja, riwayat pesanan akan muncul di sini."
+            action={
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-green-600 text-white tap-active"
+              >
+                Mulai Belanja
+              </Link>
+            }
+          />
         ) : (
           orders.map((order) => {
             const status = getStatusInfo(order.status);
             const totalDiskon = (order.pointsUsed || 0) + (order.voucherDiscount || 0);
 
             return (
-              <div 
+              <div
                 key={order.id} 
-                className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-100 active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden group"
+                className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-100 tap-active cursor-pointer relative overflow-hidden group"
                 onClick={() => router.push(`/transaksi/${order.id}`)}
               >
                 {/* Status Badge */}
@@ -128,7 +185,7 @@ export default function UserOrdersPage() {
                     <Package size={12}/> Detail Produk
                   </p>
                   <div className="space-y-1">
-                    {order.items?.slice(0, 1).map((item: any, i: number) => (
+                  {order.items.slice(0, 1).map((item, i: number) => (
                       <p key={i} className="text-xs font-black text-gray-800 uppercase line-clamp-1 italic">
                         {item.name} <span className="text-gray-400 font-bold ml-1">x{item.quantity}</span>
                       </p>

@@ -20,12 +20,12 @@ import {
 } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { 
-  Package, 
   Image as ImageIcon,
   AlertTriangle,
   Barcode,
   Warehouse
 } from 'lucide-react';
+import Image from 'next/image';
 
 type Product = {
   id: string;
@@ -74,54 +74,55 @@ export default function EditProductPage() {
         return;
       }
 
+      // Memindahkan fetch di sini untuk menghindari dependency warning
+      const fetchProductData = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, 'products', id));
+          if (!docSnap.exists()) {
+            setError('Produk tidak ditemukan.');
+            return;
+          }
+
+          const data = docSnap.data();
+          setProduct({
+            id: docSnap.id,
+            name: data.name || '',
+            price: data.price || 0,
+            wholesalePrice: data.wholesalePrice || 0,
+            stock: data.stock || 0,
+            stockByWarehouse: data.stockByWarehouse || {},
+            category: data.category || '',
+            unit: data.unit || '',
+            barcode: data.barcode || '',
+            image: data.image || 'https://placehold.co/400x400/64748b/ffffff?text=No+Image',
+            expiredDate: data.expiredDate
+          });
+          setImagePreview(data.image);
+        } catch (err) {
+          console.error('Gagal memuat produk:', err);
+          setError('Gagal memuat detail produk.');
+        }
+      };
+
+      const fetchWarehouses = async () => {
+        try {
+          const snapshot = await getDocs(collection(db, 'warehouses'));
+          const list = snapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name || ''
+          }));
+          setWarehouses(list);
+        } catch (err) {
+          console.error('Gagal memuat gudang:', err);
+        }
+      };
+
       await fetchProductData();
       await fetchWarehouses();
       setLoading(false);
     });
     return () => unsubscribe();
   }, [id, router]);
-
-  const fetchProductData = async () => {
-    try {
-      const docSnap = await getDoc(doc(db, 'products', id));
-      if (!docSnap.exists()) {
-        setError('Produk tidak ditemukan.');
-        return;
-      }
-
-      const data = docSnap.data();
-      setProduct({
-        id: docSnap.id,
-        name: data.name || '',
-        price: data.price || 0,
-        wholesalePrice: data.wholesalePrice || 0,
-        stock: data.stock || 0,
-        stockByWarehouse: data.stockByWarehouse || {},
-        category: data.category || '',
-        unit: data.unit || '',
-        barcode: data.barcode || '',
-        image: data.image || 'https://placehold.co/400x400/64748b/ffffff?text=No+Image',
-        expiredDate: data.expiredDate
-      });
-      setImagePreview(data.image);
-    } catch (err) {
-      console.error('Gagal memuat produk:', err);
-      setError('Gagal memuat detail produk.');
-    }
-  };
-
-  const fetchWarehouses = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'warehouses'));
-      const list = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name || ''
-      }));
-      setWarehouses(list);
-    } catch (err) {
-      console.error('Gagal memuat gudang:', err);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -272,9 +273,14 @@ export default function EditProductPage() {
             Gambar Produk
           </label>
           <div className="flex items-center gap-6">
-            <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+            <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
               {imagePreview ? (
-                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                <Image 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  fill
+                  className="object-cover"
+                />
               ) : (
                 <ImageIcon className="text-gray-400" size={24} />
               )}

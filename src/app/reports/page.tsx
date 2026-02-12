@@ -380,4 +380,4 @@ export default function ReportsDashboard() {
 import { AlertTriangle, Gift, Percent, Settings, Activity } from 'lucide-react';
 
 // Deklarasi global untuk XLSX
-declare const XLSX: any;
+import * as XLSX from 'xlsx';

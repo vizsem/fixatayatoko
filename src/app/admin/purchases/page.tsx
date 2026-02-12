@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -9,18 +10,20 @@ import {
   doc,
   getDoc,
   updateDoc,
-  deleteDoc,
   query,
   orderBy,
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
 import Link from 'next/link';
-import { 
-  ShoppingBag, Plus, Trash2, Truck, User, CreditCard, 
-  Package, AlertTriangle, TrendingDown, Search, ChevronRight,
-  Filter, Calendar, Clock, CheckCircle2, XCircle
+import { LucideIcon } from 'lucide-react';
+
+import {
+  ShoppingBag, Plus, CreditCard,
+  Package, Search, ChevronRight,
+  Calendar, Clock, CheckCircle2, XCircle
 } from 'lucide-react';
+
 
 // --- TYPES ---
 type ProductItem = {
@@ -53,9 +56,24 @@ export default function AdminPurchases() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const filteredPurchases = useMemo(() => {
+    let result = purchases;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(p =>
+        p.supplierName.toLowerCase().includes(term) ||
+        p.id.toLowerCase().includes(term)
+      );
+    }
+    if (statusFilter !== 'all') {
+      result = result.filter(p => p.status === statusFilter);
+    }
+    return result;
+  }, [purchases, searchTerm, statusFilter]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -82,26 +100,14 @@ export default function AdminPurchases() {
     return () => unsubscribe();
   }, [loading]);
 
-  useEffect(() => {
-    let result = purchases;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(p => 
-        p.supplierName.toLowerCase().includes(term) || 
-        p.id.toLowerCase().includes(term)
-      );
-    }
-    if (statusFilter !== 'all') {
-      result = result.filter(p => p.status === statusFilter);
-    }
-    setFilteredPurchases(result);
-  }, [searchTerm, statusFilter, purchases]);
+
 
   const updatePurchaseStatus = async (id: string, newStatus: Purchase['status']) => {
-    const confirmMsg = newStatus === 'DITERIMA' 
-      ? "Konfirmasi barang diterima? Stok akan bertambah otomatis." 
-      : "Batalkan transaksi ini?";
-    
+    const confirmMsg = newStatus === 'DITERIMA'
+      ? 'Konfirmasi barang diterima? Stok akan bertambah otomatis.'
+      : 'Batalkan transaksi ini?';
+
+
     if (!confirm(confirmMsg)) return;
 
     try {
@@ -123,14 +129,17 @@ export default function AdminPurchases() {
         }
       }
       await updateDoc(doc(db, 'purchases', id), { status: newStatus, updatedAt: serverTimestamp() });
-    } catch (err) { alert("Gagal update status"); }
+    } catch {
+      alert('Gagal update status');
+    }
+
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs">Loading Purchases...</div>;
 
   return (
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32">
-      
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
@@ -157,14 +166,14 @@ export default function AdminPurchases() {
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input 
-            className="w-full bg-gray-50 pl-12 pr-6 py-4 rounded-2xl text-xs font-bold outline-none" 
-            placeholder="Cari Supplier atau ID PO..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
+          <input
+            className="w-full bg-gray-50 pl-12 pr-6 py-4 rounded-2xl text-xs font-bold outline-none"
+            placeholder="Cari Supplier atau ID PO..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select 
+        <select
           className="bg-gray-50 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -208,19 +217,17 @@ export default function AdminPurchases() {
                 <td className="px-6 py-6">
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-gray-800">Rp {purchase.total.toLocaleString()}</span>
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-fit mt-1 ${
-                      purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                    }`}>
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-fit mt-1 ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                      }`}>
                       {purchase.paymentStatus}
                     </span>
                   </div>
                 </td>
                 <td className="px-6 py-6 text-center">
-                  <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-xl border ${
-                    purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' : 
-                    purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' : 
-                    'bg-red-50 text-red-600 border-red-100'
-                  }`}>
+                  <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-xl border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
+                    purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                      'bg-red-50 text-red-600 border-red-100'
+                    }`}>
                     {purchase.status}
                   </span>
                 </td>
@@ -228,7 +235,7 @@ export default function AdminPurchases() {
                   <div className="flex items-center justify-end gap-2">
                     {purchase.status === 'MENUNGGU' && (
                       <div className="flex gap-1">
-                         <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100">
+                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100">
                           <CheckCircle2 size={16} />
                         </button>
                         <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
@@ -258,7 +265,8 @@ export default function AdminPurchases() {
         <div className="relative z-10">
           <h3 className="text-lg font-black uppercase tracking-tighter">Sistem Stok Otomatis Aktif</h3>
           <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest mt-1 max-w-md leading-relaxed">
-            Menekan tombol "Terima" akan menambah stok barang di gudang secara real-time dan memperbarui Harga Beli (HPP) pada master data produk.
+            Menekan tombol &quot;Terima&quot; akan menambah stok barang di gudang secara real-time dan memperbarui Harga Beli (HPP) pada master data produk.
+
           </p>
         </div>
         <Package size={120} className="absolute -right-5 -bottom-5 opacity-10 group-hover:rotate-12 transition-all duration-700" />
@@ -268,7 +276,16 @@ export default function AdminPurchases() {
   );
 }
 
-function StatCard({ label, val, color, bg, icon: Icon, isWide }: any) {
+interface StatCardProps {
+  label: string;
+  val: string | number;
+  color: string;
+  bg: string;
+  icon: LucideIcon;
+  isWide?: boolean;
+}
+
+function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
   return (
     <div className={`p-6 rounded-[2rem] ${bg} ${color} border border-transparent hover:border-current transition-all flex flex-col gap-3 ${isWide ? 'md:col-span-2' : ''}`}>
       <div className="flex justify-between items-start">

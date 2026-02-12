@@ -24,6 +24,10 @@ type Product = {
   stock: number;
 };
 
+type CartItem = Product & {
+  quantity: number;
+};
+
 function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
@@ -107,8 +111,8 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   const addToCart = (p: Product) => {
-    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    const existingIdx = cart.findIndex((item: any) => item.id === p.id);
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
+    const existingIdx = cart.findIndex(item => item.id === p.id);
     if (existingIdx >= 0) cart[existingIdx].quantity += 1;
     else cart.push({ ...p, quantity: 1 });
     

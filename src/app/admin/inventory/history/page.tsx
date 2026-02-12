@@ -2,24 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { 
-  collection, 
-  query, 
-  orderBy, 
+import {
+  collection,
+  query,
+  orderBy,
   onSnapshot,
-  getDocs 
+  getDocs
 } from 'firebase/firestore';
-import { 
-  History, 
-  ArrowLeft, 
-  ArrowRightLeft, 
-  PlusCircle, 
-  MinusCircle, 
+import {
+  History,
+  ArrowLeft,
+  ArrowRightLeft,
+  PlusCircle,
+  MinusCircle,
   Search,
-  Filter,
   Calendar,
   Loader2
 } from 'lucide-react';
+
 import { useRouter } from 'next/navigation';
 
 type InventoryLog = {
@@ -33,7 +33,8 @@ type InventoryLog = {
   fromWarehouseName?: string;
   toWarehouseName?: string;
   adminId: string;
-  date: any;
+  date: Date;
+
 };
 
 export default function InventoryHistoryPage() {
@@ -56,7 +57,7 @@ export default function InventoryHistoryPage() {
       const warehouseNames = await fetchWarehouses();
 
       const q = query(
-        collection(db, 'inventory_logs'), 
+        collection(db, 'inventory_logs'),
         orderBy('date', 'desc')
       );
 
@@ -104,7 +105,7 @@ export default function InventoryHistoryPage() {
           <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] tracking-widest mb-4 hover:text-black transition-colors">
             <ArrowLeft size={14} /> Kembali ke Inventory
           </button>
-          
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-black text-white rounded-2xl">
@@ -119,7 +120,7 @@ export default function InventoryHistoryPage() {
             <div className="flex gap-2">
               <div className="relative flex-1 md:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                <input 
+                <input
                   type="text"
                   placeholder="Cari produk..."
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
@@ -127,7 +128,7 @@ export default function InventoryHistoryPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <select 
+              <select
                 className="bg-gray-50 border-none rounded-xl text-[10px] font-black uppercase px-4 focus:ring-2 focus:ring-black"
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -154,26 +155,24 @@ export default function InventoryHistoryPage() {
             filteredLogs.map((log) => (
               <div key={log.id} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  
+
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl ${
-                      log.type === 'MASUK' ? 'bg-green-50 text-green-600' : 
-                      log.type === 'KELUAR' ? 'bg-red-50 text-red-600' : 
-                      'bg-purple-50 text-purple-600'
-                    }`}>
+                    <div className={`p-3 rounded-2xl ${log.type === 'MASUK' ? 'bg-green-50 text-green-600' :
+                        log.type === 'KELUAR' ? 'bg-red-50 text-red-600' :
+                          'bg-purple-50 text-purple-600'
+                      }`}>
                       {log.type === 'MASUK' && <PlusCircle size={20} />}
                       {log.type === 'KELUAR' && <MinusCircle size={20} />}
                       {log.type === 'MUTASI' && <ArrowRightLeft size={20} />}
                     </div>
-                    
+
                     <div>
                       <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{log.productName}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                          log.type === 'MASUK' ? 'bg-green-600 text-white' : 
-                          log.type === 'KELUAR' ? 'bg-red-600 text-white' : 
-                          'bg-purple-600 text-white'
-                        }`}>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${log.type === 'MASUK' ? 'bg-green-600 text-white' :
+                            log.type === 'KELUAR' ? 'bg-red-600 text-white' :
+                              'bg-purple-600 text-white'
+                          }`}>
                           {log.type}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 uppercase">
@@ -198,14 +197,13 @@ export default function InventoryHistoryPage() {
                         </p>
                       )}
                     </div>
-                    
+
                     <div className="text-right min-w-[80px]">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Jumlah</p>
-                      <p className={`text-lg font-black tracking-tighter ${
-                        log.type === 'MASUK' ? 'text-green-600' : 
-                        log.type === 'KELUAR' ? 'text-red-600' : 
-                        'text-gray-900'
-                      }`}>
+                      <p className={`text-lg font-black tracking-tighter ${log.type === 'MASUK' ? 'text-green-600' :
+                          log.type === 'KELUAR' ? 'text-red-600' :
+                            'text-gray-900'
+                        }`}>
                         {log.type === 'MASUK' ? '+' : log.type === 'KELUAR' ? '-' : ''} {log.amount.toLocaleString()}
                       </p>
                     </div>
