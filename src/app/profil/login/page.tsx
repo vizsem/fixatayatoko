@@ -179,7 +179,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center mt-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          Belum punya akun? <Link href="/profil/daftar" className="text-green-600 hover:underline">Daftar Disini</Link>
+          Belum punya akun? <Link href="/profil/register" className="text-green-600 hover:underline">Daftar Disini</Link>
         </p>
       </div>
     </div>
