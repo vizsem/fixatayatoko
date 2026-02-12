@@ -17,22 +17,25 @@ import dynamic from 'next/dynamic';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 type DeliveryLocation = { lat: number; lng: number; };
-type OrderStatus = 'MENUNGGU' | 'DIPROSES' | 'DIKIRIM' | 'SELESAI' | 'DIBATALKAN';
+type OrderStatus = 'MENUNGGU' | 'DIPROSES' | 'DIKIRIM' | 'SELESAI' | 'DIBATALKAN' | 'BELUM_LUNAS';
 
 type Order = {
   id: string;
+  orderId?: string; // Menambahkan support untuk ID cantik (ATY-XXXX)
   customerName: string;
   customerPhone: string;
   items: Array<{ productId: string; name: string; quantity: number; price: number; }>;
   total: number;
+  subtotal: number;
+  shippingCost: number;
   status: OrderStatus;
   paymentMethod: string;
-  deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
+  deliveryMethod: string;
   deliveryAddress?: string;
   deliveryLocation?: DeliveryLocation;
   createdAt: Timestamp | null;
   notes?: string;
-
+  dueDate?: string; // Support Tempo
 };
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -188,11 +191,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <p className="text-[9px] font-black uppercase opacity-60">Kurir</p>
                   <p className="text-xs font-black uppercase">{order?.deliveryMethod?.replace('_', ' ')}</p>
                 </div>
-                <div className="p-5 bg-emerald-50 rounded-3xl text-emerald-700">
-                  <CreditCard size={20} className="mb-2" />
-                  <p className="text-[9px] font-black uppercase opacity-60">Bayar</p>
-                  <p className="text-xs font-black uppercase">{order?.paymentMethod}</p>
+                <div>
+                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Status Pembayaran</h3>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${order.status === 'SELESAI' ? 'bg-green-100 text-green-700' : order.status === 'BELUM_LUNAS' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>
+                    <CreditCard size={12}/> {order.paymentMethod} • {order.status === 'BELUM_LUNAS' ? 'BELUM LUNAS' : order.status === 'SELESAI' ? 'LUNAS' : order.status}
+                  </div>
+                  {order.dueDate && order.status === 'BELUM_LUNAS' && (
+                    <p className="mt-2 text-[10px] font-bold text-red-500 uppercase">Jatuh Tempo: {new Date(order.dueDate).toLocaleDateString('id-ID')}</p>
+                  )}
                 </div>
+
+                {order.status === 'BELUM_LUNAS' && (
+                  <button 
+                    onClick={() => updateStatus('SELESAI')}
+                    disabled={isUpdating}
+                    className="mt-2 w-full bg-green-600 text-white py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-700 transition-all shadow-lg shadow-green-200"
+                  >
+                    {isUpdating ? 'Memproses...' : 'Tandai Lunas'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -222,9 +239,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-4 border-black">
-                  <td colSpan={2} className="py-8 text-xl font-black uppercase tracking-tighter italic text-green-600">Total Pembayaran</td>
-                  <td className="py-8 text-3xl font-black text-right tracking-tighter">Rp {order?.total?.toLocaleString()}</td>
+                <tr>
+                  <td colSpan={3} className="pt-4">
+                    <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
+                      <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                        <span>Subtotal Produk</span>
+                        <span>Rp{order?.subtotal?.toLocaleString() || (order.total - (order.shippingCost || 0)).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                        <span>Ongkos Kirim</span>
+                        <span>Rp{order?.shippingCost?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100 border-dashed">
+                        <span>Total Pembayaran</span>
+                        <span>Rp{order?.total?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               </tfoot>
             </table>

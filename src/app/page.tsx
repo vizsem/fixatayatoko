@@ -10,8 +10,9 @@ import {
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
   FileText
 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // --- TYPES ---
 type Product = {
@@ -49,6 +50,7 @@ export default function Home() {
   const [randomProducts, setRandomProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
+  const [repurchaseProducts, setRepurchaseProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getDiscountedPrice = useCallback((product: Product) => {
@@ -91,7 +93,52 @@ export default function Home() {
     };
     updateCartCount();
     window.addEventListener('cart-updated', updateCartCount);
-    return () => window.removeEventListener('cart-updated', updateCartCount);
+    
+    // Fetch Repurchase Data (Jika User Login)
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Ambil 5 order terakhir user
+          const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5));
+          const snap = await getDocs(q);
+          const allItems = snap.docs.flatMap(d => d.data().items || []);
+          
+          // Ambil item unik berdasarkan ID
+          const uniqueItemIds = Array.from(new Set(allItems.map((i: any) => i.id))).slice(0, 10);
+          
+          // Karena Firestore "in" query limit 10, kita bisa langsung fetch
+          if (uniqueItemIds.length > 0) {
+            const productsQ = query(collection(db, 'products'), where('__name__', 'in', uniqueItemIds));
+            const pSnap = await getDocs(productsQ);
+            
+            const reProducts = pSnap.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                ...data,
+                name: data.Nama || data.name || "Produk",
+                price: Number(data.Ecer || data.price) || 0,
+                wholesalePrice: Number(data.Grosir || data.wholesalePrice) || Number(data.Ecer) || 0,
+                minWholesale: Number(data.Min_Grosir || data.Min_Stok_Grosir || 1),
+                stock: Number(data.Stok || data.stock || 0),
+                unit: data.Satuan || data.unit || 'pcs',
+                category: data.Kategori || data.category || 'Umum',
+                image: data.Link_Foto || data.image || '/logo-atayatoko.png',
+                variant: data.variant || ''
+              } as Product;
+            });
+            setRepurchaseProducts(reProducts);
+          }
+        } catch (e) {
+          console.error("Error fetching repurchase items:", e);
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener('cart-updated', updateCartCount);
+      unsubscribeAuth();
+    };
   }, []);
 
   useEffect(() => {
@@ -283,10 +330,51 @@ export default function Home() {
                 </div>
               </div>
             )}
+            
+            {/* Bagian Beli Lagi (Repurchase) */}
+            {repurchaseProducts.length > 0 && (
+              <div className="mb-8 px-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <RefreshCw size={18} className="text-blue-500 animate-spin-slow" />
+                  <h2 className="text-sm font-black uppercase text-gray-800 tracking-tighter">Beli Lagi</h2>
+                </div>
+                <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
+                  {repurchaseProducts.map(p => {
+                    const { price, hasPromo } = getDiscountedPrice(p);
+                    return (
+                      <div key={`rep-${p.id}`} className="min-w-[155px] md:min-w-[190px] snap-center bg-white rounded-2xl border border-gray-100 overflow-hidden relative group">
+                        <Link href={`/produk/${p.id}`} className="block aspect-square bg-gray-50 relative">
+                           <Image 
+                            src={p.image} 
+                            alt={p.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            sizes="(max-width: 768px) 155px, 190px"
+                          />
+                        </Link>
+                        <div className="p-3">
+                          <h3 className="text-[10px] font-bold text-gray-800 line-clamp-2 min-h-[30px] uppercase tracking-tight mb-2 leading-tight">{p.name}</h3>
+                          <div className="flex flex-col gap-0.5 mb-3">
+                             {hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{p.price.toLocaleString()}</span>}
+                             <span className="text-xs font-black text-green-600">Rp{price.toLocaleString()}</span>
+                          </div>
+                          <button 
+                            onClick={() => addToCart(p)}
+                            className="w-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1"
+                          >
+                            <RefreshCw size={10} /> Beli Lagi
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="mb-8 px-4">
               <div className="flex items-center gap-2 mb-4">
-                <RefreshCw size={18} className="text-blue-500" />
+                <Sparkles size={18} className="text-yellow-500" />
                 <h2 className="text-sm font-black uppercase text-gray-800 tracking-tighter">Khusus Untukmu</h2>
               </div>
               <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">

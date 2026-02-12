@@ -110,10 +110,20 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
 
         {/* Total & Metode */}
         <div className="space-y-1 text-[11px]">
-          <div className="flex justify-between font-black text-sm">
-            <span>TOTAL:</span>
-            <span>Rp {order.total?.toLocaleString()}</span>
+          <div className="flex justify-between">
+            <span>Subtotal:</span>
+            <span>Rp{(order.total - (order.deliveryAddress ? 0 : 0)).toLocaleString()}</span> 
           </div>
+          {/* Note: Logic ongkir perlu disesuaikan jika field shippingCost tersedia */}
+          <div className="flex justify-between">
+            <span>Total:</span>
+            <span className="font-black">Rp{order.total.toLocaleString()}</span>
+          </div>
+          {order.status === 'BELUM_LUNAS' && (
+             <div className="mt-2 text-center border border-black p-1">
+               <span className="font-black uppercase">BELUM LUNAS (TEMPO)</span>
+             </div>
+          )}
           <div className="flex justify-between uppercase text-[10px]">
             <span>BAYAR:</span>
             <span>{order.paymentMethod || '-'}</span>

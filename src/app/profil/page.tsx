@@ -10,9 +10,10 @@ import {
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
-  Bell, X, Zap, Ticket, Snowflake
+  Bell, X, Zap, Ticket, Snowflake, QrCode
 } from 'lucide-react';
 import Link from 'next/link';
+import MemberCard from '@/components/MemberCard';
 
 import { User as FirebaseUser } from 'firebase/auth';
 
@@ -263,6 +264,14 @@ export default function ProfilePage() {
           
           {/* KOLOM KIRI: PROFIL & POIN */}
           <div className="space-y-6">
+            {/* MEMBER CARD WIDGET (NEW) */}
+            <MemberCard 
+              name={profile?.name || "Member Ataya"} 
+              memberId={user?.uid || "GUEST"} 
+              points={profile?.points || 0}
+              level={(profile?.points || 0) > 100000 ? 'Platinum' : (profile?.points || 0) > 50000 ? 'Gold' : (profile?.points || 0) > 10000 ? 'Silver' : 'Bronze'}
+            />
+
             <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
@@ -287,27 +296,15 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* POIN WIDGET */}
-                <div className="bg-slate-900 rounded-3xl p-6 text-white relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10"><Zap size={60} fill="currentColor"/></div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2 italic">Saldo Poin Ataya</p>
-                  <div className="flex items-end gap-2">
-                    <h3 className="text-4xl font-black italic tracking-tighter">{(profile?.points || 0).toLocaleString()}</h3>
-                    <div className="mb-2 bg-yellow-400 text-black p-1 rounded-full"><Zap size={10} fill="currentColor"/></div>
+                {/* POIN WIDGET (Dihapus karena sudah ada di MemberCard, diganti info lain) */}
+                <div className="bg-slate-50 rounded-3xl p-6 mt-6 relative overflow-hidden border border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 text-blue-600 rounded-xl"><Ticket size={20}/></div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Voucher Saya</p>
+                      <h3 className="text-xl font-black text-slate-800 italic">0 Voucher</h3>
+                    </div>
                   </div>
-                  {profile?.isPointsFrozen && (
-                    <div className="mt-4 flex items-center gap-2 bg-red-500/20 text-red-400 p-2 rounded-xl border border-red-500/30">
-                      <Snowflake size={14} />
-                      <span className="text-[8px] font-black uppercase">Poin Dibekukan Admin</span>
-                    </div>
-                  )}
-                  <Link href="/vouchers" className="mt-6 flex items-center justify-between bg-white/10 hover:bg-white/20 transition-all p-4 rounded-2xl group/btn">
-                    <div className="flex items-center gap-3">
-                      <Ticket size={18} className="text-yellow-400" />
-                      <span className="text-[10px] font-black uppercase tracking-widest italic">Tukar Poin</span>
-                    </div>
-                    <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
-                  </Link>
                 </div>
               </div>
 

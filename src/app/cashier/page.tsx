@@ -96,6 +96,11 @@ export default function CashierPOS() {
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  
+  // State Khusus Tempo
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [tempoDueDate, setTempoDueDate] = useState('');
 
   // No redundant state for calculated values
 
@@ -263,6 +268,9 @@ export default function CashierPOS() {
     if (cart.length === 0) return;
     if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof && !isOffline) return alert('Wajib upload bukti!');
     if (paymentMethod === 'CASH' && change < 0) return alert('Uang kurang!');
+    if (paymentMethod === 'TEMPO') {
+      if (!customerName || !customerPhone || !tempoDueDate) return alert('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
+    }
     
     // Jika offline, blokir metode yang butuh upload kecuali dipaksa (tapi di sini kita warning saja)
     if (isOffline && (paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER')) {
@@ -286,12 +294,14 @@ export default function CashierPOS() {
       }
 
       const orderData = {
-        customerName: transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko',
+        customerName: paymentMethod === 'TEMPO' ? customerName : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko'),
+        customerPhone: paymentMethod === 'TEMPO' ? customerPhone : '',
         items: cart,
         subtotal, shippingCost, total,
         paymentMethod, paymentProofUrl: proofUrl,
         deliveryMethod, transactionType,
-        status: 'SELESAI',
+        status: paymentMethod === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI',
+        dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
         createdAt: serverTimestamp(),
       };
 
@@ -313,6 +323,9 @@ export default function CashierPOS() {
       setCashGiven('');
       setPaymentProof(null);
       setProofPreview(null);
+      setCustomerName('');
+      setCustomerPhone('');
+      setTempoDueDate('');
       alert('Transaksi Berhasil!');
     } catch (e) {
       console.error(e);
@@ -494,11 +507,43 @@ export default function CashierPOS() {
                     {change >= 0 && <p className="text-[10px] font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
                   </div>
                 ) : paymentMethod === 'TEMPO' ? (
-                   <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100">
+                   <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100 space-y-3">
                      <p className="text-[10px] font-black text-orange-600 uppercase flex items-center gap-2">
                        <History size={14}/> Pembayaran Tempo
                      </p>
-                     <p className="text-[9px] text-gray-500 mt-1">Transaksi ini akan dicatat sebagai piutang pelanggan.</p>
+                     <p className="text-[9px] text-gray-500">Transaksi ini akan dicatat sebagai piutang pelanggan.</p>
+                     
+                     <div className="space-y-2">
+                       <div>
+                         <label className="text-[9px] font-bold text-gray-500 uppercase">Nama Pelanggan</label>
+                         <input 
+                           type="text" 
+                           value={customerName} 
+                           onChange={e => setCustomerName(e.target.value)} 
+                           className="w-full p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-orange-500"
+                           placeholder="Masukkan nama..."
+                         />
+                       </div>
+                       <div>
+                         <label className="text-[9px] font-bold text-gray-500 uppercase">No. HP / WA</label>
+                         <input 
+                           type="tel" 
+                           value={customerPhone} 
+                           onChange={e => setCustomerPhone(e.target.value)} 
+                           className="w-full p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-orange-500"
+                           placeholder="08..."
+                         />
+                       </div>
+                       <div>
+                         <label className="text-[9px] font-bold text-gray-500 uppercase">Jatuh Tempo</label>
+                         <input 
+                           type="date" 
+                           value={tempoDueDate} 
+                           onChange={e => setTempoDueDate(e.target.value)} 
+                           className="w-full p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-orange-500"
+                         />
+                       </div>
+                     </div>
                    </div>
                 ) : (
                   <div className="space-y-1">

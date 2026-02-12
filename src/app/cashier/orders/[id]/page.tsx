@@ -1,7 +1,7 @@
 // src/app/cashier/orders/[id]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -45,8 +45,9 @@ type Order = {
   notes?: string;
 };
 
-export default function CashierOrderDetail({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function CashierOrderDetail({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);

@@ -52,10 +52,14 @@ export const removeItem = (id: string): void => {
 // ✅ Fungsi Cerdas: Menghitung total harga dengan logika Grosir
 // Jika jumlah barang >= Min_Grosir, gunakan harga Grosir, jika tidak gunakan harga Ecer
 export const getItemPrice = (item: CartItem): number => {
-  if (item.Grosir > 0 && item.Min_Grosir > 0 && item.quantity >= item.Min_Grosir) {
-    return item.Grosir;
+  // Gunakan optional chaining dan fallback ke 0
+  const grosirPrice = item.wholesalePrice ?? item.Grosir ?? 0;
+  const minGrosirQty = item.minWholesale ?? item.Min_Grosir ?? 0;
+  
+  if (grosirPrice > 0 && minGrosirQty > 0 && item.quantity >= minGrosirQty) {
+    return grosirPrice;
   }
-  return item.Ecer;
+  return item.price ?? item.Ecer ?? 0;
 };
 
 export const getTotalPrice = (cart: CartItem[]): number => {
