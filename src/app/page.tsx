@@ -104,7 +104,7 @@ export default function Home() {
           const allItems = snap.docs.flatMap(d => d.data().items || []);
           
           // Ambil item unik berdasarkan ID
-          const uniqueItemIds = Array.from(new Set(allItems.map((i: any) => i.id))).slice(0, 10);
+          const uniqueItemIds = Array.from(new Set(allItems.map((i: { id: string }) => i.id))).slice(0, 10);
           
           // Karena Firestore "in" query limit 10, kita bisa langsung fetch
           if (uniqueItemIds.length > 0) {

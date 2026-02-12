@@ -1,7 +1,6 @@
 import React from 'react';
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
-import { User } from 'lucide-react';
 
 type MemberCardProps = {
   name: string;

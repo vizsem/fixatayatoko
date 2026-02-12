@@ -10,7 +10,7 @@ import {
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
-  Bell, X, Zap, Ticket, Snowflake, QrCode
+  Bell, X, Ticket
 } from 'lucide-react';
 import Link from 'next/link';
 import MemberCard from '@/components/MemberCard';
