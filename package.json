@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/resources": "^2.2.0",
     "@opentelemetry/sdk-trace-base": "^2.2.0",
@@ -23,8 +24,9 @@
     "jspdf": "^3.0.4",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
-    "next-pwa": "^5.6.0",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
+    "react-barcode": "^1.6.1",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.6.0",
     "xlsx": "^0.18.5"
