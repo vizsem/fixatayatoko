@@ -115,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </aside>
-      <main className="flex-1 md:ml-72 p-4 md:p-8">
+      <main className="flex-1 p-4 md:p-8">
         <div className="md:hidden mb-4 flex items-center justify-between">
           <button
             className="p-2.5 bg-white rounded-xl shadow-sm border border-gray-100"
