@@ -2,16 +2,15 @@
 
 import { useEffect, useState, useLayoutEffect, useCallback } from 'react';
 
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  X, Tag, ShoppingCart, Truck, UsersRound,
-  BarChart3, Settings, Menu, LogOut, ChevronRight, History, Gift, Activity, Zap,
-  TrendingUp, Package, Warehouse, Users, DollarSign, Clock, AlertTriangle, ShieldCheck, Database
+  Activity, Gift, Zap,
+  Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3
 } from 'lucide-react';
 
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
 
 import {
@@ -53,43 +52,14 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
   </Link>
 );
 
-interface NavItemProps {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  colorClass: string;
-  isActive: boolean;
-  onClick: () => void;
-}
-
-const NavItem = ({ href, icon: Icon, label, colorClass, isActive, onClick }: NavItemProps) => {
-  return (
-    <li>
-      <Link
-        href={href}
-        onClick={onClick}
-        className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${isActive ? `${colorClass} font-bold shadow-sm` : 'text-gray-500 hover:bg-gray-50'
-          }`}
-      >
-        <div className="flex items-center gap-3">
-          <Icon size={18} />
-          <span className="text-xs font-black tracking-widest">{label}</span>
-
-        </div>
-        {isActive && <ChevronRight size={14} />}
-      </Link>
-    </li>
-  );
-};
+ 
 
 
 
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [stats, setStats] = useState({
     dailySales: 0,
@@ -187,12 +157,7 @@ export default function AdminDashboard() {
   }, [router, fetchDashboardData]);
 
 
-  const handleLogout = useCallback(async () => {
-    if (confirm("Yakin ingin keluar dari Console Admin?")) {
-      await signOut(auth);
-      router.push('/profil/login');
-    }
-  }, [router]);
+ 
 
 
   if (loading) return (
@@ -207,187 +172,93 @@ export default function AdminDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-[#FBFBFE] flex">
-      {/* Overlay Mobile */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-100 transition-transform lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-10 px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center shadow-lg text-white font-black">AT</div>
-              <div>
-                <h2 className="text-lg font-black text-gray-800 leading-none tracking-tighter text-normal">ATAYAMARKET</h2>
-                <p className="text-[10px] font-bold text-green-600 tracking-widest">Admin central</p>
-
-              </div>
-            </div>
-            <button className="lg:hidden p-2 text-gray-400" onClick={() => setIsMobileMenuOpen(false)}>
-              <X size={20} />
-            </button>
+    <>
+      <header className="flex justify-between items-center mb-10">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">Console Admin</h1>
+            <p className="text-gray-400 text-[10px] lg:text-xs font-bold tracking-widest">Status: <span className="text-green-500 underline decoration-2 underline-offset-4 font-black">Sistem online</span></p>
           </div>
-
-          <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <ul className="space-y-1">
-              <NavItem href="/admin" icon={TrendingUp} label="Dashboard" colorClass="bg-green-50 text-green-700" isActive={pathname === '/admin'} onClick={() => setIsMobileMenuOpen(false)} />
-
-              <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 tracking-[0.2em]">Katalog & stok</div>
-
-              <NavItem href="/admin/products" icon={Package} label="Produk" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/products'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/kategori" icon={Tag} label="Kategori" colorClass="bg-blue-50 text-blue-700" isActive={pathname === '/admin/kategori'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/warehouses" icon={Warehouse} label="Gudang" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/warehouses'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/inventory" icon={History} label="Riwayat Stok" colorClass="bg-emerald-50 text-emerald-700" isActive={pathname === '/admin/inventory'} onClick={() => setIsMobileMenuOpen(false)} />
-
-              <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 tracking-[0.2em]">Transaksi</div>
-
-              <NavItem href="/admin/orders" icon={ShoppingCart} label="Pesanan" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/orders'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/purchases" icon={Truck} label="Pembelian" colorClass="bg-purple-50 text-purple-700" isActive={pathname === '/admin/purchases'} onClick={() => setIsMobileMenuOpen(false)} />
-
-              <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 tracking-[0.2em]">Sdm & crm</div>
-
-              <NavItem href="/admin/customers" icon={Users} label="Pelanggan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/customers'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/employees" icon={UsersRound} label="Karyawan" colorClass="bg-orange-50 text-orange-700" isActive={pathname === '/admin/employees'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/promotions" icon={Gift} label="Promo & Poin" colorClass="bg-pink-50 text-pink-700" isActive={pathname === '/admin/promotions'} onClick={() => setIsMobileMenuOpen(false)} />
-
-              <div className="pt-4 pb-2 px-4 text-[9px] font-black text-gray-400 tracking-[0.2em]">Laporan</div>
-
-              <NavItem href="/admin/reports" icon={BarChart3} label="Statistik" colorClass="bg-red-50 text-red-700" isActive={pathname === '/admin/reports'} onClick={() => setIsMobileMenuOpen(false)} />
-              <NavItem href="/admin/settings" icon={Settings} label="Konfigurasi" colorClass="bg-slate-50 text-slate-700" isActive={pathname === '/admin/settings'} onClick={() => setIsMobileMenuOpen(false)} />
-
-            </ul>
-          </nav>
-
-          <button onClick={handleLogout} className="mt-6 flex items-center gap-3 px-4 py-4 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-black text-xs tracking-widest border border-transparent hover:border-red-100">
-
-            <LogOut size={18} /> Keluar Sistem
+        </div>
+        <div className="flex gap-3 items-center">
+          <div className="hidden sm:flex flex-col text-right">
+            <span className="text-[9px] font-black text-gray-400 tracking-tight">Omzet mingguan</span>
+            <span className="text-sm font-black text-green-600 tracking-tighter">Rp{stats.weeklySales.toLocaleString()}</span>
+          </div>
+          <button onClick={() => fetchDashboardData()} className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <Activity size={20} className="text-slate-400" />
           </button>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 lg:ml-72 min-h-screen p-4 lg:p-10 text-normal">
-        <header className="flex justify-between items-center mb-10">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-3 bg-white rounded-xl shadow-sm border border-gray-100"
-            >
-              <Menu size={20} />
-            </button>
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">Console Admin</h1>
-              <p className="text-gray-400 text-[10px] lg:text-xs font-bold tracking-widest">Status: <span className="text-green-500 underline decoration-2 underline-offset-4 font-black">Sistem online</span></p>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+        <StatBox label="Sales Hari Ini" value={`Rp${stats.dailySales.toLocaleString()}`} icon={DollarSign} color="text-green-600" bg="bg-green-100" />
+        <StatBox label="Pesanan Baru" value={stats.unreadOrders} icon={Clock} color="text-rose-600" bg="bg-rose-100" />
+        <StatBox label="Poin Beredar" value={stats.totalPointsIssued} icon={Zap} color="text-amber-600" bg="bg-amber-100" />
+        <StatBox label="Stok Kritis" value={stats.lowStock} icon={AlertTriangle} color="text-orange-600" bg="bg-orange-100" />
+      </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <QuickActionCard icon={Package} title="Update Stok" description="Manajemen inventaris barang" href="/admin/products" color="bg-blue-100 text-blue-600" />
+        <QuickActionCard icon={Truck} title="Supplier" description="Data pemasok barang" href="/admin/suppliers" color="bg-purple-100 text-purple-600" />
+        <QuickActionCard icon={Gift} title="Loyalty" description="Atur diskon & poin" href="/admin/promotions" color="bg-pink-100 text-pink-600" />
+        <QuickActionCard icon={BarChart3} title="Reports" description="Analisis performa toko" href="/admin/reports" color="bg-red-100 text-red-600" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="font-black text-gray-800 text-xs tracking-[0.2em]">Butuh tindakan segera</h3>
+            <Link href="/admin/orders" className="text-[9px] font-black text-blue-600 tracking-widest border-b-2 border-blue-600 pb-0.5">Semua pesanan</Link>
           </div>
-
-          <div className="flex gap-3 items-center">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-[9px] font-black text-gray-400 tracking-tight">Omzet mingguan</span>
-              <span className="text-sm font-black text-green-600 tracking-tighter">Rp{stats.weeklySales.toLocaleString()}</span>
-            </div>
-
-            <button onClick={() => fetchDashboardData()} className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 hover:rotate-180 transition-all duration-500">
-              <Activity size={20} className="text-slate-400" />
-            </button>
-          </div>
-        </header>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-          <StatBox label="Sales Hari Ini" value={`Rp${stats.dailySales.toLocaleString()}`} icon={DollarSign} color="text-green-600" bg="bg-green-100" />
-          <StatBox label="Pesanan Baru" value={stats.unreadOrders} icon={Clock} color="text-rose-600" bg="bg-rose-100" />
-          <StatBox label="Poin Beredar" value={stats.totalPointsIssued} icon={Zap} color="text-amber-600" bg="bg-amber-100" />
-          <StatBox label="Stok Kritis" value={stats.lowStock} icon={AlertTriangle} color="text-orange-600" bg="bg-orange-100" />
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <QuickActionCard icon={Package} title="Update Stok" description="Manajemen inventaris barang" href="/admin/products" color="bg-blue-100 text-blue-600" />
-          <QuickActionCard icon={Truck} title="Supplier" description="Data pemasok barang" href="/admin/suppliers" color="bg-purple-100 text-purple-600" />
-          <QuickActionCard icon={Gift} title="Loyalty" description="Atur diskon & poin" href="/admin/promotions" color="bg-pink-100 text-pink-600" />
-          <QuickActionCard icon={BarChart3} title="Reports" description="Analisis performa toko" href="/admin/reports" color="bg-red-100 text-red-600" />
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Recent Orders Section */}
-          <div className="xl:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="font-black text-gray-800 text-xs tracking-[0.2em]">Butuh tindakan segera</h3>
-              <Link href="/admin/orders" className="text-[9px] font-black text-blue-600 tracking-widest border-b-2 border-blue-600 pb-0.5">Semua pesanan</Link>
-            </div>
-
-            <div className="space-y-4">
-              {recentOrders.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <ShieldCheck className="text-green-500" size={24} />
-                  </div>
-                  <p className="text-[10px] font-black text-gray-300 tracking-widest text-center">Antrian bersih</p>
-
+          <div className="space-y-4">
+            {recentOrders.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ShieldCheck className="text-green-500" size={24} />
                 </div>
-              ) : (
-                recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] border border-transparent hover:border-green-100 hover:bg-white transition-all group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400 group-hover:text-green-600 transition-all">
-                        <Package size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-black text-gray-800 leading-none">{order.orderId || `#${order.id.substring(0, 6)}`}</p>
-                        <p className="text-[10px] font-bold text-gray-400 mt-1 tracking-tighter truncate max-w-[120px]">{order.customerName || 'Pelanggan umum'}</p>
-                      </div>
-
+                <p className="text-[10px] font-black text-gray-300 tracking-widest text-center">Antrian bersih</p>
+              </div>
+            ) : (
+              recentOrders.map((order) => (
+                <div key={order.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] border border-transparent hover:border-green-100 hover:bg-white transition-all group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400 group-hover:text-green-600 transition-all">
+                      <Package size={20} />
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-gray-900 tracking-tighter">Rp{(order.total || 0).toLocaleString()}</p>
-                      <Link href={`/admin/orders`} className="text-[9px] font-black text-green-600 tracking-widest">Proses →</Link>
-
+                    <div>
+                      <p className="text-xs font-black text-gray-800 leading-none">{order.orderId || `#${order.id.substring(0, 6)}`}</p>
+                      <p className="text-[10px] font-bold text-gray-400 mt-1 tracking-tighter truncate max-w-[120px]">{order.customerName || 'Pelanggan umum'}</p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Infrastructure Sidebar */}
-          <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <Database size={150} />
-            </div>
-
-            <h3 className="font-black text-gray-500 text-[9px] tracking-[0.3em] mb-8">Data infrastruktur</h3>
-
-            <div className="space-y-6 relative z-10 text-normal">
-              <SystemInfo label="Gudang Aktif" value={stats.warehouses} />
-              <SystemInfo label="Promo Berjalan" value={stats.activeVouchers} />
-              <SystemInfo label="Basis Pelanggan" value={stats.users} />
-              <SystemInfo label="Total SKU Produk" value={stats.totalProducts} />
-            </div>
-
-            <div className="mt-12 p-5 bg-white/5 rounded-[2rem] border border-white/10 text-center">
-              <p className="text-[9px] text-gray-400 font-black leading-relaxed tracking-widest">
-                Database cloud <br /><span className="text-green-400 font-black tracking-normal uppercase">Firestore realtime</span>
-              </p>
-
-            </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-gray-900 tracking-tighter">Rp{(order.total || 0).toLocaleString()}</p>
+                    <Link href={`/admin/orders`} className="text-[9px] font-black text-green-600 tracking-widest">Proses →</Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
-      </main>
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #f1f1f1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #e2e2e2; }
-      `}</style>
-    </div>
+        <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <Database size={150} />
+          </div>
+          <h3 className="font-black text-gray-500 text-[9px] tracking-[0.3em] mb-8">Data infrastruktur</h3>
+          <div className="space-y-6 relative z-10 text-normal">
+            <SystemInfo label="Gudang Aktif" value={stats.warehouses} />
+            <SystemInfo label="Promo Berjalan" value={stats.activeVouchers} />
+            <SystemInfo label="Basis Pelanggan" value={stats.users} />
+            <SystemInfo label="Total SKU Produk" value={stats.totalProducts} />
+          </div>
+          <div className="mt-12 p-5 bg-white/5 rounded-[2rem] border border-white/10 text-center">
+            <p className="text-[9px] text-gray-400 font-black leading-relaxed tracking-widest">
+              Database cloud <br /><span className="text-green-400 font-black tracking-normal uppercase">Firestore realtime</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

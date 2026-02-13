@@ -202,7 +202,7 @@ export default function AdminSuppliers() {
       )}
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="relative w-full md:w-64">
+        <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
           <input
             type="text"

@@ -7,7 +7,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Package, Users,
   Settings, Star, Truck, Receipt, Tag, Database,
-  UsersRound, Wallet, History, BarChart3
+  UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard
 } from 'lucide-react';
 
 
@@ -42,6 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Pelanggan', href: '/admin/customers', icon: Users },
         { name: 'Karyawan', href: '/admin/employees', icon: UsersRound },
         { name: 'Sistem Poin', href: '/admin/points', icon: Wallet },
+        { name: 'Users', href: '/admin/users', icon: Users },
       ]
     },
     {
@@ -51,7 +52,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     },
     {
       group: "Laporan", items: [
-        { name: 'Laporan Penjualan', href: '/admin/reports', icon: BarChart3 },
+        { name: 'Laporan', href: '/admin/reports', icon: BarChart3 },
+        { name: 'Penjualan', href: '/admin/reports/sales', icon: TrendingUp },
+        { name: 'Inventaris', href: '/admin/reports/inventory', icon: Database },
+        { name: 'Keuangan', href: '/admin/reports/finance', icon: CreditCard },
+        { name: 'Operasional', href: '/admin/reports/operations', icon: Settings },
+        { name: 'Promosi', href: '/admin/reports/promotions', icon: Star },
+        { name: 'Pelanggan', href: '/admin/reports/customers', icon: Users },
       ]
     },
     {
@@ -70,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform md:translate-x-0 md:static md:block shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-100 transition-transform md:translate-x-0 md:static md:block shrink-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -108,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </aside>
-      <main className="flex-1 md:ml-64 p-4 md:p-8">
+      <main className="flex-1 md:ml-72 p-4 md:p-8">
         <div className="md:hidden mb-4 flex items-center justify-between">
           <button
             className="p-2.5 bg-white rounded-xl shadow-sm border border-gray-100"
