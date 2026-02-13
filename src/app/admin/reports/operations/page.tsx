@@ -70,6 +70,7 @@ export default function OperationsReport() {
           totalAttendance?: number;
         };
         const employees = employeesSnapshot.docs.map(doc => doc.data() as EmployeeDoc);
+        const totalEmployees = employees.length;
         const activeEmployees = employees.filter((e) => String(e.status || '').toUpperCase() === 'AKTIF').length;
         const totalPayroll = employees
           .filter((e) => String(e.status || '').toUpperCase() === 'AKTIF')
