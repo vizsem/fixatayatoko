@@ -74,8 +74,8 @@ export default function FinanceReport() {
         const salesSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString()),
+            where('createdAt', '>=', startDate),
+            where('createdAt', '<=', endDate),
             where('status', '==', 'SELESAI')
           )
         );
@@ -115,14 +115,14 @@ export default function FinanceReport() {
 
           financeRecords.push({
             id: orderDoc.id,
-            date: order.createdAt,
+            date: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : String(order.createdAt || new Date().toISOString()),
             description: `Penjualan #${orderDoc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'profit',
-            amount: order.total, // Pendapatan
-            cost: totalCost,     // Biaya Pokok Penjualan
-            profit: totalProfit, // Laba Kotor
-            paymentMethod: order.paymentMethod
+            amount: Number(order.total || 0),
+            cost: totalCost,
+            profit: totalProfit,
+            paymentMethod: order.payment?.method || order.paymentMethod || 'CASH'
           });
         }
 
@@ -130,8 +130,8 @@ export default function FinanceReport() {
         const purchasesSnapshot = await getDocs(
           query(
             collection(db, 'purchases'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString())
+            where('createdAt', '>=', startDate),
+            where('createdAt', '<=', endDate)
           )
         );
 
@@ -139,12 +139,12 @@ export default function FinanceReport() {
           const data = doc.data();
           financeRecords.push({
             id: `PUR-${doc.id}`,
-            date: data.createdAt,
+            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
             description: `Pembelian dari ${data.supplierName}`,
             category: 'Pembelian',
             type: 'expense',
-            amount: data.total,
-            paymentMethod: data.paymentMethod
+            amount: Number(data.total || 0),
+            paymentMethod: data.paymentMethod || 'TRANSFER'
           });
         });
 
