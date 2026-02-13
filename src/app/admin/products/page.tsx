@@ -390,16 +390,16 @@ export default function AdminProducts() {
             <thead className="bg-gray-50 text-[10px] font-black text-gray-400 border-b">
 
               <tr>
-                <th className="p-6 w-10">
+                <th className="p-3 md:p-6 w-10">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-black">
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
                   </button>
                 </th>
-                <th className="p-6">Produk</th>
-                <th className="p-6">Stok & Gudang</th>
-                <th className="p-6">Harga (Avg)</th>
-                <th className="p-6">Tgl & Exp</th>
-                <th className="p-6 text-center">Aksi</th>
+                <th className="p-3 md:p-6">Produk</th>
+                <th className="p-3 md:p-6">Stok & Gudang</th>
+                <th className="hidden md:table-cell p-3 md:p-6">Harga (Avg)</th>
+                <th className="hidden md:table-cell p-3 md:p-6">Tgl & Exp</th>
+                <th className="p-3 md:p-6 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -410,14 +410,14 @@ export default function AdminProducts() {
 
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50/80 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
-                    <td className="p-6">
+                    <td className="p-3 md:p-6">
                       <button onClick={() => toggleSelectOne(p.id)}>
                         {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-gray-200" />}
                       </button>
                     </td>
-                    <td className="p-6">
+                    <td className="p-3 md:p-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gray-100 rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
                           {(() => {
                             // 1. Ambil sumber gambar
                             const imgSource = p.URL_Produk || p.url_produk || p.image || p.foto;
@@ -451,24 +451,24 @@ export default function AdminProducts() {
 
                       </div>
                     </td>
-                    <td className="p-6">
+                    <td className="p-3 md:p-6">
                       <p className={`font-black text-xs ${p.Stok <= p.Min_Stok ? 'text-red-600' : 'text-gray-900'}`}>{p.Stok} {p.Satuan}</p>
                       <p className="text-[8px] font-black text-gray-400 flex items-center gap-1"><Warehouse size={10} /> {whName}</p>
 
                     </td>
-                    <td className="p-6">
+                    <td className="hidden md:table-cell p-3 md:p-6">
                       <p className="text-[8px] font-black text-blue-600">Modal: Rp{(p.hargaBeli || p.Modal || 0).toLocaleString()}</p>
 
                       <p className="font-black text-xs text-emerald-600">Jual: Rp{(p.Ecer || 0).toLocaleString()}</p>
                     </td>
-                    <td className="p-6">
+                    <td className="hidden md:table-cell p-3 md:p-6">
                       <p className="text-[8px] font-black text-gray-400">In: {p.tgl_masuk || '-'}</p>
                       <p className={`text-[8px] font-black flex items-center gap-1 ${isExpired ? 'text-red-600 animate-pulse' : 'text-orange-500'}`}>
                         {isExpired && <AlertTriangle size={10} />} Exp: {p.expired_date || '-'}
                       </p>
                     </td>
 
-                    <td className="p-6 text-center">
+                    <td className="p-3 md:p-6 text-center">
                       <div className="flex justify-center gap-2">
                         <button onClick={() => setSelectedProductRestock(p)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all"><Calculator size={14} /></button>
                         <Link href={`/admin/products/edit/${p.id}`} className="p-2 bg-gray-50 border rounded-lg hover:bg-black hover:text-white transition-all"><Edit size={14} /></Link>
@@ -498,5 +498,4 @@ export default function AdminProducts() {
     </div>
   );
 }
-
 

@@ -258,19 +258,19 @@ export default function AdminCustomers() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Profil pelanggan</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Detail kontak</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Kategori</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Status piutang</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Omzet</th>
-                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 tracking-[0.2em]">Action</th>
+                <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Profil pelanggan</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Detail kontak</th>
+                <th className="px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Kategori</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Status piutang</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Omzet</th>
+                <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 tracking-[0.2em]">Action</th>
               </tr>
-
+ 
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
+                  <td colSpan={6} className="px-3 md:px-8 py-14 md:py-20 text-center">
                     <Activity className="mx-auto text-gray-200 mb-4" size={40} />
                     <p className="text-[10px] font-black text-gray-400 tracking-widest">Tidak ada data ditemukan</p>
 
@@ -279,7 +279,7 @@ export default function AdminCustomers() {
               ) : (
                 filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-8 py-6">
+                    <td className="px-3 md:px-8 py-3 md:py-6">
                       <div className="flex flex-col">
                         <span className="font-black text-gray-800 text-xs tracking-tight">{customer.name}</span>
 
@@ -294,7 +294,7 @@ export default function AdminCustomers() {
 
                       </div>
                     </td>
-                    <td className="px-6 py-6">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-600">
                           <Phone size={12} className="text-green-500" /> {customer.phone}
@@ -311,14 +311,14 @@ export default function AdminCustomers() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-6">
+                    <td className="px-3 md:px-6 py-3 md:py-6">
                       <span className={`px-3 py-1 text-[9px] font-black rounded-full tracking-widest ${customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
                         }`}>
                         {customer.type}
                       </span>
                     </td>
 
-                    <td className="px-6 py-6">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                       <div className="flex flex-col">
                         <span className={`text-xs font-black ${isOverLimit(customer) ? 'text-red-600' : 'text-gray-800'}`}>
                           Rp{customer.outstandingDebt.toLocaleString()}
@@ -334,7 +334,7 @@ export default function AdminCustomers() {
 
                       </div>
                     </td>
-                    <td className="px-6 py-6">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                       <div className="flex items-center gap-2">
                         <TrendingUp size={14} className="text-green-500" />
                         <span className="text-xs font-black text-gray-800">Rp{customer.totalSpent.toLocaleString()}</span>
@@ -344,7 +344,7 @@ export default function AdminCustomers() {
                       )}
 
                     </td>
-                    <td className="px-8 py-6 text-right">
+                    <td className="px-3 md:px-8 py-3 md:py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link href={`/admin/customers/edit/${customer.id}`} className="p-3 bg-white border border-gray-100 rounded-xl text-blue-600 hover:shadow-md transition-all">
                           <Edit size={16} />

@@ -50,6 +50,7 @@ export default function AdminSuppliers() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -202,7 +203,7 @@ export default function AdminSuppliers() {
       )}
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
           <input
             type="text"
@@ -212,7 +213,7 @@ export default function AdminSuppliers() {
             className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black outline-none"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setShowAddModal(true)}
             className="bg-white text-black border border-gray-100 px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2"
@@ -227,19 +228,19 @@ export default function AdminSuppliers() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Supplier
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kontak
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kategori
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Alamat
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Aksi
                 </th>
               </tr>
@@ -247,7 +248,7 @@ export default function AdminSuppliers() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className="px-3 md:px-6 py-10 md:py-12 text-center text-gray-500">
                     <Users className="mx-auto h-10 w-10 text-gray-400 mb-3" />
                     <p>Belum ada supplier terdaftar</p>
                     <button
@@ -261,11 +262,17 @@ export default function AdminSuppliers() {
               ) : (
                 filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{supplier.name}</div>
                       <div className="text-sm text-gray-500">{supplier.contactPerson}</div>
+                      <button
+                        onClick={() => setExpandedRows(prev => ({ ...prev, [supplier.id]: !prev[supplier.id] }))}
+                        className="md:hidden mt-2 inline-flex items-center gap-1 text-[10px] font-black text-blue-600"
+                      >
+                        {expandedRows[supplier.id] ? 'Tutup' : 'Detail'}
+                      </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2 mb-1">
                         <Phone size={14} className="text-gray-400" />
                         <span className="text-sm">{supplier.phone}</span>
@@ -275,18 +282,18 @@ export default function AdminSuppliers() {
                         <span className="text-sm text-gray-500">{supplier.email}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                         {supplier.category || 'Umum'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 max-w-xs">
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-700 max-w-xs">
                       <div className="flex items-start gap-2">
                         <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
                         <span className="truncate">{supplier.address}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center gap-3">
                         <Link
                           href={`/admin/suppliers/edit/${supplier.id}`}
@@ -310,6 +317,40 @@ export default function AdminSuppliers() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="md:hidden">
+        <table className="w-full">
+          <tbody>
+            {filteredSuppliers.map((supplier) => (
+              expandedRows[supplier.id] ? (
+                <tr key={`${supplier.id}-detail`}>
+                  <td colSpan={5} className="px-3 py-3 bg-gray-50 border-t">
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Phone size={12} className="text-gray-400" />
+                        <span>{supplier.phone || '-'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail size={12} className="text-gray-400" />
+                        <span className="text-gray-500">{supplier.email || '-'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded-full">
+                          {supplier.category || 'Umum'}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MapPin size={12} className="text-gray-400 mt-0.5" />
+                        <span className="text-gray-700">{supplier.address || '-'}</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Modal Tambah Supplier */}
