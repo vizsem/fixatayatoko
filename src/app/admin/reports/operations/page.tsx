@@ -62,6 +62,21 @@ export default function OperationsReport() {
   useEffect(() => {
     const fetchOperationsData = async () => {
       try {
+        // Ambil data karyawan
+        const employeesSnapshot = await getDocs(collection(db, 'employees'));
+        type EmployeeDoc = {
+          status?: string;
+          manualSalary?: number;
+          totalAttendance?: number;
+        };
+        const employees = employeesSnapshot.docs.map(doc => doc.data() as EmployeeDoc);
+        const activeEmployees = employees.filter((e) => String(e.status || '').toUpperCase() === 'AKTIF').length;
+        const totalPayroll = employees
+          .filter((e) => String(e.status || '').toUpperCase() === 'AKTIF')
+          .reduce((sum: number, e) => sum + Number(e.manualSalary || 0), 0);
+        const avgSalary = activeEmployees > 0 ? Math.round(totalPayroll / activeEmployees) : 0;
+        const totalAttendanceDays = employees.reduce((sum: number, e) => sum + Number(e.totalAttendance || 0), 0);
+
         // Ambil data pengguna
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const totalUsers = usersSnapshot.size;
@@ -108,6 +123,52 @@ export default function OperationsReport() {
         const transferTransactions = inventoryTransactions.filter(t => t.type === 'TRANSFER').length;
 
         const operationalMetrics: OperationalMetric[] = [
+          // Karyawan
+          {
+            id: 'active-employees',
+            name: 'Karyawan Aktif',
+            category: 'Karyawan',
+            value: activeEmployees,
+            unit: 'orang',
+            status: activeEmployees > 0 ? 'good' : 'warning',
+            description: 'Jumlah karyawan dengan status AKTIF'
+          },
+          {
+            id: 'total-employees',
+            name: 'Total Karyawan',
+            category: 'Karyawan',
+            value: totalEmployees,
+            unit: 'orang',
+            status: 'good',
+            description: 'Jumlah seluruh karyawan terdaftar'
+          },
+          {
+            id: 'monthly-payroll',
+            name: 'Total Gaji Bulanan',
+            category: 'Karyawan',
+            value: totalPayroll,
+            unit: 'Rp',
+            status: totalPayroll > 0 ? 'good' : 'warning',
+            description: 'Akumulasi take home pay karyawan aktif'
+          },
+          {
+            id: 'average-salary',
+            name: 'Rata-rata Gaji',
+            category: 'Karyawan',
+            value: avgSalary,
+            unit: 'Rp',
+            status: avgSalary > 0 ? 'good' : 'warning',
+            description: 'Rata-rata gaji per karyawan aktif'
+          },
+          {
+            id: 'attendance-total',
+            name: 'Total Absensi',
+            category: 'Karyawan',
+            value: totalAttendanceDays,
+            unit: 'hari',
+            status: 'good',
+            description: 'Akumulasi absensi seluruh karyawan'
+          },
           // Pengguna
           {
             id: 'active-users',
@@ -348,7 +409,7 @@ export default function OperationsReport() {
 
       {/* Operational Metrics by Category */}
       <div className="space-y-8">
-        {['Pengguna', 'Gudang', 'Produk', 'Pesanan', 'Inventaris'].map(category => {
+        {['Karyawan', 'Pengguna', 'Gudang', 'Produk', 'Pesanan', 'Inventaris'].map(category => {
           const categoryMetrics = metrics.filter(m => m.category === category);
           if (categoryMetrics.length === 0) return null;
 
@@ -356,6 +417,7 @@ export default function OperationsReport() {
             <div key={category} className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
               <div className="p-4 border-b bg-gray-50">
                 <h2 className="text-lg font-semibold text-black flex items-center gap-2">
+                  {category === 'Karyawan' && <Users size={20} />}
                   {category === 'Pengguna' && <Users size={20} />}
                   {category === 'Gudang' && <Warehouse size={20} />}
                   {category === 'Produk' && <Package size={20} />}

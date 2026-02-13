@@ -69,9 +69,9 @@ export default function FinanceReport() {
         const salesSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString()),
-            where('status', '==', 'SELESAI')
+            where('createdAt', '>=', startDate),
+            where('createdAt', '<=', endDate),
+            where('status', 'in', ['SELESAI', 'SUCCESS'])
           )
         );
         
@@ -79,8 +79,8 @@ export default function FinanceReport() {
         const purchasesSnapshot = await getDocs(
           query(
             collection(db, 'purchases'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString())
+            where('createdAt', '>=', startDate),
+            where('createdAt', '<=', endDate)
           )
         );
         
@@ -91,12 +91,12 @@ export default function FinanceReport() {
           const data = doc.data();
           financeRecords.push({
             id: doc.id,
-            date: data.createdAt,
+            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
             description: `Penjualan #${doc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'income',
-            amount: data.total,
-            paymentMethod: data.paymentMethod
+            amount: Number(data.total || 0),
+            paymentMethod: data.payment?.method || data.paymentMethod || 'CASH'
           });
         });
         
@@ -105,12 +105,12 @@ export default function FinanceReport() {
           const data = doc.data();
           financeRecords.push({
             id: `PUR-${doc.id}`,
-            date: data.createdAt,
+            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
             description: `Pembelian dari ${data.supplierName}`,
             category: 'Pembelian',
             type: 'expense',
-            amount: data.total,
-            paymentMethod: data.paymentMethod
+            amount: Number(data.total || 0),
+            paymentMethod: data.paymentMethod || 'TRANSFER'
           });
         });
         

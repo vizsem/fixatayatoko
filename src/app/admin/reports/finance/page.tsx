@@ -76,7 +76,7 @@ export default function FinanceReport() {
             collection(db, 'orders'),
             where('createdAt', '>=', startDate),
             where('createdAt', '<=', endDate),
-            where('status', '==', 'SELESAI')
+            where('status', 'in', ['SELESAI', 'SUCCESS'])
           )
         );
 

@@ -85,9 +85,9 @@ export default function SalesReport() {
         const ordersSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString()),
-            where('status', '==', 'SELESAI')
+            where('createdAt', '>=', startDate),
+            where('createdAt', '<=', endDate),
+            where('status', 'in', ['SELESAI', 'SUCCESS'])
           )
         );
 
@@ -97,11 +97,11 @@ export default function SalesReport() {
           for (const item of order.items || []) {
             salesList.push({
               id: orderDoc.id,
-              date: order.createdAt,
-              productName: item.name,
-              quantity: item.quantity,
-              total: item.price * item.quantity,
-              paymentMethod: order.paymentMethod,
+              date: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : String(order.createdAt || new Date().toISOString()),
+              productName: String(item.name || ''),
+              quantity: Number(item.quantity || 0),
+              total: Number(item.price || 0) * Number(item.quantity || 0),
+              paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
               customerName: order.customerName || 'Pelanggan'
             });
           }
