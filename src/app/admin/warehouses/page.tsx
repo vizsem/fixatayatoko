@@ -214,16 +214,16 @@ export default function WarehousesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50">
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Informasi Gudang</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Utilisasi Kapasitas</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Manajemen</th>
+                <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Informasi Gudang</th>
+                <th className="hidden md:table-cell px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Utilisasi Kapasitas</th>
+                <th className="hidden md:table-cell px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Manajemen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {warehouses.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-8 py-24 text-center">
+                  <td colSpan={4} className="px-3 md:px-8 py-16 md:py-24 text-center">
                     <div className="flex flex-col items-center opacity-20">
                       <Package size={60} className="mb-4" />
                       <p className="text-[10px] font-black uppercase tracking-widest">Data Gudang Kosong</p>
@@ -237,7 +237,7 @@ export default function WarehousesPage() {
 
                   return (
                     <tr key={warehouse.id} className="hover:bg-gray-50/50 transition-all group">
-                      <td className="px-8 py-6">
+                      <td className="px-3 md:px-8 py-3 md:py-6">
                         <div className="flex flex-col">
                           <span className="font-black text-gray-800 uppercase text-sm tracking-tighter">{warehouse.name}</span>
                           <div className="flex items-center gap-1 mt-1 text-gray-400">
@@ -246,7 +246,7 @@ export default function WarehousesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="hidden md:table-cell px-3 md:px-8 py-3 md:py-6">
                         <div className="max-w-[200px]">
                           <div className="flex justify-between items-end mb-2">
                             <span className="text-[11px] font-black text-gray-800">
@@ -265,7 +265,7 @@ export default function WarehousesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="hidden md:table-cell px-3 md:px-8 py-3 md:py-6">
                         <span className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-xl inline-flex items-center gap-1.5 ${warehouse.isActive
                           ? 'bg-green-50 text-green-700 border border-green-100'
                           : 'bg-gray-100 text-gray-400'
@@ -274,7 +274,7 @@ export default function WarehousesPage() {
                           {warehouse.isActive ? 'Online' : 'Offline'}
                         </span>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-3 md:px-8 py-3 md:py-6">
                         <div className="flex items-center justify-end gap-3">
                           <Link
                             href={`/admin/warehouses/mutasi/${warehouse.id}`}
@@ -304,6 +304,51 @@ export default function WarehousesPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="md:hidden">
+        <table className="w-full">
+          <tbody>
+            {warehouses.map((warehouse) => {
+              const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
+              const isCritical = rate >= 90;
+              return (
+                <tr key={`${warehouse.id}-detail`}>
+                  <td colSpan={2} className="px-3 py-3 bg-gray-50 border-t">
+                    <div className="space-y-3">
+                      <div className="max-w-full">
+                        <div className="flex justify-between items-end mb-1">
+                          <span className="text-[11px] font-black text-gray-800">
+                            {warehouse.usedCapacity.toLocaleString()} <span className="text-gray-300 text-[9px]">/ {warehouse.capacity.toLocaleString()}</span>
+                          </span>
+                          <span className={`text-[10px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
+                            {rate}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-1000 ease-out ${isCritical ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-green-500'
+                              }`}
+                            style={{ width: `${rate}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div>
+                        <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-xl inline-flex items-center gap-1.5 ${warehouse.isActive
+                          ? 'bg-green-50 text-green-700 border border-green-100'
+                          : 'bg-gray-100 text-gray-400'
+                          }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${warehouse.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                          {warehouse.isActive ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                  );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Footer Info */}

@@ -350,25 +350,25 @@ export default function FinanceReport() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Tanggal
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Deskripsi
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Pendapatan
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Biaya Pokok
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Laba
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Pengeluaran
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Metode Bayar
                 </th>
               </tr>
@@ -384,17 +384,17 @@ export default function FinanceReport() {
               ) : (
                 records.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">
                       {new Date(record.date).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{record.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">{record.description}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">
                       {record.type === 'profit' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       {record.cost ? `Rp${record.cost.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       {record.profit ? (
                         <span className={`font-medium ${record.profit >= 0 ? 'text-green-600' : 'text-red-600'
                           }`}>
@@ -402,10 +402,10 @@ export default function FinanceReport() {
                         </span>
                       ) : '–'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       {record.type === 'expense' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{record.paymentMethod}</td>
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{record.paymentMethod}</td>
                   </tr>
                 ))
               )}

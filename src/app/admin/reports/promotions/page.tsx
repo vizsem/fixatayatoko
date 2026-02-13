@@ -243,28 +243,28 @@ export default function PromotionsReport() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Nama Promosi
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Tipe
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Diskon
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Periode
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Penggunaan
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Total Diskon
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Konversi
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Status
                 </th>
               </tr>
@@ -287,29 +287,29 @@ export default function PromotionsReport() {
 
                   return (
                     <tr key={promo.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-black">{promo.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">{promo.name}</td>
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                         {promo.type === 'product' ? 'Produk' :
                           promo.type === 'category' ? 'Kategori' : 'Kupon'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">
                         {promo.discountType === 'percentage'
                           ? `${promo.discountValue}%`
                           : `Rp${promo.discountValue.toLocaleString('id-ID')}`}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                         <div>{new Date(promo.startDate).toLocaleDateString('id-ID')}</div>
                         <div className="text-gray-500">sampai</div>
                         <div>{new Date(promo.endDate).toLocaleDateString('id-ID')}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">{promo.usageCount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{promo.usageCount}</td>
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                         Rp{promo.totalDiscount.toLocaleString('id-ID')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                         {(promo.conversionRate * 100).toFixed(1)}%
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                         {isActive ? (
                           <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                             Aktif

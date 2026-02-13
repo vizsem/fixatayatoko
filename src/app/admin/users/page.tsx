@@ -228,16 +228,16 @@ export default function AdminUsers() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Pengguna
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Kontak
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Role
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Aksi
                 </th>
               </tr>
@@ -253,14 +253,14 @@ export default function AdminUsers() {
               ) : (
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <div className="font-medium text-black">{user.name}</div>
                       <div className="text-sm text-black">{user.email}</div>
                       <div className="text-xs text-black mt-1">
                         {new Date(user.createdAt).toLocaleDateString('id-ID')}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       {user.phone ? (
                         <div className="flex items-center gap-1">
                           <Phone size={14} className="text-gray-500" />
@@ -270,13 +270,13 @@ export default function AdminUsers() {
                         <span className="text-gray-500">–</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1 ${getRoleColor(user.role)}`}>
                         {getRoleIcon(user.role)}
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-black">
                       {user.id !== currentUser && (
                         <div className="flex items-center gap-2">
                           <select

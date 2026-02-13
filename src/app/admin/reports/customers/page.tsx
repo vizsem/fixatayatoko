@@ -347,25 +347,25 @@ export default function CustomerReport() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Pelanggan
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Jenis
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Total Belanja
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Frekuensi
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Piutang
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Limit Kredit
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Status
                 </th>
               </tr>
@@ -381,11 +381,11 @@ export default function CustomerReport() {
               ) : (
                 filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <div className="font-medium text-black">{customer.name}</div>
                       <div className="text-sm text-black">{customer.phone}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs rounded-full ${customer.type === 'grosir'
                         ? 'bg-purple-100 text-purple-800'
                         : 'bg-green-100 text-green-800'
@@ -393,28 +393,28 @@ export default function CustomerReport() {
                         {customer.type === 'grosir' ? 'Grosir' : 'Ecer'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">
                       <div className="flex items-center gap-1">
                         <TrendingUp size={16} className="text-green-600" />
                         <span>Rp{customer.totalSpent.toLocaleString('id-ID')}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       {customer.orderCount}x
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       <span className={`font-medium ${isOverLimit(customer) ? 'text-red-600' : 'text-black'
                         }`}>
                         Rp{customer.outstandingDebt.toLocaleString('id-ID')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       {customer.creditLimit > 0
                         ? `Rp${customer.creditLimit.toLocaleString('id-ID')}`
                         : '–'
                       }
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       {isOverLimit(customer) ? (
                         <span className="flex items-center gap-1 text-sm text-red-600">
                           <AlertTriangle size={14} />

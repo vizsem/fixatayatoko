@@ -209,25 +209,25 @@ export default function InventoryReport() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Produk
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Kategori
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Stok Saat Ini
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Stok Masuk
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Stok Keluar
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Nilai Stok
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Turnover
                 </th>
               </tr>
@@ -243,20 +243,20 @@ export default function InventoryReport() {
               ) : (
                 inventory.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{item.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{item.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">{item.name}</td>
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.category}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <span className={`font-medium ${item.currentStock <= 10 ? 'text-red-600' : 'text-black'
                         }`}>
                         {item.currentStock}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{item.stockIn}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">{item.stockOut}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-black">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.stockIn}</td>
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.stockOut}</td>
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">
                       Rp{item.stockValue.toLocaleString('id-ID')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       {item.turnoverRate > 0.5 ? (
                         <span className="text-green-600 flex items-center gap-1">
                           <TrendingUp size={16} />

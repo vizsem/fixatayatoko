@@ -251,29 +251,29 @@ export default function InventoryDashboard() {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-8 py-6 w-10">
+                <th className="px-3 md:px-8 py-3 md:py-6 w-10">
                   <button onClick={handleSelectAll} className="hover:scale-110 transition-transform">
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-300" size={20} />}
                   </button>
                 </th>
-                <th className="px-4 py-6 text-[10px] font-black text-gray-400 tracking-widest">Product</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-widest">Warehouse</th>
-                <th className="px-6 py-6 text-[10px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
-                <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 tracking-widest">Details</th>
+                <th className="px-2 md:px-4 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest">Product</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest">Warehouse</th>
+                <th className="px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
+                <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 tracking-widest">Details</th>
 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {currentItems.map(product => (
                 <tr key={product.id} className={`hover:bg-gray-50/50 transition-all ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
-                  <td className="px-8 py-6">
+                  <td className="px-3 md:px-8 py-3 md:py-6">
                     <button onClick={() => toggleSelect(product.id)}>
                       {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-200" size={20} />}
                     </button>
                   </td>
-                  <td className="px-4 py-6">
+                  <td className="px-2 md:px-4 py-3 md:py-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 overflow-hidden relative">
+                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 overflow-hidden relative">
                         {product.imageUrl ? (
                           <Image
                             src={product.imageUrl}
@@ -292,13 +292,13 @@ export default function InventoryDashboard() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-6">
+                  <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                     <span className="text-[10px] font-black text-gray-500 flex items-center gap-2">
 
                       <Warehouse size={14} className="text-gray-300" /> {warehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
                     </span>
                   </td>
-                  <td className="px-6 py-6 text-center">
+                  <td className="px-3 md:px-6 py-3 md:py-6 text-center">
                     {editingId === product.id ? (
                       <div className="flex items-center justify-center gap-2">
                         <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-xs font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
@@ -314,7 +314,7 @@ export default function InventoryDashboard() {
                       </div>
                     )}
                   </td>
-                  <td className="px-8 py-6 text-right">
+                  <td className="px-3 md:px-8 py-3 md:py-6 text-right">
                     <Link href={`/admin/products/edit/${product.id}`} className="p-3 bg-white border border-gray-100 rounded-2xl inline-block hover:border-black transition-all">
                       <ChevronRight size={18} className="text-gray-400" />
                     </Link>
@@ -326,7 +326,7 @@ export default function InventoryDashboard() {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="px-3 md:px-8 py-4 md:py-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <span className="text-[10px] font-black text-gray-400 tracking-widest">
             Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredProducts.length)} dari {filteredProducts.length} produk
 

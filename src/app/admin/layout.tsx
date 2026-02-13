@@ -1,20 +1,72 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Package, Users,
   Settings, Star, Truck, Receipt, Tag, Database,
-  UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard
+  UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
+  ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon
 } from 'lucide-react';
 
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [toasts, setToasts] = useState<Array<{
+    id: string;
+    productName: string;
+    warehouseName: string;
+    change: number;
+    type?: string;
+    adminEmail?: string;
+    createdAt?: Timestamp;
+  }>>([]);
+  const initialLoaded = useRef(false);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'stock_logs'),
+      orderBy('createdAt', 'desc'),
+      limit(20)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (!initialLoaded.current) {
+        initialLoaded.current = true;
+        return;
+      }
+      snap.docChanges().forEach((chg) => {
+        if (chg.type === 'added') {
+          const data = chg.doc.data() as {
+            productName?: string;
+            warehouseName?: string;
+            change?: number;
+            type?: string;
+            adminEmail?: string;
+            createdAt?: Timestamp;
+          };
+          const toast = {
+            id: chg.doc.id,
+            productName: String(data.productName || ''),
+            warehouseName: String(data.warehouseName || ''),
+            change: Number(data.change || 0),
+            type: String(data.type || ''),
+            adminEmail: String(data.adminEmail || ''),
+            createdAt: data.createdAt,
+          };
+          setToasts((prev) => [toast, ...prev].slice(0, 5));
+          setTimeout(() => {
+            setToasts((prev) => prev.filter(t => t.id !== toast.id));
+          }, 6000);
+        }
+      });
+    });
+    return () => unsub();
+  }, []);
 
   const menuItems = [
     {
@@ -130,6 +182,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div />
         </div>
         {children}
+        {!!toasts.length && (
+          <div className="fixed bottom-4 right-4 z-[60] space-y-2">
+            {toasts.map((t) => {
+              const isIn = t.change > 0;
+              return (
+                <div key={t.id} className="flex items-center gap-3 bg-white border border-gray-100 shadow-xl rounded-2xl p-3 min-w-[280px]">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isIn ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                    {isIn ? <ArrowUpCircle size={18} /> : <ArrowDownCircle size={18} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 text-xs font-black">
+                      <BoxIcon size={14} className="text-gray-300" />
+                      <span className="text-gray-800">{t.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-black ${isIn ? 'text-green-600' : 'text-red-600'}`}>
+                        {isIn ? `+${t.change}` : t.change}
+                      </span>
+                      <span className="text-[9px] font-bold text-gray-400">unit</span>
+                      <span className="text-[9px] font-bold text-gray-400">•</span>
+                      <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500">
+                        <Warehouse size={12} className="text-gray-300" />
+                        {t.warehouseName}
+                      </div>
+                    </div>
+                    <div className="text-[8px] font-bold text-gray-400">
+                      {t.type || 'STOCK'}
+                      {t.adminEmail ? ` • ${t.adminEmail.split('@')[0]}` : ''}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );

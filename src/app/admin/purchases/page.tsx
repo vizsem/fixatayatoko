@@ -167,7 +167,7 @@ export default function AdminPurchases() {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
-            className="w-full bg-gray-50 pl-12 pr-6 py-4 rounded-2xl text-xs font-bold outline-none"
+            className="w-full bg-gray-50 pl-12 pr-6 py-3 md:py-4 rounded-2xl text-xs font-bold outline-none"
             placeholder="Cari Supplier atau ID PO..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -191,17 +191,17 @@ export default function AdminPurchases() {
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50/50">
             <tr>
-              <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">ID & Tanggal</th>
-              <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier</th>
-              <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pembayaran</th>
-              <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-              <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+              <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">ID & Tanggal</th>
+              <th className="px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier</th>
+              <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pembayaran</th>
+              <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+              <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filteredPurchases.map((purchase) => (
               <tr key={purchase.id} className="hover:bg-gray-50/50 transition-all">
-                <td className="px-8 py-6">
+                <td className="px-3 md:px-8 py-3 md:py-6">
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-gray-800 uppercase italic">#{purchase.id.slice(-6)}</span>
                     <span className="text-[9px] font-bold text-gray-400 uppercase flex items-center gap-1 mt-1">
@@ -209,13 +209,13 @@ export default function AdminPurchases() {
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-6">
+                <td className="px-3 md:px-6 py-3 md:py-6">
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{purchase.supplierName}</span>
                     <span className="text-[9px] font-bold text-blue-500 uppercase">{purchase.items.length} Items • {purchase.warehouseName}</span>
                   </div>
                 </td>
-                <td className="px-6 py-6">
+                <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-gray-800">Rp {purchase.total.toLocaleString()}</span>
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-fit mt-1 ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
@@ -224,7 +224,7 @@ export default function AdminPurchases() {
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-6 text-center">
+                <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-center">
                   <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-xl border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
                     purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
                       'bg-red-50 text-red-600 border-red-100'
@@ -232,7 +232,7 @@ export default function AdminPurchases() {
                     {purchase.status}
                   </span>
                 </td>
-                <td className="px-8 py-6 text-right">
+                <td className="px-3 md:px-8 py-3 md:py-6 text-right">
                   <div className="flex items-center justify-end gap-2">
                     {purchase.status === 'MENUNGGU' && (
                       <div className="flex gap-1">
