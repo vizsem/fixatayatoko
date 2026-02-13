@@ -168,22 +168,21 @@ export default function WarehousesPage() {
     <div className="min-h-screen bg-[#FBFBFE] p-4 lg:p-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-black rounded-2xl">
-              <WarehouseIcon className="text-white" size={24} />
-            </div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-800">Warehouse Hub</h1>
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <WarehouseIcon size={22} />
           </div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Distribusi & Kapasitas Stok Real-time</p>
+          <div>
+            <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-800">Warehouse Hub</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Distribusi & Kapasitas Stok Real-time</p>
+          </div>
         </div>
-
         <Link
           href="/admin/warehouses/add"
-          className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-xl shadow-green-100 active:scale-95"
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg active:scale-95"
         >
-          <Plus size={18} strokeWidth={3} />
-          Tambah Gudang Baru
+          <Plus size={16} />
+          Tambah Gudang
         </Link>
       </div>
 

@@ -164,14 +164,18 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Users className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Manajemen Pengguna & Role</h1>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <Users size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">User Management</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Akses & peran pengguna sistem</p>
+          </div>
         </div>
-        <p className="text-black">Atur akses dan peran pengguna sistem ATAYATOKO2</p>
       </div>
 
       {/* Error Banner */}

@@ -22,6 +22,7 @@ import {
   Plus,
   Edit,
   Trash2,
+  ArrowLeft,
   Users,
   Phone,
   MapPin,
@@ -171,11 +172,26 @@ export default function AdminSuppliers() {
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Manajemen Supplier</h1>
-        <p className="text-gray-600">Kelola daftar supplier produk sembako Anda</p>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <div className="p-3 bg-black text-white rounded-2xl inline-flex">
+              <Users size={22} />
+            </div>
+            <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Manajemen Supplier</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola database pemasok toko</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2"
+        >
+          <Plus size={16} /> Tambah Supplier
+        </button>
       </div>
 
       {/* Error Banner */}
@@ -185,29 +201,28 @@ export default function AdminSuppliers() {
         </div>
       )}
 
-      {/* Aksi Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
           <input
             type="text"
             placeholder="Cari supplier..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black outline-none"
           />
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-        >
-          <Plus size={18} />
-          Tambah Supplier
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-white text-black border border-gray-100 px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2"
+          >
+            <Plus size={16} /> Tambah
+          </button>
+        </div>
       </div>
 
-      {/* Tabel Supplier */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

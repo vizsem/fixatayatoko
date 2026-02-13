@@ -10,7 +10,6 @@ import {
 import {
   Users,
   History,
-  ArrowLeft,
   Coins,
   User as UserIcon,
   PlusCircle,
@@ -20,7 +19,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
@@ -32,7 +31,6 @@ interface PointLog { id: string; userId: string; pointsChanged: number; type: st
 interface UserWithPoints { id: string; displayName?: string; email?: string; points: number; isPointsFrozen: boolean; }
 
 export default function AdminPointsDashboard() {
-  const router = useRouter();
   const [logs, setLogs] = useState<PointLog[]>([]);
   const [topUsers, setTopUsers] = useState<UserWithPoints[]>([]);
   const [stats, setStats] = useState({ totalPoints: 0, totalRedeemed: 0 });
@@ -116,18 +114,18 @@ export default function AdminPointsDashboard() {
 
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-4 bg-white shadow-sm rounded-2xl hover:bg-black hover:text-white transition-all">
-              <ArrowLeft size={20} />
-            </button>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+              <Coins size={22} />
+            </div>
             <div>
-              <h1 className="text-2xl font-black uppercase italic tracking-tighter">Loyalty Points Control</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Keamanan & Audit Poin</p>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Loyalty Points Control</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Keamanan & Audit Poin</p>
             </div>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-red-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg"
+            className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg"
           >
             <AlertTriangle size={16} /> Penyesuaian Manual
           </button>

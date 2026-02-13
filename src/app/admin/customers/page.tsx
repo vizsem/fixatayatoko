@@ -225,13 +225,13 @@ export default function AdminCustomers() {
 
         <div className="flex flex-wrap gap-3">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
             <input
               type="text"
               placeholder="Cari nama/hp..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-[1.5rem] text-xs font-bold w-64 shadow-sm focus:ring-2 focus:ring-green-500 outline-none transition-all"
+              className="pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold w-64 shadow-sm focus:ring-2 focus:ring-black outline-none transition-all"
             />
           </div>
           <button

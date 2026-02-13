@@ -166,16 +166,20 @@ function StockInContent() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <ArrowDown className="text-black" size={28} />
-          <h1 className="text-2xl font-bold text-black">Stok Masuk</h1>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="max-w-2xl mx-auto mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <ArrowDown size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Stok Masuk</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tambah stok dari supplier</p>
+          </div>
         </div>
-        <p className="text-black">Tambah stok dari pembelian supplier</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow border border-gray-200">
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 max-w-2xl mx-auto">
         <div className="mb-6">
           <label className="block text-black text-sm font-medium mb-2">
             Pilih Produk *

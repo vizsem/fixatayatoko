@@ -142,11 +142,11 @@ export default function AdminOrders() {
       {/* Toolbar Cari & Filter */}
       <div className="flex flex-wrap gap-3 mb-6 no-print items-center">
         <div className="flex-1 min-w-[300px] relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
           <input
             type="text"
             placeholder="Cari ID atau Nama..."
-            className="w-full pl-12 pr-4 py-4 bg-white border-none shadow-sm rounded-[1.5rem] font-bold focus:ring-2 focus:ring-black outline-none"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black outline-none"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />

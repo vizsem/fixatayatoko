@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 
-import { addDoc, collection, serverTimestamp, doc, getDoc, setDoc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, getDocs, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -44,12 +44,7 @@ const compressImage = (file: File): Promise<Blob> => {
   });
 };
 
-const generateOrderId = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let result = '';
-  for (let i = 0; i < 5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-  return `ATY-${result}`;
-};
+// Order ID dihasilkan di server
 
 export default function CartPage() {
   const router = useRouter();
@@ -80,10 +75,33 @@ export default function CartPage() {
   const [usePoints, setUsePoints] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
+  const [promoProduct, setPromoProduct] = useState<CartItem | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    // Fetch Promo Product (Minyak atau produk lain untuk tebus murah)
+    const fetchPromo = async () => {
+       try {
+         // Cari produk yang namanya mengandung "Minyak"
+         const q = query(collection(db, 'products'), where('Nama', '>=', 'Minyak'), where('Nama', '<=', 'Minyak\uf8ff'), limit(1));
+         const snap = await getDocs(q);
+         if (!snap.empty) {
+            const d = snap.docs[0].data();
+            setPromoProduct({ id: snap.docs[0].id, ...d } as CartItem);
+         } else {
+            // Fallback cari sembarang produk jika tidak ada Minyak (untuk demo)
+            const q2 = query(collection(db, 'products'), limit(1));
+            const snap2 = await getDocs(q2);
+            if (!snap2.empty) {
+               const d = snap2.docs[0].data();
+               setPromoProduct({ id: snap2.docs[0].id, ...d } as CartItem);
+            }
+         }
+       } catch (e) { console.log("Promo fetch error", e); }
+    };
+    fetchPromo();
+
     const fetchCombinedCart = async (uid: string | null) => {
       const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
       let cloudItems: CartItem[] = [];
@@ -129,6 +147,7 @@ export default function CartPage() {
 
   // LOGIKA HITUNG HARGA
   const getItemPrice = (item: CartItem) => {
+    if (item.promoType === 'TEBUS_MURAH') return 10000;
     const priceGrosir = item.Grosir;
     const minGrosir = item.Min_Grosir || 10;
     return (priceGrosir && item.quantity >= minGrosir) ? priceGrosir : (item.Ecer || item.price || 0);
@@ -200,48 +219,60 @@ export default function CartPage() {
   const handleCheckout = async () => {
     if (paymentMethod !== 'cash' && !paymentProof) return toast.error("Upload bukti transfer!");
     setIsSubmitting(true);
-    const orderId = generateOrderId();
+    // const orderId = generateOrderId(); // Generated on server now
 
     try {
       let proofUrl = "";
       if (paymentProof) {
+        // Upload proof first (client-side upload is fine for now, URL passed to server)
         const compressed = await compressImage(paymentProof);
-        const sRef = ref(storage, `payments/${orderId}`);
+        // We need a temp ID for filename since we don't have orderId yet, or generate one client side just for filename
+        const tempId = `proof-${Date.now()}`;
+        const sRef = ref(storage, `payments/${tempId}`);
         const snap = await uploadBytes(sRef, compressed);
         proofUrl = await getDownloadURL(snap.ref);
       }
 
-      // 1. SIMPAN ORDER
-      await addDoc(collection(db, 'orders'), {
-        orderId, name: customerName || 'Pelanggan Umum', phone: customerPhone || '-',
-        items: cart, subtotal, pointsUsed: pointsToUse, voucherUsed: appliedVoucher?.id || null,
-        discountTotal: pointsToUse + voucherDiscount, total: totalBayar,
-        delivery: { method: deliveryMethod, type: courierType, address: customerAddress || 'Ambil di Toko' },
-        payment: { method: paymentMethod, proof: proofUrl },
-        status: 'PENDING', createdAt: serverTimestamp(), userId: userId || 'guest'
+      // CALL SECURE API
+      const response = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: cart.map(item => ({ id: item.id || item.ID, quantity: item.quantity })),
+          customer: {
+            name: customerName,
+            phone: customerPhone,
+            address: customerAddress
+          },
+          delivery: {
+            method: deliveryMethod,
+            type: courierType,
+            address: customerAddress
+          },
+          payment: {
+            method: paymentMethod,
+            proof: proofUrl
+          },
+          userId,
+          voucherCode: appliedVoucher?.code,
+          usePoints
+        })
       });
 
-      // 2. PROSES POTONG POIN
-      if (pointsToUse > 0 && userId) {
-        await updateDoc(doc(db, 'users', userId), { points: increment(-pointsToUse) });
-        await addDoc(collection(db, 'point_logs'), {
-          userId, pointsChanged: -pointsToUse, type: 'REDEEM',
-          description: `Checkout Order #${orderId}`, createdAt: serverTimestamp()
-        });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Gagal memproses pesanan');
       }
 
-      // 3. MATIKAN VOUCHER (Burn Voucher)
-      if (appliedVoucher && userId) {
-        await updateDoc(doc(db, 'user_vouchers', appliedVoucher.id), { status: 'USED' });
-      }
-
-      // 4. CLEANUP
-      if (userId) await setDoc(doc(db, 'carts', userId), { items: [], updatedAt: serverTimestamp() });
+      // Success Logic handled by API (DB updates), just local cleanup here
       localStorage.removeItem('cart');
       window.dispatchEvent(new Event('cart-updated'));
-      router.push(`/success?id=${orderId}`);
-    } catch {
-      toast.error("Gagal memproses pesanan.");
+      router.push(`/success?id=${result.orderId}`);
+
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Gagal memproses pesanan.';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -272,6 +303,38 @@ export default function CartPage() {
 
       <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-5">
+
+          {/* PROMO BANNER TEBUS MURAH */}
+          {subtotal >= 50000 && promoProduct && !cart.some(i => i.promoType === 'TEBUS_MURAH') && (
+            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-[2rem] p-6 text-white shadow-lg relative overflow-hidden mb-6 animate-in slide-in-from-top-4">
+               <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex-1 pr-4">
+                    <span className="bg-white/20 px-3 py-1 rounded-full text-[9px] font-black uppercase mb-2 inline-block animate-pulse">🎉 Spesial Offer</span>
+                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none mb-1">Tebus Murah Cuma 10rb!</h3>
+                    <p className="text-xs font-bold opacity-90 mb-4 line-clamp-1">{promoProduct.Nama || promoProduct.name} (Normal: Rp{(promoProduct.Ecer || promoProduct.price || 0).toLocaleString()})</p>
+                    <button 
+                      onClick={() => {
+                        const newItem = { ...promoProduct, quantity: 1, promoType: 'TEBUS_MURAH', price: 10000 };
+                        const newCart = [...cart, newItem];
+                        setCart(newCart);
+                        localStorage.setItem('cart', JSON.stringify(newCart));
+                        window.dispatchEvent(new Event('cart-updated'));
+                        toast.success('Promo berhasil diambil!');
+                      }}
+                      className="bg-white text-red-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl active:scale-95 transition-all hover:bg-gray-100"
+                    >
+                      Ambil Sekarang
+                    </button>
+                  </div>
+                  <div className="w-20 h-20 bg-white rounded-2xl p-1 rotate-6 shadow-2xl flex-shrink-0">
+                     <NextImage src={promoProduct.Link_Foto || promoProduct.image || '/logo-atayatoko.png'} width={100} height={100} className="w-full h-full object-cover rounded-xl" alt="" />
+                  </div>
+               </div>
+               <div className="absolute -right-4 -bottom-10 opacity-10 rotate-12">
+                 <Package size={140} />
+               </div>
+            </div>
+          )}
 
           {/* CART ITEMS (Tampilan ringkas) */}
           <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">

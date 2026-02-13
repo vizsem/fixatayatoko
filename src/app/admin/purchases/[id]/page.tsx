@@ -7,12 +7,12 @@ import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
 
 import {
-  ChevronLeft, Printer, Truck, Calendar, CreditCard,
+  Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
   History, Receipt
 } from 'lucide-react';
 
-import Link from 'next/link';
+ 
 
 interface PurchaseItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
 interface PurchaseData { id: string; supplierName: string; warehouseName: string; items: PurchaseItem[]; subtotal: number; shippingCost: number; total: number; status: string; paymentStatus: string; paymentMethod: string; notes?: string; dueDate?: string; createdAt?: Timestamp | { toDate: () => Date } | null; }
@@ -56,29 +56,23 @@ export default function PurchaseDetail() {
     : 'N/A';
 
   return (
-    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
-
-      {/* Top Navigation */}
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-32 font-sans text-black">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/purchases" className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-            <ChevronLeft size={20} />
-          </Link>
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <Receipt size={22} />
+          </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-2">
-              Order Details
-            </h1>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1 italic">
-              Transaction ID: #{purchase.id}
-            </p>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Detail Pembelian</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
           </div>
         </div>
-
-        <div className="flex gap-2 w-full md:w-auto">
-          <button onClick={() => window.print()} className="flex-1 md:flex-none bg-white border border-gray-200 text-gray-800 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-all">
-            <Printer size={18} /> Print Invoice
-          </button>
-        </div>
+        <button
+          onClick={() => window.print()}
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+        >
+          <Printer size={16} /> Cetak
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

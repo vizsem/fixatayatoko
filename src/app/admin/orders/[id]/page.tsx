@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Timestamp, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import {
   MapPin, CreditCard,
-  Printer, ArrowLeft, Truck, MessageSquare
+  Printer, ArrowLeft, Truck, MessageSquare, Receipt
 } from 'lucide-react';
 
 import toast, { Toaster } from 'react-hot-toast';
@@ -132,19 +132,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   if (error || !order) return <div className="p-20 text-center font-black uppercase text-red-500 tracking-tighter italic">{error || 'Data Kosong'}</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 md:p-8 pb-24">
+    <div className="min-h-screen bg-gray-50 md:p-8 pb-24 text-black font-sans">
       <Toaster position="top-right" />
       <div className="max-w-4xl mx-auto bg-white shadow-2xl md:rounded-[3rem] overflow-hidden border border-white">
 
-        <div className="p-6 border-b flex justify-between items-center no-print">
-          <button onClick={() => router.back()} className="p-3 bg-slate-100 rounded-2xl hover:bg-black hover:text-white transition-all">
-            <ArrowLeft size={20} />
-          </button>
+        <div className="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <div className="p-3 bg-black text-white rounded-2xl inline-flex">
+                <Receipt size={22} />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Detail Pesanan</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola status dan cetak invoice</p>
+            </div>
+          </div>
           <div className="flex gap-2">
-            <button onClick={sendWhatsApp} className="flex items-center gap-2 text-[10px] font-black uppercase bg-green-500 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-green-600 transition-all">
+            <button onClick={sendWhatsApp} className="flex items-center gap-2 text-[10px] font-black uppercase bg-green-600 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-green-700 transition-all">
               <MessageSquare size={14} /> WhatsApp
             </button>
-            {/* Menggunakan fungsi handlePrint */}
             <button onClick={handlePrint} className="flex items-center gap-2 text-[10px] font-black uppercase bg-black text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition-all">
               <Printer size={14} /> Cetak
             </button>

@@ -98,9 +98,16 @@ export default function FinanceReport() {
           // Hitung biaya & profit berdasarkan harga beli
           for (const item of order.items || []) {
             const product = productsMap.get(item.id) || productsMap.get(item.productId);
-            const purchasePrice = product?.purchasePrice || (item.price * 0.8); // fallback 80%
+            // Gunakan field 'Modal' dari produk, fallback ke purchasePrice, lalu estimasi 80%
+            const modalPrice = Number(product?.Modal || product?.purchasePrice || 0);
+            const sellingPrice = Number(item.price);
+            
+            // Jika modal 0, gunakan estimasi margin 10% (be conservative) -> Modal = 90% Harga Jual
+            // Atau tetap 80% sesuai kode lama
+            const purchasePrice = modalPrice > 0 ? modalPrice : (sellingPrice * 0.85); 
+            
             const itemCost = purchasePrice * item.quantity;
-            const itemProfit = (item.price * item.quantity) - itemCost;
+            const itemProfit = (sellingPrice * item.quantity) - itemCost;
 
             totalCost += itemCost;
             totalProfit += itemProfit;
@@ -202,10 +209,23 @@ export default function FinanceReport() {
   const netProfit = totalProfit - totalExpense;
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-black">Laporan Keuangan</h1>
-        <p className="text-black">Analisis profitabilitas & arus kas ATAYATOKO2</p>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+            <CreditCard size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Laporan Keuangan</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Analisis profit & arus kas</p>
+          </div>
+        </div>
+        <button
+          onClick={handleExport}
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+        >
+          <Download size={16} /> Ekspor
+        </button>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow mb-6 border border-gray-200">
@@ -216,7 +236,7 @@ export default function FinanceReport() {
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-black"
+              className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
             />
           </div>
           <div>
@@ -225,13 +245,13 @@ export default function FinanceReport() {
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-black"
+              className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
             />
           </div>
           <div className="flex items-end">
             <button
               onClick={handleExport}
-              className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+              className="w-full bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
             >
               <Download size={18} />
               Ekspor Excel
@@ -400,10 +420,11 @@ export default function FinanceReport() {
           <div className="text-black">
             <p className="font-medium">Catatan Perhitungan:</p>
             <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-              <li><strong>Biaya Pokok Penjualan</strong> dihitung berdasarkan <strong>harga beli</strong> dari supplier</li>
-              <li><strong>Laba Kotor</strong> = Pendapatan - Biaya Pokok</li>
-              <li><strong>Laba Bersih</strong> = Laba Kotor - Pengeluaran Operasional</li>
-              <li>Data hanya mencakup transaksi dengan status <strong>SELESAI</strong></li>
+              <li><strong>Biaya Pokok (HPP)</strong> menggunakan data Harga Modal dari database produk.</li>
+              <li>Jika Harga Modal bernilai 0, sistem mengestimasi HPP sebesar 85% dari harga jual.</li>
+              <li><strong>Laba Kotor</strong> = Pendapatan Penjualan dikurangi Biaya Pokok (HPP).</li>
+              <li><strong>Laba Bersih</strong> = Laba Kotor dikurangi Pengeluaran Operasional (Pembelian Stok, dll).</li>
+              <li>Data hanya mencakup transaksi dengan status <strong>SELESAI</strong>.</li>
             </ul>
           </div>
         </div>

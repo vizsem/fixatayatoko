@@ -197,6 +197,8 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                     fill
                     className="object-cover"
                     sizes={viewMode === 'grid' ? "50vw" : "100px"}
+                    placeholder="blur"
+                    blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
                   />
                   {product.wholesalePrice > 0 && (
                     <div className="absolute top-2 left-2 bg-blue-600 text-[7px] text-white font-black px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">

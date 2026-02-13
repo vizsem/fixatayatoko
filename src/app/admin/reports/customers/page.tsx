@@ -196,14 +196,25 @@ export default function CustomerReport() {
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-black">Laporan Pelanggan</h1>
-        <p className="text-black">Analisis perilaku & kinerja pelanggan ATAYATOKO2</p>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+            <Users size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Laporan Pelanggan</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Analisis perilaku & kinerja</p>
+          </div>
+        </div>
+        <button
+          onClick={handleExport}
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+        >
+          <Download size={16} /> Ekspor
+        </button>
       </div>
 
-      {/* Filter & Aksi */}
       <div className="bg-white p-4 rounded-lg shadow mb-6 border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -212,7 +223,7 @@ export default function CustomerReport() {
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-black"
+              className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
             />
           </div>
           <div>
@@ -221,7 +232,7 @@ export default function CustomerReport() {
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-black"
+              className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
             />
           </div>
           <div>
@@ -229,7 +240,7 @@ export default function CustomerReport() {
             <select
               value={customerType}
               onChange={(e) => setCustomerType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-black"
+              className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
             >
               <option value="all">Semua</option>
               <option value="grosir">Grosir</option>
@@ -239,7 +250,7 @@ export default function CustomerReport() {
           <div className="flex items-end">
             <button
               onClick={handleExport}
-              className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+              className="w-full bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
             >
               <Download size={18} />
               Ekspor Excel

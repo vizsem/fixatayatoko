@@ -8,7 +8,7 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText
+  FileText, Filter
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -52,6 +52,11 @@ export default function Home() {
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
   const [repurchaseProducts, setRepurchaseProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filter States
+  const [showFilter, setShowFilter] = useState(false);
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
 
   const getDiscountedPrice = useCallback((product: Product) => {
     const promo = activePromos.find(p =>
@@ -207,7 +212,15 @@ export default function Home() {
         </button>
 
         <Link href={`/produk/${product.id}`} className="relative aspect-square bg-gray-50 overflow-hidden block">
-          <Image src={product.image} alt={product.name} fill className={`object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} sizes="190px" />
+          <Image 
+            src={product.image} 
+            alt={product.name} 
+            fill 
+            className={`object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
+            sizes="190px"
+            placeholder="blur"
+            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
+          />
           {isOut && <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10"><span className="bg-white text-black text-[9px] font-black px-3 py-1 rounded-full uppercase">Habis</span></div>}
           {promoInfo.hasPromo && !isOut && (
             <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-orange-600 to-red-600 text-white text-[8px] font-black px-2 py-1 rounded uppercase animate-pulse shadow-lg flex items-center gap-1">
@@ -246,10 +259,16 @@ export default function Home() {
     );
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const price = getDiscountedPrice(p).price;
+    const matchesMin = minPrice ? price >= Number(minPrice) : true;
+    const matchesMax = maxPrice ? price <= Number(maxPrice) : true;
+
+    return matchesSearch && matchesMin && matchesMax;
+  });
 
   if (!isMounted) return null;
 
@@ -269,13 +288,54 @@ export default function Home() {
           </Link>
           <div className="flex-1 relative max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Cari produk..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-100 border-none rounded-xl py-2 pl-10 pr-4 text-sm outline-none focus:ring-1 focus:ring-green-500/20" />
+            <input type="text" placeholder="Cari produk..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-100 border-none rounded-xl py-2 pl-10 pr-10 text-sm outline-none focus:ring-1 focus:ring-green-500/20" />
+            <button 
+              onClick={() => setShowFilter(!showFilter)}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${showFilter ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}
+            >
+              <Filter size={14} />
+            </button>
           </div>
           <Link href="/cart" className="relative text-gray-400">
             <ShoppingCart size={22} />
             {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full h-5 w-5 flex items-center justify-center border-2 border-white font-bold">{cartCount}</span>}
           </Link>
         </div>
+
+        {showFilter && (
+          <div className="max-w-7xl mx-auto mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2">
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Min Harga</label>
+                <input 
+                  type="number" 
+                  value={minPrice} 
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 transition-colors"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Max Harga</label>
+                <input 
+                  type="number" 
+                  value={maxPrice} 
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  placeholder="Tak Terbatas"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 transition-colors"
+                />
+              </div>
+              <div>
+                 <button 
+                   onClick={() => { setMinPrice(''); setMaxPrice(''); }}
+                   className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-black uppercase hover:bg-gray-200 transition-colors h-[34px]"
+                 >
+                   Reset
+                 </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {!searchQuery && (
@@ -344,14 +404,16 @@ export default function Home() {
                     return (
                       <div key={`rep-${p.id}`} className="min-w-[155px] md:min-w-[190px] snap-center bg-white rounded-2xl border border-gray-100 overflow-hidden relative group">
                         <Link href={`/produk/${p.id}`} className="block aspect-square bg-gray-50 relative">
-                           <Image 
-                            src={p.image} 
-                            alt={p.name}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-500"
-                            sizes="(max-width: 768px) 155px, 190px"
-                          />
-                        </Link>
+                            <Image 
+                             src={p.image} 
+                             alt={p.name}
+                             fill
+                             className="object-cover group-hover:scale-105 transition-transform duration-500"
+                             sizes="(max-width: 768px) 155px, 190px"
+                             placeholder="blur"
+                             blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
+                           />
+                         </Link>
                         <div className="p-3">
                           <h3 className="text-[10px] font-bold text-gray-800 line-clamp-2 min-h-[30px] uppercase tracking-tight mb-2 leading-tight">{p.name}</h3>
                           <div className="flex flex-col gap-0.5 mb-3">

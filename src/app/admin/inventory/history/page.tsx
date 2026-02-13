@@ -20,7 +20,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-import { useRouter } from 'next/navigation';
+ 
 
 type InventoryLog = {
   id: string;
@@ -38,7 +38,6 @@ type InventoryLog = {
 };
 
 export default function InventoryHistoryPage() {
-  const router = useRouter();
   const [logs, setLogs] = useState<InventoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,52 +98,41 @@ export default function InventoryHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* HEADER */}
-      <div className="bg-white border-b border-gray-100 px-6 py-8 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto">
-          <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] tracking-widest mb-4 hover:text-black transition-colors">
-            <ArrowLeft size={14} /> Kembali ke Inventory
-          </button>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-black text-white rounded-2xl">
-                <History size={24} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-black uppercase tracking-tighter italic">Log Inventaris</h1>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Riwayat Pergerakan Stok Produk</p>
-              </div>
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-black text-white rounded-2xl">
+              <History size={22} />
             </div>
-
-            <div className="flex gap-2">
-              <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                <input
-                  type="text"
-                  placeholder="Cari produk..."
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <select
-                className="bg-gray-50 border-none rounded-xl text-[10px] font-black uppercase px-4 focus:ring-2 focus:ring-black"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-              >
-                <option value="ALL">Semua</option>
-                <option value="MASUK">Masuk</option>
-                <option value="KELUAR">Keluar</option>
-                <option value="MUTASI">Mutasi</option>
-              </select>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Log Inventaris</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Riwayat pergerakan stok</p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+              <input
+                type="text"
+                placeholder="Cari produk..."
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <select
+              className="bg-gray-50 border-none rounded-xl text-[10px] font-black uppercase px-4 focus:ring-2 focus:ring-black"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="ALL">Semua</option>
+              <option value="MASUK">Masuk</option>
+              <option value="KELUAR">Keluar</option>
+              <option value="MUTASI">Mutasi</option>
+            </select>
+          </div>
         </div>
-      </div>
-
-      {/* CONTENT */}
-      <div className="max-w-4xl mx-auto p-6">
+ 
         <div className="space-y-4">
           {filteredLogs.length === 0 ? (
             <div className="bg-white rounded-[2.5rem] p-20 text-center border border-dashed border-gray-200">

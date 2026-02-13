@@ -53,6 +53,8 @@ export interface FirestoreTimestamp {
 
 export interface CartItem extends Product {
     quantity: number;
+    promoType?: string;
+    originalPrice?: number;
 }
 
 export interface OrderItem {

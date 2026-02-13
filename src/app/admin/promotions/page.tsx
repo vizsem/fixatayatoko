@@ -125,25 +125,25 @@ export default function PromotionsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-black p-2 rounded-lg text-white">
-              <Gift size={24} />
-            </div>
-            <h1 className="text-2xl font-black text-black uppercase tracking-tight">Marketing Center</h1>
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <Gift size={22} />
           </div>
-          <p className="text-gray-500 text-sm">Kelola diskon, Flash Sale, dan promo kategori untuk meningkatkan penjualan.</p>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase tracking-tighter">Marketing Center</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola diskon & flash sale</p>
+          </div>
         </div>
 
         <Link
           href="/admin/promotions/add"
-          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-green-100 flex items-center justify-center gap-2"
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2"
         >
-          <Plus size={18} />
-          Buat Promo Baru
+          <Plus size={16} />
+          Buat Promo
         </Link>
       </div>
 

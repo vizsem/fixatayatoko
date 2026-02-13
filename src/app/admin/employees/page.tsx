@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 
 import {
-  Plus, Search, Edit, Trash2, ArrowLeft,
+  Plus, Search, Edit, Trash2,
   UserCog, Loader2, Clock, CheckCircle2,
   X, Save, ShieldCheck
 } from 'lucide-react';
 
-import Link from 'next/link';
+// import Link from 'next/link';
 import {
   collection, getDocs, updateDoc, doc, query, orderBy,
   increment, addDoc, deleteDoc, serverTimestamp
@@ -123,32 +123,30 @@ export default function EmployeesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] pb-20">
+    <div className="min-h-screen bg-gray-50 pb-20">
       <Toaster position="top-center" />
 
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/admin" className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-              <ArrowLeft size={20} className="text-gray-600" />
-            </Link>
+      <div className="px-4 md:px-8 pt-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+              <UserCog size={22} />
+            </div>
             <div>
-              <h1 className="text-xl font-black text-gray-800 tracking-tighter italic">Team ataya</h1>
-              <p className="text-[9px] font-black text-green-600 tracking-[0.2em]">Management system</p>
-
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Team Ataya</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Manajemen staf & kehadiran</p>
             </div>
           </div>
           <button
             onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="bg-green-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 text-[10px] font-black shadow-xl shadow-green-100 active:scale-95 transition-all"
+            className="bg-black text-white px-6 py-3 rounded-2xl flex items-center gap-2 text-[10px] font-black shadow-lg active:scale-95 transition-all"
           >
-            <Plus size={16} strokeWidth={3} /> Tambah staff
+            <Plus size={16} /> Tambah Staff
           </button>
-
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6">
         <div className="relative mb-10 group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors" size={20} />
           <input

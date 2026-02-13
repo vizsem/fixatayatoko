@@ -204,10 +204,18 @@ function AddPromotionContent() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2 text-black">
-        {editId ? 'Edit' : 'Tambah'} Program Promosi
-      </h1>
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="max-w-4xl mx-auto mb-6 flex items-center gap-3">
+        <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+          <Gift size={22} />
+        </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">
+            {editId ? 'Edit' : 'Tambah'} Program Promosi
+          </h1>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola diskon & kupon</p>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">
@@ -217,7 +225,7 @@ function AddPromotionContent() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-lg shadow border"
+        className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 max-w-4xl mx-auto"
       >
         {/* Nama */}
         <input

@@ -13,7 +13,6 @@ import {
 import { db, auth } from '@/lib/firebase';
 
 import {
-  ArrowLeft,
   ArrowRightLeft,
   Search,
   AlertCircle,
@@ -26,7 +25,7 @@ import {
 
 
 
-import Link from 'next/link';
+ 
 
 type Product = {
   id: string;
@@ -126,14 +125,14 @@ export default function StockTransferPage() {
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black font-sans">
       <div className="max-w-2xl mx-auto">
 
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin/inventory" className="p-2 bg-white rounded-xl border hover:bg-gray-100 transition shadow-sm">
-            <ArrowLeft size={20} />
-          </Link>
-          <h1 className="text-2xl font-black tracking-tighter flex items-center gap-2 text-black">
-            <ArrowRightLeft className="text-purple-600" /> Mutasi antar gudang
-          </h1>
-
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+            <ArrowRightLeft size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-black">Mutasi Antar Gudang</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Distribusi stok antar lokasi</p>
+          </div>
         </div>
 
         {status && (

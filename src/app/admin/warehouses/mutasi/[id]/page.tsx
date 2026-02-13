@@ -8,7 +8,7 @@ import {
   runTransaction, serverTimestamp
 } from 'firebase/firestore';
 import {
-  ArrowLeft, ArrowRightLeft, Warehouse as WarehouseIcon, Package,
+  ArrowRightLeft, Warehouse as WarehouseIcon, Package,
   Loader2, AlertTriangle, Search
 } from 'lucide-react';
 
@@ -150,18 +150,17 @@ export default function MutasiGudangPage() {
     <div className="min-h-screen bg-gray-50 pb-20">
       <Toaster position="top-center" />
 
-      {/* HEADER */}
-      <div className="bg-white border-b border-gray-100 px-6 py-6 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-sm font-black uppercase tracking-widest text-gray-900">Proses Mutasi Stok</h1>
-          <div className="w-10"></div>
-        </div>
-      </div>
-
       <div className="max-w-2xl mx-auto p-6">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+            <WarehouseIcon size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Mutasi Stok Gudang</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{sourceWarehouse?.name || 'Gudang Asal'}</p>
+          </div>
+          <div className="flex-1" />
+        </div>
         {/* STEPPER / FLOW VISUAL */}
         <div className="flex items-center justify-center gap-4 mb-10">
           <div className="text-center">

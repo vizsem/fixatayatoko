@@ -9,7 +9,7 @@ import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp
 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
-  ArrowLeft, Tag, DollarSign, Warehouse, Save,
+  Tag, DollarSign, Warehouse, Save,
   Loader2, Calendar, Image as ImageIcon
 } from 'lucide-react';
 import Image from 'next/image';
@@ -226,12 +226,14 @@ export default function EditProductPage() {
       <div className="max-w-6xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-4 bg-white shadow-sm rounded-2xl hover:bg-black hover:text-white transition-all"><ArrowLeft size={20} /></button>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+              <Tag size={22} />
+            </div>
             <div>
-              <h1 className="text-2xl font-black uppercase italic tracking-tighter">Edit Master Data</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">SKU: {product.Barcode || id}</p>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Edit Produk</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SKU: {product.Barcode || id}</p>
             </div>
           </div>
           <div className="flex bg-white p-2 rounded-2xl shadow-sm">

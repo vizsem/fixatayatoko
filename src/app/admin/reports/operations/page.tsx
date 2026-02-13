@@ -288,19 +288,22 @@ export default function OperationsReport() {
   const totalMetrics = metrics.length;
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-black">Laporan Operasional</h1>
-        <p className="text-black">Analisis kinerja operasional ATAYATOKO2</p>
-      </div>
-
-      <div className="flex justify-end mb-6">
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+            <Activity size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Laporan Operasional</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Analisis kinerja sistem</p>
+          </div>
+        </div>
         <button
           onClick={handleExport}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
         >
-          <Download size={18} />
-          Ekspor Excel
+          <Download size={16} /> Ekspor
         </button>
       </div>
 

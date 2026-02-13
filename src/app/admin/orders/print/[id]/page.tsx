@@ -6,6 +6,7 @@ import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Timestamp, doc, getDoc } from 'firebase/firestore';
 
+import { ArrowLeft, Printer } from 'lucide-react';
 
 type Order = {
   id: string;
@@ -65,6 +66,25 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="bg-white min-h-screen text-black font-mono p-2 sm:p-0">
+      <div className="max-w-4xl mx-auto p-4 no-print">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <div className="p-3 bg-black text-white rounded-2xl inline-flex">
+                <Printer size={22} />
+              </div>
+              <h1 className="text-2xl font-black uppercase tracking-tighter">Print Invoice</h1>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Struk thermal siap cetak</p>
+            </div>
+          </div>
+          <button onClick={() => typeof window !== 'undefined' && window.print()} className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+            <Printer size={16} /> Cetak
+          </button>
+        </div>
+      </div>
       {/* Container Khusus Printer Thermal (Lebar Maksimal 80mm biasanya) */}
       <div className="max-w-[400px] mx-auto p-4 border border-dashed border-gray-200">
 

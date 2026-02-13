@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
 import MobileNav from '@/components/MobileNav';
+import { Toaster } from 'react-hot-toast';
+import FCMManager from '@/components/FCMManager';
 
 declare global {
   interface Window {
@@ -44,6 +46,8 @@ export default function RootLayout({
       </head>
 
       <body className="antialiased">
+        <Toaster position="top-center" />
+        <FCMManager />
         {children}
         <MobileNav />
         <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
