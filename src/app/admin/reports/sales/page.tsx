@@ -82,11 +82,10 @@ export default function SalesReport() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
 
+        // Ambil order selesai, filter tanggal di sisi klien (menghindari mismatch tipe Timestamp/string)
         const ordersSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
-            where('createdAt', '>=', startDate),
-            where('createdAt', '<=', endDate),
             where('status', 'in', ['SELESAI', 'SUCCESS'])
           )
         );
@@ -94,10 +93,15 @@ export default function SalesReport() {
         const salesList: SaleItem[] = [];
         for (const orderDoc of ordersSnapshot.docs) {
           const order = orderDoc.data();
+          const created =
+            order.createdAt?.toDate
+              ? order.createdAt.toDate()
+              : new Date(order.createdAt || new Date().toISOString());
+          if (!(created >= startDate && created <= endDate)) continue;
           for (const item of order.items || []) {
             salesList.push({
               id: orderDoc.id,
-              date: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : String(order.createdAt || new Date().toISOString()),
+              date: created.toISOString(),
               productName: String(item.name || ''),
               quantity: Number(item.quantity || 0),
               total: Number(item.price || 0) * Number(item.quantity || 0),

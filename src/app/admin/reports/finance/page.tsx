@@ -70,12 +70,10 @@ export default function FinanceReport() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // Ambil data penjualan
+        // Ambil semua order selesai (jenis status selesai), filter tanggal di sisi klien supaya aman untuk field createdAt yang bertipe string/Timestamp
         const salesSnapshot = await getDocs(
           query(
             collection(db, 'orders'),
-            where('createdAt', '>=', startDate),
-            where('createdAt', '<=', endDate),
             where('status', 'in', ['SELESAI', 'SUCCESS'])
           )
         );
@@ -89,9 +87,15 @@ export default function FinanceReport() {
 
         const financeRecords: FinancialRecord[] = [];
 
-        // Proses penjualan dengan perhitungan profit
+        // Proses penjualan dengan perhitungan profit (filter tanggal di sini)
         for (const orderDoc of salesSnapshot.docs) {
           const order = orderDoc.data();
+          const created =
+            order.createdAt?.toDate
+              ? order.createdAt.toDate()
+              : new Date(order.createdAt || new Date().toISOString());
+          if (!(created >= startDate && created <= endDate)) continue;
+
           let totalCost = 0;
           let totalProfit = 0;
 
@@ -115,7 +119,7 @@ export default function FinanceReport() {
 
           financeRecords.push({
             id: orderDoc.id,
-            date: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : String(order.createdAt || new Date().toISOString()),
+            date: created.toISOString(),
             description: `Penjualan #${orderDoc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'profit',
@@ -126,20 +130,19 @@ export default function FinanceReport() {
           });
         }
 
-        // Ambil data pembelian (pengeluaran)
-        const purchasesSnapshot = await getDocs(
-          query(
-            collection(db, 'purchases'),
-            where('createdAt', '>=', startDate),
-            where('createdAt', '<=', endDate)
-          )
-        );
+        // Ambil semua pembelian, lalu filter tanggal di sisi klien (untuk konsistensi tipe createdAt)
+        const purchasesSnapshot = await getDocs(collection(db, 'purchases'));
 
         purchasesSnapshot.docs.forEach(doc => {
           const data = doc.data();
+          const created =
+            data.createdAt?.toDate
+              ? data.createdAt.toDate()
+              : new Date(data.createdAt || new Date().toISOString());
+          if (!(created >= startDate && created <= endDate)) return;
           financeRecords.push({
             id: `PUR-${doc.id}`,
-            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
+            date: created.toISOString(),
             description: `Pembelian dari ${data.supplierName}`,
             category: 'Pembelian',
             type: 'expense',
