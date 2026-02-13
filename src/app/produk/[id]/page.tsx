@@ -266,7 +266,9 @@ export default function ProductDetailPage() {
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-50 px-4 py-4 flex items-center justify-between">
           <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-all"><ArrowLeft size={20}/></button>
           <div className="flex flex-col items-center">
-            <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 leading-none mb-1">ATAYAMARKET</h1>
+            <Link href="/" className="leading-none mb-1">
+              <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-green-600 transition-colors cursor-pointer">ATAYAMARKET</h1>
+            </Link>
             <span className="text-[10px] font-bold text-green-600 uppercase">Product Details</span>
           </div>
           <Link href="/cart" className="p-2.5 bg-green-50 text-green-600 rounded-2xl relative">

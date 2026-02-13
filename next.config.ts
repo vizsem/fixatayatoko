@@ -6,6 +6,44 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   disable: process.env.NODE_ENV === "development" || process.env.DISABLE_PWA === "true",
   register: true,
   skipWaiting: true,
+  workboxOptions: {
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "firestore-api",
+          networkTimeoutSeconds: 10,
+          cacheableResponse: { statuses: [0, 200] },
+          expiration: { maxEntries: 50, maxAgeSeconds: 300 }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "firebase-storage",
+          cacheableResponse: { statuses: [0, 200] },
+          expiration: { maxEntries: 100, maxAgeSeconds: 86400 }
+        }
+      },
+      {
+        urlPattern: ({ request }: { request: Request }) => request.destination === "image",
+        handler: "CacheFirst",
+        options: {
+          cacheName: "images",
+          expiration: { maxEntries: 200, maxAgeSeconds: 604800 }
+        }
+      },
+      {
+        urlPattern: ({ request }: { request: Request }) => request.destination === "script" || request.destination === "style",
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "assets"
+        }
+      }
+    ]
+  }
 });
 
 const nextConfig: NextConfig = {

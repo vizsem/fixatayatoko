@@ -12,8 +12,10 @@ import {
   updateDoc,
   query,
   orderBy,
-  onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  limit,
+  startAfter
 } from 'firebase/firestore';
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
@@ -58,6 +60,8 @@ export default function AdminPurchases() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const filteredPurchases = useMemo(() => {
     let result = purchases;
@@ -88,16 +92,17 @@ export default function AdminPurchases() {
 
   useEffect(() => {
     if (loading) return;
-    const q = query(collection(db, 'purchases'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    (async () => {
+      const q = query(collection(db, 'purchases'), orderBy('createdAt', 'desc'), limit(20));
+      const snapshot = await getDocs(q);
       const purchaseList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
       } as Purchase));
       setPurchases(purchaseList);
-    });
-    return () => unsubscribe();
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] ?? null);
+    })();
   }, [loading]);
 
 
@@ -254,6 +259,38 @@ export default function AdminPurchases() {
           </tbody>
         </table>
         </div>
+        {!!lastDoc && (
+          <div className="p-4 flex justify-center">
+            <button
+              className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-green-600 text-white tap-active disabled:opacity-50"
+              disabled={loadingMore}
+              onClick={async () => {
+                if (loadingMore || !lastDoc) return;
+                setLoadingMore(true);
+                try {
+                  const q = query(
+                    collection(db, 'purchases'),
+                    orderBy('createdAt', 'desc'),
+                    startAfter(lastDoc),
+                    limit(20)
+                  );
+                  const snapshot = await getDocs(q);
+                  const more = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
+                  } as Purchase));
+                  setPurchases(prev => [...prev, ...more]);
+                  setLastDoc(snapshot.docs[snapshot.docs.length - 1] ?? null);
+                } finally {
+                  setLoadingMore(false);
+                }
+              }}
+            >
+              {loadingMore ? 'Memuat...' : 'Muat Lebih Banyak'}
+            </button>
+          </div>
+        )}
         {filteredPurchases.length === 0 && (
           <div className="p-20 text-center flex flex-col items-center gap-3">
             <ShoppingBag size={48} className="text-gray-100" />

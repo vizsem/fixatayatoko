@@ -12,7 +12,6 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import * as XLSX from 'xlsx';
 import {
   Download,
   Users,
@@ -317,7 +316,7 @@ export default function OperationsReport() {
     fetchOperationsData();
   }, []);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const exportData = metrics.map(metric => ({
       Kategori: metric.category,
       Metrik: metric.name,
@@ -327,6 +326,7 @@ export default function OperationsReport() {
       Deskripsi: metric.description
     }));
 
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Laporan Operasional');

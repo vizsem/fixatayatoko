@@ -10,7 +10,7 @@ import {
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
   FileText, Filter
 } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -28,6 +28,26 @@ type Promotion = {
   discountType: 'percentage' | 'fixed'; discountValue: number;
   targetId?: string; targetName?: string; startDate: string;
   endDate: string; isActive: boolean;
+};
+
+type Banner = {
+  id?: string;
+  title: string;
+  subtitle: string;
+  buttonText: string;
+  gradient: string;
+  imageUrl?: string;
+  linkUrl?: string;
+  isActive: boolean;
+};
+
+type SystemSettings = {
+  store: {
+    name: string;
+    phone: string;
+    address: string;
+    footerMsg?: string;
+  }
 };
 
 const SkeletonCard = () => (
@@ -52,6 +72,8 @@ export default function Home() {
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
   const [repurchaseProducts, setRepurchaseProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   
   // Filter States
   const [showFilter, setShowFilter] = useState(false);
@@ -149,9 +171,11 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [prodSnap, promoSnap] = await Promise.all([
+        const [prodSnap, promoSnap, bannerSnap, sysSnap] = await Promise.all([
           getDocs(collection(db, 'products')),
-          getDocs(collection(db, 'promotions'))
+          getDocs(collection(db, 'promotions')),
+          getDocs(collection(db, 'banners')),
+          getDoc(doc(db, 'settings', 'system'))
         ]);
 
         const productList = prodSnap.docs.map(doc => {
@@ -186,6 +210,11 @@ export default function Home() {
           .sort(() => 0.5 - Math.random());
 
         setCategories(catList);
+
+        const bannerList = bannerSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Banner[];
+        setBanners(bannerList.filter(b => b.isActive));
+
+        if (sysSnap.exists()) setSystemSettings(sysSnap.data() as SystemSettings);
 
         const savedWish = localStorage.getItem('atayatoko-wishlist');
         if (savedWish) setWishlist(JSON.parse(savedWish));
@@ -276,7 +305,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 text-black pb-24 page-fade">
       <div className="bg-green-700 text-white py-1.5 overflow-hidden whitespace-nowrap">
         <div className="animate-marquee inline-block text-[10px] font-bold uppercase tracking-widest px-4">
-          🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYAMARKET 🚚
+          {systemSettings?.store?.footerMsg || '🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYAMARKET 🚚'}
         </div>
       </div>
 
@@ -349,6 +378,22 @@ export default function Home() {
               </div>
               <Package size={160} className="absolute -right-10 -bottom-10 opacity-10 rotate-12" />
             </div>
+
+            {banners.map((bn) => (
+              <div key={bn.id} className={`min-w-[92%] md:min-w-full snap-center rounded-[2.5rem] bg-gradient-to-r ${bn.gradient} text-white p-8 relative overflow-hidden shadow-lg`}>
+                <div className="relative z-10">
+                  <span className="bg-white/20 text-[8px] font-black px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Pengumuman</span>
+                  <h2 className="text-2xl md:text-3xl font-black mb-1 uppercase tracking-tighter">{bn.title}</h2>
+                  <p className="text-white/90 text-[11px] mb-6">{bn.subtitle}</p>
+                  <Link href={bn.linkUrl || '/semua-kategori'} className="inline-block bg-white text-black px-5 py-2 rounded-xl font-black text-[10px] uppercase shadow-xl tap-active">
+                    {bn.buttonText || 'Lihat'}
+                  </Link>
+                </div>
+                {bn.imageUrl ? (
+                  <Image src={bn.imageUrl} alt="Banner" width={160} height={160} className="absolute -right-6 -bottom-6 opacity-20 rounded-2xl" />
+                ) : null}
+              </div>
+            ))}
 
             {activePromos.map(p => (
               <div key={p.id} className="min-w-[92%] md:min-w-full snap-center rounded-[2.5rem] bg-gradient-to-br from-orange-500 to-red-600 text-white p-8 relative overflow-hidden shadow-lg">

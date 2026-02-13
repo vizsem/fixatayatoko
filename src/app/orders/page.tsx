@@ -8,7 +8,7 @@ import {
   Coins, Ticket
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, startAfter } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { EmptyState, SkeletonList } from '@/components/UIState';
@@ -45,6 +45,8 @@ type UserOrder = {
 export default function UserOrdersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -62,7 +64,8 @@ export default function UserOrdersPage() {
         const q = query(
           collection(db, 'orders'),
           where('userId', '==', userId), 
-          orderBy('createdAt', 'desc')
+          orderBy('createdAt', 'desc'),
+          limit(20)
         );
         
         const querySnapshot = await getDocs(q);
@@ -97,6 +100,7 @@ export default function UserOrdersPage() {
         });
         
         setOrders(ordersList);
+        setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] ?? null);
       } catch (error) {
         console.error('Error fetching user orders:', error);
       } finally {
@@ -149,7 +153,8 @@ export default function UserOrdersPage() {
             }
           />
         ) : (
-          orders.map((order) => {
+          <>
+          {orders.map((order) => {
             const status = getStatusInfo(order.status);
             const totalDiskon = (order.pointsUsed || 0) + (order.voucherDiscount || 0);
 
@@ -233,7 +238,65 @@ export default function UserOrdersPage() {
                 </div>
               </div>
             );
-          })
+          })}
+          {!!lastDoc && (
+            <div className="flex justify-center">
+              <button
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-green-600 text-white tap-active disabled:opacity-50"
+                disabled={loadingMore}
+                onClick={async () => {
+                  if (loadingMore) return;
+                  const userId = localStorage.getItem('temp_user_id');
+                  if (!userId || !lastDoc) return;
+                  setLoadingMore(true);
+                  try {
+                    const q = query(
+                      collection(db, 'orders'),
+                      where('userId', '==', userId),
+                      orderBy('createdAt', 'desc'),
+                      startAfter(lastDoc!),
+                      limit(20)
+                    );
+                    const snap = await getDocs(q);
+                    const more: UserOrder[] = snap.docs.map(doc => {
+                      const data = doc.data() as FirebaseOrder;
+                      const rawCreatedAt = data.createdAt;
+                      const createdAt =
+                        rawCreatedAt &&
+                        typeof rawCreatedAt === 'object' &&
+                        'toDate' in rawCreatedAt
+                          ? (rawCreatedAt as { toDate: () => Date }).toDate()
+                          : new Date(rawCreatedAt ?? new Date().toISOString());
+                      const items =
+                        data.items?.map(item => ({
+                          name: item.name ?? '',
+                          quantity: item.quantity ?? 0,
+                        })) ?? [];
+                      return {
+                        id: doc.id,
+                        status: data.status ?? 'PENDING',
+                        createdAt,
+                        items,
+                        pointsUsed: data.pointsUsed ?? 0,
+                        voucherDiscount: data.voucherDiscount ?? 0,
+                        voucherUsed: data.voucherUsed ?? false,
+                        total: data.total ?? 0,
+                        orderId: data.orderId,
+                        payment: data.payment,
+                      };
+                    });
+                    setOrders(prev => [...prev, ...more]);
+                    setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+                  } finally {
+                    setLoadingMore(false);
+                  }
+                }}
+              >
+                {loadingMore ? 'Memuat...' : 'Muat Lebih Banyak'}
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 

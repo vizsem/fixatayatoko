@@ -8,3 +8,5 @@ node_modules/
 git@github.com:vizsem/fixatayatoko.git
 /.gitignore
 /README.md
+tmp/
+public/workbox-*.js
