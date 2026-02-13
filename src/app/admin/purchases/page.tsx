@@ -187,6 +187,7 @@ export default function AdminPurchases() {
 
       {/* Purchases Table */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50/50">
             <tr>
@@ -252,6 +253,7 @@ export default function AdminPurchases() {
             ))}
           </tbody>
         </table>
+        </div>
         {filteredPurchases.length === 0 && (
           <div className="p-20 text-center flex flex-col items-center gap-3">
             <ShoppingBag size={48} className="text-gray-100" />
