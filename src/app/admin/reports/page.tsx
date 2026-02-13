@@ -84,8 +84,8 @@ export default function ReportsDashboard() {
       const ordersRef = collection(db, 'orders');
       const qOrders = query(
         ordersRef,
-        where('createdAt', '>=', start.toISOString()),
-        where('createdAt', '<=', end.toISOString()),
+        where('createdAt', '>=', start),
+        where('createdAt', '<=', end),
         orderBy('createdAt', 'desc')
       );
       const ordersSnap = await getDocs(qOrders);
@@ -96,7 +96,10 @@ export default function ReportsDashboard() {
 
       ordersSnap.forEach((doc) => {
         const data = doc.data();
-        tSales += Number(data.total || 0);
+        const status = String(data.status || '').toUpperCase();
+        if (['SELESAI', 'SUCCESS'].includes(status)) {
+          tSales += Number(data.total || 0);
+        }
 
         // Hitung Piutang (Status selain Selesai/Batal dianggap piutang berjalan/pending)
         if (!['SELESAI', 'DIBATALKAN', 'SUCCESS'].includes(data.status?.toUpperCase())) {
