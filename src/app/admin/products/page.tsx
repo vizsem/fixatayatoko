@@ -305,7 +305,7 @@ export default function AdminProducts() {
           <p className="text-[10px] font-bold text-gray-400">Product management</p>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap overflow-x-auto no-scrollbar">
           <button
             onClick={handleSync}
             className="bg-white border border-gray-200 text-blue-600 p-2.5 rounded-xl hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
@@ -323,7 +323,7 @@ export default function AdminProducts() {
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="bg-white p-5 rounded-[2rem] border shadow-sm flex items-center gap-4">
           <div className="bg-blue-50 p-3 rounded-2xl text-blue-600"><Package size={24} /></div>
           <div><p className="text-[10px] font-black text-gray-400">Produk</p><p className="text-xl font-black">{stats.totalJenis}</p></div>
@@ -498,6 +498,5 @@ export default function AdminProducts() {
     </div>
   );
 }
-
 
 
