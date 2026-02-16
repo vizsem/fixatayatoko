@@ -3,7 +3,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Package } from 'lucide-react';
+import notify from '@/lib/notify';
 
 type Warehouse = {
   name: string;
@@ -23,7 +24,7 @@ type Warehouse = {
   isActive: boolean;
 };
 
-function WarehouseFormContent() {
+async function WarehouseFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');
@@ -47,7 +48,7 @@ function WarehouseFormContent() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -88,10 +89,10 @@ function WarehouseFormContent() {
 
       if (editId) {
         await updateDoc(doc(db, 'warehouses', editId), warehouseData);
-        alert('Gudang berhasil diperbarui!');
+        notify.admin.success('Gudang berhasil diperbarui!');
       } else {
         await addDoc(collection(db, 'warehouses'), warehouseData);
-        alert('Gudang berhasil ditambahkan!');
+        notify.admin.success('Gudang berhasil ditambahkan!');
       }
 
       router.push('/admin/warehouses');
@@ -216,7 +217,7 @@ function WarehouseFormContent() {
   );
 }
 
-export default function AddWarehousePage() {
+export default async function AddWarehousePage() {
   return (
     <Suspense fallback={<div className="p-6">Loading form gudang...</div>}>
       <WarehouseFormContent />

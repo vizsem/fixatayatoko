@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import {
   collection,
@@ -11,7 +13,7 @@ import {
   serverTimestamp,
   increment
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   ArrowLeft,
   ArrowUpCircle,
@@ -21,6 +23,8 @@ import {
   Package
 } from 'lucide-react';
 import Link from 'next/link';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 type Product = {
   id: string;
@@ -29,7 +33,7 @@ type Product = {
   unit: string;
 };
 
-export default function StockOutPage() {
+export default async function StockOutPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +69,7 @@ export default function StockOutPage() {
     if (!selectedProduct || qty <= 0) return;
     if (qty > selectedProduct.stock) {
       setStatus({ type: 'error', msg: 'Stok tidak mencukupi!' });
+      notify.admin.error('Stok tidak mencukupi!');
       return;
     }
 
@@ -94,6 +99,7 @@ export default function StockOutPage() {
       });
 
       setStatus({ type: 'success', msg: 'Stok berhasil dikurangi!' });
+      notify.admin.success('Stok berhasil dikurangi!');
 
       // Reset Form
       setQty(0);
@@ -108,6 +114,7 @@ export default function StockOutPage() {
     } catch (error) {
       console.error(error);
       setStatus({ type: 'error', msg: 'Terjadi kesalahan sistem.' });
+      notify.admin.error('Terjadi kesalahan sistem.');
     } finally {
       setLoading(false);
     }
@@ -115,6 +122,7 @@ export default function StockOutPage() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}

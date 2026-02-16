@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -19,6 +21,8 @@ import {
 } from 'firebase/firestore';
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 import {
   ShoppingBag, Plus, CreditCard,
@@ -54,7 +58,7 @@ type Purchase = {
   createdAt: string;
 };
 
-export default function AdminPurchases() {
+export default async function AdminPurchases() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -134,8 +138,9 @@ export default function AdminPurchases() {
         }
       }
       await updateDoc(doc(db, 'purchases', id), { status: newStatus, updatedAt: serverTimestamp() });
+      notify.admin.success(newStatus === 'DITERIMA' ? 'Pembelian dikonfirmasi, stok bertambah' : 'Pembelian dibatalkan');
     } catch {
-      alert('Gagal update status');
+      notify.admin.error('Gagal update status');
     }
 
   };
@@ -144,6 +149,7 @@ export default function AdminPurchases() {
 
   return (
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32">
+      <Toaster position="top-right" />
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
@@ -282,6 +288,8 @@ export default function AdminPurchases() {
                   } as Purchase));
                   setPurchases(prev => [...prev, ...more]);
                   setLastDoc(snapshot.docs[snapshot.docs.length - 1] ?? null);
+                } catch {
+                  notify.admin.error('Gagal memuat data tambahan');
                 } finally {
                   setLoadingMore(false);
                 }
@@ -324,7 +332,7 @@ interface StatCardProps {
   isWide?: boolean;
 }
 
-function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
+async function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
   return (
     <div className={`p-6 rounded-[2rem] ${bg} ${color} border border-transparent hover:border-current transition-all flex flex-col gap-3 ${isWide ? 'md:col-span-2' : ''}`}>
       <div className="flex justify-between items-start">

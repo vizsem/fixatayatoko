@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
 import {
   ArrowLeft, Search,
   ArrowUpCircle, ArrowDownCircle, User, Warehouse, Package
@@ -11,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { Toaster } from 'react-hot-toast';
 
 interface StockLog {
   id: string;
@@ -25,7 +28,7 @@ interface StockLog {
 }
 
 
-export default function StockLogsPage() {
+export default async function StockLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<StockLog[]>([]);
 
@@ -60,6 +63,7 @@ export default function StockLogsPage() {
 
   return (
     <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
+      <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto">
 
         {/* HEADER */}

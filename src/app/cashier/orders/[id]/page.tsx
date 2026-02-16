@@ -3,7 +3,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -17,6 +17,7 @@ import {
   Truck,
   CheckCircle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // Dynamic import OrderMap agar aman untuk SSR
 import dynamic from 'next/dynamic';
@@ -45,7 +46,7 @@ type Order = {
   notes?: string;
 };
 
-export default function CashierOrderDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function CashierOrderDetail({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
 
       const role = userDoc.data()?.role;
       if (role !== 'cashier' && role !== 'admin') {
-        alert('Akses ditolak! Hanya kasir atau admin yang dapat melihat halaman ini.');
+        toast.error('Akses ditolak! Hanya kasir atau admin yang dapat melihat halaman ini.');
         router.push('/profil');
         return;
       }

@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { auth, db } from '@/lib/firebase';
+
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
@@ -12,8 +14,11 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Loader2, Chrome, Mail, Lock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { requestForToken } from '@/lib/fcm';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
-export default function LoginPage() {
+export default async function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +42,7 @@ export default function LoginPage() {
     
     try {
       // Menggunakan Popup agar tidak terputus oleh sistem redirect Vercel/Browser
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(await getFirebaseAuth(), provider);
       const user = result.user;
 
       // Sinkronisasi ke Firestore
@@ -61,13 +66,14 @@ export default function LoginPage() {
         }
       }
 
+      await requestForToken();
       // Berhasil, pindah ke profil
       router.push('/profil');
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Google Login Error:", error);
       const message = error instanceof Error ? error.message : 'Terjadi kesalahan';
-      alert("Gagal Login Google: " + message);
+      notify.user.error("Gagal Login Google: " + message);
     } finally {
       setLoading(false);
     }
@@ -80,7 +86,7 @@ export default function LoginPage() {
     
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(await getFirebaseAuth(), email, password);
       const user = result.user;
 
       const userRef = doc(db, 'users', user.uid);
@@ -93,10 +99,11 @@ export default function LoginPage() {
         }
       }
 
+      await requestForToken();
       router.push('/profil');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      alert("Email/Password salah!");
+      notify.user.error("Email/Password salah!");
     } finally {
       setLoading(false);
     }
@@ -104,6 +111,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans">
+      <Toaster position="top-right" />
       <div className="w-full max-w-md bg-white rounded-[2.5rem] p-8 md:p-12 shadow-2xl shadow-slate-200 border border-slate-100 transition-all">
         
         <div className="text-center mb-10">

@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp
@@ -14,6 +16,7 @@ import {
   Clock, CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
+import notify from '@/lib/notify';
 
 type Order = {
   id: string;
@@ -27,7 +30,7 @@ type Order = {
 
 
 
-export default function AdminOrders() {
+export default async function AdminOrders() {
   const router = useRouter();
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -80,9 +83,9 @@ export default function AdminOrders() {
       });
       await batch.commit();
       setSelectedOrders([]);
-      alert('Berhasil diperbarui!');
+      notify.admin.success('Berhasil diperbarui!');
     } catch {
-      alert('Gagal memperbarui status.');
+      notify.admin.error('Gagal memperbarui status.');
     }
 
   };

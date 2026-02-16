@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { auth, db } from '@/lib/firebase';
+
 import {
   collection, doc, getDoc, getDocs, query, where,
   runTransaction, serverTimestamp
@@ -12,7 +14,8 @@ import {
   Loader2, AlertTriangle, Search
 } from 'lucide-react';
 
-import toast, { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 interface Warehouse {
   id: string;
@@ -26,7 +29,7 @@ interface Product {
   unit: string;
 }
 
-export default function MutasiGudangPage() {
+export default async function MutasiGudangPage() {
   const router = useRouter();
   const params = useParams();
   const sourceWarehouseId = params?.id as string;
@@ -70,7 +73,7 @@ export default function MutasiGudangPage() {
         })));
 
       } catch {
-        toast.error("Gagal memuat data inventory");
+        notify.admin.error("Gagal memuat data inventory");
       } finally {
         setLoading(false);
       }
@@ -82,18 +85,18 @@ export default function MutasiGudangPage() {
   const handleMutation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductId || !targetWarehouseId || amount <= 0) {
-      toast.error("Lengkapi form mutasi");
+      notify.admin.error("Lengkapi form mutasi");
       return;
     }
 
     const selectedProduct = products.find(p => p.id === selectedProductId);
     if (!selectedProduct) {
-      toast.error("Produk tidak ditemukan");
+      notify.admin.error("Produk tidak ditemukan");
       return;
     }
 
     if (amount > selectedProduct.stok) {
-      toast.error("Stok gudang asal tidak cukup!");
+      notify.admin.error("Stok gudang asal tidak cukup!");
       return;
     }
 
@@ -101,7 +104,7 @@ export default function MutasiGudangPage() {
     setSubmitting(true);
 
     try {
-      await runTransaction(db, async (transaction) => {
+      await runTransaction(await getFirestoreDB(), async (transaction) => {
         const productRef = doc(db, 'products', selectedProductId);
         const logRef = doc(collection(db, 'inventory_logs'));
 
@@ -126,10 +129,10 @@ export default function MutasiGudangPage() {
         });
       });
 
-      toast.success("Mutasi Berhasil Disinkronkan");
+      notify.admin.success("Mutasi Berhasil Disinkronkan");
       router.push('/admin/warehouses');
     } catch {
-      toast.error("Gagal melakukan mutasi");
+      notify.admin.error("Gagal melakukan mutasi");
     } finally {
       setSubmitting(false);
     }

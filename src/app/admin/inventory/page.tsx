@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 import {
   collection,
   getDocs,
@@ -45,7 +49,7 @@ type Product = {
   imageUrl?: string;
 };
 
-export default function InventoryDashboard() {
+export default async function InventoryDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -131,7 +135,8 @@ export default function InventoryDashboard() {
       await updateDoc(ref, { stock: tempStock, updatedAt: serverTimestamp() });
       setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: tempStock } : p));
       setEditingId(null);
-    } catch { alert("Update failed"); }
+      notify.admin.success('Stok diperbarui');
+    } catch { notify.admin.error('Gagal memperbarui stok'); }
 
   };
 
@@ -170,7 +175,8 @@ export default function InventoryDashboard() {
       setSelectedIds([]);
       setIsBatchModalOpen(false);
       fetchInitialData();
-    } catch { alert("Error updating products"); }
+      notify.admin.success('Batch update berhasil');
+    } catch { notify.admin.error('Batch update gagal'); }
 
     finally { setLoading(false); }
   };
@@ -179,6 +185,7 @@ export default function InventoryDashboard() {
 
   return (
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+      <Toaster position="top-right" />
 
       {/* 1. Navigasi Cepat */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
@@ -424,7 +431,7 @@ interface NavCardProps {
   onClick?: () => void;
 }
 
-function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
+async function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
   const Content = (
     <div className={`p-5 rounded-[2rem] ${bg} ${color} flex flex-col items-center gap-2 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
       <Icon size={24} />

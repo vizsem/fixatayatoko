@@ -3,8 +3,10 @@
 import { useEffect, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-
 import { auth, db } from '@/lib/firebase';
+
+
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, collection, getDocs,
@@ -16,6 +18,7 @@ import {
   Shield, Upload, Download,
   Plus, Trash2, Users, Tag, Save, Sparkles, Package, ExternalLink, Coins, CheckCircle2
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 // --- TYPES ---
@@ -55,7 +58,7 @@ const defaultSettings: SystemSettings = {
   createdAt: new Date().toISOString()
 };
 
-export default function AdminSettings() {
+export default async function AdminSettings() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'employees' | 'banners' | 'points'>('general');
   const [loading, setLoading] = useState(true);
@@ -116,9 +119,9 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       await setDoc(doc(db, 'settings', 'system'), { ...settings, updatedAt: new Date().toISOString() });
-      alert('Sistem diperbarui!');
+      notify.admin.success('Sistem diperbarui!');
     } catch {
-      alert('Gagal menyimpan.');
+      notify.admin.error('Gagal menyimpan.');
     } finally {
       setSaving(false);
     }
@@ -129,7 +132,7 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       await setDoc(doc(db, 'settings', 'points'), pointConfig);
-      alert('Konfigurasi Point disimpan!');
+      notify.admin.success('Konfigurasi Point disimpan!');
     } finally { setSaving(false); }
   };
 
@@ -148,7 +151,7 @@ export default function AdminSettings() {
   };
 
   const handleAddBanner = async () => {
-    if (banners.length >= 5) return alert("Maksimal 5 banner!");
+    if (banners.length >= 5) return notify.admin.error("Maksimal 5 banner!");
     await addDoc(collection(db, 'banners'), newBanner);
     setNewBanner({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
     loadBanners();

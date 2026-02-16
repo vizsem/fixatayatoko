@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   collection,
   getDocs,
@@ -18,6 +18,7 @@ import {
   Info
 } from 'lucide-react';
 import Link from 'next/link';
+import notify from '@/lib/notify';
 
 
 interface Supplier { id: string; name: string; }
@@ -25,7 +26,7 @@ interface Warehouse { id: string; name: string; }
 interface Product { id: string; name: string; purchasePrice: number; unit?: string; stock?: number; sku?: string; }
 interface CartItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
 
-export default function AddPurchase() {
+export default async function AddPurchase() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -48,9 +49,9 @@ export default function AddPurchase() {
   useEffect(() => {
     const fetchData = async () => {
       const [supSnap, warSnap, prodSnap] = await Promise.all([
-        getDocs(collection(db, 'suppliers')),
-        getDocs(collection(db, 'warehouses')),
-        getDocs(query(collection(db, 'products'), orderBy('name', 'asc')))
+        getDocs(collection(await getFirestoreDB(), 'suppliers')),
+        getDocs(collection(await getFirestoreDB(), 'warehouses')),
+        getDocs(query(collection(await getFirestoreDB(), 'products'), orderBy('name', 'asc')))
       ]);
       setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier)));
       setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
@@ -92,7 +93,7 @@ export default function AddPurchase() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0 || !selectedSupplier || !selectedWarehouse) {
-      alert("Mohon lengkapi data supplier, gudang, dan produk.");
+      notify.admin.error("Mohon lengkapi data supplier, gudang, dan produk.");
       return;
     }
 
@@ -101,7 +102,7 @@ export default function AddPurchase() {
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      await addDoc(collection(db, 'purchases'), {
+      await addDoc(collection(await getFirestoreDB(), 'purchases'), {
         supplierId: selectedSupplier,
         supplierName,
         warehouseId: selectedWarehouse,
@@ -120,7 +121,7 @@ export default function AddPurchase() {
       router.push('/admin/purchases');
     } catch (err) {
       console.error(err);
-      alert("Gagal menyimpan transaksi.");
+      notify.admin.error("Gagal menyimpan transaksi.");
     } finally {
       setLoading(false);
     }

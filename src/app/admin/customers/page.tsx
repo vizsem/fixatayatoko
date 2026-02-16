@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
 
@@ -60,7 +62,7 @@ type Order = {
   status: string;
 };
 
-export default function AdminCustomers() {
+export default async function AdminCustomers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -90,7 +92,7 @@ export default function AdminCustomers() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -193,7 +195,7 @@ export default function AdminCustomers() {
       await deleteDoc(doc(db, 'customers', id));
       setCustomers(customers.filter(c => c.id !== id));
     } catch {
-      alert('Gagal menghapus.');
+      toast.error('Gagal menghapus.');
     }
 
 
@@ -447,7 +449,7 @@ interface StatBoxProps {
   bg: string;
 }
 
-function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
+async function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
 
   return (
     <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all">

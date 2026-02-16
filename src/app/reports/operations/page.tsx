@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -21,6 +21,7 @@ import {
   Clock,
   AlertTriangle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type OperationalMetric = {
   id: string;
@@ -32,7 +33,7 @@ type OperationalMetric = {
   description: string;
 };
 
-export default function OperationsReport() {
+export default async function OperationsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
@@ -46,7 +47,7 @@ export default function OperationsReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }

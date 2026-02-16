@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Image from 'next/image';
 import type { MessagePayload } from 'firebase/messaging';
 import { requestForToken, onMessageListener } from '@/lib/fcm';
-import toast from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 export default function FCMManager() {
   useEffect(() => {
@@ -15,8 +15,8 @@ export default function FCMManager() {
     onMessageListener().then((payload) => {
       const p = payload as MessagePayload;
       console.log('Foreground notification:', p);
-      toast((t) => (
-        <div className="flex items-start gap-3 cursor-pointer" onClick={() => toast.dismiss(t.id)}>
+      notify.custom((t: { id: string }) => (
+        <div className="flex items-start gap-3 cursor-pointer" onClick={() => notify.dismiss(t.id)}>
           {p.notification?.icon && (
             <Image
               src={p.notification.icon}

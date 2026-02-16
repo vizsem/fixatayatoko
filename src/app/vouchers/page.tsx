@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { auth, db } from '@/lib/firebase';
+
 import {
   collection, doc, getDoc,
   updateDoc, addDoc, increment, serverTimestamp
@@ -31,7 +33,7 @@ const VOUCHER_LIST = [
   { id: 'v4', name: 'Gratis Ongkir Toko', cost: 10000, value: 10000, color: 'bg-orange-500' },
 ];
 
-export default function VoucherExchangePage() {
+export default async function VoucherExchangePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);

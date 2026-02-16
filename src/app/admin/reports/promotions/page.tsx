@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -23,6 +23,7 @@ import {
   Calendar,
   AlertTriangle
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 type PromotionRecord = {
@@ -38,7 +39,7 @@ type PromotionRecord = {
   endDate: string;
 };
 
-export default function PromotionsReport() {
+export default async function PromotionsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
@@ -52,7 +53,7 @@ export default function PromotionsReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }

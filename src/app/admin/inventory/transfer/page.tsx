@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import {
   collection,
@@ -10,7 +12,7 @@ import {
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 
 import {
   ArrowRightLeft,
@@ -40,7 +42,7 @@ type WarehouseType = {
   name: string;
 };
 
-export default function StockTransferPage() {
+export default async function StockTransferPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);

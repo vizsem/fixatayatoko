@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc } from 'firebase/firestore';
 import { AlertTriangle, Package, ChevronLeft } from 'lucide-react'; // Tambah ChevronLeft
 import Link from 'next/link';
@@ -31,7 +31,7 @@ type Order = {
   createdAt: string;
 };
 
-export default function PublicOrderDetailPage() {
+export default async function PublicOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -45,7 +45,7 @@ export default function PublicOrderDetailPage() {
 
     const fetchOrder = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'orders', id));
+        const docSnap = await getDoc(doc(await getFirestoreDB(), 'orders', id));
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOrder({

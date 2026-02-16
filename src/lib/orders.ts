@@ -1,7 +1,7 @@
 // lib/createOrder.ts (atau di dalam komponen/Route Handler)
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { getAuth } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+
 
 export const createOrder = async (orderData: {
   customerName: string;
@@ -18,7 +18,6 @@ export const createOrder = async (orderData: {
   note?: string;
   customerAddress?: string;
 }) => {
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User tidak login');

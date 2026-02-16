@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { db } from '@/lib/firebase';
+
 import {
   LayoutDashboard, ShoppingCart, Package, Users,
   Settings, Star, Truck, Receipt, Tag, Database,
@@ -10,11 +12,11 @@ import {
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon
 } from 'lucide-react';
 
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
 
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [toasts, setToasts] = useState<Array<{

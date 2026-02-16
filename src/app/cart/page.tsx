@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NextImage from 'next/image';
+import { auth, db } from '@/lib/firebase';
+
 import {
   CheckCircle2, ChevronLeft, Coins, CreditCard,
   Loader2, MapPin, Package, Send,
@@ -12,9 +14,10 @@ import {
 
 import { collection, doc, getDoc, query, where, getDocs, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 import { CartItem, UserProfile, Voucher } from '@/lib/types';
 
 
@@ -46,7 +49,7 @@ const compressImage = (file: File): Promise<Blob> => {
 
 // Order ID dihasilkan di server
 
-export default function CartPage() {
+export default async function CartPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -176,8 +179,8 @@ export default function CartPage() {
 
   // FUNGSI CEK VOUCHER
   const handleCheckVoucher = async () => {
-    if (!voucherCode) return toast.error("Masukkan kode voucher!");
-    if (!userId) return toast.error("Silakan login untuk menggunakan voucher");
+    if (!voucherCode) return notify.user.error("Masukkan kode voucher!");
+    if (!userId) return notify.user.error("Silakan login untuk menggunakan voucher");
 
     try {
       const q = query(collection(db, 'user_vouchers'),
@@ -188,17 +191,17 @@ export default function CartPage() {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        toast.error("Voucher tidak valid atau sudah digunakan");
+        notify.user.error("Voucher tidak valid atau sudah digunakan");
       } else {
         const docSnap = snap.docs[0];
         const vData = { id: docSnap.id, ...docSnap.data() } as Voucher;
 
         setAppliedVoucher(vData);
-        toast.success(`Voucher Berhasil: ${vData.name}`);
+        notify.user.success(`Voucher Berhasil: ${vData.name}`);
 
       }
     } catch {
-      toast.error("Gagal memeriksa voucher");
+      notify.user.error("Gagal memeriksa voucher");
     }
   };
 
@@ -217,7 +220,7 @@ export default function CartPage() {
     return { ok: true, msg: "Siap dipesan" };
   })();
   const handleCheckout = async () => {
-    if (paymentMethod !== 'cash' && !paymentProof) return toast.error("Upload bukti transfer!");
+    if (paymentMethod !== 'cash' && !paymentProof) return notify.user.error("Upload bukti transfer!");
     setIsSubmitting(true);
     // const orderId = generateOrderId(); // Generated on server now
 
@@ -228,7 +231,7 @@ export default function CartPage() {
         const compressed = await compressImage(paymentProof);
         // We need a temp ID for filename since we don't have orderId yet, or generate one client side just for filename
         const tempId = `proof-${Date.now()}`;
-        const sRef = ref(storage, `payments/${tempId}`);
+        const sRef = ref(await getFirebaseStorage(), `payments/${tempId}`);
         const snap = await uploadBytes(sRef, compressed);
         proofUrl = await getDownloadURL(snap.ref);
       }
@@ -272,7 +275,7 @@ export default function CartPage() {
 
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Gagal memproses pesanan.';
-      toast.error(message);
+      notify.user.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -319,7 +322,7 @@ export default function CartPage() {
                         setCart(newCart);
                         localStorage.setItem('cart', JSON.stringify(newCart));
                         window.dispatchEvent(new Event('cart-updated'));
-                        toast.success('Promo berhasil diambil!');
+                        notify.user.success('Promo berhasil diambil!');
                       }}
                       className="bg-white text-red-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl active:scale-95 transition-all hover:bg-gray-100"
                     >

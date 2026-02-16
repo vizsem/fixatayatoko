@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
 
@@ -20,7 +20,7 @@ interface PurchaseData { id: string; supplierName: string; warehouseName: string
 
 
 
-export default function PurchaseDetail() {
+export default async function PurchaseDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [purchase, setPurchase] = useState<PurchaseData | null>(null);
@@ -30,7 +30,7 @@ export default function PurchaseDetail() {
   useEffect(() => {
     const fetchPurchase = async () => {
       try {
-        const docRef = doc(db, 'purchases', id as string);
+        const docRef = doc(await getFirestoreDB(), 'purchases', id as string);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);

@@ -5,7 +5,7 @@ import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -18,6 +18,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 
 type Product = {
@@ -33,7 +35,7 @@ type Supplier = {
   name: string;
 };
 
-function StockInContent() {
+async function StockInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams.get('productId');
@@ -94,7 +96,7 @@ function StockInContent() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -113,7 +115,7 @@ function StockInContent() {
     e.preventDefault();
 
     if (formData.quantity <= 0) {
-      alert('Jumlah harus lebih dari 0');
+      notify.admin.error('Jumlah harus lebih dari 0');
       return;
     }
 
@@ -146,11 +148,11 @@ function StockInContent() {
         }
       });
 
-      alert('Stok berhasil ditambahkan!');
+      notify.admin.success('Stok berhasil ditambahkan!');
       router.push('/admin/inventory');
     } catch (err) {
       console.error('Gagal menambah stok:', err);
-      alert('Gagal menambah stok. Silakan coba lagi.');
+      notify.admin.error('Gagal menambah stok. Silakan coba lagi.');
     }
   };
 
@@ -167,6 +169,7 @@ function StockInContent() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto mb-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
@@ -283,7 +286,7 @@ function StockInContent() {
   );
 }
 
-export default function StockInPage() {
+export default async function StockInPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <StockInContent />

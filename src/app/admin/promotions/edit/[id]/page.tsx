@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   ArrowLeft, Save, Trash2, Calendar,
   Tag, Percent, Database, CheckCircle2 // 'percent' diubah menjadi 'Percent'
 } from 'lucide-react';
 import Link from 'next/link';
-import toast, { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 type Promotion = {
   name: string;
@@ -23,7 +24,7 @@ type Promotion = {
   isActive: boolean;
 };
 
-export default function EditPromotion() {
+export default async function EditPromotion() {
   const router = useRouter();
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
@@ -47,22 +48,22 @@ export default function EditPromotion() {
     const loadData = async () => {
       try {
         // Ambil data promosi
-        const promoDoc = await getDoc(doc(db, 'promotions', id as string));
+        const promoDoc = await getDoc(doc(await getFirestoreDB(), 'promotions', id as string));
         if (promoDoc.exists()) {
           setFormData(promoDoc.data() as Promotion);
         } else {
-          toast.error("Promosi tidak ditemukan");
+          notify.admin.error("Promosi tidak ditemukan. Anda akan diarahkan kembali.");
           router.push('/admin/promotions');
         }
 
         // Ambil daftar kategori unik dari produk untuk pilihan dropdown
-        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsSnapshot = await getDocs(collection(await getFirestoreDB(), 'products'));
         const cats = new Set(productsSnapshot.docs.map(doc => doc.data().category));
         setCategories(Array.from(cats) as string[]);
 
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error loading data:", error);
-        toast.error("Gagal memuat data");
+        notify.admin.error(`Gagal memuat data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setLoading(false);
       }
@@ -75,15 +76,15 @@ export default function EditPromotion() {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'promotions', id as string), {
+      await updateDoc(doc(await getFirestoreDB(), 'promotions', id as string), {
         ...formData,
         discountValue: Number(formData.discountValue),
         updatedAt: new Date().toISOString()
       });
-      toast.success("Promosi berhasil diperbarui!");
+      notify.admin.success("Promosi berhasil diperbarui!");
       setTimeout(() => router.push('/admin/promotions'), 1500);
     } catch {
-      toast.error("Gagal menyimpan perubahan");
+      notify.admin.error("Gagal menyimpan perubahan");
     } finally {
       setSaving(false);
     }
@@ -267,7 +268,7 @@ export default function EditPromotion() {
             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ingin membatalkan promo ini?</p>
             <button
               type="button"
-              onClick={() => toast.error("Fitur hapus ada di halaman daftar promo")}
+              onClick={() => notify.admin.error("Fitur hapus ada di halaman daftar promo")}
               className="flex items-center gap-2 text-red-500 text-[10px] font-black uppercase hover:underline"
             >
               <Trash2 size={12} /> Hapus Selamanya

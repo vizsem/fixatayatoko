@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ticket, Save, Info, ArrowRightLeft, Coins } from 'lucide-react';
+import notify from '@/lib/notify';
 
 interface PointConfig {
   earningRate: number;
@@ -10,12 +11,12 @@ interface PointConfig {
   minRedeem: number;
 }
 
-export default function PointSettings() {
+export default async function PointSettings() {
   const [config, setConfig] = useState<PointConfig>({ earningRate: 0, redemptionValue: 0, minRedeem: 0 });
 
   useEffect(() => {
     const fetchConfig = async () => {
-      const snap = await getDoc(doc(db, 'settings', 'points'));
+      const snap = await getDoc(doc(await getFirestoreDB(), 'settings', 'points'));
       if (snap.exists()) setConfig(snap.data() as PointConfig);
     };
     fetchConfig();
@@ -23,8 +24,8 @@ export default function PointSettings() {
 
 
   const handleSave = async () => {
-    await updateDoc(doc(db, 'settings', 'points'), config as unknown as { [key: string]: number });
-    alert("Pengaturan point disimpan!");
+    await updateDoc(doc(await getFirestoreDB(), 'settings', 'points'), config as unknown as { [key: string]: number });
+    notify.admin.success("Pengaturan point disimpan!");
   };
 
 

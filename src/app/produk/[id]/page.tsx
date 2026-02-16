@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 // 1. Tambahkan usePathname di import next/navigation
 import { useRouter, useParams, usePathname } from 'next/navigation'; 
+import { auth, db } from '@/lib/firebase';
+
 import { 
   ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2, Sparkles, Info, ShieldCheck, Truck,
   LayoutGrid,
@@ -14,7 +16,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { doc, getDoc, collection, getDocs, query, where, limit, setDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -57,7 +59,7 @@ type CartItem = {
 
 // 3. Hapus import Home dari @/app/page karena menyebabkan konflik dan error
 
-export default function ProductDetailPage() {
+export default async function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
   

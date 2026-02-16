@@ -5,12 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import * as htmlToImage from 'html-to-image';
+import { getFirestoreDB } from '@/lib/firebase-lazy';
 import { Order, OrderItem } from '@/lib/types';
+import toast from 'react-hot-toast';
 
 
-function SuccessContent() {
+async function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('id');
   const [loading, setLoading] = useState(true);
@@ -27,10 +27,11 @@ function SuccessContent() {
         return;
       }
       try {
+        const db = await getFirestoreDB();
         // PERBAIKAN: Menggunakan Query where('orderId') 
         // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
         const q = query(
-          collection(db, 'orders'),
+          collection(await getFirestoreDB(), 'orders'),
           where('orderId', '==', orderId),
           limit(1)
         );
@@ -109,6 +110,7 @@ function SuccessContent() {
     setIsDownloading(true);
     try {
       // Tunggu sebentar untuk memastikan font ter-render
+      const htmlToImage = await import('html-to-image');
       const dataUrl = await htmlToImage.toJpeg(invoiceRef.current, {
         quality: 0.95,
         backgroundColor: '#ffffff',
@@ -120,7 +122,7 @@ function SuccessContent() {
       link.click();
     } catch (err) {
       console.error(err);
-      alert('Gagal menyimpan nota');
+      toast.error('Gagal menyimpan nota');
     } finally {
       setIsDownloading(false);
     }
@@ -281,7 +283,7 @@ function SuccessContent() {
   );
 }
 
-export default function SuccessPage() {
+export default async function SuccessPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-green-600" size={32} /></div>}>
       <SuccessContent />

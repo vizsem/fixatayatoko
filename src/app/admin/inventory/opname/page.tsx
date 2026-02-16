@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import {
   collection,
@@ -10,7 +12,7 @@ import {
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   ArrowLeft,
   RotateCcw,
@@ -21,6 +23,8 @@ import {
   Plus
 } from 'lucide-react';
 import Link from 'next/link';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 type Product = {
   id: string;
@@ -29,7 +33,7 @@ type Product = {
   unit: string;
 };
 
-export default function StockOpnamePage() {
+export default async function StockOpnamePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,6 +105,7 @@ export default function StockOpnamePage() {
       });
 
       setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });
+      notify.admin.success('Stok fisik berhasil disinkronkan!');
 
       // Update state lokal agar UI sinkron
       setProducts(prev => prev.map(p =>
@@ -117,6 +122,7 @@ export default function StockOpnamePage() {
 
     } catch {
       setStatus({ type: 'error', msg: 'Gagal memproses opname.' });
+      notify.admin.error('Gagal memproses opname.');
     } finally {
 
       setLoading(false);
@@ -125,6 +131,7 @@ export default function StockOpnamePage() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black font-sans">
+      <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto">
 
         <div className="flex items-center gap-4 mb-8">

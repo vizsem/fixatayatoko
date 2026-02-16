@@ -2,16 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
   Barcode, Image as ImageIcon, AlertCircle, Layers
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
-export default function AddProductPage() {
+export default async function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -44,20 +45,20 @@ export default function AddProductPage() {
 
     try {
       // 1. Validasi ID Duplikat (Wajib Unik untuk Sinkronisasi Excel)
-      const q = query(collection(db, 'products'), where('ID', '==', formData.ID));
+      const q = query(collection(await getFirestoreDB(), 'products'), where('ID', '==', formData.ID));
       const snap = await getDocs(q);
       if (!snap.empty) {
         throw new Error(`ID Produk "${formData.ID}" sudah terdaftar di database!`);
       }
 
       // 2. Simpan ke Firestore
-      await addDoc(collection(db, 'products'), {
+      await addDoc(collection(await getFirestoreDB(), 'products'), {
         ...formData,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
 
-      alert('Produk berhasil ditambahkan ke database!');
+      notify.admin.success('Produk berhasil ditambahkan ke database!');
       router.push('/admin/products');
     } catch (err: unknown) {
       if (err instanceof Error) {

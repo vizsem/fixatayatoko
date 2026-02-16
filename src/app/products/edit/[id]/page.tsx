@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc,
@@ -26,6 +26,7 @@ import {
   Warehouse
 } from 'lucide-react';
 import Image from 'next/image';
+import toast from 'react-hot-toast';
 
 type Product = {
   id: string;
@@ -46,7 +47,7 @@ type Warehouse = {
   name: string;
 };
 
-export default function EditProductPage() {
+export default async function EditProductPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -69,7 +70,7 @@ export default function EditProductPage() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -128,7 +129,7 @@ export default function EditProductPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        alert('Hanya file gambar yang diizinkan!');
+        toast.error('Hanya file gambar yang diizinkan!');
         return;
       }
       setImageFile(file);
@@ -146,18 +147,18 @@ export default function EditProductPage() {
     try {
       // Hapus gambar lama jika ada
       if (product.image && !product.image.includes('placehold.co')) {
-        const oldRef = ref(storage, product.image);
+        const oldRef = ref(await getFirebaseStorage(), product.image);
         await deleteObject(oldRef).catch(() => {}); // Ignore error if file not found
       }
 
       // Upload gambar baru
-      const imageRef = ref(storage, `products/${id}/${Date.now()}`);
+      const imageRef = ref(await getFirebaseStorage(), `products/${id}/${Date.now()}`);
       await uploadBytes(imageRef, imageFile);
       const downloadURL = await getDownloadURL(imageRef);
       return downloadURL;
     } catch (err) {
       console.error('Gagal upload gambar:', err);
-      alert('Gagal mengupload gambar. Gunakan gambar default.');
+      toast.error('Gagal mengupload gambar. Gunakan gambar default.');
       return 'https://placehold.co/400x400/64748b/ffffff?text=No+Image';
     }
   };
@@ -183,12 +184,12 @@ export default function EditProductPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product.name || !product.category || !product.unit) {
-      alert('Nama, kategori, dan satuan wajib diisi!');
+      toast.error('Nama, kategori, dan satuan wajib diisi!');
       return;
     }
 
     if ((product.price ?? 0) <= 0 || (product.wholesalePrice ?? 0) <= 0) {
-      alert('Harga harus lebih dari 0!');
+      toast.error('Harga harus lebih dari 0!');
       return;
     }
 
@@ -214,7 +215,7 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString()
       });
 
-      alert('Produk berhasil diperbarui!');
+      toast.success('Produk berhasil diperbarui!');
       router.push('/admin/products');
     } catch (err) {
       console.error('Gagal memperbarui produk:', err);

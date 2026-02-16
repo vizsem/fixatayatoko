@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useParams, useRouter } from 'next/navigation';
-import { auth, db, storage } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 
@@ -44,7 +46,7 @@ interface Warehouse {
   name: string;
 }
 
-export default function EditProductPage() {
+export default async function EditProductPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -144,7 +146,7 @@ export default function EditProductPage() {
       // 2. Proses Gambar
       let finalImageUrl = product.URL_Produk || product.Link_Foto || '';
       if (imageFile) {
-        const imageRef = ref(storage, `products/${id}/main.jpg`);
+        const imageRef = ref(await getFirebaseStorage(), `products/${id}/main.jpg`);
         await uploadBytes(imageRef, imageFile);
         finalImageUrl = await getDownloadURL(imageRef);
       }

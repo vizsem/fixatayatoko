@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -17,6 +17,8 @@ import {
 } from 'firebase/firestore';
 
 import { db } from '@/lib/firebase';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 import {
   Users,
   Shield,
@@ -37,7 +39,7 @@ type UserDoc = {
   createdAt: string;
 };
 
-export default function AdminUsers() {
+export default async function AdminUsers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserDoc[]>([]);
@@ -80,7 +82,7 @@ export default function AdminUsers() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        // alert('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -95,7 +97,7 @@ export default function AdminUsers() {
 
   const handleUpdateRole = async (userId: string, newRole: 'admin' | 'cashier' | 'user') => {
     if (userId === currentUser) {
-      alert('Anda tidak bisa mengubah role diri sendiri.');
+      notify.admin.error('Anda tidak bisa mengubah role diri sendiri.');
       return;
     }
 
@@ -108,13 +110,13 @@ export default function AdminUsers() {
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       console.error('Gagal memperbarui role:', err);
-      alert('Gagal memperbarui role pengguna.');
+      notify.admin.error('Gagal memperbarui role pengguna.');
     }
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
     if (userId === currentUser) {
-      alert('Anda tidak bisa menghapus akun sendiri.');
+      notify.admin.error('Anda tidak bisa menghapus akun sendiri.');
       return;
     }
 
@@ -130,7 +132,7 @@ export default function AdminUsers() {
       setUsers(users.filter(u => u.id !== userId));
     } catch (err) {
       console.error('Gagal menghapus pengguna:', err);
-      alert('Gagal menghapus pengguna.');
+      notify.admin.error('Gagal menghapus pengguna.');
     }
   };
 
@@ -165,6 +167,7 @@ export default function AdminUsers() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <Toaster position="top-center" />
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">

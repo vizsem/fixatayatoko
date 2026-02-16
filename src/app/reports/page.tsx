@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -26,6 +26,7 @@ import {
   Database,
   ShoppingCart
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type ReportSummary = {
   totalSales: number;
@@ -37,7 +38,7 @@ type ReportSummary = {
   activeCustomers: number;
 };
 
-export default function ReportsDashboard() {
+export default async function ReportsDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<ReportSummary>({
@@ -64,7 +65,7 @@ export default function ReportsDashboard() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }

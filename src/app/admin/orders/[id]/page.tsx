@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Timestamp, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import {
@@ -11,7 +13,8 @@ import {
   Printer, ArrowLeft, Truck, MessageSquare, Receipt
 } from 'lucide-react';
 
-import toast, { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
@@ -38,7 +41,7 @@ type Order = {
   dueDate?: string; // Support Tempo
 };
 
-export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;
@@ -102,9 +105,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         updatedAt: serverTimestamp()
       });
       setOrder(prev => prev ? { ...prev, status: newStatus } : null);
-      toast.success(`Status: ${newStatus}`, { icon: '🚀' });
+      notify.admin.success(`Status: ${newStatus}`, { icon: '🚀' });
     } catch {
-      toast.error('Gagal memperbarui status');
+        notify.admin.error('Gagal memperbarui status');
 
     } finally {
       setIsUpdating(false);

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://atayatoko2.vercel.app/sitemap.xml

@@ -7,7 +7,7 @@ import {
   HomeIcon, LayoutGrid, ReceiptText, User,
   Coins, Ticket
 } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, getDocs, query, where, orderBy, limit, startAfter } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -42,7 +42,7 @@ type UserOrder = {
   };
 };
 
-export default function UserOrdersPage() {
+export default async function UserOrdersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -62,7 +62,7 @@ export default function UserOrdersPage() {
 
       try {
         const q = query(
-          collection(db, 'orders'),
+          collection(await getFirestoreDB(), 'orders'),
           where('userId', '==', userId), 
           orderBy('createdAt', 'desc'),
           limit(20)
@@ -251,7 +251,7 @@ export default function UserOrdersPage() {
                   setLoadingMore(true);
                   try {
                     const q = query(
-                      collection(db, 'orders'),
+                      collection(await getFirestoreDB(), 'orders'),
                       where('userId', '==', userId),
                       orderBy('createdAt', 'desc'),
                       startAfter(lastDoc!),

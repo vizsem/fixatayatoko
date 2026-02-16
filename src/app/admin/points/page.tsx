@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { db } from '@/lib/firebase';
+
 import {
   collection, query, orderBy, limit, onSnapshot,
   getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp
@@ -30,7 +32,7 @@ interface PointLog { id: string; userId: string; pointsChanged: number; type: st
 
 interface UserWithPoints { id: string; displayName?: string; email?: string; points: number; isPointsFrozen: boolean; }
 
-export default function AdminPointsDashboard() {
+export default async function AdminPointsDashboard() {
   const [logs, setLogs] = useState<PointLog[]>([]);
   const [topUsers, setTopUsers] = useState<UserWithPoints[]>([]);
   const [stats, setStats] = useState({ totalPoints: 0, totalRedeemed: 0 });

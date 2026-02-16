@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -21,6 +21,7 @@ import {
   Download,
   AlertTriangle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // 🔴 PERBAIKAN 1: Import XLSX secara dinamis (SSR-safe)
 import * as XLSX from 'xlsx';
@@ -46,7 +47,7 @@ type Customer = {
   lastOrderDate?: string;
 };
 
-export default function CustomerReport() {
+export default async function CustomerReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -72,7 +73,7 @@ export default function CustomerReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }

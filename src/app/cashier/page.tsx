@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -31,6 +31,7 @@ import {
   History, X, Trash2, LayoutGrid, List, Edit
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
+import toast from 'react-hot-toast';
 
 // Types
 type Product = {
@@ -67,7 +68,7 @@ type Order = {
 };
 
 
-export default function CashierPOS() {
+export default async function CashierPOS() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +123,7 @@ export default function CashierPOS() {
   }, []);
 
   const addToCart = useCallback((product: Product) => {
-    if (product.stock <= 0) return alert("Stok habis!");
+    if (product.stock <= 0) return toast.error("Stok habis!");
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id);
       if (exist) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
@@ -266,10 +267,10 @@ export default function CashierPOS() {
   // --- HANDLE TRANSACTION (DIUBAH UNTUK KOMPRESI) ---
   const handleTransaction = async () => {
     if (cart.length === 0) return;
-    if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof && !isOffline) return alert('Wajib upload bukti!');
-    if (paymentMethod === 'CASH' && change < 0) return alert('Uang kurang!');
+    if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof && !isOffline) return toast.error('Wajib upload bukti!');
+    if (paymentMethod === 'CASH' && change < 0) return toast.error('Uang kurang!');
     if (paymentMethod === 'TEMPO') {
-      if (!customerName || !customerPhone || !tempoDueDate) return alert('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
+      if (!customerName || !customerPhone || !tempoDueDate) return toast.error('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
     }
     
     // Jika offline, blokir metode yang butuh upload kecuali dipaksa (tapi di sini kita warning saja)
@@ -285,7 +286,7 @@ export default function CashierPOS() {
       if (paymentProof && !isOffline) {
         // PROSES KOMPRESI SEBELUM UPLOAD
         const compressedFile = await compressImage(paymentProof);
-        const sRef = ref(storage, `payment-proofs/${Date.now()}`);
+        const sRef = ref(await getFirebaseStorage(), `payment-proofs/${Date.now()}`);
         await uploadBytes(sRef, compressedFile);
         proofUrl = await getDownloadURL(sRef);
       } else if (paymentProof && isOffline) {
@@ -326,10 +327,10 @@ export default function CashierPOS() {
       setCustomerName('');
       setCustomerPhone('');
       setTempoDueDate('');
-      alert('Transaksi Berhasil!');
+      toast.success('Transaksi Berhasil!');
     } catch (e) {
       console.error(e);
-      alert('Gagal Transaksi');
+      toast.error('Gagal Transaksi');
     } finally { setIsProcessing(false); }
   };
 
@@ -641,7 +642,7 @@ export default function CashierPOS() {
                       <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16} /></a>
                       <button onClick={async () => {
                         await updateDoc(doc(db, 'orders', o.id), { status: 'DIPROSES' });
-                        alert('Order Diproses');
+                        toast.success('Order Diproses');
                       }} className="bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase">Proses</button>
                     </div>
                   </div>

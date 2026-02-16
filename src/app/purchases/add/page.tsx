@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -15,6 +15,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import toast, { Toaster } from 'react-hot-toast';
 
 type Supplier = {
   id: string;
@@ -41,7 +42,7 @@ type PurchaseItem = {
   unit: string;
 };
 
-export default function AddPurchasePage() {
+export default async function AddPurchasePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -101,7 +102,7 @@ export default function AddPurchasePage() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -165,12 +166,12 @@ export default function AddPurchasePage() {
     e.preventDefault();
 
     if (items.length === 0) {
-      alert('Tambahkan minimal 1 produk!');
+      toast.error('Tambahkan minimal 1 produk!');
       return;
     }
 
     if (!formData.supplierId || !formData.warehouseId) {
-      alert('Pilih supplier dan gudang tujuan!');
+      toast.error('Pilih supplier dan gudang tujuan!');
       return;
     }
 
@@ -193,11 +194,11 @@ export default function AddPurchasePage() {
       };
 
       await addDoc(collection(db, 'purchases'), purchaseData);
-      alert('Pembelian berhasil ditambahkan!');
+      toast.success('Pembelian berhasil ditambahkan!');
       router.push('/admin/purchases');
     } catch (err) {
       console.error('Gagal menambahkan pembelian:', err);
-      alert('Gagal menambahkan pembelian. Silakan coba lagi.');
+      toast.error('Gagal menambahkan pembelian. Silakan coba lagi.');
     }
   };
 
@@ -214,6 +215,7 @@ export default function AddPurchasePage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <Toaster position="top-right" />
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-black">Tambah Pembelian Baru</h1>
         <p className="text-black">Buat pembelian dari supplier & kelola stok masuk</p>

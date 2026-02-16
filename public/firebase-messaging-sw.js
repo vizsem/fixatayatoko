@@ -4,12 +4,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 // ⚠️ PENTING: Ganti dengan konfigurasi Firebase Anda (bisa dilihat di src/lib/firebase.ts atau Firebase Console)
 // Karena ini file statis, kita tidak bisa menggunakan process.env
 const firebaseConfig = {
-  apiKey: "ISI_API_KEY_DISINI",
-  authDomain: "marketpleace-new.firebaseapp.com", // Sesuaikan dengan project ID
-  projectId: "marketpleace-new", // Sesuaikan
-  storageBucket: "marketpleace-new.appspot.com", // Sesuaikan
-  messagingSenderId: "ISI_SENDER_ID_DISINI",
-  appId: "ISI_APP_ID_DISINI"
+  apiKey: "AIzaSyDV5Oz_zphv8UatLlZssdLkrbHSIZ8fOZI",
+  authDomain: "atayatoko2.firebaseapp.com",
+  projectId: "atayatoko2",
+  storageBucket: "atayatoko2.appspot.com",
+  messagingSenderId: "405021515196",
+  appId: "1:405021515196:web:3693ba57b852525e435fb9"
 };
 
 try {

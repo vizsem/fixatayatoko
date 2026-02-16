@@ -2,9 +2,11 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Timestamp, doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
 
 import { ArrowLeft, Printer } from 'lucide-react';
 
@@ -22,7 +24,7 @@ type Order = {
 };
 
 
-export default function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;

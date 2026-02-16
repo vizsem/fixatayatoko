@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+
 import {
   Timestamp,
   collection,
@@ -28,6 +30,8 @@ import {
   Package,
   Activity
 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 
 // --- TYPES ---
@@ -42,12 +46,14 @@ interface Warehouse {
 }
 
 
-export default function WarehousesPage() {
+export default async function WarehousesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // 1. Proteksi Admin & Auth Check
   useEffect(() => {
@@ -60,7 +66,7 @@ export default function WarehousesPage() {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-          alert('Akses ditolak! Anda bukan admin.');
+          notify.aksesDitolakAdmin();
           router.push('/profil');
           return;
         }
@@ -118,6 +124,7 @@ export default function WarehousesPage() {
         setWarehouses(warehouseList);
         setLoading(false);
         setError(null);
+        setCurrentPage(1);
       }, () => {
         setError("Gagal sinkronisasi stok produk.");
       });
@@ -136,7 +143,7 @@ export default function WarehousesPage() {
   // 3. Handle Delete
   const handleDelete = async (id: string, name: string, used: number) => {
     if (used > 0) {
-      alert(`Gudang "${name}" tidak bisa dihapus karena masih berisi ${used} unit barang. Kosongkan stok terlebih dahulu.`);
+      notify.admin.error(`Gudang "${name}" masih berisi ${used} unit barang. Kosongkan stok dulu.`);
       return;
     }
 
@@ -144,8 +151,9 @@ export default function WarehousesPage() {
 
     try {
       await deleteDoc(doc(db, 'warehouses', id));
+      notify.admin.success('Gudang berhasil dihapus');
     } catch {
-      alert('Gagal menghapus gudang.');
+      notify.admin.error('Gagal menghapus gudang.');
     }
 
   };
@@ -166,6 +174,7 @@ export default function WarehousesPage() {
 
   return (
     <div className="min-h-screen bg-[#FBFBFE] p-4 lg:p-10">
+      <Toaster position="top-right" />
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
         <div className="flex items-center gap-3">
@@ -231,7 +240,7 @@ export default function WarehousesPage() {
                   </td>
                 </tr>
               ) : (
-                warehouses.map((warehouse) => {
+                warehouses.slice((currentPage - 1) * ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE).map((warehouse) => {
                   const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
                   const isCritical = rate >= 90;
 
@@ -309,7 +318,7 @@ export default function WarehousesPage() {
       <div className="md:hidden">
         <table className="w-full">
           <tbody>
-            {warehouses.map((warehouse) => {
+            {warehouses.slice((currentPage - 1) * ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE).map((warehouse) => {
               const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
               const isCritical = rate >= 90;
               return (
@@ -349,6 +358,29 @@ export default function WarehousesPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-8 flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+          Menampilkan {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+          {Math.min(currentPage * ITEMS_PER_PAGE, warehouses.length)} dari {warehouses.length}
+        </span>
+        <div className="flex gap-2">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            className="px-4 py-2 rounded-xl border text-[10px] font-black uppercase disabled:opacity-50"
+          >
+            Sebelumnya
+          </button>
+          <button
+            disabled={currentPage * ITEMS_PER_PAGE >= warehouses.length}
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="px-4 py-2 rounded-xl border text-[10px] font-black uppercase disabled:opacity-50"
+          >
+            Berikutnya
+          </button>
+        </div>
       </div>
 
       {/* Footer Info */}

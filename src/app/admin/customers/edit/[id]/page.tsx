@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
 import {
   User,
   ArrowLeft,
@@ -16,8 +18,9 @@ import {
   FileText,
   CheckCircle2
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
-export default function EditCustomer() {
+export default async function EditCustomer() {
   const router = useRouter();
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
@@ -64,7 +67,7 @@ export default function EditCustomer() {
               notes: data.notes || ''
             });
           } else {
-            alert("Data tidak ditemukan");
+            notify.admin.error("Data tidak ditemukan");
             router.push('/admin/customers');
           }
         } catch (err) {
@@ -90,7 +93,7 @@ export default function EditCustomer() {
         router.push('/admin/customers');
       }, 1500);
     } catch {
-      alert("Gagal memperbarui data");
+      notify.admin.error("Gagal memperbarui data");
       setSaving(false);
     }
 

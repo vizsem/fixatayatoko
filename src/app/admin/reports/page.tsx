@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -32,6 +34,8 @@ import {
   ChevronRight,
   DollarSign
 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 
 
@@ -54,7 +58,7 @@ const getInitialDateRange = () => {
   };
 };
 
-export default function ReportsDashboard() {
+export default async function ReportsDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -142,7 +146,7 @@ export default function ReportsDashboard() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Khusus administrator.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
@@ -177,7 +181,7 @@ export default function ReportsDashboard() {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Summary");
       XLSX.writeFile(workbook, `Laporan_AtayaToko_${dateRange.startDate}.xlsx`);
     } catch {
-      alert("Gagal mengekspor data");
+      notify.admin.error("Gagal mengekspor data");
     } finally {
 
       setIsExporting(false);
@@ -196,6 +200,7 @@ export default function ReportsDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 lg:p-8 bg-[#FBFBFE] min-h-screen">
+      <Toaster position="top-right" />
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
         <div>
@@ -390,7 +395,7 @@ interface StatCardProps {
   subValue?: string;
 }
 
-function StatCard({ label, value, icon: Icon, color, bg, trend, subValue }: StatCardProps) {
+async function StatCard({ label, value, icon: Icon, color, bg, trend, subValue }: StatCardProps) {
   return (
     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group">
       <div className="flex justify-between items-start mb-4">
@@ -423,7 +428,7 @@ interface ReportLinkProps {
   bg: string;
 }
 
-function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProps) {
+async function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProps) {
   return (
     <Link href={href} className="group">
       <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:border-green-100 hover:shadow-lg hover:shadow-green-100/20 transition-all flex flex-col h-full">
@@ -442,6 +447,6 @@ function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProp
 }
 
 // Helper untuk icon yang mungkin tidak ter-import otomatis
-function DollarSignIcon(props: { className?: string, size?: number }) {
+async function DollarSignIcon(props: { className?: string, size?: number }) {
   return <DollarSign {...props} />
 }

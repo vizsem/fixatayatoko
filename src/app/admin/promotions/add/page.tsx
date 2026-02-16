@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, Suspense, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -15,6 +17,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { Gift, Tag, Percent } from 'lucide-react';
+import notify from '@/lib/notify';
 
 /* ================= TYPES ================= */
 
@@ -53,7 +56,7 @@ const getInitialPromotion = (): Promotion => {
   };
 };
 
-function AddPromotionContent() {
+async function AddPromotionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');
@@ -95,7 +98,7 @@ function AddPromotionContent() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -175,7 +178,7 @@ function AddPromotionContent() {
           ...formData,
           updatedAt: serverTimestamp(),
         });
-        alert('Promosi berhasil diperbarui!');
+        notify.admin.success('Promosi berhasil diperbarui!');
       } else {
         await addDoc(collection(db, 'promotions'), {
           ...formData,
@@ -183,13 +186,13 @@ function AddPromotionContent() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        alert('Promosi berhasil ditambahkan!');
+        notify.admin.success('Promosi berhasil ditambahkan!');
       }
 
       router.push('/admin/promotions');
     } catch (err) {
       console.error(err);
-      setError('Gagal menyimpan promosi');
+      notify.admin.error('Gagal menyimpan promosi');
     }
   };
 
@@ -391,7 +394,7 @@ function AddPromotionContent() {
 
 /* ================= MAIN EXPORT ================= */
 
-export default function AddPromotionPage() {
+export default async function AddPromotionPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AddPromotionContent />

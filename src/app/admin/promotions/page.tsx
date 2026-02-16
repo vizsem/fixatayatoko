@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -13,7 +12,7 @@ import {
   onSnapshot,
   orderBy
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   Plus,
@@ -27,6 +26,7 @@ import {
   Layers,
   Clock
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 // Update Tipe Data untuk Mendukung Flash Sale & Bundle
@@ -45,7 +45,7 @@ type Promotion = {
   createdAt: string;
 };
 
-export default function PromotionsPage() {
+export default async function PromotionsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -61,7 +61,7 @@ export default function PromotionsPage() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
@@ -96,7 +96,7 @@ export default function PromotionsPage() {
     try {
       await deleteDoc(doc(db, 'promotions', id));
     } catch {
-      alert('Gagal menghapus promosi.');
+      notify.admin.error('Gagal menghapus promosi.');
     }
 
   };

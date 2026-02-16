@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+
 import { 
   doc, updateDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove 
 } from 'firebase/firestore';
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import MemberCard from '@/components/MemberCard';
+import toast from 'react-hot-toast';
 
 import { User as FirebaseUser } from 'firebase/auth';
 
@@ -52,7 +55,7 @@ interface UserProfile {
   isPointsFrozen?: boolean;
 }
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -158,7 +161,7 @@ export default function ProfilePage() {
       await updateDoc(doc(db, 'users', user.uid), { name: newName.trim() });
       setIsEditingName(false);
     } catch {
-      alert("Gagal memperbarui nama");
+      toast.error("Gagal memperbarui nama");
     } finally {
       setIsSaving(false);
     }
@@ -166,7 +169,7 @@ export default function ProfilePage() {
 
   const addAddress = async () => {
     if (!newAddress || !newReceiverName || !user) {
-      alert("Lengkapi nama penerima dan alamat!");
+      toast.error("Lengkapi nama penerima dan alamat!");
       return;
     }
     setIsSaving(true);
@@ -187,7 +190,7 @@ export default function ProfilePage() {
       setNewReceiverName('');
       setNewReceiverPhone('');
     } catch {
-      alert("Gagal menambah alamat");
+      toast.error("Gagal menambah alamat");
     } finally {
       setIsSaving(false);
     }
@@ -203,7 +206,7 @@ export default function ProfilePage() {
         addresses: arrayRemove(addrToDelete)
       });
     } catch {
-      alert("Gagal menghapus alamat");
+      toast.error("Gagal menghapus alamat");
     }
   };
 

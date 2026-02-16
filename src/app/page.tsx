@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,7 +13,7 @@ import {
   FileText, Filter
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 
 // --- TYPES ---
@@ -61,7 +63,7 @@ const SkeletonCard = () => (
   </div>
 );
 
-export default function Home() {
+export default async function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);

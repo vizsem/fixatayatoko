@@ -13,8 +13,9 @@ import {
   collection, getDocs, updateDoc, doc, query, orderBy,
   increment, addDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { toast, Toaster } from 'react-hot-toast';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 type Employee = {
   id: string;
@@ -28,7 +29,7 @@ type Employee = {
   totalAttendance: number;
 };
 
-export default function EmployeesPage() {
+export default async function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,13 +49,13 @@ export default function EmployeesPage() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'employees'), orderBy('name', 'asc'));
+      const q = query(collection(await getFirestoreDB(), 'employees'), orderBy('name', 'asc'));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Employee[];
       setEmployees(data);
     } catch {
 
-      toast.error("Gagal memuat data");
+      notify.admin.error("Gagal memuat data");
     } finally {
       setLoading(false);
     }
@@ -64,22 +65,22 @@ export default function EmployeesPage() {
     e.preventDefault();
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'employees', editingId), formData);
-        toast.success("Data berhasil diperbarui");
+        await updateDoc(doc(await getFirestoreDB(), 'employees', editingId), formData);
+        notify.admin.success("Data berhasil diperbarui");
       } else {
-        await addDoc(collection(db, 'employees'), {
+        await addDoc(collection(await getFirestoreDB(), 'employees'), {
           ...formData,
           totalAttendance: 0,
           createdAt: serverTimestamp()
         });
-        toast.success("Karyawan baru ditambahkan");
+        notify.admin.success("Karyawan baru ditambahkan");
       }
       setIsModalOpen(false);
       resetForm();
       fetchEmployees();
     } catch {
 
-      toast.error("Terjadi kesalahan sistem");
+      notify.admin.error("Gagal menyimpan data");
     }
   };
 
@@ -94,22 +95,22 @@ export default function EmployeesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus data karyawan ini secara permanen?")) return;
+    notify.admin.loading('Menghapus...');
     try {
-      await deleteDoc(doc(db, 'employees', id));
-      toast.success("Data dihapus");
-      fetchEmployees();
+      await deleteDoc(doc(await getFirestoreDB(), 'employees', id));
+      notify.admin.success("Berhasil dihapus");
+      setEmployees(employees.filter(e => e.id !== id));
     } catch {
-
-      toast.error("Gagal menghapus");
+      notify.admin.error("Gagal menghapus");
     }
   };
 
   const handlePresent = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'employees', id), { totalAttendance: increment(1) });
-      toast.success("Kehadiran tercatat");
+      await updateDoc(doc(await getFirestoreDB(), 'employees', id), { totalAttendance: increment(1) });
+      notify.admin.success("Kehadiran tercatat");
       fetchEmployees();
-    } catch { toast.error("Gagal update absensi"); }
+    } catch { notify.admin.error("Gagal update absensi"); }
 
   };
 
@@ -204,7 +205,7 @@ export default function EmployeesPage() {
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   <button onClick={() => handlePresent(emp.id)} className="bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-black text-[10px] tracking-widest transition-all active:scale-95 shadow-lg shadow-gray-200">Absen hadir</button>
-                  <button onClick={() => toast.error("Alpha dicatat")} className="bg-white border-2 border-rose-50 text-rose-500 hover:bg-rose-50 py-4 rounded-2xl font-black text-[10px] tracking-widest transition-all active:scale-95">Alpha</button>
+                  <button onClick={() => notify.admin.error("Alpha dicatat")} className="bg-white border-2 border-rose-50 text-rose-500 hover:bg-rose-50 py-4 rounded-2xl font-black text-[10px] tracking-widest transition-all active:scale-95">Alpha</button>
                 </div>
 
 

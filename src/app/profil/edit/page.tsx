@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
   doc, 
@@ -14,7 +14,7 @@ import { db } from '@/lib/firebase';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-export default function EditProfilePage() {
+export default async function EditProfilePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',

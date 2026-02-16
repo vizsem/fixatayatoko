@@ -1,23 +1,29 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  increment, 
-  serverTimestamp, 
-  query, 
-  where, 
-} from 'firebase/firestore';
+import { adminDb, FieldValue } from '@/lib/firebaseAdmin';
+ 
 
 type IncomingItem = {
   id: string;
   quantity: number;
   promoType?: 'TEBUS_MURAH' | string;
 };
+type ProductData = {
+  name?: string;
+  Nama?: string;
+  price?: number;
+  Ecer?: number;
+  wholesalePrice?: number;
+  Grosir?: number;
+  minWholesale?: number;
+  Min_Grosir?: number;
+  stock: number;
+  image?: string;
+  Link_Foto?: string;
+  unit?: string;
+  Satuan?: string;
+};
+type VoucherData = { value?: number };
+type UserData = { points?: number };
 
 // Helper to generate Order ID
 const generateOrderId = () => {
@@ -41,7 +47,7 @@ export async function POST(req: Request) {
 
     // 1. Validasi & Kalkulasi Ulang Total (Server-Side)
     let calculatedSubtotal = 0;
-    const validatedItems = [];
+    const validatedItems: { id: string; name: string; price: number; quantity: number; image?: string; unit: string; total: number }[] = [];
     
     // Gunakan Transaction untuk atomicity (Stok & Validasi Harga)
     // Catatan: Client SDK transaction di server environment mungkin memiliki limitasi tanpa Service Account,
@@ -50,14 +56,14 @@ export async function POST(req: Request) {
     // Idealnya gunakan firebase-admin transaction.
 
     for (const item of items) {
-      const productRef = doc(db, 'products', item.id);
-      const productSnap = await getDoc(productRef);
+      const productRef = adminDb.collection('products').doc(item.id);
+      const productSnap = await productRef.get();
 
-      if (!productSnap.exists()) {
+      if (!productSnap.exists) {
         return NextResponse.json({ error: `Produk dengan ID ${item.id} tidak ditemukan` }, { status: 404 });
       }
 
-      const productData = productSnap.data();
+      const productData = productSnap.data() as ProductData;
       
       // Cek Stok
       if (productData.stock < item.quantity) {
@@ -87,10 +93,10 @@ export async function POST(req: Request) {
 
       validatedItems.push({
         id: item.id,
-        name: productData.name || productData.Nama,
+        name: productData.name || productData.Nama || 'Produk Tanpa Nama',
         price: price,
         quantity: item.quantity,
-        image: productData.image || productData.Link_Foto,
+        image: productData.image || productData.Link_Foto || '',
         unit: productData.unit || productData.Satuan || 'pcs',
         total: lineTotal
       });
@@ -101,17 +107,15 @@ export async function POST(req: Request) {
     let appliedVoucherId = null;
 
     if (voucherCode && userId) {
-      const vQuery = query(
-        collection(db, 'user_vouchers'), 
-        where('userId', '==', userId),
-        where('code', '==', voucherCode),
-        where('status', '==', 'ACTIVE')
-      );
-      const vSnap = await getDocs(vQuery);
-      
+      const vSnap = await adminDb
+        .collection('user_vouchers')
+        .where('userId', '==', userId)
+        .where('code', '==', voucherCode)
+        .where('status', '==', 'ACTIVE')
+        .get();
       if (!vSnap.empty) {
         const vDoc = vSnap.docs[0];
-        const vData = vDoc.data();
+        const vData = vDoc.data() as VoucherData;
         voucherDiscount = Number(vData.value || 0);
         appliedVoucherId = vDoc.id;
       }
@@ -120,13 +124,12 @@ export async function POST(req: Request) {
     // 3. Validasi Poin
     let pointsUsed = 0;
     if (usePoints && userId) {
-      const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
+      const userRef = adminDb.collection('users').doc(userId);
+      const userSnap = await userRef.get();
+      if (userSnap.exists) {
+        const userData = userSnap.data() as UserData;
         const availablePoints = userData.points || 0;
-        const maxRedeemable = calculatedSubtotal * 0.5; // Maks 50% subtotal
-        
+        const maxRedeemable = calculatedSubtotal * 0.5;
         pointsUsed = Math.min(availablePoints, maxRedeemable);
       }
     }
@@ -157,47 +160,50 @@ export async function POST(req: Request) {
         proof: payment.proof || null
       },
       status: 'PENDING',
-      createdAt: serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     };
 
-    const orderRef = await addDoc(collection(db, 'orders'), orderData);
+    const orderRef = adminDb.collection('orders').doc();
+    await adminDb.runTransaction(async (t) => {
+      t.set(orderRef, orderData);
+      for (const item of validatedItems) {
+        const pRef = adminDb.collection('products').doc(item.id);
+        const pSnap = await t.get(pRef);
+        if (!pSnap.exists) {
+          throw new Error('Produk tidak ditemukan saat transaksi');
+        }
+        const pData = pSnap.data() as ProductData;
+        if ((pData.stock || 0) < item.quantity) {
+          throw new Error(`Stok ${pData.name || pData.Nama} tidak mencukupi`);
+        }
+        t.update(pRef, { stock: FieldValue.increment(-item.quantity) });
+      }
+    });
 
-    // 6. Update Side Effects (Stok, Poin, Voucher)
-    // Note: Ini sebaiknya batch/transaction, tapi kita lakukan sequential untuk sekarang
-    
-    // Kurangi Stok
-    for (const item of validatedItems) {
-      await updateDoc(doc(db, 'products', item.id), {
-        stock: increment(-item.quantity)
-      });
-    }
-
-    // Potong Poin
+    // 6. Update Side Effects (Poin, Voucher, Cart)
     if (pointsUsed > 0 && userId) {
-      await updateDoc(doc(db, 'users', userId), { 
-        points: increment(-pointsUsed) 
+      await adminDb.collection('users').doc(userId).update({ 
+        points: FieldValue.increment(-pointsUsed) 
       });
-      await addDoc(collection(db, 'point_logs'), {
+      await adminDb.collection('point_logs').add({
         userId, 
         pointsChanged: -pointsUsed, 
         type: 'REDEEM',
         description: `Checkout Order #${orderId}`, 
-        createdAt: serverTimestamp()
+        createdAt: FieldValue.serverTimestamp()
       });
     }
 
     // Matikan Voucher
     if (appliedVoucherId) {
-      await updateDoc(doc(db, 'user_vouchers', appliedVoucherId), { 
-        status: 'USED' 
-      });
+      await adminDb.collection('user_vouchers').doc(String(appliedVoucherId)).update({ status: 'USED' });
     }
 
     // Kosongkan Cart
     if (userId) {
-      await updateDoc(doc(db, 'carts', userId), { 
+      await adminDb.collection('carts').doc(userId).update({ 
         items: [], 
-        updatedAt: serverTimestamp() 
+        updatedAt: FieldValue.serverTimestamp() 
       });
     }
 

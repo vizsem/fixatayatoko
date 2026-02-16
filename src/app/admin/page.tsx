@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useLayoutEffect, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
+
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,7 +11,7 @@ import {
   Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3
 } from 'lucide-react';
 
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
 
@@ -57,7 +59,7 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
 
 
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
@@ -146,7 +148,7 @@ export default function AdminDashboard() {
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Khusus Admin.');
+        // alert('Akses ditolak! Khusus Admin.');
         router.push('/profil');
         return;
       }
@@ -262,7 +264,7 @@ export default function AdminDashboard() {
   );
 }
 
-function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string }) {
+async function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string }) {
 
   return (
     <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-lg transition-all">
@@ -276,7 +278,7 @@ function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value
   );
 }
 
-function SystemInfo({ label, value }: { label: string, value: string | number }) {
+async function SystemInfo({ label, value }: { label: string, value: string | number }) {
   return (
     <div className="flex justify-between items-end border-b border-white/5 pb-4">
       <span className="text-[10px] font-black text-gray-400 tracking-widest">{label}</span>

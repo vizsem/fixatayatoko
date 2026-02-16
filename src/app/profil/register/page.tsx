@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
@@ -11,7 +11,7 @@ import Image from 'next/image';
 import { User, Lock, Mail, MapPin, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
@@ -31,11 +31,11 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       // Buat akun Firebase
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(await getFirebaseAuth(), formData.email, formData.password);
       const user = userCredential.user;
       
       // Simpan data pengguna ke Firestore
-      await setDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(await getFirestoreDB(), 'users', user.uid), {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -51,11 +51,11 @@ export default function RegisterPage() {
       console.error('Register error:', error);
       let message = 'Gagal registrasi';
       const errorCode = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
-      if (errorCode === 'auth/email-already-in-use') {
+      if (errorCode === 'await getFirebaseAuth()/email-already-in-use') {
         message = 'Email sudah terdaftar';
-      } else if (errorCode === 'auth/invalid-email') {
+      } else if (errorCode === 'await getFirebaseAuth()/invalid-email') {
         message = 'Email tidak valid';
-      } else if (errorCode === 'auth/weak-password') {
+      } else if (errorCode === 'await getFirebaseAuth()/weak-password') {
         message = 'Password minimal 6 karakter';
       }
       toast.error(message);

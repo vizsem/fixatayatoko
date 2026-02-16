@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -20,6 +20,7 @@ import {
   Package,
   CreditCard
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type SaleItem = {
   id: string;
@@ -31,7 +32,7 @@ type SaleItem = {
   customerName: string;
 };
 
-export default function SalesReport() {
+export default async function SalesReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<SaleItem[]>([]);
@@ -51,7 +52,7 @@ export default function SalesReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }

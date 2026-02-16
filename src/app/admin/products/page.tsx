@@ -3,8 +3,10 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-
 import { auth, db } from '@/lib/firebase';
+
+
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection, doc, addDoc, deleteDoc,
@@ -19,7 +21,8 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 
 // ✅ SheetJS untuk Export/Import Excel
@@ -65,7 +68,7 @@ interface RestockModalProps {
   onClose: () => void;
 }
 
-function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
+async function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
 
   const [stokMasuk, setStokMasuk] = useState<number>(0);
   const [hargaBaru, setHargaBaru] = useState<number>(0);
@@ -82,7 +85,7 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
     : 0;
 
   const handleUpdate = async () => {
-    if (stokMasuk <= 0 || hargaBaru <= 0) return toast.error("Lengkapi data!");
+    if (stokMasuk <= 0 || hargaBaru <= 0) return notify.admin.error("Lengkapi data!");
     setLoading(true);
     try {
       const productRef = doc(db, 'products', product.id);
@@ -100,9 +103,9 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
         toWarehouseId: product.warehouseId || '', date: serverTimestamp(), note: 'Restock (Avg Price)'
       });
 
-      toast.success("Restock Berhasil!");
+      notify.admin.success("Restock Berhasil!");
       onClose();
-    } catch { toast.error("Gagal update data"); }
+    } catch { notify.admin.error("Gagal update data"); }
     setLoading(false);
   };
 
@@ -134,7 +137,7 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
 }
 
 // --- KOMPONEN UTAMA ---
-export default function AdminProducts() {
+export default async function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -152,7 +155,7 @@ export default function AdminProducts() {
   // Fungsi Bulk Update Status
   const handleBulkStatus = async (newStatus: number) => {
     if (selectedIds.length === 0) return;
-    const t = toast.loading(`Mengubah ${selectedIds.length} produk...`);
+    const t = notify.admin.loading(`Mengubah ${selectedIds.length} produk...`);
     try {
       const batch = writeBatch(db);
       selectedIds.forEach(id => {
@@ -160,8 +163,8 @@ export default function AdminProducts() {
       });
       await batch.commit();
       setSelectedIds([]);
-      toast.success("Berhasil diperbarui!", { id: t });
-    } catch { toast.error("Gagal memperbarui", { id: t }); }
+      notify.admin.success("Berhasil diperbarui!", { id: t });
+    } catch { notify.admin.error("Gagal memperbarui", { id: t }); }
 
   };
   // States
@@ -209,8 +212,8 @@ export default function AdminProducts() {
 
   // Handlers
   const handleExport = () => {
-    if (filteredAndSorted.length === 0) return toast.error("Tidak ada data untuk diexport!");
-    const t = toast.loading("Mengunduh Excel...");
+    if (filteredAndSorted.length === 0) return notify.admin.error("Tidak ada data untuk diexport!");
+    const t = notify.admin.loading("Mengunduh Excel...");
     try {
       const data = filteredAndSorted.map(p => ({
         ID: p.ID, Barcode: p.Barcode || "", Nama: p.Nama, Kategori: p.Kategori || "Umum",
@@ -226,8 +229,8 @@ export default function AdminProducts() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Produk");
       XLSX.writeFile(wb, `EXPORT_PRODUK_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast.success("Berhasil!", { id: t });
-    } catch { toast.error("Gagal export!", { id: t }); }
+      notify.admin.success("Berhasil!", { id: t });
+    } catch { notify.admin.error("Gagal export!", { id: t }); }
 
   };
 
@@ -244,7 +247,7 @@ export default function AdminProducts() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      const t = toast.loading("Mengimport...");
+      const t = notify.admin.loading("Mengimport...");
       try {
         const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
@@ -259,8 +262,8 @@ export default function AdminProducts() {
         });
 
         await batch.commit();
-        toast.success("Berhasil!", { id: t });
-      } catch { toast.error("Gagal!", { id: t }); }
+        notify.admin.success("Berhasil!", { id: t });
+      } catch { notify.admin.error("Gagal!", { id: t }); }
     };
     reader.readAsBinaryString(file);
   };
@@ -274,7 +277,7 @@ export default function AdminProducts() {
 
   // --- HANDLE SYNC & RESET ---
   const handleSync = () => {
-    const t = toast.loading("Mensinkronkan data...");
+    const t = notify.admin.loading("Mensinkronkan data...");
 
     try {
       // Reset semua state ke kondisi awal
@@ -285,10 +288,10 @@ export default function AdminProducts() {
 
       // Simulasi proses sinkronisasi singkat
       setTimeout(() => {
-        toast.success("Data & Filter berhasil disegarkan!", { id: t });
+        notify.admin.success("Data & Filter berhasil disegarkan!", { id: t });
       }, 700);
     } catch (err) {
-      toast.error("Gagal sinkron", { id: t });
+      notify.admin.error("Gagal sinkron", { id: t });
       console.error(err);
     }
   };
@@ -498,4 +501,3 @@ export default function AdminProducts() {
     </div>
   );
 }
-

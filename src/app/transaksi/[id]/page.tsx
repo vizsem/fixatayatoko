@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc } from 'firebase/firestore';
 import {
   AlertTriangle, Package, CreditCard, ChevronLeft,
@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Order, OrderItem } from '@/lib/types';
 
 
-export default function DetailTransaksiPage() {
+export default async function DetailTransaksiPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -27,7 +27,7 @@ export default function DetailTransaksiPage() {
 
     const fetchOrder = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'orders', id));
+        const docSnap = await getDoc(doc(await getFirestoreDB(), 'orders', id));
         if (docSnap.exists()) {
           setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
         } else {

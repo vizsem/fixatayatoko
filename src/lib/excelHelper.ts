@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
-import { db } from "@/lib/firebase";
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, writeBatch, serverTimestamp, collection, getDocs } from "firebase/firestore";
+import { db } from '@/lib/firebase';
+
 
 /**
  * Fungsi untuk mengimpor data dari file Excel (.xlsx atau .xls) ke Firestore
@@ -99,7 +101,7 @@ export const exportToExcel = async () => {
     });
 
     if (products.length === 0) {
-      alert("Tidak ada data produk untuk diekspor.");
+      console.warn("Tidak ada data produk untuk diekspor.");
       return;
     }
 
@@ -112,6 +114,6 @@ export const exportToExcel = async () => {
     XLSX.writeFile(workbook, `AtayaToko_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
   } catch (error) {
     console.error("Excel Export Error:", error);
-    alert("Gagal mengambil data dari database.");
+    throw new Error("Gagal mengambil data dari database.");
   }
 };

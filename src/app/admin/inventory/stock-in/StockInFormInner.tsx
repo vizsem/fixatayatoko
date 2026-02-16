@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 
 
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -16,8 +15,9 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 
@@ -34,7 +34,7 @@ type Supplier = {
   name: string;
 };
 
-export default function StockInFormInner({ productId }: { productId: string }) {
+export default async function StockInFormInner({ productId }: { productId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -92,7 +92,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
@@ -111,7 +111,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
     e.preventDefault();
 
     if (formData.quantity <= 0) {
-      alert('Jumlah harus lebih dari 0');
+      notify.admin.error('Jumlah harus lebih dari 0');
       return;
     }
 
@@ -144,11 +144,11 @@ export default function StockInFormInner({ productId }: { productId: string }) {
         }
       });
 
-      alert('Stok berhasil ditambahkan!');
+      notify.admin.success('Stok berhasil ditambahkan!');
       router.push('/admin/inventory');
     } catch (err) {
       console.error('Gagal menambah stok:', err);
-      alert('Gagal menambah stok. Silakan coba lagi.');
+      notify.admin.error('Gagal menambah stok. Silakan coba lagi.');
     }
   };
 

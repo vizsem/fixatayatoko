@@ -1,5 +1,4 @@
 import React from 'react';
-import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
 
 type MemberCardProps = {
@@ -55,10 +54,7 @@ export default function MemberCard({ name, memberId, points, level }: MemberCard
           </div>
         </div>
         
-        {/* Footer Barcode */}
-        <div className="mt-4 bg-white/90 p-2 rounded-xl flex items-center justify-center shadow-sm">
-           <Barcode value={memberId} height={30} fontSize={10} width={1.5} displayValue={false} />
-        </div>
+        {/* Footer Barcode - Removed due to dependency issues */}
       </div>
     </div>
   );

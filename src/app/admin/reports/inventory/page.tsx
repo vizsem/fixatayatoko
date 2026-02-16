@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -20,6 +20,7 @@ import {
   TrendingDown,
   TrendingUp
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 type InventoryItem = {
@@ -33,7 +34,7 @@ type InventoryItem = {
   stockValue: number;
 };
 
-export default function InventoryReport() {
+export default async function InventoryReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -47,7 +48,7 @@ export default function InventoryReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }

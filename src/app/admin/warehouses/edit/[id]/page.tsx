@@ -2,14 +2,17 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { db, auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+
 import {
   ArrowLeft, Save, Warehouse, MapPin,
   Phone, User, Package, Loader2
 } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 type WarehouseData = {
   id: string;
@@ -21,7 +24,7 @@ type WarehouseData = {
   status: 'AKTIF' | 'NONAKTIF';
 };
 
-export default function EditWarehousePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditWarehousePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;
@@ -40,6 +43,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') {
+        notify.admin.error("Akses ditolak! Anda bukan admin.");
         router.push('/admin');
         return;
       }
@@ -60,11 +64,11 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         if (docSnap.exists()) {
           setFormData({ id: docSnap.id, ...docSnap.data() } as WarehouseData);
         } else {
-          toast.error('Gudang tidak ditemukan');
+          notify.admin.error('Gudang tidak ditemukan');
           router.push('/admin/warehouses');
         }
       } catch {
-        toast.error('Gagal mengambil data');
+        notify.admin.error('Gagal mengambil data');
       } finally {
 
         setLoading(false);
@@ -86,10 +90,10 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         ...formData,
         updatedAt: serverTimestamp(),
       });
-      toast.success('Data gudang berhasil diperbarui');
+      notify.admin.success('Data gudang berhasil diperbarui');
       setTimeout(() => router.push('/admin/warehouses'), 1500);
     } catch {
-      toast.error('Gagal menyimpan perubahan');
+      notify.admin.error('Gagal menyimpan perubahan');
     } finally {
 
       setIsSaving(false);

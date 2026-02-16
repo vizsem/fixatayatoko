@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { auth, db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+
 import {
   collection,
   doc,
@@ -33,6 +35,7 @@ import {
 } from 'lucide-react';
 
 import * as XLSX from 'xlsx';
+import notify from '@/lib/notify';
 
 // --- TYPES ---
 type Category = {
@@ -45,7 +48,7 @@ type Category = {
 };
 
 
-export default function AdminCategories() {
+export default async function AdminCategories() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -138,8 +141,7 @@ export default function AdminCategories() {
       setShowModal(false);
       fetchData();
     } catch {
-      alert("Gagal menyimpan kategori");
-
+      notify.admin.error("Gagal menyimpan kategori");
     } finally {
       setIsSaving(false);
     }
@@ -148,7 +150,7 @@ export default function AdminCategories() {
   // 4. Handle Delete
   const handleDelete = async (id: string, name: string, count: number) => {
     if (count > 0) {
-      alert(`Kategori "${name}" tidak bisa dihapus karena masih memiliki ${count} produk.`);
+      notify.admin.error(`Kategori "${name}" tidak bisa dihapus karena masih memiliki ${count} produk.`);
       return;
     }
     if (confirm(`Hapus kategori "${name}"?`)) {
@@ -156,7 +158,7 @@ export default function AdminCategories() {
         await deleteDoc(doc(db, 'categories', id));
         setCategories(prev => prev.filter(c => c.id !== id));
       } catch {
-        alert("Gagal menghapus");
+        notify.admin.error("Gagal menghapus");
 
       }
     }
@@ -333,4 +335,3 @@ export default function AdminCategories() {
     </div>
   );
 }
-

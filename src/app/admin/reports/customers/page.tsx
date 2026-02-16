@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -23,6 +23,8 @@ import {
   Download,
   AlertTriangle
 } from 'lucide-react';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
 
 
 type Customer = {
@@ -37,7 +39,7 @@ type Customer = {
   lastOrderDate?: string;
 };
 
-export default function CustomerReport() {
+export default async function CustomerReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -83,7 +85,7 @@ export default function CustomerReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
@@ -197,6 +199,7 @@ export default function CustomerReport() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <Toaster position="top-right" />
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">

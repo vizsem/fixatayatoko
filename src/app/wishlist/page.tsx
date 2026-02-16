@@ -5,11 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, where, documentId, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { Product } from '@/lib/types';
+import notify from '@/lib/notify';
 
 
-export default function WishlistPage() {
+export default async function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export default function WishlistPage() {
         // 1. Ambil Produk Wishlist
         if (wishlistIds.length > 0) {
           const qWishlist = query(
-            collection(db, 'products'),
+            collection(await getFirestoreDB(), 'products'),
             where(documentId(), 'in', wishlistIds.slice(0, 30))
           );
           const wishlistSnap = await getDocs(qWishlist);
@@ -42,7 +43,7 @@ export default function WishlistPage() {
         }
 
         // 2. Ambil Rekomendasi Produk
-        const qRec = query(collection(db, 'products'), limit(20));
+        const qRec = query(collection(await getFirestoreDB(), 'products'), limit(20));
         const recSnap = await getDocs(qRec);
         const allRecs = recSnap.docs
           .map(doc => {
@@ -83,7 +84,7 @@ export default function WishlistPage() {
 
     localStorage.setItem('atayatoko-cart', JSON.stringify(cartItems));
     window.dispatchEvent(new Event('cart-updated'));
-    alert(`Berhasil ditambah ke keranjang!`);
+    notify.user.success(`Berhasil ditambah ke keranjang!`);
   };
 
   const handleRemove = (id: string) => {
@@ -153,7 +154,7 @@ export default function WishlistPage() {
   );
 }
 
-function ProductCard({
+async function ProductCard({
   product,
   onRemove,
   onAdd,

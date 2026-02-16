@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -22,6 +22,7 @@ import {
   TrendingDown,
   Package
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 type FinancialRecord = {
@@ -36,7 +37,7 @@ type FinancialRecord = {
   paymentMethod: string;
 };
 
-export default function FinanceReport() {
+export default async function FinanceReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<FinancialRecord[]>([]);
@@ -54,7 +55,7 @@ export default function FinanceReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }

@@ -25,7 +25,7 @@ export const requestForToken = async () => {
           console.log('FCM Token:', currentToken);
           // Save token to user profile if logged in
           if (auth.currentUser) {
-              await setDoc(doc(db, 'users', auth.currentUser.uid), { 
+              await setDoc(doc(db, 'users', auth.currentUser.uid), {
                   fcmToken: currentToken,
                   updatedAt: new Date().toISOString()
               }, { merge: true });

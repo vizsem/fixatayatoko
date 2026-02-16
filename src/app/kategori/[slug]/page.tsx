@@ -9,8 +9,9 @@ import {
   ChevronLeft, ChevronRight, Sparkles, Package 
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import toast, { Toaster } from 'react-hot-toast';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 
 type Product = {
   id: string;
@@ -28,7 +29,7 @@ type CartItem = Product & {
   quantity: number;
 };
 
-function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
+async function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
@@ -56,7 +57,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const productsSnap = await getDocs(collection(db, 'products'));
+        const productsSnap = await getDocs(collection(await getFirestoreDB(), 'products'));
         
         const mapped = productsSnap.docs.map(doc => {
           const data = doc.data();
@@ -89,7 +90,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
         }
       } catch (error) {
         console.error(error);
-        toast.error("Gagal memuat produk");
+        notify.user.error("Gagal memuat produk");
       } finally {
         setLoading(false);
       }
@@ -118,7 +119,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-updated'));
-    toast.success("Berhasil ditambah!");
+    notify.user.success("Berhasil ditambah!");
   };
 
   if (loading) return (
@@ -268,7 +269,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   );
 }
 
-export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-black uppercase text-xs">Menghubungkan...</div>}>
       <CategoryContent params={params} />

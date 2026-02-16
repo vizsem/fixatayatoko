@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -23,6 +23,7 @@ import {
   ShoppingCart,
   Database
 } from 'lucide-react';
+import notify from '@/lib/notify';
 
 
 type OperationalMetric = {
@@ -35,7 +36,7 @@ type OperationalMetric = {
   description: string;
 };
 
-export default function OperationsReport() {
+export default async function OperationsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
@@ -49,7 +50,7 @@ export default function OperationsReport() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }

@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
+import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -18,6 +18,8 @@ import {
 
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
+import { Toaster } from 'react-hot-toast';
+import notify from '@/lib/notify';
 import {
   Plus,
   Edit,
@@ -43,7 +45,7 @@ type Supplier = {
   createdAt: string;
 };
 
-export default function AdminSuppliers() {
+export default async function AdminSuppliers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -73,7 +75,7 @@ export default function AdminSuppliers() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        alert('Akses ditolak! Anda bukan admin.');
+        notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
@@ -128,6 +130,7 @@ export default function AdminSuppliers() {
         ...formData,
         createdAt: new Date().toISOString()
       });
+      notify.success('Supplier berhasil ditambahkan');
       setShowAddModal(false);
       setFormData({
         name: '',
@@ -138,9 +141,8 @@ export default function AdminSuppliers() {
         category: '',
         notes: ''
       });
-    } catch (err) {
-      alert('Gagal menambahkan supplier.');
-      console.error(err);
+    } catch {
+      notify.error('Gagal menambahkan supplier.');
     }
   };
 
@@ -148,9 +150,9 @@ export default function AdminSuppliers() {
     if (!confirm(`Hapus supplier "${name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
     try {
       await deleteDoc(doc(db, 'suppliers', id));
-    } catch (err) {
-      alert('Gagal menghapus supplier.');
-      console.error(err);
+      notify.success('Supplier dihapus');
+    } catch {
+      notify.error('Gagal menghapus supplier.');
     }
   };
 
@@ -160,6 +162,13 @@ export default function AdminSuppliers() {
     supplier.phone.includes(searchTerm) ||
     supplier.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / pageSize));
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const pageItems = filteredSuppliers.slice(startIdx, endIdx);
 
   if (loading) {
     return (
@@ -174,6 +183,7 @@ export default function AdminSuppliers() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <Toaster position="top-right" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
@@ -209,7 +219,7 @@ export default function AdminSuppliers() {
             type="text"
             placeholder="Cari supplier..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black outline-none"
           />
         </div>
@@ -260,7 +270,7 @@ export default function AdminSuppliers() {
                   </td>
                 </tr>
               ) : (
-                filteredSuppliers.map((supplier) => (
+                pageItems.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50">
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{supplier.name}</div>
@@ -322,7 +332,7 @@ export default function AdminSuppliers() {
       <div className="md:hidden">
         <table className="w-full">
           <tbody>
-            {filteredSuppliers.map((supplier) => (
+            {pageItems.map((supplier) => (
               expandedRows[supplier.id] ? (
                 <tr key={`${supplier.id}-detail`}>
                   <td colSpan={5} className="px-3 py-3 bg-gray-50 border-t">
@@ -351,6 +361,28 @@ export default function AdminSuppliers() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
+        <p className="text-xs text-gray-500">
+          Menampilkan {filteredSuppliers.length === 0 ? 0 : startIdx + 1}–{Math.min(endIdx, filteredSuppliers.length)} dari {filteredSuppliers.length}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border ${currentPage === 1 ? 'text-gray-300 border-gray-200' : 'text-black border-gray-300 hover:bg-gray-50'}`}
+          >
+            Sebelumnya
+          </button>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border ${currentPage === totalPages ? 'text-gray-300 border-gray-200' : 'text-black border-gray-300 hover:bg-gray-50'}`}
+          >
+            Berikutnya
+          </button>
+        </div>
       </div>
 
       {/* Modal Tambah Supplier */}
