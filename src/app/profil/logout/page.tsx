@@ -3,9 +3,9 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { signOut } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
+import { auth } from '@/lib/firebase';
 
 export default async function LogoutPage() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default async function LogoutPage() {
   useEffect(() => {
     const handleLogout = async () => {
       try {
-        await signOut(await getFirebaseAuth());
+        await signOut(auth);
         toast.success('Berhasil logout!');
         router.push('/');
       } catch (error) {

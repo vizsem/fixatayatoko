@@ -3,7 +3,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -13,7 +12,7 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Package } from 'lucide-react';
 import notify from '@/lib/notify';
 

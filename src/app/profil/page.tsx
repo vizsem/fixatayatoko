@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 

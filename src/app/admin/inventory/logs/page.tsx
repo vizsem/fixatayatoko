@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 

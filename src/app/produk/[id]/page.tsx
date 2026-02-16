@@ -16,7 +16,6 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { doc, getDoc, collection, getDocs, query, where, limit, setDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 

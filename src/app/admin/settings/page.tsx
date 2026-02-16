@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { auth, db } from '@/lib/firebase';
 
 
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, collection, getDocs,

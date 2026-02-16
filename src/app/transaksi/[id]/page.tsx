@@ -2,8 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import {
   AlertTriangle, Package, CreditCard, ChevronLeft,
   MapPin, Phone, User, CheckCircle2,
@@ -27,7 +27,7 @@ export default async function DetailTransaksiPage() {
 
     const fetchOrder = async () => {
       try {
-        const docSnap = await getDoc(doc(await getFirestoreDB(), 'orders', id));
+        const docSnap = await getDoc(doc(db, 'orders', id));
         if (docSnap.exists()) {
           setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
         } else {

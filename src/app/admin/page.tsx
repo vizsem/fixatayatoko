@@ -11,7 +11,6 @@ import {
   Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3
 } from 'lucide-react';
 
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
 

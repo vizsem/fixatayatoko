@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -13,7 +12,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { 
   Users, 
   TrendingUp, 

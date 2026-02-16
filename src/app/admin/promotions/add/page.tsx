@@ -5,7 +5,6 @@ import { auth, db } from '@/lib/firebase';
 
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,

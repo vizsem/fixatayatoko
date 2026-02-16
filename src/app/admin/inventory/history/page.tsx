@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   collection,
   query,
@@ -9,6 +8,7 @@ import {
   onSnapshot,
   getDocs
 } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import {
   History,
   ArrowLeft,
@@ -46,7 +46,7 @@ export default async function InventoryHistoryPage() {
   useEffect(() => {
     // 1. Ambil data gudang dulu untuk mapping ID ke Nama
     const fetchWarehouses = async () => {
-      const wSnap = await getDocs(collection(await getFirestoreDB(), 'warehouses'));
+      const wSnap = await getDocs(collection(db, 'warehouses'));
       const wMap: Record<string, string> = {};
       wSnap.docs.forEach(doc => wMap[doc.id] = doc.data().name);
       return wMap;
@@ -56,7 +56,7 @@ export default async function InventoryHistoryPage() {
       const warehouseNames = await fetchWarehouses();
 
       const q = query(
-        collection(await getFirestoreDB(), 'inventory_logs'),
+        collection(db, 'inventory_logs'),
         orderBy('date', 'desc')
       );
 

@@ -3,14 +3,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
   doc, 
   getDoc, 
   updateDoc 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 

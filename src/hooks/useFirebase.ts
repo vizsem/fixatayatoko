@@ -1,83 +1,44 @@
-// Custom hooks untuk Firebase dengan lazy loading
+// Custom hooks untuk Firebase
 import { useState, useEffect } from 'react';
 import { Auth, User } from 'firebase/auth';
 import { Firestore } from 'firebase/firestore';
 import { FirebaseStorage } from 'firebase/storage';
-import { getFirebaseServices, getFirebaseAuth, getFirestoreDB, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { auth, db, storage } from '@/lib/firebase';
 
 export const useFirebaseAuth = () => {
-  const [auth, setAuth] = useState<Auth | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authInstance, setAuth] = useState<Auth | null>(auth);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        setLoading(true);
-        const authInstance = await getFirebaseAuth();
-        setAuth(authInstance);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
+    setAuth(auth);
   }, []);
 
-  return { auth, loading, error };
+  return { auth: authInstance, loading, error };
 };
 
 export const useFirestore = () => {
-  const [db, setDb] = useState<Firestore | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dbInstance, setDb] = useState<Firestore | null>(db);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const initializeFirestore = async () => {
-      try {
-        setLoading(true);
-        const dbInstance = await getFirestoreDB();
-        setDb(dbInstance);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeFirestore();
+    setDb(db);
   }, []);
 
-  return { db, loading, error };
+  return { db: dbInstance, loading, error };
 };
 
 export const useFirebaseStorage = () => {
-  const [storage, setStorage] = useState<FirebaseStorage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [storageInstance, setStorage] = useState<FirebaseStorage | null>(storage);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const initializeStorage = async () => {
-      try {
-        setLoading(true);
-        const storageInstance = await getFirebaseStorage();
-        setStorage(storageInstance);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeStorage();
+    setStorage(storage);
   }, []);
 
-  return { storage, loading, error };
+  return { storage: storageInstance, loading, error };
 };
 
 export const useFirebase = () => {
@@ -85,27 +46,14 @@ export const useFirebase = () => {
     auth: Auth | null;
     db: Firestore | null;
     storage: FirebaseStorage | null;
-  }>({ auth: null, db: null, storage: null });
+  }>({ auth, db, storage });
   
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const initializeAll = async () => {
-      try {
-        setLoading(true);
-        const firebaseServices = await getFirebaseServices();
-        setServices(firebaseServices);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAll();
+    setServices({ auth, db, storage });
   }, []);
 
-  return { ...services, loading, error };
+  return { services, loading, error };
 };

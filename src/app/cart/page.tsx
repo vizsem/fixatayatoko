@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NextImage from 'next/image';
-import { auth, db } from '@/lib/firebase';
-
+import { auth, db, storage } from '@/lib/firebase';
 import {
   CheckCircle2, ChevronLeft, Coins, CreditCard,
   Loader2, MapPin, Package, Send,
@@ -14,7 +13,6 @@ import {
 
 import { collection, doc, getDoc, query, where, getDocs, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -86,15 +84,27 @@ export default async function CartPage() {
     // Fetch Promo Product (Minyak atau produk lain untuk tebus murah)
     const fetchPromo = async () => {
        try {
-         // Cari produk yang namanya mengandung "Minyak"
-         const q = query(collection(db, 'products'), where('Nama', '>=', 'Minyak'), where('Nama', '<=', 'Minyak\uf8ff'), limit(1));
+         // OPTIMASI: Cari produk promo dengan stock > 0 dan status active
+         const q = query(
+           collection(db, 'products'), 
+           where('Nama', '>=', 'Minyak'), 
+           where('Nama', '<=', 'Minyak\uf8ff'),
+           where('stock', '>', 0),
+           where('status', '==', 'active'),
+           limit(1)
+         );
          const snap = await getDocs(q);
          if (!snap.empty) {
             const d = snap.docs[0].data();
             setPromoProduct({ id: snap.docs[0].id, ...d } as CartItem);
          } else {
-            // Fallback cari sembarang produk jika tidak ada Minyak (untuk demo)
-            const q2 = query(collection(db, 'products'), limit(1));
+            // Fallback: cari produk aktif dengan stock tersedia
+            const q2 = query(
+              collection(db, 'products'),
+              where('stock', '>', 0),
+              where('status', '==', 'active'),
+              limit(1)
+            );
             const snap2 = await getDocs(q2);
             if (!snap2.empty) {
                const d = snap2.docs[0].data();
@@ -231,7 +241,7 @@ export default async function CartPage() {
         const compressed = await compressImage(paymentProof);
         // We need a temp ID for filename since we don't have orderId yet, or generate one client side just for filename
         const tempId = `proof-${Date.now()}`;
-        const sRef = ref(await getFirebaseStorage(), `payments/${tempId}`);
+        const sRef = ref(storage, `payments/${tempId}`);
         const snap = await uploadBytes(sRef, compressed);
         proofUrl = await getDownloadURL(snap.ref);
       }

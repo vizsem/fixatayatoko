@@ -6,7 +6,6 @@ import { auth, db } from '@/lib/firebase';
 
 
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
 

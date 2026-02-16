@@ -4,7 +4,6 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -16,7 +15,7 @@ import {
   query
 } from 'firebase/firestore';
 
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import {

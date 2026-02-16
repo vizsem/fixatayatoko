@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, Sparkles, Package 
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
@@ -57,7 +57,7 @@ async function CategoryContent({ params }: { params: Promise<{ slug: string }> }
     const fetchData = async () => {
       try {
         setLoading(true);
-        const productsSnap = await getDocs(collection(await getFirestoreDB(), 'products'));
+        const productsSnap = await getDocs(collection(db, 'products'));
         
         const mapped = productsSnap.docs.map(doc => {
           const data = doc.data();

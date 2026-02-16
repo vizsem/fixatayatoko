@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Ticket, Save, Info, ArrowRightLeft, Coins } from 'lucide-react';
 import notify from '@/lib/notify';
 
@@ -16,7 +16,7 @@ export default async function PointSettings() {
 
   useEffect(() => {
     const fetchConfig = async () => {
-      const snap = await getDoc(doc(await getFirestoreDB(), 'settings', 'points'));
+      const snap = await getDoc(doc(db, 'settings', 'points'));
       if (snap.exists()) setConfig(snap.data() as PointConfig);
     };
     fetchConfig();
@@ -24,7 +24,7 @@ export default async function PointSettings() {
 
 
   const handleSave = async () => {
-    await updateDoc(doc(await getFirestoreDB(), 'settings', 'points'), config as unknown as { [key: string]: number });
+    await updateDoc(doc(db, 'settings', 'points'), config as unknown as { [key: string]: number });
     notify.admin.success("Pengaturan point disimpan!");
   };
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   collection,
   getDocs,
@@ -11,7 +10,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-
+import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
   Package, Store, Truck, Calculator,
@@ -49,9 +48,9 @@ export default async function AddPurchase() {
   useEffect(() => {
     const fetchData = async () => {
       const [supSnap, warSnap, prodSnap] = await Promise.all([
-        getDocs(collection(await getFirestoreDB(), 'suppliers')),
-        getDocs(collection(await getFirestoreDB(), 'warehouses')),
-        getDocs(query(collection(await getFirestoreDB(), 'products'), orderBy('name', 'asc')))
+        getDocs(collection(db, 'suppliers')),
+        getDocs(collection(db, 'warehouses')),
+        getDocs(query(collection(db, 'products'), orderBy('name', 'asc')))
       ]);
       setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier)));
       setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
@@ -102,7 +101,7 @@ export default async function AddPurchase() {
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      await addDoc(collection(await getFirestoreDB(), 'purchases'), {
+      await addDoc(collection(db, 'purchases'), {
         supplierId: selectedSupplier,
         supplierName,
         warehouseId: selectedWarehouse,

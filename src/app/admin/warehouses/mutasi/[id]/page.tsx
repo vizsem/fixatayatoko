@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { auth, db } from '@/lib/firebase';
 
 import {
@@ -104,7 +103,7 @@ export default async function MutasiGudangPage() {
     setSubmitting(true);
 
     try {
-      await runTransaction(await getFirestoreDB(), async (transaction) => {
+      await runTransaction(db, async (transaction) => {
         const productRef = doc(db, 'products', selectedProductId);
         const logRef = doc(collection(db, 'inventory_logs'));
 

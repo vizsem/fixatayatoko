@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { getFirestoreDB } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import { Order, OrderItem } from '@/lib/types';
 import toast from 'react-hot-toast';
 
@@ -27,11 +27,10 @@ async function SuccessContent() {
         return;
       }
       try {
-        const db = await getFirestoreDB();
         // PERBAIKAN: Menggunakan Query where('orderId') 
         // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
         const q = query(
-          collection(await getFirestoreDB(), 'orders'),
+          collection(db, 'orders'),
           where('orderId', '==', orderId),
           limit(1)
         );

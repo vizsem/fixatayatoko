@@ -11,9 +11,10 @@ import {
 // import Link from 'next/link';
 import {
   collection, getDocs, updateDoc, doc, query, orderBy,
-  increment, addDoc, deleteDoc, serverTimestamp
+  increment, addDoc, deleteDoc, serverTimestamp,
+  writeBatch, arrayUnion, Timestamp, setDoc
 } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 
@@ -49,7 +50,7 @@ export default async function EmployeesPage() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const q = query(collection(await getFirestoreDB(), 'employees'), orderBy('name', 'asc'));
+      const q = query(collection(db, 'employees'), orderBy('name', 'asc'));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Employee[];
       setEmployees(data);
@@ -65,10 +66,10 @@ export default async function EmployeesPage() {
     e.preventDefault();
     try {
       if (editingId) {
-        await updateDoc(doc(await getFirestoreDB(), 'employees', editingId), formData);
+        await updateDoc(doc(db, 'employees', editingId), formData);
         notify.admin.success("Data berhasil diperbarui");
       } else {
-        await addDoc(collection(await getFirestoreDB(), 'employees'), {
+        await addDoc(collection(db, 'employees'), {
           ...formData,
           totalAttendance: 0,
           createdAt: serverTimestamp()
@@ -97,7 +98,7 @@ export default async function EmployeesPage() {
     if (!confirm("Hapus data karyawan ini secara permanen?")) return;
     notify.admin.loading('Menghapus...');
     try {
-      await deleteDoc(doc(await getFirestoreDB(), 'employees', id));
+      await deleteDoc(doc(db, 'employees', id));
       notify.admin.success("Berhasil dihapus");
       setEmployees(employees.filter(e => e.id !== id));
     } catch {
@@ -105,13 +106,66 @@ export default async function EmployeesPage() {
     }
   };
 
-  const handlePresent = async (id: string) => {
+  const handlePresent = async (employee: Employee) => {
     try {
-      await updateDoc(doc(await getFirestoreDB(), 'employees', id), { totalAttendance: increment(1) });
-      notify.admin.success("Kehadiran tercatat");
+      const batch = writeBatch(db);
+      
+      // Update attendance counter
+      const employeeRef = doc(db, 'employees', employee.id);
+      batch.update(employeeRef, { 
+        totalAttendance: increment(1),
+        attendanceDates: arrayUnion(new Date().toISOString().split('T')[0])
+      });
+      
+      // Record operational cost for daily salary
+      const dailySalary = Math.round(employee.manualSalary / 30); // Calculate daily salary
+      if (dailySalary > 0) {
+        const operationalRef = doc(collection(db, 'operational_costs'));
+        batch.set(operationalRef, {
+          type: 'GAJI_KARYAWAN',
+          description: `Gaji harian ${employee.name} - ${employee.role}`,
+          amount: dailySalary,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          date: new Date().toISOString().split('T')[0],
+          createdAt: serverTimestamp(),
+          category: 'PENGELUARAN_OPERASIONAL'
+        });
+      }
+      
+      await batch.commit();
+      notify.admin.success("Kehadiran dan biaya operasional tercatat");
       fetchEmployees();
-    } catch { notify.admin.error("Gagal update absensi"); }
+    } catch (error) { 
+      console.error('Absensi error:', error);
+      notify.admin.error("Gagal mencatat absensi"); 
+    }
+  };
 
+  const handleAlpha = async (employee: Employee) => {
+    try {
+      // Record alpha (absence) in operational costs as penalty
+      const penaltyAmount = Math.round(employee.manualSalary / 30 * 0.5); // 50% penalty for absence
+      
+      const operationalRef = doc(collection(db, 'operational_costs'));
+      await setDoc(operationalRef, {
+        type: 'DENDA_ALPHA',
+        description: `Denda alpha ${employee.name} - ${employee.role}`,
+        amount: -penaltyAmount, // Negative amount for penalty
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp(),
+        category: 'PENGELUARAN_OPERASIONAL',
+        notes: 'Karyawan tidak hadir (alpha)'
+      });
+      
+      notify.admin.success("Alpha dan denda tercatat");
+      fetchEmployees();
+    } catch (error) { 
+      console.error('Alpha error:', error);
+      notify.admin.error("Gagal mencatat alpha"); 
+    }
   };
 
   const resetForm = () => {
@@ -124,36 +178,36 @@ export default async function EmployeesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
       <Toaster position="top-center" />
 
-      <div className="px-4 md:px-8 pt-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
-              <UserCog size={22} />
+      <div className="px-4 md:px-8 pt-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-3xl shadow-lg">
+              <UserCog size={28} />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Team Ataya</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Manajemen staf & kehadiran</p>
+              <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Team Ataya</h1>
+              <p className="text-xs font-semibold text-gray-500 mt-1">Manajemen staf & kehadiran</p>
             </div>
           </div>
           <button
             onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="bg-black text-white px-6 py-3 rounded-2xl flex items-center gap-2 text-[10px] font-black shadow-lg active:scale-95 transition-all"
+            className="bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3.5 rounded-2xl text-sm font-bold hover:shadow-xl transition-all duration-200 flex items-center gap-2"
           >
-            <Plus size={16} /> Tambah Staff
+            <Plus size={18} /> Tambah Staff
           </button>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-        <div className="relative mb-10 group">
+        <div className="relative mb-8 group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors" size={20} />
           <input
             type="text"
             placeholder="Cari berdasarkan nama staff..."
-            className="w-full pl-14 pr-6 py-5 bg-white border-none rounded-[28px] text-sm font-bold focus:ring-4 focus:ring-green-500/10 outline-none shadow-sm transition-all"
+            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -162,60 +216,55 @@ export default async function EmployeesPage() {
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-green-600" size={40} /></div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEmployees.map((emp) => (
-              <div key={emp.id} className="bg-white rounded-[35px] p-7 shadow-sm border border-gray-100 hover:shadow-xl hover:shadow-gray-200/50 transition-all group relative overflow-hidden">
-                <div className="absolute top-0 right-0 px-5 py-2.5 bg-gray-50 text-gray-500 rounded-bl-[20px] flex items-center gap-2 border-l border-b border-gray-100">
+              <div key={emp.id} className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                <div className="absolute top-0 right-0 px-4 py-2 bg-gray-50 text-gray-600 rounded-bl-2xl flex items-center gap-2 border-l border-b border-gray-200">
                   <Clock size={12} />
-                  <span className="text-[9px] font-black tracking-widest">{emp.workSchedule}</span>
-
+                  <span className="text-xs font-medium">{emp.workSchedule}</span>
                 </div>
 
-                <div className="flex justify-between items-start mb-6 pt-4">
-                  <div className="w-16 h-16 bg-green-50 rounded-3xl flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all shadow-inner">
-                    <UserCog size={32} />
+                <div className="flex justify-between items-start mb-6 pt-2">
+                  <div className="w-14 h-14 bg-green-100 text-green-700 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
+                    <UserCog size={28} />
                   </div>
-                  <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black tracking-[0.1em] ${emp.status === 'AKTIF' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-
+                  <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${emp.status === 'AKTIF' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {emp.status}
                   </span>
                 </div>
 
                 <div className="mb-6">
-                  <h3 className="font-black text-gray-800 tracking-tighter text-xl leading-none mb-2">{emp.name}</h3>
+                  <h3 className="font-bold text-gray-900 text-lg leading-tight mb-2">{emp.name}</h3>
                   <div className="flex items-center gap-2 text-green-600">
                     <ShieldCheck size={14} />
-                    <span className="text-[10px] font-black tracking-widest">{emp.role}</span>
+                    <span className="text-xs font-medium">{emp.role}</span>
                   </div>
-
                 </div>
 
-                <div className="space-y-3 mb-8">
-                  <div className="p-5 bg-[#FBFBFE] rounded-[25px] border border-gray-50 group-hover:border-green-100 transition-all">
-                    <span className="text-[9px] font-black text-gray-400 tracking-widest block mb-1">Take home pay</span>
-                    <p className="text-2xl font-black text-gray-800 tracking-tighter">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                <div className="space-y-3 mb-6">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 group-hover:border-green-200 transition-all">
+                    <span className="text-xs font-medium text-gray-500 block mb-1">Gaji Bulanan</span>
+                    <p className="text-xl font-bold text-gray-900">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
                   </div>
 
-                  <div className="flex items-center gap-2 px-2 text-gray-400">
-                    <CheckCircle2 size={16} className="text-emerald-500" />
-                    <span className="text-[11px] font-black tracking-tighter text-gray-500">Total absensi: {emp.totalAttendance || 0} Hari</span>
+                  <div className="flex items-center gap-2 px-1 text-gray-500">
+                    <CheckCircle2 size={16} className="text-green-500" />
+                    <span className="text-sm font-medium">Total absensi: {emp.totalAttendance || 0} Hari</span>
                   </div>
-
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  <button onClick={() => handlePresent(emp.id)} className="bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-black text-[10px] tracking-widest transition-all active:scale-95 shadow-lg shadow-gray-200">Absen hadir</button>
-                  <button onClick={() => notify.admin.error("Alpha dicatat")} className="bg-white border-2 border-rose-50 text-rose-500 hover:bg-rose-50 py-4 rounded-2xl font-black text-[10px] tracking-widest transition-all active:scale-95">Alpha</button>
+                  <button onClick={() => handlePresent(emp)} className="bg-gray-900 hover:bg-black text-white py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-md">Absen hadir</button>
+                  <button onClick={() => handleAlpha(emp)} className="bg-white border-2 border-red-100 text-red-600 hover:bg-red-50 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95">Alpha</button>
                 </div>
 
-
-                <div className="flex items-center justify-between pt-5 border-t border-gray-50">
-                  <button onClick={() => handleEdit(emp)} className="flex items-center gap-2 text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                  <button onClick={() => handleEdit(emp)} className="flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
                     <Edit size={14} /> Edit data
                   </button>
 
-                  <button onClick={() => handleDelete(emp.id)} className="text-gray-300 hover:text-rose-500 transition-colors">
-                    <Trash2 size={18} />
+                  <button onClick={() => handleDelete(emp.id)} className="text-gray-400 hover:text-red-600 transition-colors">
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
@@ -45,14 +45,14 @@ export default async function AddProductPage() {
 
     try {
       // 1. Validasi ID Duplikat (Wajib Unik untuk Sinkronisasi Excel)
-      const q = query(collection(await getFirestoreDB(), 'products'), where('ID', '==', formData.ID));
+      const q = query(collection(db, 'products'), where('ID', '==', formData.ID));
       const snap = await getDocs(q);
       if (!snap.empty) {
         throw new Error(`ID Produk "${formData.ID}" sudah terdaftar di database!`);
       }
 
       // 2. Simpan ke Firestore
-      await addDoc(collection(await getFirestoreDB(), 'products'), {
+      await addDoc(collection(db, 'products'), {
         ...formData,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),

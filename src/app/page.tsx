@@ -13,7 +13,6 @@ import {
   FileText, Filter
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 
 // --- TYPES ---

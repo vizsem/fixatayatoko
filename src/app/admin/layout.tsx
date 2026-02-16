@@ -12,7 +12,6 @@ import {
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon
 } from 'lucide-react';
 
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
 
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, where, documentId, limit } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
 
@@ -24,7 +24,7 @@ export default async function WishlistPage() {
         // 1. Ambil Produk Wishlist
         if (wishlistIds.length > 0) {
           const qWishlist = query(
-            collection(await getFirestoreDB(), 'products'),
+            collection(db, 'products'),
             where(documentId(), 'in', wishlistIds.slice(0, 30))
           );
           const wishlistSnap = await getDocs(qWishlist);
@@ -43,7 +43,7 @@ export default async function WishlistPage() {
         }
 
         // 2. Ambil Rekomendasi Produk
-        const qRec = query(collection(await getFirestoreDB(), 'products'), limit(20));
+        const qRec = query(collection(db, 'products'), limit(20));
         const recSnap = await getDocs(qRec);
         const allRecs = recSnap.docs
           .map(doc => {

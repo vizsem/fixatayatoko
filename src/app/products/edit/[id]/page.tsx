@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc,
@@ -18,7 +17,7 @@ import {
   getDownloadURL,
   deleteObject 
 } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { 
   Image as ImageIcon,
   AlertTriangle,
@@ -147,12 +146,12 @@ export default async function EditProductPage() {
     try {
       // Hapus gambar lama jika ada
       if (product.image && !product.image.includes('placehold.co')) {
-        const oldRef = ref(await getFirebaseStorage(), product.image);
+        const oldRef = ref(storage, product.image);
         await deleteObject(oldRef).catch(() => {}); // Ignore error if file not found
       }
 
       // Upload gambar baru
-      const imageRef = ref(await getFirebaseStorage(), `products/${id}/${Date.now()}`);
+      const imageRef = ref(storage, `products/${id}/${Date.now()}`);
       await uploadBytes(imageRef, imageFile);
       const downloadURL = await getDownloadURL(imageRef);
       return downloadURL;

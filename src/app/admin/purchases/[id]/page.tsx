@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 
 import {
@@ -30,7 +30,7 @@ export default async function PurchaseDetail() {
   useEffect(() => {
     const fetchPurchase = async () => {
       try {
-        const docRef = doc(await getFirestoreDB(), 'purchases', id as string);
+        const docRef = doc(db, 'purchases', id as string);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);

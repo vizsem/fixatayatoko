@@ -2,8 +2,8 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AlertTriangle, Package, ChevronLeft } from 'lucide-react'; // Tambah ChevronLeft
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,7 @@ export default async function PublicOrderDetailPage() {
 
     const fetchOrder = async () => {
       try {
-        const docSnap = await getDoc(doc(await getFirestoreDB(), 'orders', id));
+        const docSnap = await getDoc(doc(db, 'orders', id));
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOrder({

@@ -4,7 +4,6 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -14,7 +13,7 @@ import {
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import toast, { Toaster } from 'react-hot-toast';
 
 type Supplier = {

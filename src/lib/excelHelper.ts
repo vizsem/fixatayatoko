@@ -1,5 +1,4 @@
 import * as XLSX from 'xlsx';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { doc, writeBatch, serverTimestamp, collection, getDocs } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 

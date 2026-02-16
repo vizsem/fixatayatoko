@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 
@@ -12,11 +11,15 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   addDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  query,
+  where,
+  limit
 } from 'firebase/firestore';
 
 
@@ -80,22 +83,42 @@ export default async function AdminCategories() {
     return () => unsubscribe();
   }, [router]);
 
-  // 2. Fetch Data & Sinkronisasi Jumlah Produk
+  // 2. Fetch Data & Sinkronisasi Jumlah Produk - OPTIMIZED FOR COST
   const fetchData = async () => {
     try {
       setLoading(true);
-      // GANTI BARIS INI:
       const catSnap = await getDocs(collection(db, 'categories'));
-      const prodSnap = await getDocs(collection(db, 'products'));
-
-      const products = prodSnap.docs.map(d => d.data());
-
-      const categoryList = catSnap.docs.map(doc => {
+      
+      // Optimasi: Hitung jumlah produk per kategori menggunakan aggregation
+      // Simpan count di setiap kategori untuk menghindari pembacaan seluruh produk
+      const categoryList = await Promise.all(catSnap.docs.map(async (doc) => {
         const data = doc.data();
-        // Gunakan toLowerCase agar sinkronisasi nama kategori lebih akurat
-        const count = products.filter(p =>
-          p.category?.toLowerCase() === data.name?.toLowerCase()
-        ).length;
+        const categoryName = data.name?.toLowerCase().trim();
+        
+        // Query yang lebih efisien - hanya hitung dokumen, tidak baca semua data
+        let count = 0;
+        try {
+          // Coba kedua format field
+          const q1 = query(collection(db, 'products'), 
+            where('Kategori', '==', data.name),
+            limit(1)
+          );
+          const q2 = query(collection(db, 'products'), 
+            where('category', '==', data.name),
+            limit(1)
+          );
+          
+          const [snap1, snap2] = await Promise.all([
+            getCountFromServer(q1).catch(() => ({ data: () => ({ count: 0 }) })),
+            getCountFromServer(q2).catch(() => ({ data: () => ({ count: 0 }) }))
+          ]);
+          
+          count = snap1.data().count + snap2.data().count;
+        } catch (error) {
+          console.warn('Count query failed, using fallback:', error);
+          // Fallback: jika count aggregation tidak support, gunakan cached count
+          count = data.productCount || 0;
+        }
 
         return {
           id: doc.id,
@@ -105,7 +128,7 @@ export default async function AdminCategories() {
           productCount: count,
           createdAt: data.createdAt
         };
-      });
+      }));
 
       // Sortir secara manual agar lebih stabil
       setCategories(categoryList.sort((a, b) => a.name.localeCompare(b.name)));

@@ -13,7 +13,6 @@ import {
   serverTimestamp,
   increment
 } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import {
   ArrowLeft,
   ArrowUpCircle,

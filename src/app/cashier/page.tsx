@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -24,7 +23,7 @@ import {
   uploadBytes,
   getDownloadURL
 } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
@@ -207,23 +206,45 @@ export default async function CashierPOS() {
 
   useEffect(() => {
     if (loading) return;
-    const unsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const p = snapshot.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          name: data.name || 'TANPA NAMA',
-          price: data.price || 0,
-          unit: data.unit || 'pcs',
-          stock: data.stock || 0,
-          barcode: data.barcode || '',
-          image: data.image || data.imageUrl || data.photo || null
-        } as Product;
-      });
-      setProducts(p);
-      setFilteredProducts(p);
-    });
-    return () => unsubscribe();
+    
+    // OPTIMASI: Gunakan query dengan limit dan hanya ambil field yang diperlukan
+    // Jangan gunakan onSnapshot untuk seluruh koleksi - terlalu mahal!
+    const fetchProducts = async () => {
+      try {
+        // Hanya ambil produk yang aktif dan punya stock > 0 untuk cashier
+        const q = query(
+          collection(db, 'products'),
+          where('stock', '>', 0),
+          where('status', '==', 'active'),
+          limit(200) // Batasi jumlah produk yang diambil
+        );
+        
+        const snapshot = await getDocs(q);
+        const p = snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name || 'TANPA NAMA',
+            price: data.price || 0,
+            unit: data.unit || 'pcs',
+            stock: data.stock || 0,
+            barcode: data.barcode || '',
+            image: data.image || data.imageUrl || data.photo || null
+          } as Product;
+        });
+        setProducts(p);
+        setFilteredProducts(p);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+    
+    fetchProducts();
+    
+    // Refresh data setiap 2 menit instead of real-time (jauh lebih hemat)
+    const interval = setInterval(fetchProducts, 120000);
+    
+    return () => clearInterval(interval);
   }, [loading]);
 
   useEffect(() => {
@@ -286,7 +307,7 @@ export default async function CashierPOS() {
       if (paymentProof && !isOffline) {
         // PROSES KOMPRESI SEBELUM UPLOAD
         const compressedFile = await compressImage(paymentProof);
-        const sRef = ref(await getFirebaseStorage(), `payment-proofs/${Date.now()}`);
+        const sRef = ref(storage, `payment-proofs/${Date.now()}`);
         await uploadBytes(sRef, compressedFile);
         proofUrl = await getDownloadURL(sRef);
       } else if (paymentProof && isOffline) {

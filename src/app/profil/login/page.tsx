@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { auth, db } from '@/lib/firebase';
 
 import { 
@@ -42,7 +41,7 @@ export default async function LoginPage() {
     
     try {
       // Menggunakan Popup agar tidak terputus oleh sistem redirect Vercel/Browser
-      const result = await signInWithPopup(await getFirebaseAuth(), provider);
+      const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
       // Sinkronisasi ke Firestore
@@ -86,7 +85,7 @@ export default async function LoginPage() {
     
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(await getFirebaseAuth(), email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
 
       const userRef = doc(db, 'users', user.uid);

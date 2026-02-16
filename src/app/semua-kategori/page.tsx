@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { collection, getDocs } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default async function AllCategoriesPage() {
@@ -30,7 +30,7 @@ export default async function AllCategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const querySnapshot = await getDocs(collection(await getFirestoreDB(), 'products'));
+        const querySnapshot = await getDocs(collection(db, 'products'));
         const allKategori = querySnapshot.docs.map(doc => {
           const data = doc.data();
           // Ambil dari field 'Kategori' atau 'category'

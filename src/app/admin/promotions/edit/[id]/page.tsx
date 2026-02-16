@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
+import { db } from '@/lib/firebase';
 import {
   ArrowLeft, Save, Trash2, Calendar,
   Tag, Percent, Database, CheckCircle2 // 'percent' diubah menjadi 'Percent'
@@ -48,7 +48,7 @@ export default async function EditPromotion() {
     const loadData = async () => {
       try {
         // Ambil data promosi
-        const promoDoc = await getDoc(doc(await getFirestoreDB(), 'promotions', id as string));
+        const promoDoc = await getDoc(doc(db, 'promotions', id as string));
         if (promoDoc.exists()) {
           setFormData(promoDoc.data() as Promotion);
         } else {
@@ -57,7 +57,7 @@ export default async function EditPromotion() {
         }
 
         // Ambil daftar kategori unik dari produk untuk pilihan dropdown
-        const productsSnapshot = await getDocs(collection(await getFirestoreDB(), 'products'));
+        const productsSnapshot = await getDocs(collection(db, 'products'));
         const cats = new Set(productsSnapshot.docs.map(doc => doc.data().category));
         setCategories(Array.from(cats) as string[]);
 
@@ -76,7 +76,7 @@ export default async function EditPromotion() {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateDoc(doc(await getFirestoreDB(), 'promotions', id as string), {
+      await updateDoc(doc(db, 'promotions', id as string), {
         ...formData,
         discountValue: Number(formData.discountValue),
         updatedAt: new Date().toISOString()
