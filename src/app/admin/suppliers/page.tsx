@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirestoreDB, getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase-lazy';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -16,7 +15,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -41,6 +40,7 @@ type Supplier = {
   email: string;
   address: string;
   category: string;
+  unit: string;
   notes: string;
   createdAt: string;
 };
@@ -62,6 +62,7 @@ export default async function AdminSuppliers() {
     email: '',
     address: '',
     category: '',
+    unit: '',
     notes: ''
   });
 
@@ -107,6 +108,7 @@ export default async function AdminSuppliers() {
             email: data.email || '',
             address: data.address || '',
             category: data.category || '',
+            unit: data.unit || '',
             notes: data.notes || '',
             createdAt: data.createdAt || ''
           });
@@ -139,6 +141,7 @@ export default async function AdminSuppliers() {
         email: '',
         address: '',
         category: '',
+        unit: '',
         notes: ''
       });
     } catch {
@@ -250,6 +253,9 @@ export default async function AdminSuppliers() {
                 <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Alamat
                 </th>
+                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Satuan
+                </th>
                 <th scope="col" className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Aksi
                 </th>
@@ -302,6 +308,11 @@ export default async function AdminSuppliers() {
                         <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
                         <span className="truncate">{supplier.address}</span>
                       </div>
+                    </td>
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-700">
+                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                        {supplier.unit || '-'}
+                      </span>
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center gap-3">
@@ -457,7 +468,7 @@ export default async function AdminSuppliers() {
                     />
                   </div>
 
-                  <div className="md:col-span-2">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Kategori Produk
                     </label>
@@ -467,6 +478,19 @@ export default async function AdminSuppliers() {
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                       placeholder="Contoh: Beras, Minyak, Bumbu"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Satuan Produk
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.unit}
+                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      placeholder="Contoh: Kg, Pcs, Liter"
                     />
                   </div>
 
