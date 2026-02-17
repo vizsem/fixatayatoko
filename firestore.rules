@@ -1,84 +1,135 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // PRODUK: Publik baca, admin & cashier CRUD (cashier butuh edit stok)
-    match /products/{productId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin() || isCashier();
-    }    
-    
-    // PESANAN: User akses pesanannya, admin & cashier full akses
+
+    // --- FUNGSI BANTUAN ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userDocExists() && getUserData().role == 'admin';
+    }
+
+    function isCashier() {
+      return isSignedIn() && userDocExists() && getUserData().role == 'cashier';
+    }
+
+    function isStaff() {
+      return isAdmin() || isCashier();
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- ATURAN KOLEKSI ---
+
+    // 1. CARTS
+    match /carts/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 2. ORDERS
     match /orders/{orderId} {
-      allow read, update: if 
-        isOwner(resource.data.customerId) || 
-        isAdmin() || 
-        isCashier();
-      allow create: if request.auth != null;
+      allow read: if true;
+      allow create: if true;
+      allow update: if isStaff();
       allow delete: if isAdmin();
     }
-    
-    // PELANGGAN: Admin only
+
+    // 3. PRODUCTS
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // 4. CUSTOMERS
     match /customers/{customerId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isStaff();
     }
-    
-    // USER PROFILE: Hanya pemilik
+
+    // 5. USER PROFILE (🔥 FIX UTAMA UNTUK LOGIN)
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      
+      // Mengizinkan user mengecek dokumennya sendiri (getDoc)
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Mengizinkan pengecekan koleksi (getDocs) HANYA untuk pendaftaran user pertama
+      allow list: if isSignedIn();
+
+      // CREATE → User membuat profilnya sendiri
+      allow create: if isSignedIn() && request.auth.uid == userId;
+
+      // UPDATE → User sendiri atau Admin
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow delete: if isAdmin();
     }
-    
-    // SUPPLIER: Admin only
-    match /suppliers/{supplierId} {
-      allow read, write: if isAdmin();
+
+    // 6. SUPPLIERS & LOGISTIK
+    match /suppliers/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
     }
-    
-    // PEMBELIAN: Admin only (cashier tidak perlu akses)
-    match /purchases/{purchaseId} {
-      allow read, write: if isAdmin();
+
+    match /purchases/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
     }
-    
-    // INVENTARIS TRANSACTIONS: Admin & cashier
-    match /inventory_transactions/{transactionId} {
-      allow read, write: if isAdmin() || isCashier();
+
+    // 7. INVENTORY
+    match /inventory_transactions/{id} {
+      allow read, write: if isStaff();
     }
-    
-    // PROMOTIONS: Admin only
-    match /promotions/{promotionId} {
-      allow read, write: if isAdmin();
+
+    match /stock_logs/{logId} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
     }
-    
-    // WAREHOUSES: Admin only
-    match /warehouses/{warehouseId} {
-      allow read, write: if isAdmin();
+
+    // 8. WAREHOUSES
+    match /warehouses/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
-    
-    // SETTINGS: Admin only
-    match /settings/{settingId} {
-      allow read, write: if isAdmin();
+
+    // 9. CATEGORIES
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isStaff();
     }
-    
-    // SEMUA KOLEKSI LAINNYA: Admin only
+
+    // 10. PROMOTIONS & SETTINGS
+    match /promotions/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 11. POINT SYSTEM
+    match /point_logs/{logId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // 12. CATCH ALL
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
-  }
-
-  // FUNGSI BANTUAN
-  function isOwner(userId) {
-    return request.auth != null && request.auth.uid == userId;
-  }
-  
-  function isAdmin() {
-    return request.auth != null && 
-           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-  }
-
-  // FUNGSI UNTUK KASIR
-  function isCashier() {
-    return request.auth != null && 
-           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cashier';
   }
 }

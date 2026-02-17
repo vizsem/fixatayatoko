@@ -55,7 +55,7 @@ const getInitialPromotion = (): Promotion => {
   };
 };
 
-async function AddPromotionContent() {
+function AddPromotionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');

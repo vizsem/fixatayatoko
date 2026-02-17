@@ -43,6 +43,7 @@ export default function SalesReport() {
   });
   const [sortBy, setSortBy] = useState<'date' | 'total' | 'quantity'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const sortedSales = useMemo(() => {
     return [...sales].sort((a, b) => {
@@ -138,6 +139,15 @@ export default function SalesReport() {
     XLSX.writeFile(wb, `laporan-penjualan-${dateRange.startDate}-sampai-${dateRange.endDate}.xlsx`);
   };
 
+  // Pagination logic - moved before conditional return
+  const itemsPerPage = 10;
+  const paginatedSales = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedSales.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedSales, currentPage]);
+
+  const totalPages = Math.ceil(sortedSales.length / itemsPerPage);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -151,15 +161,6 @@ export default function SalesReport() {
 
   const totalSales = sortedSales.reduce((sum, sale) => sum + sale.total, 0);
   const totalItems = sortedSales.reduce((sum, sale) => sum + sale.quantity, 0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  
-  const paginatedSales = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return sortedSales.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedSales, currentPage]);
-  
-  const totalPages = Math.ceil(sortedSales.length / itemsPerPage);
 
 
   return (

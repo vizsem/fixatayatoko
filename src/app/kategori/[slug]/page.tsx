@@ -29,7 +29,7 @@ type CartItem = Product & {
   quantity: number;
 };
 
-async function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
+function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;

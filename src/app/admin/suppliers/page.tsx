@@ -17,7 +17,6 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from '@/lib/firebase';
-import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {

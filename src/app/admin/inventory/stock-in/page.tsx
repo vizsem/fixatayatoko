@@ -34,7 +34,7 @@ type Supplier = {
   name: string;
 };
 
-async function StockInContent() {
+function StockInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams.get('productId');

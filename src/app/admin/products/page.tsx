@@ -68,7 +68,7 @@ interface RestockModalProps {
   onClose: () => void;
 }
 
-async function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
+function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
 
   const [stokMasuk, setStokMasuk] = useState<number>(0);
   const [hargaBaru, setHargaBaru] = useState<number>(0);

@@ -23,7 +23,7 @@ type Warehouse = {
   isActive: boolean;
 };
 
-async function WarehouseFormContent() {
+function WarehouseFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('id');

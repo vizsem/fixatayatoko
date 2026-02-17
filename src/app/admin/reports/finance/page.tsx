@@ -187,6 +187,14 @@ export default function FinanceReport() {
     XLSX.writeFile(wb, `laporan-keuangan-${dateRange.startDate}-sampai-${dateRange.endDate}.xlsx`);
   };
 
+  // Pagination logic - moved before conditional return
+  const paginatedRecords = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return records.slice(startIndex, startIndex + itemsPerPage);
+  }, [records, currentPage]);
+
+  const totalPages = Math.ceil(records.length / itemsPerPage);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -216,14 +224,6 @@ export default function FinanceReport() {
     .reduce((sum, r) => sum + r.amount, 0);
 
   const netProfit = totalProfit - totalExpense;
-
-  // Pagination logic
-  const paginatedRecords = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return records.slice(startIndex, startIndex + itemsPerPage);
-  }, [records, currentPage]);
-
-  const totalPages = Math.ceil(records.length / itemsPerPage);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
