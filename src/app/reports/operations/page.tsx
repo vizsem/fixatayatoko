@@ -32,7 +32,7 @@ type OperationalMetric = {
   description: string;
 };
 
-export default async function OperationsReport() {
+export default function OperationsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);

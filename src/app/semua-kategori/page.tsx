@@ -6,7 +6,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 
-export default async function AllCategoriesPage() {
+export default function AllCategoriesPage() {
   const [categories, setCategories] = useState<{ name: string, slug: string }[]>([]);
   const [loading, setLoading] = useState(true);
 

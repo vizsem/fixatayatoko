@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 
 import { onAuthStateChanged } from 'firebase/auth';
@@ -136,7 +137,7 @@ async function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
 }
 
 // --- KOMPONEN UTAMA ---
-export default async function AdminProducts() {
+export default function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -309,7 +310,8 @@ export default async function AdminProducts() {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
+    <ErrorBoundary>
+      <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
       <Toaster />
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
@@ -557,5 +559,6 @@ export default async function AdminProducts() {
       {selectedProductRestock && <RestockModal product={selectedProductRestock} isOpen={!!selectedProductRestock} onClose={() => setSelectedProductRestock(null)} />}
 
     </div>
-  );
+  </ErrorBoundary>
+);
 }

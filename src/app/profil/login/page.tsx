@@ -17,7 +17,7 @@ import { requestForToken } from '@/lib/fcm';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
-export default async function LoginPage() {
+export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

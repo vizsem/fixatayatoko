@@ -27,7 +27,7 @@ interface StockLog {
 }
 
 
-export default async function StockLogsPage() {
+export default function StockLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<StockLog[]>([]);
 

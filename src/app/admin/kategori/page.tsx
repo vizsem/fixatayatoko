@@ -51,7 +51,7 @@ type Category = {
 };
 
 
-export default async function AdminCategories() {
+export default function AdminCategories() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);

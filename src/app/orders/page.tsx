@@ -42,7 +42,7 @@ type UserOrder = {
   };
 };
 
-export default async function UserOrdersPage() {
+export default function UserOrdersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

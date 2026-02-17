@@ -11,7 +11,7 @@ interface PointConfig {
   minRedeem: number;
 }
 
-export default async function PointSettings() {
+export default function PointSettings() {
   const [config, setConfig] = useState<PointConfig>({ earningRate: 0, redemptionValue: 0, minRedeem: 0 });
 
   useEffect(() => {

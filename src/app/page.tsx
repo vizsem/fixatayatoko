@@ -62,7 +62,7 @@ const SkeletonCard = () => (
   </div>
 );
 
-export default async function Home() {
+export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);

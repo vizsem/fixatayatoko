@@ -58,7 +58,7 @@ type CartItem = {
 
 // 3. Hapus import Home dari @/app/page karena menyebabkan konflik dan error
 
-export default async function ProductDetailPage() {
+export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
   

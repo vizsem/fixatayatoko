@@ -12,7 +12,7 @@ import {
 import notify from '@/lib/notify';
 
 
-export default async function AddProductPage() {
+export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');

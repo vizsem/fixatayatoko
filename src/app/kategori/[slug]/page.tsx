@@ -269,7 +269,7 @@ async function CategoryContent({ params }: { params: Promise<{ slug: string }> }
   );
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-black uppercase text-xs">Menghubungkan...</div>}>
       <CategoryContent params={params} />

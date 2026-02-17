@@ -68,7 +68,7 @@ type Order = {
 };
 
 
-export default async function CashierPOS() {
+export default function CashierPOS() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
 

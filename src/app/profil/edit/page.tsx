@@ -13,7 +13,7 @@ import { auth, db } from '@/lib/firebase';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-export default async function EditProfilePage() {
+export default function EditProfilePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',

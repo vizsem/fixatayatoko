@@ -25,7 +25,7 @@ interface Warehouse { id: string; name: string; }
 interface Product { id: string; name: string; purchasePrice: number; unit?: string; stock?: number; sku?: string; }
 interface CartItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
 
-export default async function AddPurchase() {
+export default function AddPurchase() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 

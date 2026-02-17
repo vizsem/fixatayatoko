@@ -29,7 +29,7 @@ type Order = {
 
 
 
-export default async function AdminOrders() {
+export default function AdminOrders() {
   const router = useRouter();
 
   const [orders, setOrders] = useState<Order[]>([]);

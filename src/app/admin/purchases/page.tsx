@@ -57,7 +57,7 @@ type Purchase = {
   createdAt: string;
 };
 
-export default async function AdminPurchases() {
+export default function AdminPurchases() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [purchases, setPurchases] = useState<Purchase[]>([]);

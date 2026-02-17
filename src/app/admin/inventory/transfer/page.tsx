@@ -41,7 +41,7 @@ type WarehouseType = {
   name: string;
 };
 
-export default async function StockTransferPage() {
+export default function StockTransferPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);

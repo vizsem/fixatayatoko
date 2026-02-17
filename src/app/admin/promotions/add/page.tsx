@@ -393,7 +393,7 @@ async function AddPromotionContent() {
 
 /* ================= MAIN EXPORT ================= */
 
-export default async function AddPromotionPage() {
+export default function AddPromotionPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AddPromotionContent />

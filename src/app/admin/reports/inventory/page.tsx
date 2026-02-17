@@ -33,7 +33,7 @@ type InventoryItem = {
   stockValue: number;
 };
 
-export default async function InventoryReport() {
+export default function InventoryReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);

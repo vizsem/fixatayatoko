@@ -15,7 +15,7 @@ import {
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
 
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [toasts, setToasts] = useState<Array<{

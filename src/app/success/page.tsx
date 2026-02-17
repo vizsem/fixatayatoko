@@ -10,7 +10,7 @@ import { Order, OrderItem } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 
-async function SuccessContent() {
+function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('id');
   const [loading, setLoading] = useState(true);
@@ -282,7 +282,7 @@ async function SuccessContent() {
   );
 }
 
-export default async function SuccessPage() {
+export default function SuccessPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-green-600" size={32} /></div>}>
       <SuccessContent />

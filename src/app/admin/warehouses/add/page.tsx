@@ -216,7 +216,7 @@ async function WarehouseFormContent() {
   );
 }
 
-export default async function AddWarehousePage() {
+export default function AddWarehousePage() {
   return (
     <Suspense fallback={<div className="p-6">Loading form gudang...</div>}>
       <WarehouseFormContent />

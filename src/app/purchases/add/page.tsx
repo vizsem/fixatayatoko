@@ -41,7 +41,7 @@ type PurchaseItem = {
   unit: string;
 };
 
-export default async function AddPurchasePage() {
+export default function AddPurchasePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

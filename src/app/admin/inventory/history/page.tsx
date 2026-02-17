@@ -37,7 +37,7 @@ type InventoryLog = {
 
 };
 
-export default async function InventoryHistoryPage() {
+export default function InventoryHistoryPage() {
   const [logs, setLogs] = useState<InventoryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

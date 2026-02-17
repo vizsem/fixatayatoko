@@ -24,7 +24,7 @@ type Promotion = {
   isActive: boolean;
 };
 
-export default async function EditPromotion() {
+export default function EditPromotion() {
   const router = useRouter();
   const { id } = useParams();
   const [loading, setLoading] = useState(true);

@@ -23,7 +23,7 @@ type Order = {
 };
 
 
-export default async function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;

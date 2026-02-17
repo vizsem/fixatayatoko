@@ -45,7 +45,7 @@ type Promotion = {
   createdAt: string;
 };
 
-export default async function PromotionsPage() {
+export default function PromotionsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState<Promotion[]>([]);

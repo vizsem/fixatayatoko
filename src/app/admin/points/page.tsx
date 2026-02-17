@@ -31,7 +31,7 @@ interface PointLog { id: string; userId: string; pointsChanged: number; type: st
 
 interface UserWithPoints { id: string; displayName?: string; email?: string; points: number; isPointsFrozen: boolean; }
 
-export default async function AdminPointsDashboard() {
+export default function AdminPointsDashboard() {
   const [logs, setLogs] = useState<PointLog[]>([]);
   const [topUsers, setTopUsers] = useState<UserWithPoints[]>([]);
   const [stats, setStats] = useState({ totalPoints: 0, totalRedeemed: 0 });

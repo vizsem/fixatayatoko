@@ -32,7 +32,7 @@ const VOUCHER_LIST = [
   { id: 'v4', name: 'Gratis Ongkir Toko', cost: 10000, value: 10000, color: 'bg-orange-500' },
 ];
 
-export default async function VoucherExchangePage() {
+export default function VoucherExchangePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);

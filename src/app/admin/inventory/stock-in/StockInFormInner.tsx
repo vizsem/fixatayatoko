@@ -34,7 +34,7 @@ type Supplier = {
   name: string;
 };
 
-export default async function StockInFormInner({ productId }: { productId: string }) {
+export default function StockInFormInner({ productId }: { productId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);

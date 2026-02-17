@@ -57,7 +57,7 @@ const defaultSettings: SystemSettings = {
   createdAt: new Date().toISOString()
 };
 
-export default async function AdminSettings() {
+export default function AdminSettings() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'employees' | 'banners' | 'points'>('general');
   const [loading, setLoading] = useState(true);

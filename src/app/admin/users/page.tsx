@@ -38,7 +38,7 @@ type UserDoc = {
   createdAt: string;
 };
 
-export default async function AdminUsers() {
+export default function AdminUsers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserDoc[]>([]);

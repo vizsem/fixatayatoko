@@ -31,7 +31,7 @@ type Order = {
   createdAt: string;
 };
 
-export default async function PublicOrderDetailPage() {
+export default function PublicOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;

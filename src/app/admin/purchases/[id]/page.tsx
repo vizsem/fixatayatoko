@@ -20,7 +20,7 @@ interface PurchaseData { id: string; supplierName: string; warehouseName: string
 
 
 
-export default async function PurchaseDetail() {
+export default function PurchaseDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [purchase, setPurchase] = useState<PurchaseData | null>(null);

@@ -47,7 +47,7 @@ const compressImage = (file: File): Promise<Blob> => {
 
 // Order ID dihasilkan di server
 
-export default async function CartPage() {
+export default function CartPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);

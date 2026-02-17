@@ -61,7 +61,7 @@ type Order = {
   status: string;
 };
 
-export default async function AdminCustomers() {
+export default function AdminCustomers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);

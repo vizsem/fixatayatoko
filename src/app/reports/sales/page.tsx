@@ -31,7 +31,7 @@ type SaleItem = {
   customerName: string;
 };
 
-export default async function SalesReport() {
+export default function SalesReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<SaleItem[]>([]);

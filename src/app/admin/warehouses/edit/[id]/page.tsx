@@ -23,7 +23,7 @@ type WarehouseData = {
   status: 'AKTIF' | 'NONAKTIF';
 };
 
-export default async function EditWarehousePage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditWarehousePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;

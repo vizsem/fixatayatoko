@@ -45,7 +45,7 @@ interface Warehouse {
 }
 
 
-export default async function WarehousesPage() {
+export default function WarehousesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);

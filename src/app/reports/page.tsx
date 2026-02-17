@@ -37,7 +37,7 @@ type ReportSummary = {
   activeCustomers: number;
 };
 
-export default async function ReportsDashboard() {
+export default function ReportsDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<ReportSummary>({

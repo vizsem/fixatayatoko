@@ -28,7 +28,7 @@ interface Product {
   unit: string;
 }
 
-export default async function MutasiGudangPage() {
+export default function MutasiGudangPage() {
   const router = useRouter();
   const params = useParams();
   const sourceWarehouseId = params?.id as string;

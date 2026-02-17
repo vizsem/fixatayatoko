@@ -32,7 +32,7 @@ type Product = {
   unit: string;
 };
 
-export default async function StockOpnamePage() {
+export default function StockOpnamePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

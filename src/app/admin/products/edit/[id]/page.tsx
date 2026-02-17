@@ -45,7 +45,7 @@ interface Warehouse {
   name: string;
 }
 
-export default async function EditProductPage() {
+export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;

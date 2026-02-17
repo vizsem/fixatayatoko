@@ -285,7 +285,7 @@ async function StockInContent() {
   );
 }
 
-export default async function StockInPage() {
+export default function StockInPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <StockInContent />

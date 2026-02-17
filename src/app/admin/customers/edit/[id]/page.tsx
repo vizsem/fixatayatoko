@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 
-export default async function EditCustomer() {
+export default function EditCustomer() {
   const router = useRouter();
   const { id } = useParams();
   const [loading, setLoading] = useState(true);

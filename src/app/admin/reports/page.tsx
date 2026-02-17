@@ -57,7 +57,7 @@ const getInitialDateRange = () => {
   };
 };
 
-export default async function ReportsDashboard() {
+export default function ReportsDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);

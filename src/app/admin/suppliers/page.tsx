@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import {
   collection,
   doc,
@@ -45,7 +46,7 @@ type Supplier = {
   createdAt: string;
 };
 
-export default async function AdminSuppliers() {
+export default function AdminSuppliers() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -185,7 +186,8 @@ export default async function AdminSuppliers() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <ErrorBoundary>
+      <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-right" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -542,6 +544,7 @@ export default async function AdminSuppliers() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

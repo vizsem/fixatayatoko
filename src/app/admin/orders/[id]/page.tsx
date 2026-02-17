@@ -40,7 +40,7 @@ type Order = {
   dueDate?: string; // Support Tempo
 };
 
-export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
   const id = resolvedParams.id;

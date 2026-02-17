@@ -30,7 +30,7 @@ type Employee = {
   totalAttendance: number;
 };
 
-export default async function EmployeesPage() {
+export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

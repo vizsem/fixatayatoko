@@ -58,7 +58,7 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
 
 
 
-export default async function AdminDashboard() {
+export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 

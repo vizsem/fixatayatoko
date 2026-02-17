@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Order, OrderItem } from '@/lib/types';
 
 
-export default async function DetailTransaksiPage() {
+export default function DetailTransaksiPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;

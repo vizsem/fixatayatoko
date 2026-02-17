@@ -12,7 +12,7 @@ import { toast } from 'react-hot-toast';
 import { auth, db } from '@/lib/firebase';
 
 
-export default async function RegisterPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',

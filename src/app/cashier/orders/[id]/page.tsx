@@ -45,7 +45,7 @@ type Order = {
   notes?: string;
 };
 
-export default async function CashierOrderDetail({ params }: { params: Promise<{ id: string }> }) {
+export default function CashierOrderDetail({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const router = useRouter();

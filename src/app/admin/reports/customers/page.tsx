@@ -38,7 +38,7 @@ type Customer = {
   lastOrderDate?: string;
 };
 
-export default async function CustomerReport() {
+export default function CustomerReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);

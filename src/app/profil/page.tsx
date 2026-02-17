@@ -54,7 +54,7 @@ interface UserProfile {
   isPointsFrozen?: boolean;
 }
 
-export default async function ProfilePage() {
+export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);

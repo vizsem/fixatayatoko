@@ -21,7 +21,7 @@ import { auth, db } from '@/lib/firebase';
    notes: string;
  }
  
- export default async function EditSupplierPage() {
+ export default function EditSupplierPage() {
    const router = useRouter();
    const params = useParams();
    const id = params.id as string;

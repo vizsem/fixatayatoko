@@ -48,7 +48,7 @@ type Product = {
   imageUrl?: string;
 };
 
-export default async function InventoryDashboard() {
+export default function InventoryDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);

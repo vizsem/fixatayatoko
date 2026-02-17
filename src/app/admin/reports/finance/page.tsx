@@ -40,7 +40,7 @@ type FinancialRecord = {
   paymentMethod: string;
 };
 
-export default async function FinanceReport() {
+export default function FinanceReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<FinancialRecord[]>([]);

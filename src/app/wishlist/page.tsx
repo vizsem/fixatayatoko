@@ -10,7 +10,7 @@ import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
 
 
-export default async function WishlistPage() {
+export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

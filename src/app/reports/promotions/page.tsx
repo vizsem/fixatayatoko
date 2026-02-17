@@ -38,7 +38,7 @@ type PromotionRecord = {
   conversionRate: number;
 };
 
-export default async function PromotionsReport() {
+export default function PromotionsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);

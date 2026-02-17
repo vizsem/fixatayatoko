@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import { auth } from '@/lib/firebase';
 
-export default async function LogoutPage() {
+export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
