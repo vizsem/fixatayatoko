@@ -193,16 +193,16 @@ export default async function AdminSuppliers() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <div className="p-3 bg-black text-white rounded-2xl inline-flex">
+            <div className="p-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 rounded-2xl shadow-2xl inline-flex">
               <Users size={22} />
             </div>
-            <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Manajemen Supplier</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola database pemasok toko</p>
+            <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Manajemen Supplier</h1>
+            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Kelola database pemasok toko</p>
           </div>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2"
+          className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-sm font-bold uppercase tracking-wide shadow-2xl flex items-center gap-2 transition-all hover:scale-[1.02]"
         >
           <Plus size={16} /> Tambah Supplier
         </button>
@@ -223,40 +223,40 @@ export default async function AdminSuppliers() {
             placeholder="Cari supplier..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-black outline-none"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-black outline-none"
           />
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-white text-black border border-gray-100 px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2"
-          >
-            <Plus size={16} /> Tambah
-          </button>
+              onClick={() => setShowAddModal(true)}
+              className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 border border-orange-200 px-6 py-3 rounded-[1.5rem] text-sm font-bold uppercase tracking-wide shadow-2xl flex items-center gap-2 transition-all hover:scale-[1.02]"
+            >
+              <Plus size={16} /> Tambah
+            </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden transition-all hover:scale-[1.02]">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Supplier
                 </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Kontak
                 </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Kategori
                 </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Alamat
                 </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Satuan
                 </th>
-                <th scope="col" className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
                   Aksi
                 </th>
               </tr>
@@ -264,71 +264,72 @@ export default async function AdminSuppliers() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 md:px-6 py-10 md:py-12 text-center text-gray-500">
-                    <Users className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                    <p>Belum ada supplier terdaftar</p>
+                  <td colSpan={6} className="px-4 md:px-6 py-16 md:py-20 text-center">
+                    <Users className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                    <p className="text-lg font-semibold text-gray-500 mb-2">Belum ada supplier terdaftar</p>
+                    <p className="text-sm text-gray-400 mb-4">Mulai dengan menambahkan supplier pertama Anda</p>
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="mt-2 inline-block text-green-600 hover:text-green-800 font-medium"
+                      className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-sm font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 mx-auto transition-all hover:scale-[1.02]"
                     >
-                      Tambah supplier sekarang
+                      <Plus size={16} /> Tambah Supplier Pertama
                     </button>
                   </td>
                 </tr>
               ) : (
                 pageItems.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50">
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{supplier.name}</div>
-                      <div className="text-sm text-gray-500">{supplier.contactPerson}</div>
+                    <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
+                      <div className="font-semibold text-gray-900 text-base">{supplier.name}</div>
+                      <div className="text-sm text-gray-600 mt-1">{supplier.contactPerson}</div>
                       <button
                         onClick={() => setExpandedRows(prev => ({ ...prev, [supplier.id]: !prev[supplier.id] }))}
-                        className="md:hidden mt-2 inline-flex items-center gap-1 text-[10px] font-black text-blue-600"
+                        className="md:hidden mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600"
                       >
                         {expandedRows[supplier.id] ? 'Tutup' : 'Detail'}
                       </button>
                     </td>
-                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Phone size={14} className="text-gray-400" />
-                        <span className="text-sm">{supplier.phone}</span>
+                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Phone size={16} className="text-gray-500" />
+                        <span className="text-sm font-medium text-gray-800">{supplier.phone}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Mail size={14} className="text-gray-400" />
-                        <span className="text-sm text-gray-500">{supplier.email}</span>
+                        <Mail size={16} className="text-gray-500" />
+                        <span className="text-sm text-gray-600">{supplier.email}</span>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm font-medium text-gray-800">
                       <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                         {supplier.category || 'Umum'}
                       </span>
                     </td>
-                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-700 max-w-xs">
+                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm text-gray-700 max-w-xs">
                       <div className="flex items-start gap-2">
                         <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
                         <span className="truncate">{supplier.address}</span>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm font-medium text-gray-800">
                       <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
                         {supplier.unit || '-'}
                       </span>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          href={`/admin/suppliers/edit/${supplier.id}`}
-                          className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)}
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                          title="Edit Supplier"
                         >
-                          <Edit size={16} />
-                          Edit
-                        </Link>
+                          <Edit size={18} />
+                        </button>
                         <button
                           onClick={() => handleDelete(supplier.id, supplier.name)}
-                          className="text-red-600 hover:text-red-800 flex items-center gap-1"
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                          title="Hapus Supplier"
                         >
-                          <Trash2 size={16} />
-                          Hapus
+                          <Trash2 size={18} />
                         </button>
                       </div>
                     </td>
