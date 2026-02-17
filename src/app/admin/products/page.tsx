@@ -274,6 +274,19 @@ export default async function AdminProducts() {
   if (loading) return <div className="p-10 text-center font-black">Loading ataya...</div>;
 
 
+  // --- HANDLE DELETE ---
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Hapus produk "${product.Nama}"? Tindakan ini tidak bisa dikembalikan.`)) return;
+    
+    try {
+      await deleteDoc(doc(db, 'products', product.id));
+      notify.success('Produk berhasil dihapus');
+    } catch (error) {
+      console.error('Gagal menghapus produk:', error);
+      notify.error('Gagal menghapus produk');
+    }
+  };
+
   // --- HANDLE SYNC & RESET ---
   const handleSync = () => {
     const t = notify.admin.loading("Mensinkronkan data...");
