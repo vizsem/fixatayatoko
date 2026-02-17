@@ -7,6 +7,13 @@ type IncomingItem = {
   quantity: number;
   promoType?: 'TEBUS_MURAH' | string;
 };
+type ChannelKey = 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
+
+type ChannelPricing = {
+  price?: number;
+  wholesalePrice?: number;
+};
+
 type ProductData = {
   name?: string;
   Nama?: string;
@@ -21,6 +28,12 @@ type ProductData = {
   Link_Foto?: string;
   unit?: string;
   Satuan?: string;
+  channelPricing?: {
+    offline?: ChannelPricing;
+    website?: ChannelPricing;
+    shopee?: ChannelPricing;
+    tiktok?: ChannelPricing;
+  };
 };
 type VoucherData = { value?: number };
 type UserData = { points?: number };
@@ -36,7 +49,7 @@ const generateOrderId = () => {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, customer, delivery, payment, userId, voucherCode, usePoints } = body;
+    const { items, customer, delivery, payment, userId, voucherCode, usePoints, channel } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Keranjang kosong' }, { status: 400 });
@@ -55,6 +68,11 @@ export async function POST(req: Request) {
     // Untuk simplifikasi dan menghindari masalah lock di Client SDK non-admin, kita fetch dulu lalu write.
     // Idealnya gunakan firebase-admin transaction.
 
+    const channelKey: ChannelKey =
+      channel === 'OFFLINE' || channel === 'SHOPEE' || channel === 'TIKTOK' || channel === 'WEBSITE'
+        ? channel
+        : 'WEBSITE';
+
     for (const item of items) {
       const productRef = adminDb.collection('products').doc(item.id);
       const productSnap = await productRef.get();
@@ -70,10 +88,23 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Stok ${productData.name} tidak mencukupi (Sisa: ${productData.stock})` }, { status: 400 });
       }
 
-      // Hitung Harga (Logika Grosir)
       let price = Number(productData.price || productData.Ecer || 0);
       const wholesalePrice = Number(productData.wholesalePrice || productData.Grosir || 0);
       const minWholesale = Number(productData.minWholesale || productData.Min_Grosir || 10);
+
+      if (productData.channelPricing) {
+        const mapping: Record<ChannelKey, keyof NonNullable<ProductData['channelPricing']>> = {
+          OFFLINE: 'offline',
+          WEBSITE: 'website',
+          SHOPEE: 'shopee',
+          TIKTOK: 'tiktok'
+        };
+        const key = mapping[channelKey];
+        const channelConfig = productData.channelPricing[key];
+        if (channelConfig?.price != null) {
+          price = Number(channelConfig.price);
+        }
+      }
 
       if (wholesalePrice > 0 && item.quantity >= minWholesale) {
         price = wholesalePrice;
@@ -160,6 +191,7 @@ export async function POST(req: Request) {
         proof: payment.proof || null
       },
       status: 'PENDING',
+      channel: channelKey,
       createdAt: FieldValue.serverTimestamp()
     };
 

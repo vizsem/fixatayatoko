@@ -43,14 +43,14 @@ describe('MemberCard', () => {
 
   it('should render QR code container', () => {
     render(<MemberCard {...defaultProps} />);
-    const qrContainer = screen.getByText('M123456789').closest('div')?.previousSibling;
-    expect(qrContainer).toHaveClass('bg-white');
+    const qrContainer = screen.getByTestId('member-card').querySelector('[class*="bg-white"]');
+    expect(qrContainer).toBeInTheDocument();
   });
 
   describe('Level-based styling', () => {
     it('should apply correct styling for Bronze level', () => {
       render(<MemberCard {...defaultProps} level="Bronze" />);
-      const card = screen.getByText('John Doe').closest('div');
+      const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
       expect(card).toHaveClass('from-orange-400');
       expect(card).toHaveClass('to-orange-200');
@@ -58,7 +58,7 @@ describe('MemberCard', () => {
 
     it('should apply correct styling for Silver level', () => {
       render(<MemberCard {...defaultProps} level="Silver" />);
-      const card = screen.getByText('John Doe').closest('div');
+      const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
       expect(card).toHaveClass('from-gray-400');
       expect(card).toHaveClass('to-gray-200');
@@ -66,7 +66,7 @@ describe('MemberCard', () => {
 
     it('should apply correct styling for Gold level', () => {
       render(<MemberCard {...defaultProps} level="Gold" />);
-      const card = screen.getByText('John Doe').closest('div');
+      const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
       expect(card).toHaveClass('from-yellow-500');
       expect(card).toHaveClass('to-yellow-300');
@@ -74,7 +74,7 @@ describe('MemberCard', () => {
 
     it('should apply correct styling for Platinum level', () => {
       render(<MemberCard {...defaultProps} level="Platinum" />);
-      const card = screen.getByText('John Doe').closest('div');
+      const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
       expect(card).toHaveClass('from-slate-900');
       expect(card).toHaveClass('to-slate-700');

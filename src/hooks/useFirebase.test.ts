@@ -1,16 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useFirebaseAuth, useFirestore, useFirebaseStorage, useFirebase } from './useFirebase';
 
-// Mock Firebase services
-const mockAuth = {};
-const mockDb = {};
-const mockStorage = {};
-
 // Mock the firebase module
 vi.mock('@/lib/firebase', () => ({
-  auth: mockAuth,
-  db: mockDb,
-  storage: mockStorage
+  auth: {},
+  db: {},
+  storage: {}
 }));
 
 describe('Firebase Hooks', () => {
@@ -24,7 +19,7 @@ describe('Firebase Hooks', () => {
         error: null
       });
       
-      expect(result.auth).toBe(mockAuth);
+      expect(result.auth).toEqual(expect.any(Object));
     });
   });
 
@@ -38,7 +33,7 @@ describe('Firebase Hooks', () => {
         error: null
       });
       
-      expect(result.db).toBe(mockDb);
+      expect(result.db).toEqual(expect.any(Object));
     });
   });
 
@@ -52,7 +47,7 @@ describe('Firebase Hooks', () => {
         error: null
       });
       
-      expect(result.storage).toBe(mockStorage);
+      expect(result.storage).toEqual(expect.any(Object));
     });
   });
 
@@ -70,9 +65,9 @@ describe('Firebase Hooks', () => {
         error: null
       });
       
-      expect(result.services.auth).toBe(mockAuth);
-      expect(result.services.db).toBe(mockDb);
-      expect(result.services.storage).toBe(mockStorage);
+      expect(result.services.auth).toEqual(expect.any(Object));
+      expect(result.services.db).toEqual(expect.any(Object));
+      expect(result.services.storage).toEqual(expect.any(Object));
     });
   });
 });

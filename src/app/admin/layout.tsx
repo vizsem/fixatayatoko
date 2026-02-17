@@ -74,11 +74,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       group: "Utama", items: [
         { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
         { name: 'Pesanan', href: '/admin/orders', icon: ShoppingCart },
+        { name: 'Order Marketplace', href: '/admin/marketplace-orders', icon: Receipt },
       ]
     },
     {
       group: "Katalog & Stok", items: [
         { name: 'Produk', href: '/admin/products', icon: Package },
+        { name: 'Harga per Channel', href: '/admin/products/channel-pricing', icon: Tag },
         { name: 'Kategori', href: '/admin/kategori', icon: Tag },
         { name: 'Gudang', href: '/admin/warehouses', icon: Database },
         { name: 'Inventory', href: '/admin/inventory', icon: History },

@@ -13,11 +13,12 @@ type EmptyStateProps = {
 
 export function SkeletonList({ lines = 3 }: SkeletonListProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="skeleton-container">
       {Array.from({ length: lines }).map((_, idx) => (
         <div
           key={idx}
           className="h-16 rounded-2xl bg-slate-100 animate-pulse-soft"
+          data-testid="skeleton-line"
         />
       ))}
     </div>

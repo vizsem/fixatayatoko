@@ -2,6 +2,11 @@
  * Shared Type Definitions for AtayaToko
  */
 
+export interface ChannelPriceConfig {
+    price: number;
+    wholesalePrice?: number;
+}
+
 export interface Product {
     id: string;         // ID dokumen Firestore
     name: string;       // Nama Produk (Primary)
@@ -44,6 +49,12 @@ export interface Product {
     variant?: string;
     stockByWarehouse?: Record<string, number>;
     expiredDate?: string;
+    channelPricing?: {
+        offline?: ChannelPriceConfig;
+        website?: ChannelPriceConfig;
+        shopee?: ChannelPriceConfig;
+        tiktok?: ChannelPriceConfig;
+    };
 }
 
 export interface FirestoreTimestamp {
@@ -102,6 +113,7 @@ export interface Order {
     } | null;
     voucherDiscount?: number;
     discountTotal?: number;
+    channel?: 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
 }
 
 

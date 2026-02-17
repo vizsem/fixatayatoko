@@ -19,16 +19,16 @@ describe('UIState Components', () => {
 
     it('should have correct styling for skeleton lines', () => {
       render(<SkeletonList lines={1} />);
-      const skeletonLine = screen.getByRole('generic');
-      expect(skeletonLine).toHaveClass('h-16');
-      expect(skeletonLine).toHaveClass('rounded-2xl');
-      expect(skeletonLine).toHaveClass('bg-slate-100');
-      expect(skeletonLine).toHaveClass('animate-pulse-soft');
+      const skeletonLines = screen.getAllByTestId('skeleton-line');
+      expect(skeletonLines[0]).toHaveClass('h-16');
+      expect(skeletonLines[0]).toHaveClass('rounded-2xl');
+      expect(skeletonLines[0]).toHaveClass('bg-slate-100');
+      expect(skeletonLines[0]).toHaveClass('animate-pulse-soft');
     });
 
     it('should have space between skeleton lines', () => {
       render(<SkeletonList lines={2} />);
-      const container = screen.getByRole('generic').parentElement;
+      const container = screen.getByTestId('skeleton-container');
       expect(container).toHaveClass('space-y-3');
     });
   });

@@ -20,7 +20,10 @@ export default function MemberCard({ name, memberId, points, level }: MemberCard
   };
 
   return (
-    <div className={`w-full aspect-[1.586] rounded-[2rem] p-6 relative overflow-hidden shadow-2xl transition-all hover:scale-[1.02] ${getLevelColor()}`}>
+    <div 
+      className={`w-full aspect-[1.586] rounded-[2rem] p-6 relative overflow-hidden shadow-2xl transition-all hover:scale-[1.02] ${getLevelColor()}`}
+      data-testid="member-card"
+    >
       {/* Background Pattern */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-black opacity-5 rounded-full translate-y-1/3 -translate-x-1/3 blur-2xl"></div>

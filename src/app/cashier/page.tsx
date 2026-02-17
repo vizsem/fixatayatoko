@@ -237,6 +237,7 @@ export default function CashierPOS() {
         setFilteredProducts(p);
       } catch (error) {
         console.error('Error fetching products:', error);
+        toast.error('Gagal memuat produk. Silakan coba lagi.');
       }
     };
     
@@ -403,7 +404,7 @@ export default function CashierPOS() {
 
       {activeTab === 'pos' ? (
         <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
-          <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+          <div className="col-span-12 xl:col-span-8 flex flex-col gap-4">
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
               <div className="bg-green-50 p-2 rounded-xl text-green-600"><Search size={20} /></div>
               <input
@@ -419,7 +420,11 @@ export default function CashierPOS() {
               </div>
             </div>
 
-            <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div 
+              className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} 
+              style={{ maxHeight: 'calc(100vh - 200px)' }}
+              data-testid="product-grid-view"
+            >
               {filteredProducts.map(p => (
                 <button key={p.id} onClick={() => addToCart(p)} className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'}`}>
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
@@ -446,7 +451,7 @@ export default function CashierPOS() {
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+          <div className="col-span-12 xl:col-span-4 flex flex-col gap-4">
             <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'online' ? 'bg-blue-600 animate-pulse' : 'bg-green-600'}`}>
               {transactionType === 'online' ? <><Truck size={14} /> MODE PESANAN ONLINE</> : <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
             </div>
@@ -463,7 +468,7 @@ export default function CashierPOS() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4" data-testid="cart-items-container">
                 {cart.map(item => (
                   <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex justify-between items-start">
@@ -517,7 +522,7 @@ export default function CashierPOS() {
               </div>
 
               <div className="p-5 bg-white border-t space-y-4">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {['CASH', 'QRIS', 'TRANSFER', 'TEMPO'].map(m => (
                     <button key={m} onClick={() => setPaymentMethod(m)} className={`py-2 rounded-xl text-[10px] font-black border transition-all ${paymentMethod === m ? (transactionType === 'online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-green-600 border-green-600 text-white') : 'bg-white text-gray-400'}`}>{m}</button>
                   ))}
@@ -663,8 +668,13 @@ export default function CashierPOS() {
                     <div className="flex gap-2">
                       <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16} /></a>
                       <button onClick={async () => {
-                        await updateDoc(doc(db, 'orders', o.id), { status: 'DIPROSES' });
-                        toast.success('Order Diproses');
+                        try {
+                          await updateDoc(doc(db, 'orders', o.id), { status: 'DIPROSES' });
+                          toast.success('Order Diproses');
+                        } catch (error) {
+                          console.error('Error updating order:', error);
+                          toast.error('Gagal memproses order');
+                        }
                       }} className="bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase">Proses</button>
                     </div>
                   </div>

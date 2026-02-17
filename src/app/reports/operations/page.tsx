@@ -92,8 +92,12 @@ export default function OperationsReport() {
                 return sum + (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime());
               }
               return sum;
-            }, 0) / totalOrders / (60 * 1000)) // dalam menit
+            }, 0) / totalOrders / (60 * 1000))
           : 0;
+        const offlineOrders = orders.filter(o => o.channel === 'OFFLINE').length;
+        const websiteOrders = orders.filter(o => !o.channel || o.channel === 'WEBSITE').length;
+        const shopeeOrders = orders.filter(o => o.channel === 'SHOPEE').length;
+        const tiktokOrders = orders.filter(o => o.channel === 'TIKTOK').length;
 
         // Ambil data transaksi inventaris
         const inventorySnapshot = await getDocs(collection(db, 'inventory_transactions'));
@@ -200,6 +204,42 @@ export default function OperationsReport() {
             unit: 'pesanan',
             status: 'good',
             description: 'Jumlah total pesanan sepanjang waktu'
+          },
+          {
+            id: 'offline-orders',
+            name: 'Pesanan Offline',
+            category: 'Pesanan',
+            value: offlineOrders,
+            unit: 'pesanan',
+            status: 'good',
+            description: 'Total pesanan dari kanal offline'
+          },
+          {
+            id: 'website-orders',
+            name: 'Pesanan Website',
+            category: 'Pesanan',
+            value: websiteOrders,
+            unit: 'pesanan',
+            status: 'good',
+            description: 'Total pesanan dari website'
+          },
+          {
+            id: 'shopee-orders',
+            name: 'Pesanan Shopee',
+            category: 'Pesanan',
+            value: shopeeOrders,
+            unit: 'pesanan',
+            status: 'good',
+            description: 'Total pesanan dari Shopee'
+          },
+          {
+            id: 'tiktok-orders',
+            name: 'Pesanan TikTok',
+            category: 'Pesanan',
+            value: tiktokOrders,
+            unit: 'pesanan',
+            status: 'good',
+            description: 'Total pesanan dari TikTok Shop'
           },
           
           // Inventaris
