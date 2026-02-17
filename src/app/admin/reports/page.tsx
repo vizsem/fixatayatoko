@@ -394,7 +394,7 @@ interface StatCardProps {
   subValue?: string;
 }
 
-async function StatCard({ label, value, icon: Icon, color, bg, trend, subValue }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, color, bg, trend, subValue }: StatCardProps) {
   return (
     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group">
       <div className="flex justify-between items-start mb-4">
@@ -427,7 +427,7 @@ interface ReportLinkProps {
   bg: string;
 }
 
-async function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProps) {
+function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProps) {
   return (
     <Link href={href} className="group">
       <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:border-green-100 hover:shadow-lg hover:shadow-green-100/20 transition-all flex flex-col h-full">
@@ -446,6 +446,6 @@ async function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLi
 }
 
 // Helper untuk icon yang mungkin tidak ter-import otomatis
-async function DollarSignIcon(props: { className?: string, size?: number }) {
+function DollarSignIcon(props: { className?: string, size?: number }) {
   return <DollarSign {...props} />
 }

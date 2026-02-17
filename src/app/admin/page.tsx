@@ -263,7 +263,7 @@ export default function AdminDashboard() {
   );
 }
 
-async function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string }) {
+function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string }) {
 
   return (
     <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-lg transition-all">
@@ -277,7 +277,7 @@ async function StatBox({ label, value, icon: Icon, color, bg }: { label: string,
   );
 }
 
-async function SystemInfo({ label, value }: { label: string, value: string | number }) {
+function SystemInfo({ label, value }: { label: string, value: string | number }) {
   return (
     <div className="flex justify-between items-end border-b border-white/5 pb-4">
       <span className="text-[10px] font-black text-gray-400 tracking-widest">{label}</span>
