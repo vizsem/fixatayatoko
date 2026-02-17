@@ -331,7 +331,7 @@ interface StatCardProps {
   isWide?: boolean;
 }
 
-async function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
+function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
   return (
     <div className={`p-6 rounded-[2rem] ${bg} ${color} border border-transparent hover:border-current transition-all flex flex-col gap-3 ${isWide ? 'md:col-span-2' : ''}`}>
       <div className="flex justify-between items-start">

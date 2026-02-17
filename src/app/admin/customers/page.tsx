@@ -448,7 +448,7 @@ interface StatBoxProps {
   bg: string;
 }
 
-async function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
+function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
 
   return (
     <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all">

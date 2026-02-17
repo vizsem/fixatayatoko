@@ -430,7 +430,7 @@ interface NavCardProps {
   onClick?: () => void;
 }
 
-async function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
+function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
   const Content = (
     <div className={`p-5 rounded-[2rem] ${bg} ${color} flex flex-col items-center gap-2 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
       <Icon size={24} />

@@ -154,7 +154,7 @@ export default function WishlistPage() {
   );
 }
 
-async function ProductCard({
+function ProductCard({
   product,
   onRemove,
   onAdd,
