@@ -36,7 +36,7 @@ type ProductData = {
   };
 };
 type VoucherData = { value?: number };
-type UserData = { points?: number };
+type UserData = { points?: number; walletBalance?: number };
 
 // Helper to generate Order ID
 const generateOrderId = () => {
@@ -49,7 +49,7 @@ const generateOrderId = () => {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, customer, delivery, payment, userId, voucherCode, usePoints, channel } = body;
+    const { items, customer, delivery, payment, userId, voucherCode, usePoints, useWallet, channel } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Keranjang kosong' }, { status: 400 });
@@ -152,21 +152,29 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Validasi Poin
+    // 3. Validasi Poin dan Dompet
     let pointsUsed = 0;
-    if (usePoints && userId) {
+    let walletUsed = 0;
+    if (userId && (usePoints || useWallet)) {
       const userRef = adminDb.collection('users').doc(userId);
       const userSnap = await userRef.get();
       if (userSnap.exists) {
         const userData = userSnap.data() as UserData;
-        const availablePoints = userData.points || 0;
-        const maxRedeemable = calculatedSubtotal * 0.5;
-        pointsUsed = Math.min(availablePoints, maxRedeemable);
+        if (usePoints) {
+          const availablePoints = userData.points || 0;
+          const maxRedeemable = calculatedSubtotal * 0.5;
+          pointsUsed = Math.min(availablePoints, maxRedeemable);
+        }
+        if (useWallet) {
+          const availableWallet = userData.walletBalance || 0;
+          const baseTotal = Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount);
+          walletUsed = Math.min(availableWallet, baseTotal);
+        }
       }
     }
 
     // 4. Hitung Total Akhir
-    const total = Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount);
+    const total = Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount - walletUsed);
     const orderId = generateOrderId();
 
     // 5. Simpan Order ke Firestore
@@ -180,6 +188,7 @@ export async function POST(req: Request) {
       pointsUsed,
       voucherUsed: appliedVoucherId,
       discountTotal: pointsUsed + voucherDiscount,
+      walletUsed,
       total,
       delivery: {
         method: delivery.method,
@@ -214,14 +223,28 @@ export async function POST(req: Request) {
 
     // 6. Update Side Effects (Poin, Voucher, Cart)
     if (pointsUsed > 0 && userId) {
-      await adminDb.collection('users').doc(userId).update({ 
-        points: FieldValue.increment(-pointsUsed) 
+      await adminDb.collection('users').doc(userId).update({
+        points: FieldValue.increment(-pointsUsed)
       });
       await adminDb.collection('point_logs').add({
-        userId, 
-        pointsChanged: -pointsUsed, 
+        userId,
+        pointsChanged: -pointsUsed,
         type: 'REDEEM',
-        description: `Checkout Order #${orderId}`, 
+        description: `Checkout Order #${orderId}`,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
+
+    if (walletUsed > 0 && userId) {
+      await adminDb.collection('users').doc(userId).update({
+        walletBalance: FieldValue.increment(-walletUsed)
+      });
+      await adminDb.collection('wallet_logs').add({
+        userId,
+        orderId,
+        amountChanged: -walletUsed,
+        type: 'PAYMENT',
+        description: `Pembayaran Order #${orderId} menggunakan dompet`,
         createdAt: FieldValue.serverTimestamp()
       });
     }

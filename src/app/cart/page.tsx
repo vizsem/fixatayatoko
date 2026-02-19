@@ -68,12 +68,13 @@ export default function CartPage() {
   const [courierType] = useState<'toko' | 'ojol' | 'ekspedisi'>('toko');
 
 
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris' | 'wallet'>('cash');
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
 
   // STATE POIN & VOUCHER
   const [usePoints, setUsePoints] = useState(false);
+  const [useWallet, setUseWallet] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [promoProduct, setPromoProduct] = useState<CartItem | null>(null);
@@ -184,8 +185,12 @@ export default function CartPage() {
   // HITUNG DISKON VOUCHER
   const voucherDiscount = appliedVoucher ? appliedVoucher.value : 0;
 
+  const walletBalance = userData?.walletBalance || 0;
+  const baseTotal = Math.max(0, subtotal - pointsToUse - voucherDiscount);
+  const walletToUse = useWallet ? Math.min(walletBalance, baseTotal) : 0;
+
   // TOTAL AKHIR
-  const totalBayar = Math.max(0, subtotal - pointsToUse - voucherDiscount);
+  const totalBayar = Math.max(0, baseTotal - walletToUse);
 
   // FUNGSI CEK VOUCHER
   const handleCheckVoucher = async () => {
@@ -230,7 +235,10 @@ export default function CartPage() {
     return { ok: true, msg: "Siap dipesan" };
   })();
   const handleCheckout = async () => {
-    if (paymentMethod !== 'cash' && !paymentProof) return notify.user.error("Upload bukti transfer!");
+    if (paymentMethod !== 'cash' && paymentMethod !== 'wallet' && !paymentProof) return notify.user.error("Upload bukti transfer!");
+    if (paymentMethod === 'wallet' && (!userData || userData.walletBalance === undefined)) return notify.user.error("Dompet tidak tersedia!");
+    if (paymentMethod === 'wallet' && userData && (userData.walletBalance || 0) < subtotal) return notify.user.error("Saldo dompet tidak mencukupi!");
+    
     setIsSubmitting(true);
     // const orderId = generateOrderId(); // Generated on server now
 
@@ -268,7 +276,8 @@ export default function CartPage() {
           },
           userId,
           voucherCode: appliedVoucher?.code,
-          usePoints
+          usePoints,
+          useWallet
         })
       });
 
@@ -423,6 +432,35 @@ export default function CartPage() {
             </div>
           </div>
 
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-600">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Dompet Digital</h3>
+                  <p className="text-sm font-black italic">
+                    Rp{walletBalance.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              {userId && walletBalance > 0 && (
+                <button
+                  onClick={() => setUseWallet(!useWallet)}
+                  className={`w-12 h-6 rounded-full transition-all relative ${useWallet ? 'bg-emerald-600 shadow-inner' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${useWallet ? 'left-7' : 'left-1'}`} />
+                </button>
+              )}
+            </div>
+            {(!userId || walletBalance <= 0) && (
+              <p className="text-[8px] font-black text-slate-400 uppercase italic mt-3">
+                {userId ? 'Belum ada saldo dompet yang bisa digunakan' : 'Login untuk menggunakan saldo dompet'}
+              </p>
+            )}
+          </div>
+
           {/* INFORMASI PENGIRIMAN (Form Ringkas) */}
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 space-y-6">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><MapPin size={16} /> Tujuan Pengantaran</h3>
@@ -451,7 +489,7 @@ export default function CartPage() {
           <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 sticky top-24">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2"><CreditCard size={18} /> Metode Bayar</h2>
             <div className="grid grid-cols-1 gap-2 mb-8">
-              {(['cash', 'transfer', 'qris'] as const).map(m => (
+              {(['cash', 'transfer', 'qris', 'wallet'] as const).map(m => (
                 <button key={m} onClick={() => setPaymentMethod(m)} className={`p-4 border-2 rounded-2xl text-left transition-all flex items-center justify-between ${paymentMethod === m ? 'border-green-600 bg-green-50 text-green-700' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
                   <span className="text-[10px] font-black uppercase">{m}</span>
                   {paymentMethod === m && <CheckCircle2 size={16} />}
@@ -476,6 +514,19 @@ export default function CartPage() {
               </label>
             )}
 
+            {paymentMethod === 'wallet' && userData && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-4 text-center mb-8">
+                <p className="text-[10px] font-black text-blue-700 uppercase">Saldo Dompet</p>
+                <p className="text-lg font-black text-blue-700">Rp{(userData.walletBalance || 0).toLocaleString()}</p>
+                <p className="text-[10px] text-blue-600">Total belanja: Rp{subtotal.toLocaleString()}</p>
+                {(userData.walletBalance || 0) >= subtotal ? (
+                  <p className="text-[10px] text-green-600 font-bold">✓ Saldo mencukupi</p>
+                ) : (
+                  <p className="text-[10px] text-red-600 font-bold">✗ Saldo tidak mencukupi</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3 pt-6 border-t border-slate-50">
               <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
                 <span>Subtotal</span>
@@ -491,6 +542,12 @@ export default function CartPage() {
                 <div className="flex justify-between text-[10px] font-black uppercase text-emerald-600 italic">
                   <span>- Voucher</span>
                   <span>Rp{voucherDiscount.toLocaleString()}</span>
+                </div>
+              )}
+              {walletToUse > 0 && (
+                <div className="flex justify-between text-[10px] font-black uppercase text-emerald-600 italic">
+                  <span>- Dompet</span>
+                  <span>Rp{walletToUse.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between items-end pt-4">

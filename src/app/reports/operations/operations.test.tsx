@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('firebase/auth', () => ({
-  onAuthStateChanged: (auth: unknown, callback: (user: any) => void) => {
+  onAuthStateChanged: (_auth: unknown, callback: (user: { uid: string } | null) => void) => {
     callback({ uid: 'admin-user' });
     return () => {};
   },

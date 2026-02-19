@@ -179,7 +179,7 @@ export default function MarketplaceOrdersPage() {
         unit: item.unit
       }));
 
-      const docRef = await (await import('firebase/firestore')).addDoc(orderRef, {
+      await (await import('firebase/firestore')).addDoc(orderRef, {
         orderId: externalOrderId || null,
         name: customerName || 'Marketplace',
         userId: 'marketplace',
@@ -448,4 +448,3 @@ export default function MarketplaceOrdersPage() {
     </div>
   );
 }
-

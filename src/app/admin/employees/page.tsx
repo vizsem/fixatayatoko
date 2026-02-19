@@ -12,7 +12,7 @@ import {
 import {
   collection, getDocs, updateDoc, doc, query, orderBy,
   increment, addDoc, deleteDoc, serverTimestamp,
-  writeBatch, arrayUnion, Timestamp, setDoc
+  writeBatch, arrayUnion, setDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import notify from '@/lib/notify';

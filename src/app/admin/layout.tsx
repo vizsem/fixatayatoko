@@ -96,7 +96,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       group: "Pelanggan & SDM", items: [
         { name: 'Pelanggan', href: '/admin/customers', icon: Users },
         { name: 'Karyawan', href: '/admin/employees', icon: UsersRound },
-        { name: 'Sistem Poin', href: '/admin/points', icon: Wallet },
+        { name: 'Sistem Poin', href: '/admin/points', icon: Star },
+        { name: 'Dompet Digital', href: '/admin/wallet', icon: Wallet },
         { name: 'Users', href: '/admin/users', icon: Users },
       ]
     },

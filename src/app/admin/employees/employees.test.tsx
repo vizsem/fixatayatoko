@@ -16,20 +16,19 @@ vi.mock('firebase/firestore', () => ({
       docs: [
         {
           id: 'emp1',
-          data: () =>
-            ({
-              name: 'Budi Santoso',
-              role: 'Kasir',
-              email: 'budi@example.com',
-              phone: '08123456789',
-              status: 'AKTIF',
-              manualSalary: 3000000,
-              workSchedule: '07:00 - 14:00',
-              totalAttendance: 5,
-            } as any),
-        } as any,
+          data: () => ({
+            name: 'Budi Santoso',
+            role: 'Kasir',
+            email: 'budi@example.com',
+            phone: '08123456789',
+            status: 'AKTIF',
+            manualSalary: 3000000,
+            workSchedule: '07:00 - 14:00',
+            totalAttendance: 5,
+          }),
+        },
       ],
-    } as any),
+    }),
   ),
   increment: vi.fn(),
   addDoc: vi.fn(),

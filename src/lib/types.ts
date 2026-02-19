@@ -83,7 +83,7 @@ export interface Order {
     userId: string;
     customerId?: string;
     customerName?: string;
-    name?: string; // used for guest/customer name
+    name?: string;
     items: OrderItem[];
     total: number;
     subtotal?: number;
@@ -101,9 +101,9 @@ export interface Order {
     createdAt: FirestoreTimestamp | Date | null;
     updatedAt?: FirestoreTimestamp | Date | null;
     phone?: string;
-    customerPhone?: string; // legacy fallback
+    customerPhone?: string;
     address?: string;
-    customerAddress?: string; // legacy fallback
+    customerAddress?: string;
     shippingCost: number;
     pointsUsed: number;
     voucherUsed?: string | null;
@@ -113,6 +113,7 @@ export interface Order {
     } | null;
     voucherDiscount?: number;
     discountTotal?: number;
+    walletUsed?: number;
     channel?: 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
 }
 
@@ -138,6 +139,7 @@ export interface UserProfile {
     points: number;
     isPointsFrozen: boolean;
     role: 'customer' | 'admin' | 'cashier';
+    walletBalance?: number;
     addresses?: string[];
     createdAt: FirestoreTimestamp | Date | null;
 }

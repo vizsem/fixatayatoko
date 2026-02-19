@@ -52,6 +52,7 @@ interface UserProfile {
   addresses: Address[];
   points?: number;
   isPointsFrozen?: boolean;
+  walletBalance?: number;
 }
 
 export default function ProfilePage() {
@@ -271,6 +272,7 @@ export default function ProfilePage() {
               name={profile?.name || "Member Ataya"} 
               memberId={user?.uid || "GUEST"} 
               points={profile?.points || 0}
+              walletBalance={profile?.walletBalance}
               level={(profile?.points || 0) > 100000 ? 'Platinum' : (profile?.points || 0) > 50000 ? 'Gold' : (profile?.points || 0) > 10000 ? 'Silver' : 'Bronze'}
             />
 
@@ -298,13 +300,14 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* POIN WIDGET (Dihapus karena sudah ada di MemberCard, diganti info lain) */}
                 <div className="bg-slate-50 rounded-3xl p-6 mt-6 relative overflow-hidden border border-slate-100">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-blue-100 text-blue-600 rounded-xl"><Ticket size={20}/></div>
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Voucher Saya</p>
-                      <h3 className="text-xl font-black text-slate-800 italic">0 Voucher</h3>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo Dompet</p>
+                      <h3 className="text-xl font-black text-slate-800 italic">
+                        Rp{(profile?.walletBalance || 0).toLocaleString('id-ID')}
+                      </h3>
                     </div>
                   </div>
                 </div>

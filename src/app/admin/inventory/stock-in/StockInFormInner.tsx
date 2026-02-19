@@ -15,7 +15,7 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
 import notify from '@/lib/notify';
 

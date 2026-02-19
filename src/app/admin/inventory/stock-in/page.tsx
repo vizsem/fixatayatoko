@@ -5,7 +5,7 @@ import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,

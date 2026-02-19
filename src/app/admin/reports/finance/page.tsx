@@ -11,7 +11,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   Timestamp
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -38,6 +37,7 @@ type FinancialRecord = {
   cost?: number;
   profit?: number;
   paymentMethod: string;
+  channel?: string;
 };
 
 export default function FinanceReport() {
@@ -86,18 +86,25 @@ export default function FinanceReport() {
 
         // Ambil data produk untuk harga beli
         const productsSnapshot = await getDocs(collection(db, 'products'));
-        const productsMap = new Map();
-        productsSnapshot.docs.forEach(doc => {
-          productsMap.set(doc.id, doc.data());
+        const productsMap = new Map<string, Record<string, unknown>>();
+          productsSnapshot.docs.forEach(docSnap => {
+            productsMap.set(docSnap.id, docSnap.data() as Record<string, unknown>);
         });
 
         const financeRecords: FinancialRecord[] = [];
 
         // Proses penjualan dengan perhitungan profit (filter tanggal di sini)
         for (const orderDoc of salesSnapshot.docs) {
-          const order = orderDoc.data();
+          const order = orderDoc.data() as {
+            createdAt?: Timestamp | string;
+            total?: number;
+            payment?: { method?: string };
+            paymentMethod?: string;
+            items?: { id?: string; productId?: string; price: number; quantity: number }[];
+            channel?: string;
+          };
           const created =
-            order.createdAt?.toDate
+            order.createdAt instanceof Timestamp
               ? order.createdAt.toDate()
               : new Date(order.createdAt || new Date().toISOString());
           if (!(created >= startDate && created <= endDate)) continue;
@@ -107,14 +114,18 @@ export default function FinanceReport() {
 
           // Hitung biaya & profit berdasarkan harga beli
           for (const item of order.items || []) {
-            const product = productsMap.get(item.id) || productsMap.get(item.productId);
+            const product = productsMap.get(item.id || '') || productsMap.get(item.productId || '');
             // Gunakan field 'Modal' dari produk, fallback ke purchasePrice, lalu estimasi 80%
-            const modalPrice = Number(product?.Modal || product?.purchasePrice || 0);
+            const modalPrice = Number(
+              (product && (product.Modal as number | undefined)) ??
+              (product && (product.purchasePrice as number | undefined)) ??
+              0
+            );
             const sellingPrice = Number(item.price);
             
             // Jika modal 0, gunakan estimasi margin 10% (be conservative) -> Modal = 90% Harga Jual
             // Atau tetap 80% sesuai kode lama
-            const purchasePrice = modalPrice > 0 ? modalPrice : (sellingPrice * 0.85); 
+            const purchasePrice = modalPrice > 0 ? modalPrice : sellingPrice * 0.85;
             
             const itemCost = purchasePrice * item.quantity;
             const itemProfit = (sellingPrice * item.quantity) - itemCost;
@@ -132,7 +143,8 @@ export default function FinanceReport() {
             amount: Number(order.total || 0),
             cost: totalCost,
             profit: totalProfit,
-            paymentMethod: order.payment?.method || order.paymentMethod || 'CASH'
+            paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
+            channel: order.channel || 'OFFLINE'
           });
         }
 
@@ -142,7 +154,7 @@ export default function FinanceReport() {
         purchasesSnapshot.docs.forEach(doc => {
           const data = doc.data();
           const created =
-            data.createdAt?.toDate
+            data.createdAt instanceof Timestamp
               ? data.createdAt.toDate()
               : new Date(data.createdAt || new Date().toISOString());
           if (!(created >= startDate && created <= endDate)) return;
@@ -224,6 +236,25 @@ export default function FinanceReport() {
     .reduce((sum, r) => sum + r.amount, 0);
 
   const netProfit = totalProfit - totalExpense;
+
+  const channels: string[] = ['OFFLINE', 'WEBSITE', 'SHOPEE', 'TIKTOK'];
+
+  const channelSummary = channels.map(channel => {
+    const channelRecords = records.filter(
+      r => r.type === 'profit' && (r.channel || 'OFFLINE') === channel,
+    );
+
+    const revenue = channelRecords.reduce((sum, r) => sum + r.amount, 0);
+    const cost = channelRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
+    const profit = channelRecords.reduce((sum, r) => sum + (r.profit || 0), 0);
+
+    return {
+      channel,
+      revenue,
+      cost,
+      profit,
+    };
+  });
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -369,6 +400,54 @@ export default function FinanceReport() {
         </div>
       </div>
 
+      {/* Ringkasan Laba per Channel */}
+      <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Ringkasan Laba per Channel</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Menggunakan Harga Modal/HPP dari produk dan harga jual per channel.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {channelSummary.map(summary => (
+            <div
+              key={summary.channel}
+              className="p-4 rounded-2xl border border-gray-100 bg-gray-50 flex flex-col gap-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                  {summary.channel}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Pendapatan</p>
+                <p className="text-sm font-bold text-green-600">
+                  Rp{summary.revenue.toLocaleString('id-ID')}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">HPP (Modal)</p>
+                <p className="text-sm font-bold text-red-600">
+                  Rp{summary.cost.toLocaleString('id-ID')}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] text-gray-500">Laba Kotor</p>
+                <p
+                  className={`text-sm font-extrabold ${
+                    summary.profit >= 0 ? 'text-blue-600' : 'text-red-600'
+                  }`}
+                >
+                  Rp{summary.profit.toLocaleString('id-ID')}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Data Table Section */}
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-200">
@@ -414,7 +493,7 @@ export default function FinanceReport() {
                   </td>
                 </tr>
               ) : (
-                records.map((record) => (
+                paginatedRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(record.date).toLocaleDateString('id-ID')}

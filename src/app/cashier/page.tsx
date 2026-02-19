@@ -103,6 +103,12 @@ export default function CashierPOS() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [tempoDueDate, setTempoDueDate] = useState('');
 
+  // State untuk Wallet
+  const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number} | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number}>>([]);
+
+
   // No redundant state for calculated values
 
 
@@ -156,6 +162,28 @@ export default function CashierPOS() {
     }
     return 0;
   }, [cashGiven, total, paymentMethod]);
+
+  // Search Customer for Wallet
+  useEffect(() => {
+    if (customerSearch.length < 3) {
+      setCustomerResults([]);
+      return;
+    }
+    const performSearch = async () => {
+      const nameQuery = query(collection(db, 'users'), where('name', '>=', customerSearch), where('name', '<=', customerSearch + '\uf8ff'), limit(5));
+      const phoneQuery = query(collection(db, 'users'), where('phone', '>=', customerSearch), where('phone', '<=', customerSearch + '\uf8ff'), limit(5));
+      
+      const [nameSnap, phoneSnap] = await Promise.all([getDocs(nameQuery), getDocs(phoneQuery)]);
+      
+      const results = new Map();
+      nameSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+      phoneSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
+      
+      setCustomerResults(Array.from(results.values()));
+    };
+    const debounce = setTimeout(performSearch, 300);
+    return () => clearTimeout(debounce);
+  }, [customerSearch]);
 
   useEffect(() => {
     // Detect Offline Status
@@ -295,6 +323,10 @@ export default function CashierPOS() {
     if (paymentMethod === 'TEMPO') {
       if (!customerName || !customerPhone || !tempoDueDate) return toast.error('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
     }
+    if (paymentMethod === 'DOMPET') {
+      if (!selectedCustomer) return toast.error('Pilih pelanggan terlebih dahulu!');
+      if (selectedCustomer.walletBalance < total) return toast.error('Saldo dompet tidak mencukupi!');
+    }
     
     // Jika offline, blokir metode yang butuh upload kecuali dipaksa (tapi di sini kita warning saja)
     if (isOffline && (paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER')) {
@@ -318,7 +350,7 @@ export default function CashierPOS() {
       }
 
       const orderData = {
-        customerName: paymentMethod === 'TEMPO' ? customerName : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko'),
+        customerName: paymentMethod === 'TEMPO' ? customerName : (paymentMethod === 'DOMPET' ? selectedCustomer?.name : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko')),
         customerPhone: paymentMethod === 'TEMPO' ? customerPhone : '',
         items: cart,
         subtotal, shippingCost, total,
@@ -327,6 +359,7 @@ export default function CashierPOS() {
         status: paymentMethod === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI',
         dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
         createdAt: serverTimestamp(),
+        userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
       };
 
       const newOrderRef = doc(collection(db, 'orders'));
@@ -340,6 +373,23 @@ export default function CashierPOS() {
         }
       }
 
+      // --- LOGIKA BARU UNTUK DOMPET ---
+      if (paymentMethod === 'DOMPET' && selectedCustomer) {
+        const userRef = doc(db, 'users', selectedCustomer.id);
+        const newBalance = selectedCustomer.walletBalance - total;
+        batch.update(userRef, { walletBalance: newBalance });
+
+        const logRef = doc(collection(db, 'wallet_logs'));
+        batch.set(logRef, {
+          userId: selectedCustomer.id,
+          amount: -total,
+          type: 'payment',
+          description: `Pembayaran pesanan #${newOrderRef.id}`,
+          createdAt: serverTimestamp()
+        });
+      }
+      // --- AKHIR LOGIKA DOMPET ---
+
       await batch.commit();
       printReceipt({ ...orderData, id: newOrderRef.id, createdAt: new Date() });
       setCart([]);
@@ -350,6 +400,8 @@ export default function CashierPOS() {
       setCustomerName('');
       setCustomerPhone('');
       setTempoDueDate('');
+      setSelectedCustomer(null);
+      setCustomerSearch('');
       toast.success('Transaksi Berhasil!');
     } catch (e) {
       console.error(e);
@@ -522,13 +574,59 @@ export default function CashierPOS() {
               </div>
 
               <div className="p-5 bg-white border-t space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {['CASH', 'QRIS', 'TRANSFER', 'TEMPO'].map(m => (
-                    <button key={m} onClick={() => setPaymentMethod(m)} className={`py-2 rounded-xl text-[10px] font-black border transition-all ${paymentMethod === m ? (transactionType === 'online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-green-600 border-green-600 text-white') : 'bg-white text-gray-400'}`}>{m}</button>
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                  {['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'].map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setPaymentMethod(m)}
+                      className={`p-3 rounded-xl text-xs font-black uppercase transition-all border-2 ${paymentMethod === m ? 'bg-green-50 text-green-600 border-green-200' : 'bg-gray-50 border-transparent hover:border-gray-200'}`}
+                    >
+                      {m}
+                    </button>
                   ))}
                 </div>
 
-                {paymentMethod === 'CASH' ? (
+                {paymentMethod === 'DOMPET' ? (
+                  <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100 space-y-3 relative">
+                     <p className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2">
+                       Pembayaran Dompet
+                     </p>
+                     <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => {
+                        setCustomerSearch(e.target.value);
+                        setSelectedCustomer(null); // Reset on new search
+                      }}
+                      placeholder="Cari Nama/No.HP Pelanggan..."
+                      className="w-full p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    {customerResults.length > 0 && !selectedCustomer && (
+                      <div className="absolute top-full left-0 right-0 bg-white border rounded-lg shadow-lg z-10 mt-1 max-h-48 overflow-y-auto">
+                        {customerResults.map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => {
+                              setSelectedCustomer({id: c.id, name: c.name, walletBalance: c.walletBalance || 0});
+                              setCustomerSearch(c.name);
+                              setCustomerResults([]);
+                            }}
+                            className="p-3 hover:bg-gray-100 cursor-pointer text-xs"
+                          >
+                            <p className="font-bold">{c.name}</p>
+                            <p className="text-gray-500">{c.phone} - Saldo: Rp{(c.walletBalance || 0).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedCustomer && (
+                      <div className="mt-2 p-3 bg-blue-100 border border-blue-200 rounded-lg text-center">
+                        <p className="text-xs font-bold text-blue-800">{selectedCustomer.name}</p>
+                        <p className="text-lg font-black text-blue-800">Rp{selectedCustomer.walletBalance.toLocaleString()}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : paymentMethod === 'CASH' ? (
                   <div className="bg-gray-50 p-3 rounded-2xl">
                     <label className="text-[10px] font-black text-gray-400 uppercase">Bayar Tunai</label>
                     <input type="number" value={cashGiven} onChange={e => setCashGiven(e.target.value)} className="w-full bg-transparent font-black text-lg outline-none" placeholder="0" />

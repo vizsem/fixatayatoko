@@ -91,9 +91,8 @@ export default function AdminCategories() {
       
       // Optimasi: Hitung jumlah produk per kategori menggunakan aggregation
       // Simpan count di setiap kategori untuk menghindari pembacaan seluruh produk
-      const categoryList = await Promise.all(catSnap.docs.map(async (doc) => {
+        const categoryList = await Promise.all(catSnap.docs.map(async (doc) => {
         const data = doc.data();
-        const categoryName = data.name?.toLowerCase().trim();
         
         // Query yang lebih efisien - hanya hitung dokumen, tidak baca semua data
         let count = 0;

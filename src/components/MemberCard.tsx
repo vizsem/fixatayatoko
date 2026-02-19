@@ -1,14 +1,16 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Wallet, Ticket } from 'lucide-react';
 
 type MemberCardProps = {
   name: string;
   memberId: string;
   points: number;
+  walletBalance?: number;
   level: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 };
 
-export default function MemberCard({ name, memberId, points, level }: MemberCardProps) {
+export default function MemberCard({ name, memberId, points, walletBalance, level }: MemberCardProps) {
   // Tentukan warna berdasarkan level
   const getLevelColor = () => {
     switch (level) {
@@ -51,9 +53,17 @@ export default function MemberCard({ name, memberId, points, level }: MemberCard
              <p className="text-[8px] font-mono mt-1 opacity-80">{memberId}</p>
           </div>
 
-          <div className="flex flex-col items-end">
-            <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Poin Aktif</p>
-            <p className="text-3xl font-black italic tracking-tighter">{points.toLocaleString()}</p>
+          <div className="flex items-center gap-4">
+            {typeof walletBalance === 'number' && (
+              <div className="flex flex-col items-end">
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Wallet size={10}/> Saldo</p>
+                <p className="text-xl font-black italic tracking-tighter">Rp{walletBalance.toLocaleString()}</p>
+              </div>
+            )}
+            <div className="flex flex-col items-end">
+              <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Ticket size={10}/> Poin</p>
+              <p className="text-3xl font-black italic tracking-tighter">{points.toLocaleString()}</p>
+            </div>
           </div>
         </div>
         
