@@ -47,6 +47,15 @@ const generateOrderId = () => {
 };
 
 export async function POST(req: Request) {
+  // SAFETY CHECK: Pastikan Firebase Admin sudah terinisialisasi
+  if (!adminDb || typeof adminDb.collection !== 'function') {
+    console.error('🔥 CRITICAL ERROR: Firebase Admin SDK not initialized.');
+    console.error('Check your Vercel Environment Variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
+    return NextResponse.json({ 
+      error: 'Server Misconfiguration: Database connection failed. Please contact admin.' 
+    }, { status: 500 });
+  }
+
   try {
     const body = await req.json();
     const { items, customer, delivery, payment, userId, voucherCode, usePoints, useWallet, channel } = body;
