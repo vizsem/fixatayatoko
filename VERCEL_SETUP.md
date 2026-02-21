@@ -1,42 +1,43 @@
-# Panduan Setup Vercel untuk Firebase Admin
+# Panduan Setup Environment Variables di Vercel
 
-Aplikasi ini menggunakan **Firebase Admin SDK** untuk fungsi server-side (seperti Checkout dan API Orders). Agar fungsi ini berjalan di Vercel, Anda **WAJIB** menambahkan Environment Variables.
+Agar aplikasi berjalan sempurna (Login, Checkout, Notifikasi), Anda wajib mengisi Environment Variables berikut di Vercel.
 
-## 1. Dapatkan Kredensial Firebase
-1. Buka [Firebase Console](https://console.firebase.google.com/).
-2. Pilih project Anda.
-3. Masuk ke **Project settings** (ikon gir) > **Service accounts**.
-4. Klik **Generate new private key**.
-5. File JSON akan terdownload. Buka file tersebut dengan text editor.
+## 1. Buka Vercel Dashboard
+1. Masuk ke project Anda di Vercel.
+2. Klik tab **Settings** -> **Environment Variables**.
 
-## 2. Masukkan ke Vercel
-1. Buka Dashboard Vercel project Anda.
-2. Masuk ke **Settings** > **Environment Variables**.
-3. Tambahkan variabel berikut (ambil nilainya dari file JSON tadi):
+## 2. Masukkan Variabel Berikut
 
-| Nama Variabel (Key) | Isi (Value) dari JSON | Contoh Value |
-|---------------------|-----------------------|--------------|
-| `FIREBASE_PROJECT_ID` | `project_id` | `toko-saya-123` |
-| `FIREBASE_CLIENT_EMAIL` | `client_email` | `firebase-adminsdk-xxx@toko-saya.iam.gserviceaccount.com` |
-| `FIREBASE_PRIVATE_KEY` | `private_key` | `-----BEGIN PRIVATE KEY-----\nMIIEv...` (Copy SEMUANYA termasuk header/footer) |
+### A. Firebase Admin (Server-Side) - WAJIB UNTUK CHECKOUT
+*Ambil dari file JSON Service Account yang Anda download.*
+(Jika hilang, buat baru di: Firebase Console -> Project Settings -> Service Accounts -> Generate New Private Key)
 
-> **PENTING:** Untuk `FIREBASE_PRIVATE_KEY`, copy seluruh isi string private key termasuk `-----BEGIN PRIVATE KEY-----` dan `\n`. Jangan khawatir tentang baris baru, paste saja apa adanya.
+| Key | Value (Contoh) |
+|-----|----------------|
+| `FIREBASE_PROJECT_ID` | `toko-saya-123` |
+| `FIREBASE_CLIENT_EMAIL` | `firebase-adminsdk-xxxxx@...` |
+| `FIREBASE_PRIVATE_KEY` | `-----BEGIN PRIVATE KEY-----\nMIIEv...` (Copy semua isinya termasuk baris baru) |
+
+### B. Firebase Client (Frontend) - WAJIB UNTUK LOGIN
+*Ambil dari: Firebase Console -> Project Settings -> General -> Your Apps (Web/SDK)*
+
+| Key | Value |
+|-----|-------|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | `AIzaSyD...` |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `toko-saya-123.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `toko-saya-123` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `toko-saya-123.appspot.com` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | `1234567890` |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | `1:1234567890:web:abcdef...` |
+
+### C. Fitur Tambahan (Opsional)
+
+| Key | Value | Fungsi |
+|-----|-------|--------|
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | (Dari tab Cloud Messaging -> Web Push certs) | Untuk Notifikasi Push |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | (Dari Google Cloud Console) | Untuk Peta Lokasi di Checkout |
 
 ## 3. Redeploy
-Setelah menambahkan variabel, Anda harus melakukan **Redeploy** agar perubahan diterapkan:
-1. Masuk ke tab **Deployments** di Vercel.
-2. Klik titik tiga (⋮) pada deployment terbaru (atau yang gagal).
-3. Pilih **Redeploy**.
-
----
-
-## Troubleshooting Error Umum
-
-### "Unable to detect a Project Id"
-Artinya `FIREBASE_PROJECT_ID` belum di-set atau salah.
-
-### "Firebase Admin credentials not fully provided"
-Artinya salah satu dari 3 variabel di atas hilang.
-
-### Build Error "ERESOLVE could not resolve"
-Sudah diperbaiki dengan file `.npmrc`. Pastikan Anda redeploy versi terbaru dari git.
+Setelah semua variabel disimpan, Anda **WAJIB melakukan Redeploy** agar perubahan terbaca.
+- Masuk ke tab **Deployments**.
+- Klik titik tiga di deployment terakhir -> **Redeploy**.
