@@ -81,6 +81,33 @@ export default function CartPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // AUTO-FILL DATA DARI PROFIL USER
+  useEffect(() => {
+    if (userData) {
+      // Isi nama jika belum diisi
+      if (!customerName && userData.name) {
+        setCustomerName(userData.name);
+      }
+      
+      // Isi nomor HP jika belum diisi
+      if (!customerPhone && userData.phone) {
+        setCustomerPhone(userData.phone);
+      }
+      
+      // Isi alamat jika belum diisi
+      if (!customerAddress) {
+        // Cek array addresses
+        if (userData.addresses && userData.addresses.length > 0) {
+          setCustomerAddress(userData.addresses[0]);
+        } 
+        // Cek properti legacy 'address' (jika ada)
+        else if ((userData as any).address) {
+          setCustomerAddress((userData as any).address);
+        }
+      }
+    }
+  }, [userData]);
+
   useEffect(() => {
     // Fetch Promo Product (Minyak atau produk lain untuk tebus murah)
     const fetchPromo = async () => {

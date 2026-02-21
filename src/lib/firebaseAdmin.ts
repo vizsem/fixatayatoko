@@ -35,5 +35,7 @@ if (!admin.apps.length) {
   }
 }
 
-export const adminDb = admin.firestore();
-export const FieldValue = admin.firestore.FieldValue;
+// Export safe instances (mock if init failed to prevent build crashes)
+// Note: Runtime usage will still fail if init failed, but build/import won't crash immediately.
+export const adminDb = admin.apps.length > 0 ? admin.firestore() : {} as admin.firestore.Firestore;
+export const FieldValue = admin.apps.length > 0 ? admin.firestore.FieldValue : {} as typeof admin.firestore.FieldValue;
