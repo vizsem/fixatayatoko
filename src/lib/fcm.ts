@@ -2,10 +2,22 @@ import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import app, { db, auth } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
-export const requestForToken = async () => {
+export const requestForToken = async (force = false) => {
   try {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const messaging = getMessaging(app);
+      
+      // Check current permission
+      if (Notification.permission === 'default' && !force) {
+        console.log('Notification permission is default. Waiting for user gesture.');
+        return null;
+      }
+
+      if (Notification.permission === 'denied') {
+        console.warn('Notification permission denied.');
+        return null;
+      }
+
       const permission = await Notification.requestPermission();
       
       if (permission === 'granted') {

@@ -8,12 +8,15 @@ import notify from '@/lib/notify';
 
 export default function FCMManager() {
   useEffect(() => {
-    // Request permission and token
-    requestForToken();
-
-    // Listen for foreground messages
-    onMessageListener().then((payload) => {
-      const p = payload as MessagePayload;
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // Hanya request token jika sudah diizinkan sebelumnya
+      if (Notification.permission === 'granted') {
+        requestForToken();
+      }
+      
+      // Listen for foreground messages
+      onMessageListener().then((payload) => {
+        const p = payload as MessagePayload;
       console.log('Foreground notification:', p);
       notify.custom((t: { id: string }) => (
         <div className="flex items-start gap-3 cursor-pointer" onClick={() => notify.dismiss(t.id)}>
@@ -34,6 +37,7 @@ export default function FCMManager() {
         </div>
       ), { duration: 5000, position: 'top-center', style: { borderRadius: '1rem', padding: '12px' } });
     });
+    }
   }, []);
 
   return null;
