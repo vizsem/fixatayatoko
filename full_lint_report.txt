@@ -1,0 +1,217 @@
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/customers/edit/[id]/page.tsx
+   92:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  209:86  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/customers/page.tsx
+  182:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  193:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/opname/page.tsx
+  4:10  warning  'useRouter' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/page.tsx
+   23:19  warning  'AlertCircle' is defined but never used  @typescript-eslint/no-unused-vars
+  132:14  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+  170:14  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/inventory/transfer/page.tsx
+   21:3   warning  'Warehouse' is defined but never used        @typescript-eslint/no-unused-vars
+   40:9   warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  113:14  warning  'error' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/kategori/page.tsx
+   16:3   warning  'query' is defined but never used         @typescript-eslint/no-unused-vars
+   17:3   warning  'orderBy' is defined but never used       @typescript-eslint/no-unused-vars
+   30:3   warning  'MoreVertical' is defined but never used  @typescript-eslint/no-unused-vars
+   32:3   warning  'Archive' is defined but never used       @typescript-eslint/no-unused-vars
+   43:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  138:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  155:16  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/layout.tsx
+  9:15  warning  'Store' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/orders/[id]/page.tsx
+   9:3   warning  'AlertTriangle' is defined but never used  @typescript-eslint/no-unused-vars
+   9:18  warning  'Package' is defined but never used        @typescript-eslint/no-unused-vars
+  10:3   warning  'User' is defined but never used           @typescript-eslint/no-unused-vars
+  10:29  warning  'CheckCircle' is defined but never used    @typescript-eslint/no-unused-vars
+  10:49  warning  'Phone' is defined but never used          @typescript-eslint/no-unused-vars
+  31:14  error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  72:16  warning  'err' is defined but never used            @typescript-eslint/no-unused-vars
+  99:14  warning  'err' is defined but never used            @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/orders/print/[id]/page.tsx
+   8:10  warning  'Printer' is defined but never used       @typescript-eslint/no-unused-vars
+   8:19  warning  'MapPin' is defined but never used        @typescript-eslint/no-unused-vars
+   8:27  warning  'Truck' is defined but never used         @typescript-eslint/no-unused-vars
+   8:34  warning  'CreditCard' is defined but never used    @typescript-eslint/no-unused-vars
+   8:46  warning  'Clock' is defined but never used         @typescript-eslint/no-unused-vars
+  20:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/page.tsx
+  32:11  warning  'Stats' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/points/page.tsx
+   10:3   warning  'Trophy' is defined but never used                  @typescript-eslint/no-unused-vars
+   14:3   warning  'Search' is defined but never used                  @typescript-eslint/no-unused-vars
+   16:3   warning  'TrendingUp' is defined but never used              @typescript-eslint/no-unused-vars
+   18:3   warning  'Calendar' is defined but never used                @typescript-eslint/no-unused-vars
+   19:3   warning  'ArrowUpRight' is defined but never used            @typescript-eslint/no-unused-vars
+   20:3   warning  'ArrowDownLeft' is defined but never used           @typescript-eslint/no-unused-vars
+   34:36  error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
+   35:44  error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
+   37:10  warning  'loading' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   38:10  warning  'searchTerm' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   38:22  warning  'setSearchTerm' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   92:14  warning  'e' is defined but never used                       @typescript-eslint/no-unused-vars
+  104:14  warning  'e' is defined but never used                       @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/products/edit/[id]/page.tsx
+   10:3   warning  'Package' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   10:32  warning  'Barcode' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   11:25  warning  'Layers' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   12:24  warning  'Eye' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   12:29  warning  'EyeOff' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   12:37  warning  'AlertTriangle' is defined but never used                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   13:3   warning  'Truck' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   13:10  warning  'Bookmark' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   25:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   26:48  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   39:6   warning  React Hook useEffect has missing dependencies: 'fetchProductData' and 'router'. Either include them or remove the dependency array                                                                                                                                                       react-hooks/exhaustive-deps
+   69:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   86:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  109:60  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  109:68  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  112:23  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  153:17  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  188:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  261:55  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/products/page.tsx
+    4:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   11:20  warning  'getDoc' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   26:53  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   62:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   65:7   warning  'handleSync' is assigned a value but never used                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  130:12  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  134:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  135:48  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  137:10  warning  'showAddModal' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  138:72  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  143:20  warning  'setFormData' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  143:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  198:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  209:32  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  220:29  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  228:16  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  233:9   warning  'handleCreate' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  233:34  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  239:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  391:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  467:24  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  470:25  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  474:25  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  478:26  warning  'arg0' is defined but never used                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/promotions/edit/[id]/page.tsx
+   85:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  148:86  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  182:94  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/[id]/page.tsx
+   6:23  warning  'updateDoc' is defined but never used                                                                      @typescript-eslint/no-unused-vars
+   6:34  warning  'serverTimestamp' is defined but never used                                                                @typescript-eslint/no-unused-vars
+   9:40  warning  'XCircle' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+  10:3   warning  'Download' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+  17:44  error    Unexpected any. Specify a different type                                                                   @typescript-eslint/no-explicit-any
+  37:6   warning  React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  96:47  error    Unexpected any. Specify a different type                                                                   @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/add/page.tsx
+   5:10  warning  'auth' is defined but never used          @typescript-eslint/no-unused-vars
+  16:26  warning  'CreditCard' is defined but never used    @typescript-eslint/no-unused-vars
+  17:3   warning  'AlertCircle' is defined but never used   @typescript-eslint/no-unused-vars
+  26:46  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:48  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:44  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  38:36  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:31  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:61  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/purchases/page.tsx
+   22:22  warning  'Trash2' is defined but never used                               @typescript-eslint/no-unused-vars
+   22:30  warning  'Truck' is defined but never used                                @typescript-eslint/no-unused-vars
+   22:37  warning  'User' is defined but never used                                 @typescript-eslint/no-unused-vars
+   23:12  warning  'AlertTriangle' is defined but never used                        @typescript-eslint/no-unused-vars
+   23:27  warning  'TrendingDown' is defined but never used                         @typescript-eslint/no-unused-vars
+   24:3   warning  'Filter' is defined but never used                               @typescript-eslint/no-unused-vars
+  130:14  warning  'err' is defined but never used                                  @typescript-eslint/no-unused-vars
+  263:28  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  263:35  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/customers/page.tsx
+   23:3   warning  'Package' is defined but never used       @typescript-eslint/no-unused-vars
+   25:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  318:62  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/finance/page.tsx
+   22:3   warning  'Calendar' is defined but never used      @typescript-eslint/no-unused-vars
+  418:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/inventory/page.tsx
+  280:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/operations/page.tsx
+   16:3   warning  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  394:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/page.tsx
+   21:3   warning  'Package' is defined but never used       @typescript-eslint/no-unused-vars
+   31:3   warning  'Percent' is defined but never used       @typescript-eslint/no-unused-vars
+   32:3   warning  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  177:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  372:9   error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  403:9   error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/reports/promotions/page.tsx
+  347:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/settings/page.tsx
+   15:25   warning  'Truck' is defined but never used         @typescript-eslint/no-unused-vars
+  118:14   warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  163:14   warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  195:16   warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  394:107  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/settings/points/page.tsx
+   9:10  warning  'loading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  14:51  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/suppliers/page.tsx
+  12:3  warning  'getDocs' is defined but never used    @typescript-eslint/no-unused-vars
+  14:3  warning  'updateDoc' is defined but never used  @typescript-eslint/no-unused-vars
+  30:3  warning  'Building' is defined but never used   @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/users/page.tsx
+  23:3  warning  'Mail' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/edit/[id]/page.tsx
+   91:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  207:97  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/mutasi/[id]/page.tsx
+   5:20  warning  'storage' is defined but never used       @typescript-eslint/no-unused-vars
+  23:58  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:60  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:44  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/hadzikoh/marketpleace-new/src/app/admin/warehouses/page.tsx
+   27:3   warning  'ChevronRight' is defined but never used  @typescript-eslint/no-unused-vars
+   39:14  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   65:16  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  143:14  warning  'err' is defined but never used           @typescript-eslint/no-unused-vars
+
+✖ 154 problems (48 errors, 106 warnings)
+
