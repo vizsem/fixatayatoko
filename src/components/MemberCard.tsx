@@ -23,7 +23,7 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
 
   return (
     <div 
-      className={`w-full aspect-[1.586] rounded-[2rem] p-6 relative overflow-hidden shadow-2xl transition-all hover:scale-[1.02] ${getLevelColor()}`}
+      className={`w-full max-w-md md:max-w-sm lg:max-w-xs aspect-[1.586] rounded-2xl p-5 md:p-4 relative overflow-hidden shadow-xl transition-all hover:scale-[1.01] ${getLevelColor()}`}
       data-testid="member-card"
     >
       {/* Background Pattern */}
@@ -34,11 +34,11 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-1">ATAYATOKO MEMBER</h3>
-            <h2 className="text-2xl font-black uppercase tracking-tight line-clamp-1">{name}</h2>
+            <h3 className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-70 mb-1">ATAYATOKO MEMBER</h3>
+            <h2 className="text-xl md:text-lg font-bold uppercase tracking-tight line-clamp-1">{name}</h2>
           </div>
           <div className="flex flex-col items-end">
-             <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/20 backdrop-blur rounded-lg border border-white/10">
+             <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 bg-white/20 backdrop-blur rounded-lg border border-white/10">
                {level}
              </span>
           </div>
@@ -47,22 +47,22 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
         {/* Content: Barcode & Points */}
         <div className="flex items-end justify-between mt-4">
           <div className="flex flex-col gap-1">
-             <div className="bg-white p-2 rounded-xl inline-block shadow-sm">
-                <QRCodeSVG value={memberId} size={64} />
+             <div className="bg-white p-1.5 rounded-lg inline-block shadow-sm">
+                <QRCodeSVG value={memberId} size={48} className="md:w-10 md:h-10" />
              </div>
-             <p className="text-[8px] font-mono mt-1 opacity-80">{memberId}</p>
+             <p className="text-[7px] font-mono mt-0.5 opacity-80">{memberId}</p>
           </div>
 
           <div className="flex items-center gap-4">
             {typeof walletBalance === 'number' && (
               <div className="flex flex-col items-end">
-                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Wallet size={10}/> Saldo</p>
-                <p className="text-xl font-black tracking-tight">Rp{walletBalance.toLocaleString()}</p>
+                <p className="text-[8px] font-medium uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Wallet size={8}/> Saldo</p>
+                <p className="text-lg font-bold tracking-tight">Rp{walletBalance.toLocaleString()}</p>
               </div>
             )}
             <div className="flex flex-col items-end">
-              <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Ticket size={10}/> Poin</p>
-              <p className="text-3xl font-black tracking-tight">{points.toLocaleString()}</p>
+              <p className="text-[8px] font-medium uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Ticket size={8}/> Poin</p>
+              <p className="text-2xl md:text-xl font-bold tracking-tight">{points.toLocaleString()}</p>
             </div>
           </div>
         </div>
