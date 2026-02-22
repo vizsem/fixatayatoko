@@ -215,83 +215,91 @@ export default function ProfilePage() {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <Loader2 className="animate-spin text-green-600 mb-2" size={32} />
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Memuat Profil...</p>
+      <Loader2 className="animate-spin text-emerald-500 mb-2" size={32} />
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Memuat Profil...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 pb-24 font-sans">
       {/* HEADER */}
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-[100] border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-green-100 hover:text-green-600 transition-all">
+            <Link href="/" className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-emerald-100 hover:text-emerald-600 transition-all">
               <ChevronLeft size={20} />
             </Link>
-            <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter italic underline decoration-green-500 underline-offset-4">Akun Saya</h1>
+            <h1 className="text-sm font-bold text-slate-800 uppercase tracking-tight underline decoration-emerald-500 underline-offset-4">Akun Saya</h1>
           </div>
           
           <button onClick={() => setShowNotif(!showNotif)} className="relative p-3 bg-slate-100 rounded-2xl text-slate-500 group">
             <Bell size={20} className={activeOrdersCount > 0 ? 'animate-bounce' : ''} />
-            {activeOrdersCount > 0 && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
+            {activeOrdersCount > 0 && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>}
           </button>
         </div>
 
         {showNotif && (
           <div className="absolute right-6 top-20 w-80 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Aktivitas Belanja</span>
-              <button onClick={() => setShowNotif(false)}><X size={16}/></button>
+            <div className="p-5 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
+              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Aktivitas Belanja</span>
+              <button onClick={() => setShowNotif(false)} className="text-slate-400 hover:text-emerald-600 p-1 rounded-full hover:bg-emerald-100 transition-all"><X size={16}/></button>
             </div>
             <div className="max-h-80 overflow-y-auto p-3 space-y-2">
-              {activeOrdersList.length > 0 ? activeOrdersList.map(order => (
-                <div key={order.id} onClick={() => router.push(`/transaksi/${order.id}`)} className="p-4 hover:bg-slate-50 rounded-2xl flex gap-3 items-center cursor-pointer border border-transparent hover:border-slate-100 transition-all">
-                  <div className="bg-green-100 p-2 rounded-xl text-green-600"><Clock size={16}/></div>
-                  <div className="flex-1">
-                    <p className="text-[10px] font-black text-slate-800 uppercase italic">Status: {order.status}</p>
-                    <p className="text-[8px] font-bold text-slate-400 mt-1">{order.orderId || order.id.slice(0,8)}</p>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-200"/>
-                </div>
-              )) : (
-                <div className="py-10 text-center opacity-30 italic text-[10px] font-black uppercase tracking-widest">Belum ada aktivitas</div>
-              )}
+              {activeOrdersList.length > 0 ? activeOrdersList.map(order => {
+                    const status = getStatusInfo(order.status);
+                    return (
+                      <div key={order.id} onClick={() => router.push(`/transaksi/${order.id}`)} className="p-4 hover:bg-slate-50 rounded-2xl flex gap-3 items-center cursor-pointer border border-transparent hover:border-slate-100 transition-all">
+                        <div className={`p-2 rounded-xl bg-gray-50 ${status.color}`}>
+                          {status.icon}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-black text-slate-800 uppercase">Status: {status.label}</p>
+                          <p className="text-[8px] font-bold text-slate-400 mt-1">{order.orderId || order.id.slice(0,8)}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-200"/>
+                      </div>
+                    );
+                  }) : (
+                    <div className="py-10 text-center opacity-40 text-[10px] font-black uppercase tracking-widest">Belum ada aktivitas</div>
+                  )}
             </div>
           </div>
         )}
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* MEMBER CARD WIDGET (NEW) - FULL WIDTH */}
+        <div className="mb-8">
+          <MemberCard 
+            name={profile?.name || "Member Ataya"} 
+            memberId={user?.uid || "GUEST"} 
+            points={profile?.points || 0}
+            walletBalance={profile?.walletBalance}
+            level={(profile?.points || 0) > 100000 ? 'Platinum' : (profile?.points || 0) > 50000 ? 'Gold' : (profile?.points || 0) > 10000 ? 'Silver' : 'Bronze'}
+          />
+        </div>
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* KOLOM KIRI: PROFIL & POIN */}
           <div className="space-y-6">
-            {/* MEMBER CARD WIDGET (NEW) */}
-            <MemberCard 
-              name={profile?.name || "Member Ataya"} 
-              memberId={user?.uid || "GUEST"} 
-              points={profile?.points || 0}
-              walletBalance={profile?.walletBalance}
-              level={(profile?.points || 0) > 100000 ? 'Platinum' : (profile?.points || 0) > 50000 ? 'Gold' : (profile?.points || 0) > 10000 ? 'Silver' : 'Bronze'}
-            />
 
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-shadow">
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg shadow-green-100">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-100">
                     <User size={32} />
                   </div>
                   <div className="flex-1">
                     {isEditingName ? (
                       <div className="flex gap-2">
-                        <input value={newName} onChange={e => setNewName(e.target.value)} className="bg-slate-50 px-3 py-1 rounded-lg outline-none font-black text-lg w-full uppercase italic" autoFocus />
-                        <button onClick={handleSaveName} disabled={isSaving} className="text-green-600"><Save size={20}/></button>
+                        <input value={newName} onChange={e => setNewName(e.target.value)} className="bg-white px-3 py-1 rounded-lg outline-none font-bold text-lg w-full border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" autoFocus />
+                        <button onClick={handleSaveName} disabled={isSaving} className="text-emerald-600 hover:text-emerald-700 p-1 rounded-full hover:bg-emerald-100 transition-all"><Save size={20}/></button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 group/name">
-                        <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">{profile?.name || "Member Ataya"}</h2>
-                        <button onClick={() => setIsEditingName(true)} className="opacity-0 group-hover/name:opacity-100 transition-opacity"><Edit size={14} className="text-slate-300 hover:text-green-600"/></button>
+                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{profile?.name || "Member Ataya"}</h2>
+                        <button onClick={() => setIsEditingName(true)} className="opacity-0 group-hover/name:opacity-100 transition-opacity p-1 rounded-full hover:bg-emerald-100"><Edit size={14} className="text-slate-400 hover:text-emerald-600"/></button>
                       </div>
                     )}
                     <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1 uppercase tracking-widest">
@@ -305,7 +313,7 @@ export default function ProfilePage() {
                     <div className="p-3 bg-blue-100 text-blue-600 rounded-xl"><Ticket size={20}/></div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo Dompet</p>
-                      <h3 className="text-xl font-black text-slate-800 italic">
+                      <h3 className="text-xl font-bold text-slate-800">
                         Rp{(profile?.walletBalance || 0).toLocaleString('id-ID')}
                       </h3>
                     </div>
@@ -326,29 +334,29 @@ export default function ProfilePage() {
             </div>
 
             {/* BAGIAN ALAMAT */}
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <MapPin size={14} className="text-green-600" /> Alamat Tersimpan
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+              <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <MapPin size={14} className="text-emerald-500" /> Alamat Tersimpan
               </h3>
               <div className="space-y-4 mb-8">
                 {addresses.length > 0 ? addresses.map(addr => (
                   <div key={addr.id} className="p-5 bg-slate-50 rounded-3xl relative border border-slate-50 group">
-                    <p className="text-[10px] font-black text-green-600 uppercase italic mb-1">{addr.label}</p>
+                    <p className="text-[10px] font-bold text-green-600 uppercase mb-1">{addr.label}</p>
                     <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{addr.receiverName}</p>
                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase leading-relaxed">{addr.address}</p>
                     <button onClick={() => deleteAddress(addr.id)} className="absolute top-5 right-5 text-slate-300 hover:text-rose-500 transition-colors">
                       <Trash2 size={16}/>
                     </button>
                   </div>
-                )) : <p className="text-[10px] text-center italic text-slate-300 py-4">Belum ada alamat.</p>}
+                )) : <p className="text-[10px] text-center text-slate-400 py-4 font-medium">Belum ada alamat.</p>}
               </div>
               
-              <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-dashed border-slate-200 space-y-3">
-                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="LABEL (MISAL: RUMAH)..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-black uppercase outline-none border border-slate-100 focus:border-green-500" />
-                <input value={newReceiverName} onChange={e => setNewReceiverName(e.target.value)} placeholder="NAMA PENERIMA..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-black uppercase outline-none border border-slate-100 focus:border-green-500" />
-                <input value={newReceiverPhone} onChange={e => setNewReceiverPhone(e.target.value)} placeholder="NO. WHATSAPP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-black uppercase outline-none border border-slate-100 focus:border-green-500" />
-                <textarea value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="ALAMAT LENGKAP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-black uppercase outline-none border border-slate-100 h-20 resize-none" />
-                <button onClick={addAddress} disabled={isSaving} className="w-full bg-black text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <div className="bg-emerald-50/50 p-6 rounded-3xl border-2 border-dashed border-emerald-200 space-y-3">
+                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="LABEL (MISAL: RUMAH)..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <input value={newReceiverName} onChange={e => setNewReceiverName(e.target.value)} placeholder="NAMA PENERIMA..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <input value={newReceiverPhone} onChange={e => setNewReceiverPhone(e.target.value)} placeholder="NO. WHATSAPP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                <textarea value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="ALAMAT LENGKAP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 h-20 resize-none" />
+                <button onClick={addAddress} disabled={isSaving} className="w-full bg-emerald-500 text-white py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-emerald-600">
                    {isSaving ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>} Simpan Alamat
                 </button>
               </div>
@@ -357,22 +365,22 @@ export default function ProfilePage() {
 
           {/* KOLOM KANAN: RIWAYAT PESANAN */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 min-h-[600px]">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 min-h-[600px] hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                   <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest italic">Riwayat Transaksi</h3>
+                   <h3 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">Riwayat Transaksi</h3>
                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Total {orders.length} Pesanan</p>
                 </div>
                 {activeOrdersCount > 0 && (
-                   <div className="bg-green-100 text-green-600 px-4 py-2 rounded-full flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-ping"></div>
-                      <span className="text-[9px] font-black uppercase tracking-widest">{activeOrdersCount} Aktif</span>
+                   <div className="bg-emerald-100 text-emerald-600 px-4 py-2 rounded-full flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping"></div>
+                      <span className="text-[9px] font-bold uppercase tracking-widest">{activeOrdersCount} Aktif</span>
                    </div>
                 )}
               </div>
 
               {orders.length === 0 ? (
-                <div className="text-center py-24 italic opacity-40">
+                <div className="text-center py-24 opacity-40">
                   <Package className="mx-auto text-slate-200 mb-4" size={64} />
                   <p className="text-[10px] font-black uppercase tracking-[0.3em]">Belum ada riwayat belanja</p>
                 </div>
@@ -381,19 +389,21 @@ export default function ProfilePage() {
                   {currentOrders.map(order => {
                     const status = getStatusInfo(order.status);
                     const isActive = ['PENDING', 'MENUNGGU', 'DIPROSES', 'DIKIRIM'].includes(order.status?.toUpperCase());
+                    const firstItem = order.items?.[0];
+                    const additionalItems = (order.items?.length || 0) - 1;
 
                     return (
-                      <div key={order.id} className={`p-6 border rounded-[2rem] transition-all relative overflow-hidden group ${isActive ? 'bg-green-50/30 border-green-100' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
+                      <div key={order.id} className={`p-6 border rounded-[2rem] transition-all relative overflow-hidden group ${isActive ? 'bg-emerald-50/30 border-emerald-100' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex items-center gap-3">
                             <div className={`p-3 rounded-2xl bg-gray-50 ${status.color}`}>
-                                {status.icon}
+                              {status.icon}
                             </div>
                             <div>
-                                <h4 className="text-[10px] font-black uppercase italic tracking-tighter">{order.orderId || `INV-${order.id.slice(0,8).toUpperCase()}`}</h4>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase">
-                                    {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : '-'}
-                                </p>
+                              <h4 className="text-[10px] font-bold uppercase tracking-tight">{order.orderId || `ATY-${order.id.slice(0,5).toUpperCase()}`}</h4>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : '-'}
+                              </p>
                             </div>
                           </div>
                           <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${status.color} ${status.bg}`}>
@@ -402,19 +412,25 @@ export default function ProfilePage() {
                         </div>
 
                         <div className="mb-6">
-                            {order.items?.slice(0, 1).map((item, i) => (
-                                <p key={i} className="text-xs font-black text-slate-800 uppercase italic line-clamp-1">{item.name} <span className="text-slate-400 ml-1">x{item.quantity}</span></p>
-                            ))}
-                            {order.items?.length > 1 && <p className="text-[9px] font-bold text-slate-400 mt-1">+ {order.items.length - 1} PRODUK LAINNYA</p>}
+                          {firstItem && (
+                            <p className="text-xs font-bold text-slate-800 uppercase line-clamp-1">
+                              {firstItem.name} <span className="text-slate-400 ml-1">x{firstItem.quantity}</span>
+                            </p>
+                          )}
+                          {additionalItems > 0 && (
+                            <p className="text-[9px] font-bold text-slate-400 mt-1">+ {additionalItems} PRODUK LAINNYA</p>
+                          )}
                         </div>
 
                         <div className="flex justify-between items-center pt-4 border-t border-dashed border-slate-200">
                           <div>
-                             <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Bayar</p>
-                             <p className="text-xl font-black text-slate-900 italic tracking-tighter">Rp{(order.total || 0).toLocaleString()}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Bayar</p>
+                            <p className="text-xl font-bold text-slate-900 tracking-tight">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
                           </div>
-                          <Link href={`/transaksi/${order.id}`} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-green-600 hover:border-green-100 transition-all">
-                             <ChevronRight size={20} />
+                          <Link href={`/transaksi/${order.id}`} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-emerald-500 hover:border-emerald-100 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-chevron-right" aria-hidden="true">
+                              <path d="m9 18 6-6-6-6"></path>
+                            </svg>
                           </Link>
                         </div>
                       </div>
