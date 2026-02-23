@@ -462,44 +462,136 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <thead>
                 <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
                   <th className="pb-4 text-left">Item</th>
-                  <th className="pb-4 text-center">Qty</th>
+                  <th className="pb-4 text-center w-24">Qty</th>
                   <th className="pb-4 text-right">Subtotal</th>
+                  {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
+                    <th className="pb-4 text-right w-24">Stok Ada</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {order.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="py-6 font-black text-sm uppercase">{item.name}</td>
-                    <td className="py-6 text-center font-bold text-slate-400">x{item.quantity}</td>
-                    <td className="py-6 text-right font-black">
+                {editableItems.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className={`${!item.selected ? 'opacity-40 bg-slate-50' : ''} transition-all`}
+                  >
+                    <td className="py-4 font-black text-sm uppercase">
+                      {item.name}
+                      <p className="text-xs font-mono text-slate-400 font-medium normal-case">
+                        Rp{item.price.toLocaleString()}
+                      </p>
+                    </td>
+                    <td className="py-4 text-center">
+                      {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value, 10);
+                            setEditableItems((prev) =>
+                              prev.map((it, i) =>
+                                i === idx
+                                  ? {
+                                      ...it,
+                                      quantity: isNaN(newQuantity)
+                                        ? 0
+                                        : Math.max(0, newQuantity)
+                                    }
+                                  : it
+                              )
+                            );
+                          }}
+                          className="w-16 text-center font-bold bg-slate-100 rounded-lg p-2 text-sm"
+                          max={item.originalQuantity}
+                        />
+                      ) : (
+                        <span className="font-bold text-slate-400">x{item.quantity}</span>
+                      )}
+                    </td>
+                    <td className="py-4 text-right font-black">
                       Rp {(item.quantity * item.price).toLocaleString()}
                     </td>
+                    {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
+                      <td className="py-4 text-right">
+                        <input
+                          type="checkbox"
+                          checked={item.selected}
+                          onChange={(e) =>
+                            setEditableItems((prev) =>
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, selected: e.target.checked } : it
+                              )
+                            )
+                          }
+                          className="w-5 h-5 rounded-lg border-slate-300 text-emerald-600 focus:ring-emerald-500 shadow-sm"
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr>
-                  <td colSpan={3} className="pt-4">
-                    <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
-                      <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                        <span>Subtotal Produk</span>
-                        <span>
-                          Rp
-                          {order.subtotal?.toLocaleString() ||
-                            (order.total - (order.shippingCost || 0)).toLocaleString()}
-                        </span>
+                {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
+                  <>
+                    <tr>
+                      <td colSpan={4} className="pt-6">
+                        <div className="ml-auto max-w-sm border-t-2 border-slate-100 pt-6 space-y-3">
+                          <div className="flex justify-between text-sm font-bold text-slate-500">
+                            <span>Subtotal Awal</span>
+                            <span>Rp{originalSubtotal.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-bold text-slate-500">
+                            <span>Ongkos Kirim</span>
+                            <span>Rp{order.shippingCost?.toLocaleString() || 0}</span>
+                          </div>
+                          {refundAmount > 0 && (
+                            <div className="flex justify-between text-sm font-bold text-rose-500">
+                              <span>Refund ke Dompet</span>
+                              <span>- Rp{refundAmount.toLocaleString()}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-lg font-black text-slate-900 pt-3 border-t-2 border-slate-100 border-dashed">
+                            <span>Total Baru</span>
+                            <span>Rp{newTotal.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="pt-6 text-right">
+                        <button
+                          onClick={handleConfirmItems}
+                          disabled={isConfirmingItems || confirmedItems.length === 0}
+                          className="bg-emerald-600 text-white font-black uppercase text-sm px-8 py-4 rounded-2xl shadow-lg hover:bg-emerald-700 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
+                        >
+                          {isConfirmingItems ? 'Memproses...' : 'Konfirmasi & Proses Pesanan'}
+                        </button>
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="pt-4">
+                      <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                          <span>Subtotal Produk</span>
+                          <span>
+                            Rp
+                            {(order.subtotal || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                          <span>Ongkos Kirim</span>
+                          <span>Rp{(order.shippingCost || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100 border-dashed">
+                          <span>Total Pembayaran</span>
+                          <span>Rp{(order.total || 0).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                        <span>Ongkos Kirim</span>
-                        <span>Rp{order.shippingCost?.toLocaleString() || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100 border-dashed">
-                        <span>Total Pembayaran</span>
-                        <span>Rp{order.total?.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>
@@ -594,34 +686,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl bg-black/90 backdrop-blur-xl p-4 rounded-[2.5rem] shadow-2xl z-[100] no-print">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar justify-center">
-          <button
-            onClick={() => updateStatus('DIPROSES')}
-            className="px-6 py-3 rounded-2xl bg-amber-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all"
-          >
-            Proses
-          </button>
-          <button
-            onClick={() => updateStatus('DIKIRIM')}
-            className="px-6 py-3 rounded-2xl bg-blue-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all"
-          >
-            Kirim
-          </button>
-          <button
-            onClick={() => updateStatus('SELESAI')}
-            className="px-6 py-3 rounded-2xl bg-emerald-500 text-[10px] font-black uppercase text-white hover:scale-105 transition-all"
-          >
-            Selesai
-          </button>
-          <button
-            onClick={() => updateStatus('DIBATALKAN')}
-            className="px-6 py-3 rounded-2xl bg-rose-600 text-[10px] font-black uppercase text-white hover:scale-105 transition-all"
-          >
-            Batal
-          </button>
-        </div>
-      </div>
+
 
       <style jsx global>{`
         @media print {

@@ -71,7 +71,12 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
 
       // UPDATE → User sendiri atau Admin
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Proteksi wallet balance agar hanya bisa diubah oleh staff atau melalui transaksi sah
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && 
+         !request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance'])) || 
+        isStaff()
+      );
 
       allow delete: if isAdmin();
     }
@@ -127,7 +132,14 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 12. CATCH ALL
+    // 12. WALLET SYSTEM
+    match /wallet_logs/{logId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isStaff(); // Hanya staff yang bisa membuat log wallet
+      allow update, delete: if isAdmin();
+    }
+
+    // 13. CATCH ALL
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }

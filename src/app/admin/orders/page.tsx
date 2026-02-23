@@ -7,7 +7,7 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp
+  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp, limit
 } from 'firebase/firestore';
 import {
   ShoppingCart, Search, Truck, Printer, XCircle,
@@ -53,16 +53,22 @@ export default function AdminOrders() {
     return () => unsubAuth();
   }, [router]);
 
-  // 2. Real-time Data Fetching
+  // 2. Real-time Data Fetching dengan Pagination
   useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    // Load hanya data yang dibutuhkan untuk halaman saat ini
+    const offset = (currentPage - 1) * itemsPerPage;
+    const q = query(
+      collection(db, 'orders'), 
+      orderBy('createdAt', 'desc'),
+      limit(itemsPerPage)
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setOrders(list);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentPage]);
 
   // 3. Fungsi Cetak Cepat
   const handlePrint = (orderId: string) => {
