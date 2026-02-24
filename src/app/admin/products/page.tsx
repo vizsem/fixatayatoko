@@ -407,8 +407,8 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left min-w-[800px] md:min-w-0">
             <thead className="bg-gray-50 text-xs font-semibold text-gray-600 border-b border-gray-200">
               <tr>
                 <th className="p-4 md:p-6 w-12">

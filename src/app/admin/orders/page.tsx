@@ -55,8 +55,6 @@ export default function AdminOrders() {
 
   // 2. Real-time Data Fetching dengan Pagination
   useEffect(() => {
-    // Load hanya data yang dibutuhkan untuk halaman saat ini
-    const offset = (currentPage - 1) * itemsPerPage;
     const q = query(
       collection(db, 'orders'), 
       orderBy('createdAt', 'desc'),

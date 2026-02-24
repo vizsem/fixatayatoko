@@ -88,33 +88,33 @@ export default function PurchaseDetail() {
                 {purchase.items?.length || 0} Items
               </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="overflow-x-auto -mx-4 md:mx-0">
+              <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead>
                   <tr className="border-b border-gray-50">
-                    <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase">Product Name</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase">Unit Price</th>
-                    <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Product Name</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Unit Price</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {purchase.items?.map((item, idx) => (
 
                     <tr key={idx} className="hover:bg-gray-50/50 transition-all">
-                      <td className="px-8 py-5">
+                      <td className="px-3 md:px-8 py-3 md:py-5">
                         <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{item.name}</span>
                         <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Product ID: {item.id.slice(0, 8)}</p>
                       </td>
-                      <td className="px-6 py-5 text-center">
+                      <td className="px-3 md:px-6 py-3 md:py-5 text-center">
                         <span className="text-xs font-black text-gray-700 bg-gray-100 px-3 py-1 rounded-lg">
                           {item.quantity} {item.unit}
                         </span>
                       </td>
-                      <td className="px-6 py-5 text-xs font-bold text-gray-600">
+                      <td className="px-3 md:px-6 py-3 md:py-5 text-xs font-bold text-gray-600">
                         Rp {item.purchasePrice.toLocaleString()}
                       </td>
-                      <td className="px-8 py-5 text-right text-xs font-black text-gray-800">
+                      <td className="px-3 md:px-8 py-3 md:py-5 text-right text-xs font-black text-gray-800">
                         Rp {(item.quantity * item.purchasePrice).toLocaleString()}
                       </td>
                     </tr>

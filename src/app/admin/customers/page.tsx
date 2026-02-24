@@ -255,8 +255,8 @@ export default function AdminCustomers() {
 
       {/* Main Table */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-[0.2em]">Profil pelanggan</th>

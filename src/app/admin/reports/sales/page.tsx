@@ -298,26 +298,26 @@ export default function SalesReport() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full min-w-[640px] md:min-w-0">
+            <thead className="bg-gray-50 text-xs md:text-sm">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Tanggal
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Produk
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Qty
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Total
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Pembayaran
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Pelanggan
                 </th>
               </tr>
@@ -325,7 +325,7 @@ export default function SalesReport() {
             <tbody className="bg-white divide-y divide-gray-100">
               {sortedSales.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center">
+                  <td colSpan={6} className="px-3 md:px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <TrendingUp className="h-16 w-16 text-gray-300 mb-4" />
                       <p className="text-gray-500 font-medium text-lg mb-2">Belum ada data penjualan</p>
@@ -336,23 +336,23 @@ export default function SalesReport() {
               ) : (
                 paginatedSales.map((sale, index) => (
                   <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(sale.date).toLocaleDateString('id-ID', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric'
                       })}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                    <td className="px-3 py-3 md:px-6 md:py-4 text-sm text-gray-900 max-w-xs truncate">
                       {sale.productName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900 font-semibold">
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-center text-gray-900 font-semibold">
                       {sale.quantity}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-green-600 font-bold">
                       Rp{sale.total.toLocaleString('id-ID')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         sale.paymentMethod === 'CASH' 
                           ? 'bg-green-100 text-green-800'
@@ -365,7 +365,7 @@ export default function SalesReport() {
                         {sale.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-sm text-gray-900">
                       {sale.customerName}
                     </td>
                   </tr>

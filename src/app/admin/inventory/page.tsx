@@ -253,8 +253,8 @@ export default function InventoryDashboard() {
 
       {/* 3. Main Table */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50/50">
               <tr>
                 <th className="px-3 md:px-8 py-3 md:py-6 w-10">

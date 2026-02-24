@@ -454,29 +454,29 @@ export default function FinanceReport() {
           <h2 className="text-xl font-bold text-gray-900">Detail Transaksi Keuangan</h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full min-w-[720px] md:min-w-0">
+            <thead className="bg-gray-50 text-xs md:text-sm">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Tanggal
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Deskripsi
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Pendapatan
                 </th>
-                <th className="hidden md:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Biaya Pokok
                 </th>
-                <th className="hidden md:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Laba
                 </th>
-                <th className="hidden md:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Pengeluaran
                 </th>
-                <th className="hidden md:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Metode Bayar
                 </th>
               </tr>
@@ -484,7 +484,7 @@ export default function FinanceReport() {
             <tbody className="divide-y divide-gray-100">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={7} className="px-3 md:px-6 py-16 text-center">
                     <div className="flex flex-col items-center">
                       <CreditCard className="h-16 w-16 text-gray-300 mb-4" />
                       <p className="text-gray-500 font-medium">Tidak ada data keuangan dalam periode ini</p>
@@ -495,17 +495,17 @@ export default function FinanceReport() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(record.date).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{record.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                    <td className="px-3 py-3 md:px-6 md:py-4 text-sm text-gray-900 max-w-xs truncate">{record.description}</td>
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                       {record.type === 'profit' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-red-600">
                       {record.cost ? `Rp${record.cost.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
                       {record.profit ? (
                         <span className={`text-sm font-bold ${record.profit >= 0 ? 'text-green-600' : 'text-red-600'
                           }`}>
@@ -513,10 +513,10 @@ export default function FinanceReport() {
                         </span>
                       ) : '–'}
                     </td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm font-semibold text-orange-600">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-semibold text-orange-600">
                       {record.type === 'expense' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
                     </td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {record.paymentMethod}
                       </span>

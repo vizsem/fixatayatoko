@@ -169,22 +169,22 @@ export default function PromotionsPage() {
 
       {/* Tabel Promosi */}
       <div className="bg-white shadow-sm rounded-[2rem] border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="min-w-full divide-y divide-gray-100 min-w-[720px] md:min-w-0">
             <thead>
               <tr className="bg-gray-50/50">
-                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Detail Promo</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Target</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Potongan</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Periode</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Detail Promo</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Target</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Potongan</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Periode</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {promotions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-3 md:px-6 py-20 text-center">
                     <div className="flex flex-col items-center opacity-20">
                       <Gift size={48} className="mb-4" />
                       <p className="text-sm font-black uppercase tracking-widest">Belum ada promo aktif</p>
@@ -198,7 +198,7 @@ export default function PromotionsPage() {
 
                   return (
                     <tr key={promo.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-3 md:px-6 py-3 md:py-4">
                         <div className="font-bold text-gray-900 uppercase text-xs">{promo.name}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                           {promo.type === 'product' && <Tag size={12} className="text-blue-500" />}
@@ -209,7 +209,7 @@ export default function PromotionsPage() {
                           <span className="text-[10px] font-black text-gray-400 uppercase">{promo.type}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 md:px-6 py-3 md:py-4">
                         {promo.type === 'coupon' ? (
                           <span className="px-2 py-1 bg-gray-100 text-black rounded-lg text-[10px] font-black font-mono border border-gray-200">
                             {promo.code}
@@ -218,14 +218,14 @@ export default function PromotionsPage() {
                           <span className="text-xs font-bold text-gray-600 italic">{promo.targetName || 'Semua Produk'}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 md:px-6 py-3 md:py-4">
                         <div className="text-xs font-black text-green-600">
                           {promo.discountType === 'percentage'
                             ? `${promo.discountValue}%`
                             : `Rp${(promo.discountValue || 0).toLocaleString('id-ID')}`}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 md:px-6 py-3 md:py-4">
                         <div className="flex flex-col gap-1 text-[10px] font-bold text-gray-500 uppercase">
                           <div className="flex items-center gap-1">
                             <Clock size={10} />
@@ -237,7 +237,7 @@ export default function PromotionsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 md:px-6 py-3 md:py-4">
                         {expired ? (
                           <span className="px-2 py-1 text-[8px] font-black bg-red-50 text-red-500 rounded-md uppercase border border-red-100">
                             Kedaluwarsa
@@ -254,7 +254,7 @@ export default function PromotionsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link
                             href={`/admin/promotions/edit/${promo.id}`}

@@ -342,20 +342,20 @@ export default function MarketplaceOrdersPage() {
                 )}
               </div>
             </div>
-
-            <table className="w-full text-left">
+            <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full text-left min-w-[680px] md:min-w-0">
               <thead className="bg-gray-50/50">
                 <tr>
-                  <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga</th>
-                  <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
+                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga</th>
+                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {cart.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-8 py-4">
+                    <td className="px-3 md:px-8 py-3 md:py-4">
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
                         <button
@@ -367,7 +367,7 @@ export default function MarketplaceOrdersPage() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 md:px-6 py-3 md:py-4">
                       <div className="flex items-center justify-center">
                         <input
                           type="number"
@@ -378,7 +378,7 @@ export default function MarketplaceOrdersPage() {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                       <input
                         type="number"
                         className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
@@ -387,20 +387,21 @@ export default function MarketplaceOrdersPage() {
                         min={0}
                       />
                     </td>
-                    <td className="px-8 py-4 text-right text-xs font-black text-gray-800">
+                    <td className="px-3 md:px-8 py-3 md:py-4 text-right text-xs font-black text-gray-800">
                       Rp {(item.quantity * item.price).toLocaleString()}
                     </td>
                   </tr>
                 ))}
                 {!cart.length && (
                   <tr>
-                    <td colSpan={4} className="px-8 py-10 text-center text-[11px] font-bold text-gray-400">
+                    <td colSpan={4} className="px-3 md:px-8 py-10 text-center text-[11px] font-bold text-gray-400">
                       Belum ada produk di order marketplace ini.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 

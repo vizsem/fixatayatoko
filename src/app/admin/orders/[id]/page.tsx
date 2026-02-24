@@ -458,14 +458,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           <div className="mb-12">
-            <table className="w-full">
+            <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full min-w-[600px] md:min-w-0">
               <thead>
                 <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
-                  <th className="pb-4 text-left">Item</th>
-                  <th className="pb-4 text-center w-24">Qty</th>
-                  <th className="pb-4 text-right">Subtotal</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-left">Item</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-center w-24">Qty</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-right">Subtotal</th>
                   {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
-                    <th className="pb-4 text-right w-24">Stok Ada</th>
+                    <th className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-right w-24">Stok Ada</th>
                   )}
                 </tr>
               </thead>
@@ -475,13 +476,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     key={idx}
                     className={`${!item.selected ? 'opacity-40 bg-slate-50' : ''} transition-all`}
                   >
-                    <td className="py-4 font-black text-sm uppercase">
+                    <td className="px-3 md:px-0 py-3 md:py-4 font-black text-sm uppercase">
                       {item.name}
                       <p className="text-xs font-mono text-slate-400 font-medium normal-case">
                         Rp{item.price.toLocaleString()}
                       </p>
                     </td>
-                    <td className="py-4 text-center">
+                    <td className="px-3 md:px-0 py-3 md:py-4 text-center">
                       {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
                         <input
                           type="number"
@@ -508,11 +509,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         <span className="font-bold text-slate-400">x{item.quantity}</span>
                       )}
                     </td>
-                    <td className="py-4 text-right font-black">
+                    <td className="px-3 md:px-0 py-3 md:py-4 text-right font-black">
                       Rp {(item.quantity * item.price).toLocaleString()}
                     </td>
                     {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
-                      <td className="py-4 text-right">
+                      <td className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-right">
                         <input
                           type="checkbox"
                           checked={item.selected}
@@ -534,7 +535,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
                   <>
                     <tr>
-                      <td colSpan={4} className="pt-6">
+                      <td colSpan={4} className="pt-6 px-3 md:px-0">
                         <div className="ml-auto max-w-sm border-t-2 border-slate-100 pt-6 space-y-3">
                           <div className="flex justify-between text-sm font-bold text-slate-500">
                             <span>Subtotal Awal</span>
@@ -558,7 +559,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       </td>
                     </tr>
                     <tr>
-                      <td colSpan={4} className="pt-6 text-right">
+                      <td colSpan={4} className="pt-6 text-right px-3 md:px-0">
                         <button
                           onClick={handleConfirmItems}
                           disabled={isConfirmingItems || confirmedItems.length === 0}
@@ -571,7 +572,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </>
                 ) : (
                   <tr>
-                    <td colSpan={3} className="pt-4">
+                    <td colSpan={3} className="pt-4 px-3 md:px-0">
                       <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
                         <div className="flex justify-between text-[11px] font-bold text-slate-500">
                           <span>Subtotal Produk</span>
@@ -594,6 +595,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 )}
               </tfoot>
             </table>
+            </div>
           </div>
 
           {(order.status === 'MENUNGGU' || order.status === 'PENDING') && editableItems.length > 0 && (

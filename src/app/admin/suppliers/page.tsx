@@ -238,8 +238,8 @@ export default function AdminSuppliers() {
       </div>
 
       <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden transition-all hover:scale-[1.02]">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">

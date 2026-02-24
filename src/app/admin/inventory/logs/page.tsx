@@ -94,8 +94,8 @@ export default function StockLogsPage() {
 
         {/* TABEL LOGS */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full text-left min-w-[680px] md:min-w-0">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Waktu & Admin</th>

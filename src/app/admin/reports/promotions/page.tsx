@@ -239,8 +239,8 @@ export default function PromotionsReport() {
           <h2 className="text-lg font-semibold text-black">Detail Promosi</h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">

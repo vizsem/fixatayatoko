@@ -355,8 +355,8 @@ export default function CustomerReport() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">

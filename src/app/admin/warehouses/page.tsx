@@ -218,8 +218,8 @@ export default function WarehousesPage() {
 
       {/* Main Content: Warehouse Cards / Table */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0">
             <thead>
               <tr className="bg-gray-50/50">
                 <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Informasi Gudang</th>

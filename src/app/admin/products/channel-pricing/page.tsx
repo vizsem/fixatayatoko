@@ -151,8 +151,8 @@ export default function ChannelPricingPage() {
             Memuat data produk...
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full text-left min-w-[720px] md:min-w-0">
               <thead className="bg-gray-50/60">
                 <tr>
                   <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
@@ -238,4 +238,3 @@ export default function ChannelPricingPage() {
     </div>
   );
 }
-
