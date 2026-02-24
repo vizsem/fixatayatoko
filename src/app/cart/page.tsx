@@ -107,7 +107,7 @@ export default function CartPage() {
         }
       }
     }
-  }, [userData]);
+  }, [userData, customerName, customerPhone, customerAddress]);
 
   useEffect(() => {
     // Fetch Promo Product (Minyak atau produk lain untuk tebus murah)

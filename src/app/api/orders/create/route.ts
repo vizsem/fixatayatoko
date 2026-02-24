@@ -34,7 +34,6 @@ type ProductData = {
     tiktok?: ChannelPricing;
   };
 };
-type VoucherData = { value?: number };
 type UserData = { points?: number; walletBalance?: number };
 
 const generateOrderId = () => {

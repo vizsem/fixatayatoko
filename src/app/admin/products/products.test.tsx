@@ -119,7 +119,7 @@ vi.mock('next/link', () => ({
 // Mock next/image
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
-    <img src={src} alt={alt} />
+    <span data-testid="next-image" data-src={src} aria-label={alt} />
   ),
 }));
 

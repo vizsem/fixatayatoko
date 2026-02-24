@@ -38,7 +38,7 @@ describe('MemberCard', () => {
 
   it('should render "Poin" text', () => {
     render(<MemberCard {...defaultProps} />);
-    expect(screen.getByText((content, element) => content.includes('Poin'))).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes('Poin'))).toBeInTheDocument();
   });
 
   it('should render QR code container', () => {
