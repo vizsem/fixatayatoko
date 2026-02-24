@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { auth, db } from '@/lib/firebase';
+import useProducts from '@/lib/hooks/useProducts';
 
 
 import { useRouter } from 'next/navigation';
@@ -13,9 +14,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {
   collection,
-  getDocs,
-  query,
-  orderBy,
+  onSnapshot,
   doc,
   updateDoc,
   writeBatch,
@@ -51,6 +50,7 @@ type Product = {
 export default function InventoryDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const { products: liveProducts, loading: productsLoading } = useProducts();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
@@ -72,31 +72,40 @@ export default function InventoryDashboard() {
   const [batchAction, setBatchAction] = useState<'category' | 'warehouse' | 'status' | null>(null);
   const [batchValue, setBatchValue] = useState('');
 
-  const fetchInitialData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [prodSnap, catSnap, warSnap] = await Promise.all([
-        getDocs(query(collection(db, 'products'), orderBy('name', 'asc'))),
-        getDocs(collection(db, 'categories')),
-        getDocs(collection(db, 'warehouses'))
-      ]);
-      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
-      setCategories(catSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
-      setWarehouses(warSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
-    } catch { /* Suppress */ } finally { setLoading(false); }
-
-  }, []);
+  useEffect(() => {
+    setProducts(liveProducts as Product[]);
+  }, [liveProducts]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push('/profil/login');
         return;
       }
-      fetchInitialData();
+      const unsubCats = onSnapshot(collection(db, 'categories'), (s) => {
+        setCategories(
+          s.docs.map((d) => {
+            const data = d.data() as Record<string, unknown>;
+            return { id: d.id, name: String(data.name || '') };
+          })
+        );
+      });
+      const unsubWh = onSnapshot(collection(db, 'warehouses'), (s) => {
+        setWarehouses(
+          s.docs.map((d) => {
+            const data = d.data() as Record<string, unknown>;
+            return { id: d.id, name: String(data.name || '') };
+          })
+        );
+      });
+      setLoading(false);
+      return () => {
+        unsubCats();
+        unsubWh();
+      };
     });
-    return () => unsubscribe();
-  }, [router, fetchInitialData]);
+    return () => unsub();
+  }, [router]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -173,7 +182,6 @@ export default function InventoryDashboard() {
       await batch.commit();
       setSelectedIds([]);
       setIsBatchModalOpen(false);
-      fetchInitialData();
       notify.admin.success('Batch update berhasil');
     } catch { notify.admin.error('Batch update gagal'); }
 
@@ -193,7 +201,6 @@ export default function InventoryDashboard() {
     try {
       await batch.commit();
       setSelectedIds([]);
-      fetchInitialData();
       notify.admin.success('Produk berhasil dihapus');
     } catch {
       notify.admin.error('Gagal menghapus produk');
@@ -202,7 +209,7 @@ export default function InventoryDashboard() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
+  if (loading || productsLoading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
 
   return (
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">

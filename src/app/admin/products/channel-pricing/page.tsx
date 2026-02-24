@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ChevronLeft, Search, Save, Tag } from 'lucide-react';
@@ -39,30 +39,35 @@ export default function ChannelPricingPage() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const snap = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-        setProducts(list);
-        const initial: Record<string, ChannelPricingState> = {};
-        list.forEach(p => {
-          initial[p.id] = {
+    const unsub = onSnapshot(collection(db, 'products'), (s) => {
+      const list = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Product));
+      setProducts(list);
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
+      notify.admin.error('Gagal memuat produk.');
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (products.length === 0) return;
+    setPrices(prev => {
+      const next = { ...prev };
+      products.forEach(p => {
+        if (!next[p.id]) {
+          next[p.id] = {
             offline: p.channelPricing?.offline?.price ?? undefined,
             website: p.channelPricing?.website?.price ?? undefined,
             shopee: p.channelPricing?.shopee?.price ?? undefined,
             tiktok: p.channelPricing?.tiktok?.price ?? undefined,
           };
-        });
-        setPrices(initial);
-      } catch (err) {
-        console.error(err);
-        notify.admin.error('Gagal memuat produk.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
+        }
+      });
+      return next;
+    });
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     if (!search) return products;

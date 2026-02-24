@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  query,
-  orderBy
-} from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -18,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
+import useProducts from '@/lib/hooks/useProducts';
 
 
 interface Supplier { id: string; name: string; }
@@ -28,6 +22,7 @@ interface CartItem { id: string; name: string; purchasePrice: number; quantity: 
 export default function AddPurchase() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { products: liveProducts } = useProducts();
 
   // Data References
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -46,18 +41,20 @@ export default function AddPurchase() {
 
 
   useEffect(() => {
-    const fetchData = async () => {
-      const [supSnap, warSnap, prodSnap] = await Promise.all([
-        getDocs(collection(db, 'suppliers')),
-        getDocs(collection(db, 'warehouses')),
-        getDocs(query(collection(db, 'products'), orderBy('name', 'asc')))
-      ]);
-      setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier)));
-      setWarehouses(warSnap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
-      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
-    };
+    setProducts(liveProducts as Product[]);
+  }, [liveProducts]);
 
-    fetchData();
+  useEffect(() => {
+    const unsubSup = onSnapshot(collection(db, 'suppliers'), (s) => {
+      setSuppliers(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Supplier)));
+    });
+    const unsubWar = onSnapshot(collection(db, 'warehouses'), (s) => {
+      setWarehouses(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse)));
+    });
+    return () => {
+      unsubSup();
+      unsubWar();
+    };
   }, []);
 
   const addToCart = (product: Product) => {
