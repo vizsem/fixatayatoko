@@ -25,7 +25,7 @@ import {
   Box, Search, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw,
   ClipboardCheck, Package, Warehouse, ChevronRight,
   ChevronLeft, Download, Activity, ListFilter, CheckSquare, Square,
-  X, MapPinned, FolderInput, EyeOff, Check, ScanBarcode, Image as ImageIcon,
+  X, MapPinned, FolderInput, EyeOff, Check, ScanBarcode, Image as ImageIcon, Trash2,
   LucideIcon
 } from 'lucide-react';
 
@@ -178,6 +178,28 @@ export default function InventoryDashboard() {
     } catch { notify.admin.error('Batch update gagal'); }
 
     finally { setLoading(false); }
+  };
+
+  const executeBatchDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = typeof window !== 'undefined' ? window.confirm(`Hapus permanen ${selectedIds.length} produk?`) : true;
+    if (!ok) return;
+    setLoading(true);
+    const batch = writeBatch(db);
+    selectedIds.forEach(id => {
+      const pRef = doc(db, 'products', id);
+      batch.delete(pRef);
+    });
+    try {
+      await batch.commit();
+      setSelectedIds([]);
+      fetchInitialData();
+      notify.admin.success('Produk berhasil dihapus');
+    } catch {
+      notify.admin.error('Gagal menghapus produk');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
@@ -390,6 +412,10 @@ export default function InventoryDashboard() {
 
             <button onClick={() => { setBatchAction('status'); executeBatchUpdate(); }} className="flex flex-col items-center gap-1 group transition-all">
               <EyeOff size={18} className="group-hover:text-red-400" /><span className="text-[8px] font-black">Disable</span>
+            </button>
+
+            <button onClick={executeBatchDelete} className="flex flex-col items-center gap-1 group transition-all">
+              <Trash2 size={18} className="group-hover:text-rose-500" /><span className="text-[8px] font-black">Delete</span>
             </button>
 
           </div>
