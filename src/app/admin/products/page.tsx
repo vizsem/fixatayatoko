@@ -5,12 +5,14 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import useProducts from '@/lib/hooks/useProducts';
+import type { NormalizedProduct } from '@/lib/normalize';
 
 
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection, doc, addDoc, deleteDoc,
-  query, orderBy, onSnapshot, serverTimestamp, writeBatch, updateDoc
+  onSnapshot, serverTimestamp, writeBatch, updateDoc
 } from 'firebase/firestore';
 
 import Link from 'next/link';
@@ -29,31 +31,26 @@ import notify from '@/lib/notify';
 import * as XLSX from 'xlsx';
 
 
-interface Product {
-  id: string;
-  ID: string;
-  Barcode?: string;
-  Nama: string;
-  Kategori: string;
-  Satuan: string;
-  Stok: number;
-  Min_Stok: number;
-  Modal: number;
-  Ecer: number;
-  Harga_Grosir: number;
-  Min_Grosir: number;
-  Lokasi: string;
-  Deskripsi: string;
+type ProductRow = NormalizedProduct & {
+  tgl_masuk?: string;
+  expired_date?: string;
   URL_Produk?: string;
   url_produk?: string;
   image?: string;
   foto?: string;
-  Status: number;
-  warehouseId: string;
-  tgl_masuk: string;
-  expired_date: string;
-  hargaBeli?: number;
-}
+  Nama?: string;
+  ID?: string;
+  Kategori?: string;
+  Stok?: number;
+  Min_Stok?: number;
+  Satuan?: string;
+  Modal?: number;
+  Ecer?: number;
+  Harga_Grosir?: number;
+  Min_Grosir?: number;
+  Lokasi?: string;
+  Deskripsi?: string;
+};
 
 
 interface Warehouse {
@@ -63,7 +60,7 @@ interface Warehouse {
 
 // --- KOMPONEN MODAL RESTOCK ---
 interface RestockModalProps {
-  product: Product;
+  product: ProductRow;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -76,8 +73,8 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
 
   if (!isOpen) return null;
 
-  const stokLama = Number(product.Stok || 0);
-  const hargaLama = Number(product.hargaBeli || product.Modal || 0);
+  const stokLama = Number(product.stock || product.Stok || 0);
+  const hargaLama = Number(product.purchasePrice || product.Modal || 0);
   const totalStokBaru = stokLama + (stokMasuk || 0);
 
   const simulasiHargaAvg = totalStokBaru > 0
@@ -90,7 +87,9 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
     try {
       const productRef = doc(db, 'products', product.id);
       await updateDoc(productRef, {
+        stock: totalStokBaru,
         Stok: totalStokBaru,
+        purchasePrice: simulasiHargaAvg,
         hargaBeli: simulasiHargaAvg,
         Modal: simulasiHargaAvg,
         updatedAt: serverTimestamp(),
@@ -141,6 +140,7 @@ export default function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { products: liveProducts } = useProducts();
 
   // Fungsi Toggle Select
   const toggleSelectAll = () => {
@@ -169,11 +169,10 @@ export default function AdminProducts() {
   };
   // States
   const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [selectedProductRestock, setSelectedProductRestock] = useState<Product | null>(null);
+  const [selectedProductRestock, setSelectedProductRestock] = useState<ProductRow | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -189,21 +188,25 @@ export default function AdminProducts() {
       setLoading(false);
     });
     const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => setWarehouses(s.docs.map(d => ({ id: d.id, ...d.data() })) as Warehouse[]));
-    const unsubP = onSnapshot(query(collection(db, 'products'), orderBy('updatedAt', 'desc')), (s) => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })) as Product[]));
-    return () => { unsubAuth(); unsubW(); unsubP(); };
+    return () => { unsubAuth(); unsubW(); };
   }, [router]);
+
+  const rows = liveProducts as unknown as ProductRow[];
 
   // Logic Filter & Pagination (Harus di atas handleExport)
   const filteredAndSorted = useMemo(() => {
-    return products.filter(p => {
-      const matchSearch = (p.Nama || "").toLowerCase().includes(searchTerm.toLowerCase()) || (p.ID || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchStatus = showInactive ? p.Status === 0 : p.Status !== 0;
+    return rows.filter(p => {
+      const name = (p.name || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      const term = searchTerm.toLowerCase();
+      const matchSearch = name.includes(term) || sku.includes(term);
+      const matchStatus = showInactive ? p.isActive === false : p.isActive !== false;
       return matchSearch && matchStatus;
     });
-  }, [products, searchTerm, showInactive]);
+  }, [rows, searchTerm, showInactive]);
 
   const stats = useMemo(() => {
-    const totalAset = filteredAndSorted.reduce((acc, curr) => acc + (Number(curr.Stok || 0) * Number(curr.Modal || 0)), 0);
+    const totalAset = filteredAndSorted.reduce((acc, curr) => acc + (Number(curr.stock || 0) * Number(curr.purchasePrice || 0)), 0);
     return { totalJenis: filteredAndSorted.length, totalAset };
   }, [filteredAndSorted]);
 
@@ -215,16 +218,28 @@ export default function AdminProducts() {
     if (filteredAndSorted.length === 0) return notify.admin.error("Tidak ada data untuk diexport!");
     const t = notify.admin.loading("Mengunduh Excel...");
     try {
-      const data = filteredAndSorted.map(p => ({
-        ID: p.ID, Barcode: p.Barcode || "", Nama: p.Nama, Kategori: p.Kategori || "Umum",
-        Satuan: p.Satuan || "Pcs", Stok: p.Stok || 0, Min_Stok: p.Min_Stok || 0,
-        Modal: p.Modal || 0, Total_Nilai_Aset: Number(p.Stok || 0) * Number(p.Modal || 0),
-        Ecer: p.Ecer || 0, Min_Grosir: p.Min_Grosir || 0, Harga_Grosir: p.Harga_Grosir || 0,
-        Lokasi: p.Lokasi || "", Deskripsi: p.Deskripsi || "", URL_Produk: p.URL_Produk || "",
-        Status: p.Status === 1 ? '1' : '0', warehouseId: p.warehouseId || "",
-        Gudang_Nama: warehouses.find(w => w.id === p.warehouseId)?.name || '-',
-        tgl_masuk: p.tgl_masuk || "", expired_date: p.expired_date || ""
-      }));
+    const data = filteredAndSorted.map(p => ({
+      ID: p.sku || '',
+      Barcode: '',
+      Nama: p.name,
+      Kategori: p.category || 'Umum',
+      Satuan: p.unit || 'Pcs',
+      Stok: p.stock || 0,
+      Min_Stok: p.minStock || 0,
+      Modal: p.purchasePrice || 0,
+      Total_Nilai_Aset: Number(p.stock || 0) * Number(p.purchasePrice || 0),
+      Ecer: p.priceEcer || 0,
+      Min_Grosir: p.Min_Grosir || 0,
+      Harga_Grosir: p.priceGrosir || 0,
+      Lokasi: p.Lokasi || '',
+      Deskripsi: p.Deskripsi || '',
+      URL_Produk: p.imageUrl || '',
+      Status: p.isActive ? '1' : '0',
+      warehouseId: p.warehouseId || '',
+      Gudang_Nama: warehouses.find(w => w.id === p.warehouseId)?.name || '-',
+      tgl_masuk: p.tgl_masuk || '',
+      expired_date: p.expired_date || ''
+    }));
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Produk");
@@ -255,7 +270,7 @@ export default function AdminProducts() {
 
         const batch = writeBatch(db);
         data.forEach((item) => {
-          const exist = products.find(p => p.ID === String(item.ID));
+          const exist = rows.find(p => p.sku === String(item.ID));
           const pData = { ...item, updatedAt: serverTimestamp() };
           if (exist) batch.update(doc(db, 'products', exist.id), pData);
           else batch.set(doc(collection(db, 'products')), { ...pData, createdAt: serverTimestamp() });
@@ -276,7 +291,7 @@ export default function AdminProducts() {
 
 
   // --- HANDLE DELETE ---
-  const handleDelete = async (product: Product) => {
+  const handleDelete = async (product: ProductRow) => {
     if (!confirm(`Hapus produk "${product.Nama}"? Tindakan ini tidak bisa dikembalikan.`)) return;
     
     try {
@@ -439,46 +454,35 @@ export default function AdminProducts() {
                     <td className="p-4 md:p-6">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                          {(() => {
-                            // 1. Ambil sumber gambar
-                            const imgSource = p.URL_Produk || p.url_produk || p.image || p.foto;
-
-                            // 2. Cek apakah string link-nya valid
-                            const isValid = imgSource && typeof imgSource === 'string' && imgSource.trim().startsWith('http');
-
-                            if (isValid) {
-                              return (
-                                <Image
-                                  key={p.id} // Memaksa render ulang jika ID produk berubah
-                                  src={imgSource}
-                                  alt={p.Nama}
-                                  width={56}
-                                  height={56}
-                                  className="w-full h-full object-cover"
-                                />
-                              );
-                            }
-
-                            // 3. Jika benar-benar kosong tampilkan icon kamera
-                            return <Camera size={20} className="text-gray-400" />;
-                          })()}
+                          {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
+                            <Image
+                              key={p.id}
+                              src={p.imageUrl}
+                              alt={p.name}
+                              width={56}
+                              height={56}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Camera size={20} className="text-gray-400" />
+                          )}
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-blue-600 tracking-tight mb-1">ID: {p.ID}</p>
-                          <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{p.Nama}</h3>
-                          <p className="text-xs text-gray-500 font-medium">{p.Kategori}</p>
+                          <p className="text-xs font-semibold text-blue-600 tracking-tight mb-1">ID: {p.sku}</p>
+                          <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{p.name}</h3>
+                          <p className="text-xs text-gray-500 font-medium">{p.category}</p>
                         </div>
 
                       </div>
                     </td>
                     <td className="p-4 md:p-6">
                       <div className="flex flex-col gap-1">
-                        <p className={`font-bold text-sm ${p.Stok <= p.Min_Stok ? 'text-red-600' : 'text-gray-900'}`}>
-                          {p.Stok} {p.Satuan}
+                        <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                          {p.stock} {p.unit}
                         </p>
-                        {p.Stok <= p.Min_Stok && (
+                        {Number(p.stock) <= Number(p.minStock) && (
                           <p className="text-xs font-medium text-red-500">
-                            Min: {p.Min_Stok}
+                            Min: {p.minStock}
                           </p>
                         )}
                         <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
@@ -489,14 +493,14 @@ export default function AdminProducts() {
                     <td className="hidden md:table-cell p-4 md:p-6">
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-blue-600">
-                          Modal: Rp{(p.hargaBeli || p.Modal || 0).toLocaleString('id-ID')}
+                          Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                         </p>
                         <p className="text-sm font-bold text-emerald-600">
-                          Jual: Rp{(p.Ecer || 0).toLocaleString('id-ID')}
+                          Jual: Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                         </p>
-                        {p.Harga_Grosir > 0 && (
+                        {Number(p.priceGrosir || 0) > 0 && (
                           <p className="text-xs font-medium text-purple-600">
-                            Grosir: Rp{p.Harga_Grosir.toLocaleString('id-ID')}
+                            Grosir: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
                           </p>
                         )}
                       </div>
