@@ -101,8 +101,9 @@ export default function CartPage() {
           setCustomerAddress(userData.addresses[0]);
         } 
         // Cek properti legacy 'address' (jika ada)
-        else if ((userData as any).address) {
-          setCustomerAddress((userData as any).address);
+        else {
+          const legacy = (userData as Partial<{ address: string }>).address;
+          if (legacy) setCustomerAddress(legacy);
         }
       }
     }
