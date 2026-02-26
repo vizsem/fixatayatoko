@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
-import { collection, getDocs, query, where, documentId, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, documentId, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
@@ -43,7 +43,12 @@ export default function WishlistPage() {
         }
 
         // 2. Ambil Rekomendasi Produk
-        const qRec = query(collection(db, 'products'), limit(20));
+        const qRec = query(
+          collection(db, 'products'),
+          where('isActive', '==', true),
+          orderBy('name', 'asc'),
+          limit(20)
+        );
         const recSnap = await getDocs(qRec);
         const allRecs = recSnap.docs
           .map(doc => {

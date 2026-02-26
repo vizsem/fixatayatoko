@@ -8,7 +8,7 @@ import {
   ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
   ChevronLeft, ChevronRight, Sparkles, Package 
 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -57,34 +57,63 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const productsSnap = await getDocs(collection(db, 'products'));
-        
-        const mapped = productsSnap.docs.map(doc => {
-          const data = doc.data();
+        // Coba query terindeks berdasarkan kategori asli (nama kategori penuh)
+        const qIndexed = query(
+          collection(db, 'products'),
+          where('isActive', '==', true),
+          where('category', '==', slug),
+          orderBy('name', 'asc')
+        );
+        const indexedSnap = await getDocs(qIndexed);
+        let products: Product[] = indexedSnap.docs.map(docSnap => {
+          const d = docSnap.data() as Record<string, unknown>;
           return {
-            id: doc.id,
-            name: data.Nama || data.name || "Produk",
-            price: Number(data.Ecer || data.price) || 0,
-            wholesalePrice: Number(data.Grosir || data.wholesalePrice) || 0,
-            minWholesale: Number(data.Min_Grosir || data.minWholesaleQty || 12),
-            category: data.Kategori || data.category || 'Umum',
-            image: data.Link_Foto || data.image || '',
-            unit: data.Satuan || data.unit || 'pcs',
-            stock: Number(data.Stok || data.stock) || 0
+            id: docSnap.id,
+            name: String(d.Nama ?? d.name ?? 'Produk'),
+            price: Number(d.Ecer ?? d.price ?? 0),
+            wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
+            minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
+            category: String(d.Kategori ?? d.category ?? 'Umum'),
+            image: String(d.Link_Foto ?? d.image ?? ''),
+            unit: String(d.Satuan ?? d.unit ?? 'pcs'),
+            stock: Number(d.Stok ?? d.stock ?? 0)
           };
-        }) as Product[];
-
-        const filtered = mapped.filter(p => {
-          const generatedSlug = p.category.toLowerCase()
-            .replace(/&/g, 'dan')
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-          return generatedSlug === slug;
         });
 
-        if (filtered.length > 0) {
-          setCategoryName(filtered[0].category);
-          setAllCategoryProducts(filtered);
+        // Fallback: jika tidak ada hasil (mungkin field bukan 'category' atau link memakai slug)
+        if (products.length === 0) {
+          const qActive = query(
+            collection(db, 'products'),
+            where('isActive', '==', true),
+            orderBy('name', 'asc')
+          );
+          const activeSnap = await getDocs(qActive);
+          const mapped = activeSnap.docs.map(docSnap => {
+            const d = docSnap.data() as Record<string, unknown>;
+            return {
+              id: docSnap.id,
+              name: String(d.Nama ?? d.name ?? 'Produk'),
+              price: Number(d.Ecer ?? d.price ?? 0),
+              wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
+              minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
+              category: String(d.Kategori ?? d.category ?? 'Umum'),
+              image: String(d.Link_Foto ?? d.image ?? ''),
+              unit: String(d.Satuan ?? d.unit ?? 'pcs'),
+              stock: Number(d.Stok ?? d.stock ?? 0)
+            } as Product;
+          });
+          products = mapped.filter(p => {
+            const generatedSlug = p.category.toLowerCase()
+              .replace(/&/g, 'dan')
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '');
+            return generatedSlug === slug;
+          });
+        }
+
+        if (products.length > 0) {
+          setCategoryName(products[0].category);
+          setAllCategoryProducts(products);
         } else {
           setCategoryName(slug.replace(/-/g, ' '));
         }

@@ -240,12 +240,11 @@ export default function CashierPOS() {
     // Jangan gunakan onSnapshot untuk seluruh koleksi - terlalu mahal!
     const fetchProducts = async () => {
       try {
-        // Hanya ambil produk yang aktif dan punya stock > 0 untuk cashier
         const q = query(
           collection(db, 'products'),
-          where('stock', '>', 0),
-          where('status', '==', 'active'),
-          limit(200) // Batasi jumlah produk yang diambil
+          where('isActive', '==', true),
+          orderBy('name', 'asc'),
+          limit(200)
         );
         
         const snapshot = await getDocs(q);
@@ -254,13 +253,13 @@ export default function CashierPOS() {
           return {
             id: d.id,
             name: data.name || 'TANPA NAMA',
-            price: data.price || 0,
-            unit: data.unit || 'pcs',
-            stock: data.stock || 0,
+            price: data.price || data.priceEcer || 0,
+            unit: data.unit || data.Satuan || 'pcs',
+            stock: data.stock || data.Stok || 0,
             barcode: data.barcode || '',
             image: data.image || data.imageUrl || data.photo || null
           } as Product;
-        });
+        }).filter(item => (item.stock || 0) > 0);
         setProducts(p);
         setFilteredProducts(p);
       } catch (error) {

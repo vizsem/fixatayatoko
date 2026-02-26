@@ -14,7 +14,10 @@ import {
   getDocs,
   addDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where,
+  orderBy
 } from 'firebase/firestore';
 import { ArrowDown, Plus } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -57,8 +60,13 @@ function StockInContent() {
 
   const loadSupportingData = useCallback(async () => {
     try {
-      // Load products
-      const productsSnap = await getDocs(collection(db, 'products'));
+      // Load products (aktif & urut nama) - memakai indeks
+      const productsQuery = query(
+        collection(db, 'products'),
+        where('isActive', '==', true),
+        orderBy('name', 'asc')
+      );
+      const productsSnap = await getDocs(productsQuery);
       const productList = productsSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name,

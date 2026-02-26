@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 
+import useProducts from '@/lib/hooks/useProducts';
 
 import Link from 'next/link';
 import Image from 'next/image';
@@ -72,9 +73,10 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activePromos, setActivePromos] = useState<Promotion[]>([]);
   const [repurchaseProducts, setRepurchaseProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [othersLoading, setOthersLoading] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const { products: normalizedProducts, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   
   // Filter States
   const [showFilter, setShowFilter] = useState(false);
@@ -172,45 +174,17 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [prodSnap, promoSnap, bannerSnap, sysSnap] = await Promise.all([
-          getDocs(collection(db, 'products')),
+        const [promoSnap, bannerSnap, sysSnap] = await Promise.all([
           getDocs(collection(db, 'promotions')),
           getDocs(collection(db, 'banners')),
           getDoc(doc(db, 'settings', 'system'))
         ]);
-
-        const productList = prodSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            name: data.Nama || data.name || "Produk",
-            price: Number(data.Ecer || data.price) || 0,
-            wholesalePrice: Number(data.Grosir || data.wholesalePrice) || Number(data.Ecer) || 0,
-            minWholesale: Number(data.Min_Grosir || data.Min_Stok_Grosir || 1),
-            stock: Number(data.Stok || data.stock || 0),
-            unit: data.Satuan || data.unit || 'pcs',
-            category: data.Kategori || data.category || 'Umum',
-            image: data.Link_Foto || data.image || '/logo-atayatoko.png',
-            variant: data.variant || ''
-          };
-        }) as Product[];
 
         const now = new Date();
         const active = promoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Promotion))
           .filter(p => p.isActive && now >= new Date(p.startDate) && now <= new Date(p.endDate));
 
         setActivePromos(active);
-        setProducts(productList);
-        setRandomProducts([...productList].sort(() => 0.5 - Math.random()).slice(0, 6));
-
-        const catList = Array.from(new Set(productList.map(p => p.category)))
-          .map((name, i) => ({
-            id: `cat-${i}`, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-          }))
-          .sort(() => 0.5 - Math.random());
-
-        setCategories(catList);
 
         const bannerList = bannerSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Banner[];
         setBanners(bannerList.filter(b => b.isActive));
@@ -219,11 +193,39 @@ export default function Home() {
 
         const savedWish = localStorage.getItem('atayatoko-wishlist');
         if (savedWish) setWishlist(JSON.parse(savedWish));
-      } catch (error) { console.error(error); } finally { setLoading(false); }
+      } catch (error) { console.error(error); } finally { setOthersLoading(false); }
     };
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const mapped = normalizedProducts.map((p) => {
+      const minQtyUnit = (p.units || []).find((u) => typeof u.minQty === 'number' && u.minQty > 0);
+      return {
+        id: p.id,
+        name: p.name || 'Produk',
+        price: Number(p.priceEcer || 0),
+        wholesalePrice: Number(p.priceGrosir || p.priceEcer || 0),
+        minWholesale: Number(minQtyUnit?.minQty || 1),
+        stock: Number(p.stock || 0),
+        unit: p.unit || 'pcs',
+        category: p.category || 'Umum',
+        image: p.imageUrl || '/logo-atayatoko.png',
+        variant: ''
+      } as Product;
+    });
+    setProducts(mapped);
+    const inStock = mapped.filter((pp) => pp.stock > 0);
+    setRandomProducts([...inStock].sort(() => 0.5 - Math.random()).slice(0, 6));
+    const catList = Array.from(new Set(mapped.map(p => p.category)))
+      .map((name, i) => ({
+        id: `cat-${i}`, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      }))
+      .sort(() => 0.5 - Math.random());
+    setCategories(catList);
+  }, [normalizedProducts]);
+
+  const isLoading = productsLoading || othersLoading;
 
   const ProductCard = ({ product }: { product: Product }) => {
     const promoInfo = getDiscountedPrice(product);
@@ -412,7 +414,7 @@ export default function Home() {
       )}
 
       <main className="max-w-7xl mx-auto py-4">
-        {loading ? (
+        {isLoading ? (
           <div className="px-4 space-y-8"><div className="flex gap-4 overflow-hidden"><SkeletonCard /><SkeletonCard /></div></div>
         ) : searchQuery ? (
           <section className="px-4">

@@ -8,7 +8,10 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs
+  getDocs,
+  query,
+  where,
+  orderBy
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
@@ -94,7 +97,12 @@ export default function OperationsReport() {
         ).length;
 
         // Ambil data produk
-        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsQ = query(
+          collection(db, 'products'),
+          where('isActive', '==', true),
+          orderBy('name', 'asc')
+        );
+        const productsSnapshot = await getDocs(productsQ);
         const products = productsSnapshot.docs.map(doc => doc.data());
         const totalProducts = products.length;
         const outOfStockProducts = products.filter(p => p.stock === 0).length;

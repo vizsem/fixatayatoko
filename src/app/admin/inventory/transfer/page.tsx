@@ -10,7 +10,10 @@ import {
   doc,
   updateDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where,
+  orderBy
 } from 'firebase/firestore';
 
 import {
@@ -58,7 +61,12 @@ export default function StockTransferPage() {
   // 1. Fetch Produk & Gudang
   useEffect(() => {
     const fetchData = async () => {
-      const prodSnap = await getDocs(collection(db, 'products'));
+      const q = query(
+        collection(db, 'products'),
+        where('isActive', '==', true),
+        orderBy('name', 'asc')
+      );
+      const prodSnap = await getDocs(q);
       setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
 
       const whSnap = await getDocs(collection(db, 'warehouses'));

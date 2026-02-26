@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -30,7 +30,12 @@ export default function AllCategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
+        const q = query(
+          collection(db, 'products'),
+          where('isActive', '==', true),
+          orderBy('name', 'asc')
+        );
+        const querySnapshot = await getDocs(q);
         const allKategori = querySnapshot.docs.map(doc => {
           const data = doc.data();
           // Ambil dari field 'Kategori' atau 'category'

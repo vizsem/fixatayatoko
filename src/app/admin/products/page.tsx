@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import useProducts from '@/lib/hooks/useProducts';
-import type { NormalizedProduct } from '@/lib/normalize';
+import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 
 
 import { onAuthStateChanged } from 'firebase/auth';
@@ -140,7 +140,6 @@ export default function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { products: liveProducts } = useProducts();
 
   // Fungsi Toggle Select
   const toggleSelectAll = () => {
@@ -177,6 +176,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  const { products: liveProducts } = useProducts({ isActive: showInactive ? false : true, orderByField: 'name', orderDirection: 'asc' });
 
 
 
@@ -496,13 +496,20 @@ export default function AdminProducts() {
                           Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                         </p>
                         <p className="text-sm font-bold text-emerald-600">
-                          Jual: Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
+                          Rp{(p.priceEcer || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()}
                         </p>
                         {Number(p.priceGrosir || 0) > 0 && (
                           <p className="text-xs font-medium text-purple-600">
-                            Grosir: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
+                            Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()} {Number((p as ProductRow).Min_Grosir || 0) > 0 ? `(min.${Number((p as ProductRow).Min_Grosir || 0)})` : ''}
                           </p>
                         )}
+                        {((Array.isArray(p.units) ? p.units : []) as UnitOption[])
+                          .filter((u: UnitOption) => (u?.code || '').toString().toUpperCase() !== (p.unit || 'PCS').toString().toUpperCase())
+                          .map((u: UnitOption, idx: number) => (
+                            <p key={idx} className="text-xs font-medium text-gray-700">
+                              {Number(u?.price || 0) > 0 ? `Rp${Number(u.price).toLocaleString('id-ID')}` : 'Rp -'} /{(u?.code || '').toString().toUpperCase()} {Number(u?.contains || 0) > 0 ? `(isi ${u.contains})` : ''}
+                            </p>
+                          ))}
                       </div>
                     </td>
                     <td className="hidden md:table-cell p-4 md:p-6">

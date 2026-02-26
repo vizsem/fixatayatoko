@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
+import useProducts from '@/lib/hooks/useProducts';
 
 import {
-  collection, doc, getDoc, getDocs, query, where,
+  collection, doc, getDoc, getDocs,
   runTransaction, serverTimestamp
 } from 'firebase/firestore';
 import {
@@ -21,13 +22,6 @@ interface Warehouse {
   name: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  stok: number;
-  unit: string;
-}
-
 export default function MutasiGudangPage() {
   const router = useRouter();
   const params = useParams();
@@ -37,7 +31,7 @@ export default function MutasiGudangPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sourceWarehouse, setSourceWarehouse] = useState<Warehouse | null>(null);
   const [targetWarehouses, setTargetWarehouses] = useState<Warehouse[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, loading: productsLoading } = useProducts({ warehouseId: sourceWarehouseId, isActive: true, orderByField: 'name' });
 
 
   // Form State
@@ -59,17 +53,6 @@ export default function MutasiGudangPage() {
           .map(d => ({ id: d.id, ...d.data() } as Warehouse))
           .filter(d => d.id !== sourceWarehouseId)
         );
-
-
-        // 3. Ambil Produk yang ada di Gudang Asal ini
-        const pQuery = query(collection(db, 'products'), where('warehouseId', '==', sourceWarehouseId));
-        const pSnap = await getDocs(pQuery);
-        setProducts(pSnap.docs.map(d => ({
-          id: d.id,
-          name: d.data().Nama || d.data().name,
-          stok: Number(d.data().Stok || d.data().stock || 0),
-          unit: d.data().Satuan || d.data().unit || 'pcs'
-        })));
 
       } catch {
         notify.admin.error("Gagal memuat data inventory");
@@ -94,7 +77,7 @@ export default function MutasiGudangPage() {
       return;
     }
 
-    if (amount > selectedProduct.stok) {
+    if (amount > selectedProduct.stock) {
       notify.admin.error("Stok gudang asal tidak cukup!");
       return;
     }
@@ -142,7 +125,7 @@ export default function MutasiGudangPage() {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return (
+  if (loading || productsLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <Loader2 className="animate-spin text-green-600" size={40} />
     </div>
@@ -207,7 +190,7 @@ export default function MutasiGudangPage() {
                 >
                   <div>
                     <p className="text-xs font-black uppercase text-gray-900">{p.name}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Tersedia: {p.stok} {p.unit}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Tersedia: {p.stock} {p.unit}</p>
                   </div>
                   {selectedProductId === p.id && <Package className="text-green-600" size={18} />}
                 </div>

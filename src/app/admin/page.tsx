@@ -17,7 +17,6 @@ import { LucideIcon } from 'lucide-react';
 import {
   collection, doc, getDoc, getDocs, query, orderBy, limit, where
 } from 'firebase/firestore';
-import { Product } from '@/lib/types';
 
 interface Order {
   id: string;
@@ -85,8 +84,14 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const pSnap = await getDocs(collection(db, 'products'));
-      const lowStockCount = pSnap.docs.filter(d => ((d.data() as Product).stock || 0) <= 10).length;
+      // Produk: gunakan indeks dan query terarah
+      const productsActiveSnap = await getDocs(
+        query(collection(db, 'products'), where('isActive', '==', true), orderBy('name', 'asc'))
+      );
+      const lowStockSnap = await getDocs(
+        query(collection(db, 'products'), where('stock', '<=', 10))
+      );
+      const lowStockCount = lowStockSnap.size;
 
       const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -122,7 +127,7 @@ export default function AdminDashboard() {
       setStats({
         dailySales: salesToday,
         weeklySales: salesWeekly,
-        totalProducts: pSnap.size,
+        totalProducts: productsActiveSnap.size,
         lowStock: lowStockCount,
         unreadOrders: unreadSnap.size,
         warehouses: wSnap.size,

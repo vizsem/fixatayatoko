@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ChevronLeft, Search, Save, Tag } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import useProducts from '@/lib/hooks/useProducts';
+import type { NormalizedProduct } from '@/lib/normalize';
 
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
@@ -17,12 +19,7 @@ type ChannelPricingState = {
   tiktok?: number;
 };
 
-type Product = {
-  id: string;
-  Nama?: string;
-  name?: string;
-  Ecer?: number;
-  price?: number;
+type Product = NormalizedProduct & {
   channelPricing?: {
     offline?: { price?: number };
     website?: { price?: number };
@@ -32,30 +29,17 @@ type Product = {
 };
 
 export default function ChannelPricingPage() {
-  const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
   const [prices, setPrices] = useState<Record<string, ChannelPricingState>>({});
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'products'), (s) => {
-      const list = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Product));
-      setProducts(list);
-      setLoading(false);
-    }, (err) => {
-      console.error(err);
-      notify.admin.error('Gagal memuat produk.');
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (products.length === 0) return;
+  // Init state harga channel dari data produk
+  // LiveProducts sudah ter-normalisasi; channelPricing tetap optional
+  if (liveProducts.length > 0) {
     setPrices(prev => {
       const next = { ...prev };
-      products.forEach(p => {
+      (liveProducts as Product[]).forEach(p => {
         if (!next[p.id]) {
           next[p.id] = {
             offline: p.channelPricing?.offline?.price ?? undefined,
@@ -67,16 +51,16 @@ export default function ChannelPricingPage() {
       });
       return next;
     });
-  }, [products]);
+  }
 
   const filteredProducts = useMemo(() => {
+    const products = liveProducts as Product[];
     if (!search) return products;
     const lower = search.toLowerCase();
     return products.filter(p => {
-      const name = p.Nama || p.name || '';
-      return name.toLowerCase().includes(lower);
+      return (p.name || '').toLowerCase().includes(lower);
     });
-  }, [products, search]);
+  }, [liveProducts, search]);
 
   const handleChangePrice = (productId: string, channel: ChannelKey, value: string) => {
     setPrices(prev => ({
@@ -181,7 +165,7 @@ export default function ChannelPricingPage() {
               <tbody className="divide-y divide-gray-50">
                 {filteredProducts.map((p) => {
                   const state = prices[p.id] || {};
-                  const displayName = p.Nama || p.name || 'Produk';
+                  const displayName = p.name || 'Produk';
                   return (
                     <tr key={p.id}>
                       <td className="px-6 py-4">
@@ -191,7 +175,7 @@ export default function ChannelPricingPage() {
                           </span>
                           <span className="text-[9px] font-bold text-gray-400">
                             Harga dasar: Rp{' '}
-                            {Number(p.Ecer || p.price || 0).toLocaleString()}
+                            {Number(p.priceEcer || 0).toLocaleString()}
                           </span>
                         </div>
                       </td>

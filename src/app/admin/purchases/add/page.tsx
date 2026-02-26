@@ -22,7 +22,7 @@ interface CartItem { id: string; name: string; purchasePrice: number; quantity: 
 export default function AddPurchase() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { products: liveProducts } = useProducts();
+  const { products: liveProducts } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
 
   // Data References
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

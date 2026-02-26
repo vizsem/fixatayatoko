@@ -11,6 +11,8 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import useProducts from '@/lib/hooks/useProducts';
+import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
 import {
   Package,
@@ -37,6 +39,8 @@ export default function InventoryReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -57,56 +61,39 @@ export default function InventoryReport() {
   }, [router]);
 
   useEffect(() => {
-    const fetchInventoryData = async () => {
+    const build = async () => {
+      setBuilding(true);
       try {
-        const productsSnapshot = await getDocs(collection(db, 'products'));
-        const inventoryList: InventoryItem[] = [];
-
-        // Ambil data transaksi untuk perhitungan mutasi
         const transactionsSnapshot = await getDocs(collection(db, 'inventory_transactions'));
-        const transactions = transactionsSnapshot.docs.map(doc => doc.data());
-
-        productsSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const productId = doc.id;
-
-          // Hitung stok masuk & keluar dari transaksi
+        const transactions = transactionsSnapshot.docs.map(d => d.data() as Record<string, unknown>);
+        const inv: InventoryItem[] = products.map((p: NormalizedProduct) => {
           const stockIn = transactions
-            .filter(t => t.productId === productId && t.type === 'STOCK_IN')
-            .reduce((sum, t) => sum + t.quantity, 0);
-
+            .filter(t => t.productId === p.id && t.type === 'STOCK_IN')
+            .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
           const stockOut = transactions
-            .filter(t => t.productId === productId && t.type === 'STOCK_OUT')
-            .reduce((sum, t) => sum + t.quantity, 0);
-
-          // Asumsikan harga beli 80% dari harga jual
-          const purchasePrice = (data.price || 0) * 0.8;
-          const stockValue = (data.stock || 0) * purchasePrice;
-
-          // Hitung turnover rate (sederhana: stockOut / currentStock)
-          const turnoverRate = data.stock > 0 ? stockOut / data.stock : 0;
-
-          inventoryList.push({
-            id: doc.id,
-            name: data.name || '',
-            category: data.category || '',
-            currentStock: data.stock || 0,
+            .filter(t => t.productId === p.id && t.type === 'STOCK_OUT')
+            .reduce((sum, t) => sum + Number(t.quantity || 0), 0);
+          const purchasePrice = typeof p.purchasePrice === 'number' ? p.purchasePrice : (p.priceEcer || 0) * 0.8;
+          const stockValue = (p.stock || 0) * purchasePrice;
+          const turnoverRate = p.stock > 0 ? stockOut / p.stock : 0;
+          return {
+            id: p.id,
+            name: p.name || '',
+            category: p.category || '',
+            currentStock: p.stock || 0,
             stockIn,
             stockOut,
             turnoverRate,
             stockValue
-          });
+          };
         });
-
-        setInventory(inventoryList);
-      } catch {
-        // Error is logged to console
+        setInventory(inv);
+      } finally {
+        setBuilding(false);
       }
-
     };
-
-    fetchInventoryData();
-  }, []);
+    if (!productsLoading) build();
+  }, [productsLoading, products]);
 
   const handleExport = () => {
     const exportData = inventory.map(item => ({
@@ -125,7 +112,7 @@ export default function InventoryReport() {
     XLSX.writeFile(wb, 'laporan-inventaris.xlsx');
   };
 
-  if (loading) {
+  if (loading || productsLoading || building) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
@@ -90,8 +90,13 @@ export default function MarketplaceOrdersPage() {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      const snap = await getDocs(collection(db, 'products'));
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+      const q = query(
+        collection(db, 'products'),
+        where('isActive', '==', true),
+        orderBy('name', 'asc')
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Product));
       setProducts(list);
     };
     fetchProducts();

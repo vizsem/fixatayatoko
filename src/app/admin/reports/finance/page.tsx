@@ -84,12 +84,27 @@ export default function FinanceReport() {
           )
         );
 
-        // Ambil data produk untuk harga beli
-        const productsSnapshot = await getDocs(collection(db, 'products'));
-        const productsMap = new Map<string, Record<string, unknown>>();
-          productsSnapshot.docs.forEach(docSnap => {
-            productsMap.set(docSnap.id, docSnap.data() as Record<string, unknown>);
+        // Kumpulkan ID produk unik dari order untuk fetch terarah
+        const productIdsSet = new Set<string>();
+        salesSnapshot.docs.forEach((orderDoc) => {
+          const orderData = orderDoc.data() as { items?: { id?: string; productId?: string }[] };
+          (orderData.items || []).forEach((it) => {
+            const pid = it.id || it.productId;
+            if (pid) productIdsSet.add(pid);
+          });
         });
+        const productIds = Array.from(productIdsSet);
+        const productsMap = new Map<string, Record<string, unknown>>();
+        // Batch fetch maksimum 10 id per permintaan
+        for (let i = 0; i < productIds.length; i += 10) {
+          const chunk = productIds.slice(i, i + 10);
+          if (chunk.length === 0) continue;
+          const qChunk = query(collection(db, 'products'), where('__name__', 'in', chunk));
+          const snap = await getDocs(qChunk);
+          snap.forEach((docSnap) => {
+            productsMap.set(docSnap.id, docSnap.data() as Record<string, unknown>);
+          });
+        }
 
         const financeRecords: FinancialRecord[] = [];
 

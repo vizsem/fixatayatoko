@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 
+import useProducts from '@/lib/hooks/useProducts';
+import type { NormalizedProduct } from '@/lib/normalize';
 
 import {
   collection,
-  getDocs,
   doc,
   updateDoc,
   addDoc,
@@ -25,46 +26,17 @@ import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
-type Product = {
-  id: string;
-  name: string;
-  stock: number;
-  unit: string;
-};
-
 export default function StockOpnamePage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
 
   // Form State
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
   const [physicalStock, setPhysicalStock] = useState<number>(0);
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
-
-  // 1. Fetch Produk dengan Proteksi Data
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        const list = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name || 'Produk Tanpa Nama', // Proteksi undefined
-            stock: Number(data.stock) || 0,
-            unit: data.unit || 'pcs'
-          };
-        });
-        setProducts(list);
-      } catch (err) {
-        console.error("Gagal ambil data:", err);
-      }
-    };
-    fetchProducts();
-  }, []);
 
   // Filter Aman (Mencegah error .toLowerCase)
   const filteredProducts = products.filter(p => {
@@ -106,11 +78,6 @@ export default function StockOpnamePage() {
       setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });
       notify.admin.success('Stok fisik berhasil disinkronkan!');
 
-      // Update state lokal agar UI sinkron
-      setProducts(prev => prev.map(p =>
-        p.id === selectedProduct.id ? { ...p, stock: physicalStock } : p
-      ));
-
       // Reset Form
       setTimeout(() => {
         setSelectedProduct(null);
@@ -141,6 +108,12 @@ export default function StockOpnamePage() {
             <RotateCcw className="text-orange-600" /> Stok Opname
           </h1>
         </div>
+
+        {productsLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-8 w-8 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+          </div>
+        )}
 
         {status && (
           <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm border animate-in fade-in ${status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'

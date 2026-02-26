@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { auth, db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
+import type { UnitOption } from '@/lib/normalize';
 
 
 import { useRouter } from 'next/navigation';
@@ -45,12 +46,13 @@ type Product = {
   unit: string;
   isActive?: boolean;
   imageUrl?: string;
+  units?: UnitOption[];
 };
 
 export default function InventoryDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const { products: liveProducts, loading: productsLoading } = useProducts();
+  const { products: liveProducts, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
@@ -58,6 +60,7 @@ export default function InventoryDashboard() {
   // Quick Edit States
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempStock, setTempStock] = useState<number>(0);
+  const [unitSelection, setUnitSelection] = useState<Record<string, string>>({});
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,6 +119,25 @@ export default function InventoryDashboard() {
       return matchesSearch && matchesCategory && matchesWarehouse;
     });
   }, [products, searchTerm, selectedCategory, selectedWarehouse]);
+
+  const unitCodes = (p: Product) => {
+    const set = new Set<string>();
+    const base = (p.unit || '').toUpperCase();
+    if (base) set.add(base);
+    (p.units || []).forEach(u => {
+      const code = (u.code || '').toUpperCase();
+      if (code) set.add(code);
+    });
+    return Array.from(set);
+  };
+
+  const displayedStock = (p: Product) => {
+    const selected = (unitSelection[p.id] || p.unit || '').toUpperCase();
+    if (!selected || selected === (p.unit || '').toUpperCase()) return p.stock;
+    const found = (p.units || []).find(u => (u.code || '').toUpperCase() === selected && typeof u.contains === 'number' && (u.contains as number) > 0);
+    if (!found) return p.stock;
+    return Math.floor(p.stock / (found.contains as number));
+  };
 
   const handleExport = useCallback(() => {
     const exportData = filteredProducts.map(p => ({
@@ -323,7 +345,20 @@ export default function InventoryDashboard() {
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-gray-800 tracking-tight">{product.name}</span>
                         <span className="text-[9px] font-bold text-gray-400 tracking-wider">{product.sku} • {product.category}</span>
-
+                        <span className="text-[10px] font-black text-emerald-600">
+                          {(() => {
+                            const sel = (unitSelection[product.id] || product.unit).toUpperCase();
+                            if (sel === (product.unit || '').toUpperCase()) {
+                              return `Rp${Number(product.priceEcer || 0).toLocaleString('id-ID')} /${sel}`;
+                            }
+                            const found = (product.units || []).find(u => (u.code || '').toUpperCase() === sel);
+                            const price = Number(found?.price || 0);
+                            const contains = Number(found?.contains || 0);
+                            const partA = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : 'Rp -';
+                            const partB = contains > 0 ? ` (isi ${contains})` : '';
+                            return `${partA} /${sel}${partB}`;
+                          })()}
+                        </span>
                       </div>
                     </div>
                   </td>
@@ -341,11 +376,22 @@ export default function InventoryDashboard() {
                         <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={14} /></button>
                       </div>
                     ) : (
-                      <div className="group relative inline-block cursor-pointer" onDoubleClick={() => { setEditingId(product.id); setTempStock(product.stock); }}>
-                        <span className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800 hover:bg-black hover:text-white'}`}>
-                          {product.stock.toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5">{product.unit}</span>
-                        </span>
-                        {product.stock <= product.minStock && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />}
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="group relative inline-block cursor-pointer" onDoubleClick={() => { setEditingId(product.id); setTempStock(product.stock); }}>
+                          <span className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800 hover:bg-black hover:text-white'}`}>
+                            {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
+                          </span>
+                          {product.stock <= product.minStock && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />}
+                        </div>
+                        {unitCodes(product).length > 1 && (
+                          <select
+                            className="mt-0.5 text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1"
+                            value={(unitSelection[product.id] || product.unit).toUpperCase()}
+                            onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
+                          >
+                            {unitCodes(product).map(code => <option key={code} value={code}>{code}</option>)}
+                          </select>
+                        )}
                       </div>
                     )}
                   </td>
