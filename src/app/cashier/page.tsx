@@ -28,28 +28,47 @@ import { auth, db, storage } from '@/lib/firebase';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
-  History, X, Trash2, LayoutGrid, List, Edit
+  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 
 // Types
+type UnitOption = {
+  code: string;
+  contains?: number;
+  price?: number;
+  minQty?: number;
+};
+
+type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
+type ChannelPricing = Partial<Record<ChannelKey, Record<string, { price?: number }>>>;
+
 type Product = {
   id: string;
   name: string;
-  price: number;
-  unit: string;
+  price: number; // base unit price (ecer)
+  unit: string; // base unit code
   stock: number;
   barcode?: string;
   image?: string;
+  units?: UnitOption[];
+  channelPricing?: ChannelPricing | {
+    offline?: { price?: number };
+    website?: { price?: number };
+    shopee?: { price?: number };
+    tiktok?: { price?: number };
+  };
 };
 
 type CartItem = {
   id: string;
   name: string;
-  price: number;
-  quantity: number;
-  unit: string;
+  price: number; // price per chosen unit (e.g., per CTN)
+  quantity: number; // number of chosen units
+  unit: string; // unit code (PCS/BOX/CTN)
+  contains?: number; // how many pcs per chosen unit
+  channel?: ChannelKey; // Add channel to CartItem
 };
 
 type Order = {
@@ -89,7 +108,7 @@ export default function CashierPOS() {
   const [editPriceValue, setEditPriceValue] = useState('');
 
   // Transaksi States
-  const [transactionType, setTransactionType] = useState<'toko' | 'online'>('toko');
+  const [transactionType, setTransactionType] = useState<'toko' | 'online' | 'shopee' | 'tiktok'>('toko');
   const [deliveryMethod] = useState('Ambil di Toko');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [cashGiven, setCashGiven] = useState('');
@@ -128,14 +147,59 @@ export default function CashierPOS() {
     }
   }, []);
 
+  const getChannelKey = useCallback((txType: string): ChannelKey => {
+    if (txType === 'toko') return 'offline';
+    if (txType === 'online') return 'website';
+    if (txType === 'shopee') return 'shopee';
+    if (txType === 'tiktok') return 'tiktok';
+    return 'offline';
+  }, []);
+
   const addToCart = useCallback((product: Product) => {
     if (product.stock <= 0) return toast.error("Stok habis!");
+    const channel = getChannelKey(transactionType);
+    const baseCode = (product.unit || 'PCS').toUpperCase();
+    const containsBase = 1;
+    
+    let priceToUse = product.price;
+    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[baseCode]?.price;
+    
+    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+      priceToUse = chPrice;
+    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[baseCode]?.price) {
+       // Fallback logic: Shopee/TikTok -> Website -> Base
+       priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
+    }
+
     setCart(prev => {
-      const exist = prev.find(i => i.id === product.id);
-      if (exist) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1, unit: product.unit }];
+      const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
+      if (exist) return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { id: product.id, name: product.name, price: priceToUse, quantity: 1, unit: baseCode, contains: containsBase, channel }];
     });
-  }, []);
+  }, [transactionType, getChannelKey]);
+
+  const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
+    if (product.stock <= 0) return toast.error("Stok habis!");
+    const code = (unit.code || product.unit || 'PCS').toUpperCase();
+    const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
+    const channel = getChannelKey(transactionType);
+    
+    let unitPrice = Number(unit.price || (contains > 0 ? product.price * contains : product.price));
+    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
+
+    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+      unitPrice = chPrice;
+    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[code]?.price) {
+      // Fallback logic
+      unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
+    }
+
+    setCart(prev => {
+      const exist = prev.find(i => i.id === product.id && i.unit === code);
+      if (exist) return prev.map(i => (i.id === product.id && i.unit === code) ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { id: product.id, name: product.name, price: unitPrice, quantity: 1, unit: code, contains, channel }];
+    });
+  }, [transactionType, getChannelKey]);
 
   const updateQuantity = useCallback((id: string, q: number) => {
     if (q <= 0) setCart(prev => prev.filter(i => i.id !== id));
@@ -250,14 +314,32 @@ export default function CashierPOS() {
         const snapshot = await getDocs(q);
         const p = snapshot.docs.map(d => {
           const data = d.data();
+          const baseUnit = String(data.unit || data.Satuan || 'PCS').toUpperCase();
+          const basePrice = Number(data.price || data.priceEcer || data.Ecer || 0);
+          const rawUnits = Array.isArray(data.units) ? data.units as Array<Record<string, unknown>> : [];
+          const units: UnitOption[] = rawUnits
+            .map(u => {
+              const ru = u as Record<string, unknown>;
+              const code = String(ru.code || '').toUpperCase();
+              if (!code) return null;
+              const contains = typeof ru.contains === 'number' ? ru.contains : Number(ru.contains || 0);
+              const price = typeof ru.price === 'number' ? ru.price : Number(ru.price || 0);
+              const rawMin = ru.minQty;
+              const minQty = typeof rawMin === 'number' ? rawMin : (rawMin !== undefined ? Number(rawMin) : undefined);
+              return { code, contains, price, minQty } as UnitOption;
+            })
+            .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
+          if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
           return {
             id: d.id,
             name: data.name || 'TANPA NAMA',
-            price: data.price || data.priceEcer || 0,
-            unit: data.unit || data.Satuan || 'pcs',
+            price: basePrice,
+            unit: baseUnit,
             stock: data.stock || data.Stok || 0,
             barcode: data.barcode || '',
-            image: data.image || data.imageUrl || data.photo || null
+            image: data.image || data.imageUrl || data.photo || null,
+            units,
+            channelPricing: data.channelPricing
           } as Product;
         }).filter(item => (item.stock || 0) > 0);
         setProducts(p);
@@ -368,7 +450,9 @@ export default function CashierPOS() {
         const pRef = doc(db, 'products', item.id);
         const pSnap = await getDoc(pRef);
         if (pSnap.exists()) {
-          batch.update(pRef, { stock: (pSnap.data().stock || 0) - item.quantity });
+          const contains = Number(item.contains || 1);
+          const pcsToDeduct = item.quantity * contains;
+          batch.update(pRef, { stock: (pSnap.data().stock || 0) - pcsToDeduct });
         }
       }
 
@@ -477,7 +561,7 @@ export default function CashierPOS() {
               data-testid="product-grid-view"
             >
               {filteredProducts.map(p => (
-                <button key={p.id} onClick={() => addToCart(p)} className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'}`}>
+                <div key={p.id} className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'}`}>
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
                   {p.image ? (
                     <Image 
@@ -496,15 +580,43 @@ export default function CashierPOS() {
                       <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
                       <span className={`text-[10px] font-bold ${p.stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
                     </div>
+                    <div className="mt-2 space-y-1">
+                      {(p.units || []).slice(0,3).map(u => {
+                        const contains = Number(u.contains || (u.code === 'PCS' ? 1 : 0));
+                        const channel = getChannelKey(transactionType);
+                        let unitPrice = Number(u.price || (contains > 0 ? p.price * contains : p.price));
+                        const chPrice = (p.channelPricing as ChannelPricing)?.[channel]?.[u.code]?.price;
+
+                        if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+                          unitPrice = chPrice;
+                        } else if ((channel === 'shopee' || channel === 'tiktok') && (p.channelPricing as ChannelPricing)?.['website']?.[u.code]?.price) {
+                          unitPrice = (p.channelPricing as ChannelPricing)['website']![u.code].price!;
+                        }
+                        const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
+                        return (
+                          <button
+                            key={u.code}
+                            onClick={() => addToCartWithUnit(p, u)}
+                            className="w-full text-left text-[10px] font-black text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg px-2 py-1"
+                            title={`Tambah 1 ${u.code}`}
+                          >
+                            {u.code} - Rp{p.price.toLocaleString()}  Rp{unitPrice.toLocaleString()} / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
 
           <div className="col-span-12 xl:col-span-4 flex flex-col gap-4">
-            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'online' ? 'bg-blue-600 animate-pulse' : 'bg-green-600'}`}>
-              {transactionType === 'online' ? <><Truck size={14} /> MODE PESANAN ONLINE</> : <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
+            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
+              {transactionType === 'toko' && <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
+              {transactionType === 'online' && <><Truck size={14} /> MODE PESANAN ONLINE</>}
+              {transactionType === 'shopee' && <><Package size={14} /> MODE SHOPEE</>}
+              {transactionType === 'tiktok' && <><ShoppingBag size={14} /> MODE TIKTOK</>}
             </div>
 
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col overflow-hidden h-full">
@@ -514,7 +626,16 @@ export default function CashierPOS() {
                   <h2 className="font-black text-xs uppercase tracking-widest text-gray-700">Keranjang</h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setTransactionType(transactionType === 'toko' ? 'online' : 'toko')} className="text-[10px] font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300">GANTI MODE</button>
+                  <select
+                    value={transactionType}
+                    onChange={(e) => setTransactionType(e.target.value as 'toko' | 'online' | 'shopee' | 'tiktok')}
+                    className="text-[10px] font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300 outline-none cursor-pointer"
+                  >
+                    <option value="toko">OFFLINE</option>
+                    <option value="online">WEBSITE</option>
+                    <option value="shopee">SHOPEE</option>
+                    <option value="tiktok">TIKTOK</option>
+                  </select>
                   <button onClick={() => setCart([])} className="text-red-400 hover:text-red-600"><Trash2 size={18} /></button>
                 </div>
               </div>
@@ -523,7 +644,12 @@ export default function CashierPOS() {
                 {cart.map(item => (
                   <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
+                      <div className="flex flex-col">
+                        <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
+                        <span className="text-[8px] font-black text-gray-400 uppercase">
+                          Harga channel: {item.channel || 'OFFLINE'}
+                        </span>
+                      </div>
                       {editingPriceId === item.id ? (
                         <input
                           autoFocus
@@ -552,8 +678,22 @@ export default function CashierPOS() {
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 bg-white border rounded-lg"><Minus size={12} /></button>
+                    <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const prod = products.find(p => p.id === item.id);
+                            const u = prod?.units?.find(u => u.code === item.unit);
+                            const minQty = Number(u?.minQty || 0);
+                            const next = item.quantity - 1;
+                            if (minQty && next > 0 && next < minQty) {
+                              toast.error(`Min. qty untuk ${item.unit} adalah ${minQty}`);
+                              updateQuantity(item.id, minQty);
+                            } else {
+                              updateQuantity(item.id, next);
+                            }
+                          }}
+                          className="p-1 bg-white border rounded-lg"
+                        ><Minus size={12} /></button>
                         <input 
                           type="number" 
                           min="1"
@@ -561,12 +701,61 @@ export default function CashierPOS() {
                           value={item.quantity} 
                           onChange={(e) => {
                             const val = parseInt(e.target.value);
-                            if (!isNaN(val) && val > 0) updateQuantity(item.id, val);
+                            if (!isNaN(val) && val > 0) {
+                              const prod = products.find(p => p.id === item.id);
+                              const u = prod?.units?.find(u => u.code === item.unit);
+                              const minQty = Number(u?.minQty || 0);
+                              if (minQty && val < minQty) {
+                                toast.error(`Min. qty untuk ${item.unit} adalah ${minQty}`);
+                                updateQuantity(item.id, minQty);
+                              } else {
+                                updateQuantity(item.id, val);
+                              }
+                            }
                           }}
                         />
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 bg-white border rounded-lg"><Plus size={12} /></button>
+                        <button
+                          onClick={() => {
+                            const next = item.quantity + 1;
+                            updateQuantity(item.id, next);
+                          }}
+                          className="p-1 bg-white border rounded-lg"
+                        ><Plus size={12} /></button>
                       </div>
-                      <span className="text-[10px] font-bold text-gray-400">{item.unit}</span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={item.unit}
+                          onChange={(e) => {
+                            const prod = products.find(p => p.id === item.id);
+                            const code = e.target.value;
+                            const u = prod?.units?.find(u => u.code === code) || { code, contains: code === 'PCS' ? 1 : 0, price: 0 };
+                            const contains = Number(u.contains || (code === 'PCS' ? 1 : 0));
+                            const channel = getChannelKey(transactionType);
+                            let unitPrice = Number(u.price || (contains > 0 ? (prod?.price || 0) * contains : (prod?.price || 0)));
+                            const chPrice = (prod?.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
+
+                            if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+                              unitPrice = chPrice;
+                            } else if ((channel === 'shopee' || channel === 'tiktok') && (prod?.channelPricing as ChannelPricing)?.['website']?.[code]?.price) {
+                              unitPrice = (prod?.channelPricing as ChannelPricing)['website']![code].price!;
+                            }
+                            const minQty = Number(u.minQty || 0);
+                            setCart(prev => prev.map(ci => {
+                              if (ci.id !== item.id) return ci;
+                              const nextQty = minQty && ci.quantity < minQty ? minQty : ci.quantity;
+                              if (minQty && ci.quantity < minQty) toast.success(`Min. qty ${code}: ${minQty}. Qty disesuaikan.`);
+                              return { ...ci, unit: code, contains, price: unitPrice, quantity: nextQty, channel };
+                            }));
+                          }}
+                          className="text-[10px] font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"
+                        >
+                          {(products.find(p => p.id === item.id)?.units || [{ code: 'PCS', contains: 1 }]).map(u => (
+                            <option key={u.code} value={u.code}>
+                              {u.code}{u.contains && u.contains > 1 ? ` (Isi ${u.contains})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 ))}

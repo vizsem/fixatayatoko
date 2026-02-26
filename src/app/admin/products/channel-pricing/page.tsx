@@ -19,8 +19,9 @@ type ChannelPricingState = {
   tiktok?: number;
 };
 
+type UnitChannelPricing = Record<string, { price?: number }>;
 type Product = NormalizedProduct & {
-  channelPricing?: {
+  channelPricing?: Record<ChannelKey, UnitChannelPricing> | {
     offline?: { price?: number };
     website?: { price?: number };
     shopee?: { price?: number };
@@ -31,23 +32,48 @@ type Product = NormalizedProduct & {
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
-  const [prices, setPrices] = useState<Record<string, ChannelPricingState>>({});
+  // prices[productId][unitCode] = ChannelPricingState
+  const [prices, setPrices] = useState<Record<string, Record<string, ChannelPricingState>>>({});
+  const [selectedUnit, setSelectedUnit] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
 
   // Init state harga channel dari data produk
   // LiveProducts sudah ter-normalisasi; channelPricing tetap optional
   if (liveProducts.length > 0) {
     setPrices(prev => {
-      const next = { ...prev };
+      const next = { ...prev } as Record<string, Record<string, ChannelPricingState>>;
       (liveProducts as Product[]).forEach(p => {
-        if (!next[p.id]) {
-          next[p.id] = {
-            offline: p.channelPricing?.offline?.price ?? undefined,
-            website: p.channelPricing?.website?.price ?? undefined,
-            shopee: p.channelPricing?.shopee?.price ?? undefined,
-            tiktok: p.channelPricing?.tiktok?.price ?? undefined,
-          };
-        }
+        const unitList = (p.units || []).map(u => (u?.code || '').toString().toUpperCase());
+        const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
+        const units = unitList.length ? unitList : [baseUnit];
+        if (!next[p.id]) next[p.id] = {};
+        if (!selectedUnit[p.id]) setSelectedUnit(su => ({ ...su, [p.id]: baseUnit }));
+        units.forEach(uc => {
+          if (!next[p.id][uc]) {
+            // Compat: jika channelPricing lama (flat), pakai untuk baseUnit
+            const legacy = (p.channelPricing || {}) as {
+              offline?: { price?: number };
+              website?: { price?: number };
+              shopee?: { price?: number };
+              tiktok?: { price?: number };
+            };
+            const legacyState: ChannelPricingState = {
+              offline: legacy?.offline?.price,
+              website: legacy?.website?.price,
+              shopee: legacy?.shopee?.price,
+              tiktok: legacy?.tiktok?.price,
+            };
+            // Nested baru: channelPricing[channel]?.[unitCode]?.price
+            const nested = (p.channelPricing || {}) as Record<string, UnitChannelPricing>;
+            const fromNested: ChannelPricingState = {
+              offline: nested?.offline?.[uc]?.price,
+              website: nested?.website?.[uc]?.price,
+              shopee: nested?.shopee?.[uc]?.price,
+              tiktok: nested?.tiktok?.[uc]?.price,
+            };
+            next[p.id][uc] = uc === baseUnit ? { ...legacyState, ...fromNested } : fromNested;
+          }
+        });
       });
       return next;
     });
@@ -62,12 +88,15 @@ export default function ChannelPricingPage() {
     });
   }, [liveProducts, search]);
 
-  const handleChangePrice = (productId: string, channel: ChannelKey, value: string) => {
+  const handleChangePrice = (productId: string, unitCode: string, channel: ChannelKey, value: string) => {
     setPrices(prev => ({
       ...prev,
       [productId]: {
         ...prev[productId],
-        [channel]: value === '' ? undefined : Number(value),
+        [unitCode]: {
+          ...(prev[productId]?.[unitCode] || {}),
+          [channel]: value === '' ? undefined : Number(value),
+        },
       },
     }));
   };
@@ -77,15 +106,18 @@ export default function ChannelPricingPage() {
     setSavingId(product.id);
     const toastId = notify.admin.loading('Menyimpan harga channel...');
     try {
-      const channelPricing: Record<string, { price: number }> = {};
-      (['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).forEach(key => {
-        const v = state[key];
-        if (typeof v === 'number' && !Number.isNaN(v)) {
-          channelPricing[key] = { price: v };
-        }
+      const payload: Record<string, Record<string, { price: number }>> = {};
+      (['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).forEach((ch) => {
+        Object.entries(state).forEach(([unitCode, chState]) => {
+          const v = (chState as ChannelPricingState)[ch];
+          if (typeof v === 'number' && !Number.isNaN(v)) {
+            if (!payload[ch]) payload[ch] = {};
+            payload[ch][unitCode] = { price: v };
+          }
+        });
       });
       await updateDoc(doc(db, 'products', product.id), {
-        channelPricing: Object.keys(channelPricing).length ? channelPricing : null,
+        channelPricing: Object.keys(payload).length ? payload : null,
       });
       notify.admin.success('Harga channel tersimpan.', { id: toastId });
     } catch (err) {
@@ -166,6 +198,11 @@ export default function ChannelPricingPage() {
                 {filteredProducts.map((p) => {
                   const state = prices[p.id] || {};
                   const displayName = p.name || 'Produk';
+                  const unitList = ((p.units || []).map(u => (u?.code || '').toString().toUpperCase()));
+                  const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
+                  const units = unitList.length ? unitList : [baseUnit];
+                  const currentUnit = selectedUnit[p.id] || baseUnit;
+                  const stateByUnit = prices[p.id]?.[currentUnit] || {};
                   return (
                     <tr key={p.id}>
                       <td className="px-6 py-4">
@@ -177,6 +214,17 @@ export default function ChannelPricingPage() {
                             Harga dasar: Rp{' '}
                             {Number(p.priceEcer || 0).toLocaleString()}
                           </span>
+                          <div className="mt-2">
+                            <select
+                              value={currentUnit}
+                              onChange={(e) => setSelectedUnit(su => ({ ...su, [p.id]: e.target.value }))}
+                              className="text-[10px] font-black bg-gray-50 border rounded-lg px-2 py-1"
+                            >
+                              {units.map(uc => (
+                                <option key={uc} value={uc}>{uc}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </td>
                       {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => (
@@ -186,9 +234,9 @@ export default function ChannelPricingPage() {
                             <input
                               type="number"
                               className="w-24 bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none"
-                              value={state[key] ?? ''}
+                              value={stateByUnit[key] ?? ''}
                               onChange={(e) =>
-                                handleChangePrice(p.id, key, e.target.value)
+                                handleChangePrice(p.id, currentUnit, key, e.target.value)
                               }
                               min={0}
                             />

@@ -18,6 +18,14 @@ import Image from 'next/image';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
 
+type UnitOption = {
+  code: string;
+  contains?: number;
+  price?: number;
+  minQty?: number;
+  label?: string;
+};
+
 interface ProductData {
   id: string;
   ID: string;
@@ -38,6 +46,7 @@ interface ProductData {
   Link_Foto?: string;
   image?: string;
   stockByWarehouse: Record<string, number>;
+  units?: UnitOption[];
 }
 
 interface Warehouse {
@@ -60,6 +69,7 @@ export default function EditProductPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [units, setUnits] = useState<UnitOption[]>([]);
 
 
 
@@ -74,7 +84,8 @@ export default function EditProductPage() {
         return router.push('/admin/products');
       }
       const data = docSnap.data();
-      setProduct({
+      const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
+      const loadedProduct: ProductData = {
         ...data,
         id: docSnap.id,
         ID: data.ID || '',
@@ -84,7 +95,7 @@ export default function EditProductPage() {
         Grosir: Number(data.Grosir || 0),
         Stok: Number(data.Stok ?? 0),
         Kategori: data.Kategori || 'UMUM',
-        Satuan: data.Satuan || 'PCS',
+        Satuan: baseUnit,
         Barcode: data.Barcode || '',
         Brand: data.Brand || '',
         Supplier: data.Supplier || '',
@@ -92,7 +103,21 @@ export default function EditProductPage() {
         expired_date: data.expired_date || '', // Sinkron dengan tabel admin
         Status: data.Status ?? 1,
         stockByWarehouse: data.stockByWarehouse || {},
-      });
+        units: Array.isArray(data.units) ? data.units : undefined,
+      };
+      setProduct(loadedProduct);
+
+      const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
+      const byCode: Record<string, UnitOption> = {};
+      existingUnits.forEach(u => { if (u?.code) byCode[String(u.code).toUpperCase()] = { ...u, code: String(u.code).toUpperCase() }; });
+      const basePrice = Number(loadedProduct.Ecer || 0);
+      const defaultUnits: UnitOption[] = [
+        { code: baseUnit, contains: 1, price: basePrice },
+        { code: 'BOX', contains: byCode['BOX']?.contains ?? 0, price: byCode['BOX']?.price ?? 0 },
+        { code: 'CTN', contains: byCode['CTN']?.contains ?? 0, price: byCode['CTN']?.price ?? 0 },
+      ];
+      const merged = defaultUnits.map(u => byCode[u.code] ? { ...u, ...byCode[u.code] } : u);
+      setUnits(merged);
 
       const currentPhoto = data.URL_Produk || data.Link_Foto || data.image;
       setImagePreview(currentPhoto || null);
@@ -192,11 +217,27 @@ export default function EditProductPage() {
       });
 
       // 4. Update Dokumen Produk
+      const baseUnit = String(product.Satuan || 'PCS').toUpperCase();
+      const cleanedUnits = (units || [])
+        .map(u => ({
+          code: String(u.code || '').toUpperCase(),
+          contains: typeof u.contains === 'number' ? u.contains : Number(u.contains || 0),
+          price: typeof u.price === 'number' ? u.price : Number(u.price || 0),
+          minQty: typeof u.minQty === 'number' ? u.minQty : (u.minQty !== undefined ? Number(u.minQty) : undefined),
+          label: u.label ? String(u.label) : undefined,
+        } as UnitOption))
+        .filter(u => u.code);
+
+      const baseUnitEntry = cleanedUnits.find(u => u.code === baseUnit) || { code: baseUnit, contains: 1, price: Number(product.Ecer || 0) };
+      const nextEcer = Number(baseUnitEntry.price || product.Ecer || 0);
+
       const updatePayload = {
         ...product,
         Nama: product.Nama.toUpperCase(),
         Stok: totalStock,
         URL_Produk: finalImageUrl,
+        Ecer: nextEcer,
+        units: cleanedUnits,
         updatedAt: serverTimestamp()
       };
 
@@ -314,6 +355,79 @@ export default function EditProductPage() {
                   <input type="number" value={product.Grosir} onChange={e => setProduct({ ...product, Grosir: Number(e.target.value) })} className="w-full bg-transparent font-black text-lg text-emerald-600 outline-none" />
                 </div>
 
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-gray-700">Pilih Satuan Jual</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {['PCS', 'BOX', 'CTN'].map((code) => {
+                  const idx = units.findIndex(u => String(u.code || '').toUpperCase() === code);
+                  const current = idx >= 0 ? units[idx] : { code, contains: code === 'PCS' ? 1 : 0, price: 0 };
+                  const basePrice = Number(product.Ecer || 0);
+                  const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
+                  const unitPrice = Number(current.price || 0);
+                  const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
+                  return (
+                    <div key={code} className="p-4 rounded-2xl border bg-gray-50">
+                      <div className="text-[10px] font-black uppercase text-gray-400 mb-2">{code}</div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
+                          <input
+                            type="number"
+                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                            value={current.price ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Number(e.target.value);
+                              const next = [...units];
+                              if (idx >= 0) next[idx] = { ...current, price: val };
+                              else next.push({ code, price: val, contains: current.contains });
+                              setUnits(next);
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
+                          <input
+                            type="number"
+                            disabled={code === 'PCS'}
+                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
+                            value={code === 'PCS' ? 1 : (current.contains ?? '')}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Number(e.target.value);
+                              const next = [...units];
+                              if (idx >= 0) next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
+                              else next.push({ code, price: current.price, contains: code === 'PCS' ? 1 : val });
+                              setUnits(next);
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                            value={current.minQty ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Number(e.target.value);
+                              const next = [...units];
+                              if (idx >= 0) next[idx] = { ...current, minQty: val };
+                              else next.push({ code, price: current.price, contains: current.contains, minQty: val });
+                              setUnits(next);
+                            }}
+                          />
+                        </div>
+                        <div className="text-[10px] font-black text-gray-500">
+                          {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
+                          <span className="mx-1">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
+                          / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

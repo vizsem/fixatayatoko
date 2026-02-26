@@ -23,6 +23,8 @@ export default function AddProductPage() {
     Parent_ID: '',
     Nama: '',
     Kategori: '',
+    Brand: '',
+    Expired_Default: '',
     Satuan: 'Pcs',
     Stok: 0,
     Min_Stok: 5,
@@ -97,28 +99,42 @@ export default function AddProductPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* BAGIAN 1: IDENTITAS (ID & SKU) */}
-          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-blue-600">
-              <Barcode size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Identitas Produk</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">ID Produk (Unique) *</label>
-                <input required type="text" placeholder="Contoh: AT-001" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.ID} onChange={e => setFormData({ ...formData, ID: e.target.value })} />
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag" aria-hidden="true">
+                <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path>
+                <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle>
+              </svg>
+              Identitas Barang
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
+                <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Barcode / SKU</label>
-                <input type="text" placeholder="Scan Barcode" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black font-bold" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Parent ID (Untuk Varian)</label>
-                <input type="text" placeholder="Kosongkan jika bukan varian" className="w-full p-4 bg-purple-50 rounded-2xl border-none focus:ring-2 focus:ring-purple-500 font-bold text-purple-700" value={formData.Parent_ID} onChange={e => setFormData({ ...formData, Parent_ID: e.target.value })} />
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Nama Produk *</label>
-                <input required type="text" className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black font-bold" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
+                <div className="relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" aria-hidden="true">
+                    <path d="M8 2v4"></path>
+                    <path d="M16 2v4"></path>
+                    <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                    <path d="M3 10h18"></path>
+                  </svg>
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.Expired_Default} onChange={e => setFormData({ ...formData, Expired_Default: e.target.value })} />
+                </div>
               </div>
             </div>
           </div>
@@ -130,10 +146,6 @@ export default function AddProductPage() {
               <h3 className="text-xs font-black uppercase tracking-widest">Kategori & Stok</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              <div className="col-span-2 md:col-span-1 space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Kategori</label>
-                <input required type="text" placeholder="Umum" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
-              </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Satuan</label>
                 <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />

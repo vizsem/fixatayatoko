@@ -19,7 +19,7 @@ import {
   where,
   orderBy
 } from 'firebase/firestore';
-import { ArrowDown, Plus } from 'lucide-react';
+import { ArrowDown, Plus, Calendar } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
@@ -29,6 +29,7 @@ type Product = {
   name: string;
   unit: string;
   stock: number;
+  units?: { code: string; contains?: number }[];
   stockByWarehouse?: { [key: string]: number };
 };
 
@@ -49,6 +50,7 @@ function StockInContent() {
     productId: productId || '',
     supplierId: '',
     quantity: 0,
+    unitCode: 'PCS',
     purchasePrice: 0,
     expiredDate: ''
   });
@@ -67,12 +69,24 @@ function StockInContent() {
         orderBy('name', 'asc')
       );
       const productsSnap = await getDocs(productsQuery);
-      const productList = productsSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name,
-        unit: doc.data().unit || 'pcs',
-        stock: doc.data().stock || 0
-      }));
+      const productList = productsSnap.docs.map(d => {
+        const data = d.data() as Record<string, unknown>;
+        const baseUnit = String((data.unit || data.Satuan || 'PCS')).toUpperCase();
+        const units = Array.isArray((data as Record<string, unknown>).units)
+          ? ((data as Record<string, unknown>).units as Array<Record<string, unknown>>).map(u => ({
+              code: String(u.code || '').toUpperCase(),
+              contains: typeof u.contains === 'number' ? u.contains : Number(u.contains || 0),
+            })).filter(u => u.code)
+          : [];
+        if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1 });
+        return {
+          id: d.id,
+          name: String(data.name || 'Produk'),
+          unit: baseUnit,
+          stock: Number(data.stock || 0),
+          units,
+        } as Product;
+      });
       setProducts(productList);
 
       // Load suppliers
@@ -127,6 +141,10 @@ function StockInContent() {
     }
 
     try {
+      const prod = products.find(p => p.id === formData.productId);
+      const selectedUnit = prod?.units?.find(u => u.code === formData.unitCode) || { code: 'PCS', contains: 1 };
+      const contains = Number(selectedUnit.contains || 1);
+      const pcsToAdd = formData.quantity * contains;
       // 1. Simpan transaksi stok masuk
       const transactionData = {
         type: 'STOCK_IN',
@@ -134,7 +152,10 @@ function StockInContent() {
         productName: selectedProduct?.name,
         supplierId: formData.supplierId,
         supplierName: suppliers.find(s => s.id === formData.supplierId)?.name,
-        quantity: formData.quantity,
+        quantity: pcsToAdd,
+        unitCode: formData.unitCode,
+        unitQty: formData.quantity,
+        unitContains: contains,
         purchasePrice: formData.purchasePrice,
         expiredDate: formData.expiredDate,
         createdAt: serverTimestamp()
@@ -146,12 +167,12 @@ function StockInContent() {
       // 2. Update stok produk
       const productRef = doc(db, 'products', formData.productId);
       const currentStock = selectedProduct?.stock || 0;
-      const newStock = currentStock + formData.quantity;
+      const newStock = currentStock + pcsToAdd;
 
       await updateDoc(productRef, {
         stock: newStock,
         stockByWarehouse: {
-          'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + formData.quantity
+          'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + pcsToAdd
         }
       });
 
@@ -228,7 +249,7 @@ function StockInContent() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div>
             <label className="block text-black text-sm font-medium mb-2">
               Jumlah *
@@ -242,6 +263,22 @@ function StockInContent() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
               placeholder="100"
             />
+          </div>
+          <div>
+            <label className="block text-black text-sm font-medium mb-2">
+              Satuan
+            </label>
+            <select
+              value={formData.unitCode}
+              onChange={(e) => setFormData({ ...formData, unitCode: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
+            >
+              {(products.find(p => p.id === formData.productId)?.units || [{ code: 'PCS', contains: 1 }]).map(u => (
+                <option key={u.code} value={u.code}>
+                  {u.code} {u.contains && u.contains > 1 ? `(Isi ${u.contains})` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -259,17 +296,28 @@ function StockInContent() {
             />
           </div>
         </div>
+        <div className="mb-6 text-[10px] font-black text-gray-500 uppercase">
+          {(() => {
+            const prod = products.find(p => p.id === formData.productId);
+            const contains = prod?.units?.find(u => u.code === formData.unitCode)?.contains || 1;
+            const pcs = (formData.quantity || 0) * (contains || 1);
+            return `Akan menambah ke stok: ${pcs.toLocaleString('id-ID')} pcs`;
+          })()}
+        </div>
 
         <div className="mb-8">
           <label className="block text-black text-sm font-medium mb-2">
             Tanggal Kadaluarsa
           </label>
-          <input
-            type="date"
-            value={formData.expiredDate}
-            onChange={(e) => setFormData({ ...formData, expiredDate: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-          />
+          <div className="relative">
+            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+            <input
+              type="date"
+              value={formData.expiredDate}
+              onChange={(e) => setFormData({ ...formData, expiredDate: e.target.value })}
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
+            />
+          </div>
         </div>
 
         <div className="flex gap-3">
