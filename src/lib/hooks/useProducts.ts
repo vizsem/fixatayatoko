@@ -17,7 +17,6 @@ export default function useProducts(options?: ProductQueryOptions) {
 
   const qRef = useMemo(() => {
     const constraints: QueryConstraint[] = [];
-    if (typeof options?.isActive === 'boolean') constraints.push(where('isActive', '==', options.isActive));
     if (options?.category) constraints.push(where('category', '==', options.category));
     if (options?.warehouseId) constraints.push(where('warehouseId', '==', options.warehouseId));
     const field = options?.orderByField || 'name';
