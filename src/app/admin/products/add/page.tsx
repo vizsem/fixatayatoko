@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import {
@@ -16,6 +16,7 @@ export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
 
   const [formData, setFormData] = useState({
     ID: '',
@@ -25,6 +26,8 @@ export default function AddProductPage() {
     Kategori: '',
     Brand: '',
     Expired_Default: '',
+    expired_date: '',
+    tgl_masuk: '',
     Satuan: 'Pcs',
     Stok: 0,
     Min_Stok: 5,
@@ -37,7 +40,9 @@ export default function AddProductPage() {
     Deskripsi: '',
     Status: 1,
     Supplier: '',
-    No_WA_Supplier: ''
+    No_WA_Supplier: '',
+    Lokasi: '',
+    warehouseId: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,9 +58,25 @@ export default function AddProductPage() {
         throw new Error(`ID Produk "${formData.ID}" sudah terdaftar di database!`);
       }
 
-      // 2. Simpan ke Firestore
+      // 2. Simpan ke Firestore (lengkap dengan field ter-normalisasi)
       await addDoc(collection(db, 'products'), {
         ...formData,
+        sku: formData.ID,
+        name: formData.Nama,
+        category: formData.Kategori,
+        unit: formData.Satuan,
+        stock: Number(formData.Stok || 0),
+        minStock: Number(formData.Min_Stok || 0),
+        purchasePrice: Number(formData.Modal || 0),
+        priceEcer: Number(formData.Ecer || 0),
+        priceGrosir: Number(formData.Grosir || 0),
+        Min_Grosir: Number(formData.Min_Grosir || 0),
+        imageUrl: formData.Link_Foto,
+        isActive: Number(formData.Status) === 1,
+        warehouseId: formData.warehouseId || '',
+        tgl_masuk: formData.tgl_masuk || '',
+        expired_date: formData.expired_date || formData.Expired_Default || '',
+        Lokasi: formData.Lokasi || '',
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -74,6 +95,17 @@ export default function AddProductPage() {
     }
   };
 
+  // Load warehouses
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'warehouses'), (s) => {
+      setWarehouses(s.docs.map(d => {
+        const data = d.data() as Record<string, unknown>;
+        const name = (typeof data.name === 'string' && data.name) ? data.name : d.id;
+        return { id: d.id, name };
+      }));
+    });
+    return () => unsub();
+  }, []);
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-24 text-black font-sans">
       <div className="max-w-4xl mx-auto">
@@ -113,6 +145,10 @@ export default function AddProductPage() {
                 <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
               </div>
               <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Lokasi} onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} />
+              </div>
+              <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
               </div>
@@ -136,6 +172,18 @@ export default function AddProductPage() {
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.Expired_Default} onChange={e => setFormData({ ...formData, Expired_Default: e.target.value })} />
                 </div>
               </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
+                <div className="relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" aria-hidden="true">
+                    <path d="M8 2v4"></path>
+                    <path d="M16 2v4"></path>
+                    <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                    <path d="M3 10h18"></path>
+                  </svg>
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.tgl_masuk} onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -157,6 +205,13 @@ export default function AddProductPage() {
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
                 <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Gudang</label>
+                <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.warehouseId} onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}>
+                  <option value="">Pilih Gudang</option>
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
               </div>
             </div>
           </div>
@@ -190,6 +245,13 @@ export default function AddProductPage() {
                 <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
               </div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase text-gray-400">Status</span>
+              <select className="p-3 bg-gray-50 rounded-xl text-xs font-bold" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
+                <option value={1}>Aktif</option>
+                <option value={0}>Arsip</option>
+              </select>
             </div>
           </div>
 

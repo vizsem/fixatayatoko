@@ -166,6 +166,20 @@ export default function AdminProducts() {
     } catch { notify.admin.error("Gagal memperbarui", { id: t }); }
 
   };
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Hapus ${selectedIds.length} produk? Tindakan ini tidak bisa dikembalikan.`)) return;
+    const t = notify.admin.loading(`Menghapus ${selectedIds.length} produk...`);
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => {
+        batch.delete(doc(db, 'products', id));
+      });
+      await batch.commit();
+      setSelectedIds([]);
+      notify.admin.success("Produk berhasil dihapus", { id: t });
+    } catch { notify.admin.error("Gagal menghapus produk", { id: t }); }
+  };
   // States
   const [loading, setLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -174,7 +188,7 @@ export default function AdminProducts() {
   const [selectedProductRestock, setSelectedProductRestock] = useState<ProductRow | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const { products: liveProducts } = useProducts({ isActive: showInactive ? false : true, orderByField: 'name', orderDirection: 'asc' });
 
@@ -192,6 +206,21 @@ export default function AdminProducts() {
   }, [router]);
 
   const rows = liveProducts as unknown as ProductRow[];
+  const displayWarehouses = useMemo(() => {
+    const base = warehouses;
+    const knownIds = new Set(base.map(w => w.id));
+    const knownNames = new Set(base.map(w => w.name));
+    const derived = new Set<string>();
+    rows.forEach((p) => {
+      const by = (p as unknown as { stockByWarehouse?: Record<string, number> }).stockByWarehouse || {};
+      Object.keys(by).forEach(k => derived.add(k));
+      if (p.warehouseId) derived.add(String(p.warehouseId));
+    });
+    const virtuals = Array.from(derived)
+      .filter(k => !knownIds.has(k) && !knownNames.has(k))
+      .map(k => ({ id: k, name: k }));
+    return [...base, ...virtuals];
+  }, [warehouses, rows]);
 
   // Logic Filter & Pagination (Harus di atas handleExport)
   const filteredAndSorted = useMemo(() => {
@@ -218,7 +247,7 @@ export default function AdminProducts() {
     if (filteredAndSorted.length === 0) return notify.admin.error("Tidak ada data untuk diexport!");
     const t = notify.admin.loading("Mengunduh Excel...");
     try {
-    const data = filteredAndSorted.map(p => ({
+      const data = filteredAndSorted.map(p => ({
       ID: p.sku || '',
       Barcode: '',
       Nama: p.name,
@@ -236,7 +265,7 @@ export default function AdminProducts() {
       URL_Produk: p.imageUrl || '',
       Status: p.isActive ? '1' : '0',
       warehouseId: p.warehouseId || '',
-      Gudang_Nama: warehouses.find(w => w.id === p.warehouseId)?.name || '-',
+        Gudang_Nama: displayWarehouses.find(w => w.id === p.warehouseId)?.name || '-',
       tgl_masuk: p.tgl_masuk || '',
       expired_date: p.expired_date || ''
     }));
@@ -400,12 +429,20 @@ export default function AdminProducts() {
           <div className="flex gap-3 items-center">
             {/* Bulk Action Button */}
             {selectedIds.length > 0 && (
-              <button
-                onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
-                className="bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
-              >
-                <CheckSquare size={16} /> {showInactive ? 'Aktifkan' : 'Arsipkan'} ({selectedIds.length})
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
+                  className="bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
+                >
+                  <CheckSquare size={16} /> {showInactive ? 'Aktifkan' : 'Arsipkan'} ({selectedIds.length})
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="bg-gradient-to-r from-black to-gray-900 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
+                >
+                  <Trash2 size={16} /> Hapus ({selectedIds.length})
+                </button>
+              </div>
             )}
 
             <button
@@ -440,7 +477,7 @@ export default function AdminProducts() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {currentItems.map(p => {
-                const whName = warehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
+                const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
                 const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
                 const isSelected = selectedIds.includes(p.id);
 
@@ -560,7 +597,19 @@ export default function AdminProducts() {
         <div className="p-6 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
           <div className="text-[10px] font-black text-gray-400">Hal {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Produk</div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <span className="text-[10px] font-black text-gray-400">Tampilan</span>
+            {[100, 500, 1000].map(n => (
+              <button
+                key={n}
+                onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
+                className={`px-3 py-2 bg-white border rounded-xl text-[10px] font-black shadow-sm ${
+                  itemsPerPage === n ? 'bg-black text-white border-black' : ''
+                }`}
+              >
+                {n}
+              </button>
+            ))}
             <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white border rounded-xl disabled:opacity-30 shadow-sm"><ChevronLeft size={20} /></button>
             <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white border rounded-xl disabled:opacity-30 shadow-sm"><ChevronRight size={20} /></button>
           </div>

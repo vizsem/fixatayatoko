@@ -47,6 +47,7 @@ type Product = {
   isActive?: boolean;
   imageUrl?: string;
   units?: UnitOption[];
+  stockByWarehouse?: Record<string, number>;
 };
 
 export default function InventoryDashboard() {
@@ -119,6 +120,21 @@ export default function InventoryDashboard() {
       return matchesSearch && matchesCategory && matchesWarehouse;
     });
   }, [products, searchTerm, selectedCategory, selectedWarehouse]);
+  const displayWarehouses = useMemo(() => {
+    const base = warehouses;
+    const knownIds = new Set(base.map(w => w.id));
+    const knownNames = new Set(base.map(w => w.name));
+    const derived = new Set<string>();
+    products.forEach((p) => {
+      const by = (p.stockByWarehouse || {});
+      Object.keys(by).forEach(k => derived.add(k));
+      if (p.warehouseId) derived.add(String(p.warehouseId));
+    });
+    const virtuals = Array.from(derived)
+      .filter(k => !knownIds.has(k) && !knownNames.has(k))
+      .map(k => ({ id: k, name: k }));
+    return [...base, ...virtuals];
+  }, [warehouses, products]);
 
   const unitCodes = (p: Product) => {
     const set = new Set<string>();
@@ -365,8 +381,17 @@ export default function InventoryDashboard() {
                   <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
                     <span className="text-[10px] font-black text-gray-500 flex items-center gap-2">
 
-                      <Warehouse size={14} className="text-gray-300" /> {warehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
+                      <Warehouse size={14} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
                     </span>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {Object.entries(product.stockByWarehouse || {})
+                        .filter(([_, v]) => Number(v) > 0)
+                        .map(([wid, val]) => (
+                          <span key={wid} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                            {displayWarehouses.find(w => w.id === wid)?.name || wid}: {val}
+                          </span>
+                        ))}
+                    </div>
                   </td>
                   <td className="px-3 md:px-6 py-3 md:py-6 text-center">
                     {editingId === product.id ? (
