@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
@@ -30,6 +30,8 @@ type Product = {
   Satuan?: string;
   unit?: string;
   stock?: number;
+  isActive?: boolean;
+  Status?: number;
   channelPricing?: {
     offline?: {
       price?: number;
@@ -92,12 +94,12 @@ export default function MarketplaceOrdersPage() {
     const fetchProducts = async () => {
       const q = query(
         collection(db, 'products'),
-        where('isActive', '==', true),
         orderBy('name', 'asc')
       );
       const snap = await getDocs(q);
       const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Product));
-      setProducts(list);
+      const active = list.filter((p) => (typeof p.isActive === 'boolean' ? p.isActive : typeof p.Status === 'number' ? p.Status === 1 : true));
+      setProducts(active);
     };
     fetchProducts();
   }, []);

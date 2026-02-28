@@ -33,6 +33,8 @@ const mockAddDoc = vi.fn();
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db: unknown, _path: string) => ({ path: _path })),
   doc: vi.fn((_dbOrCol: unknown, _col: string, id: string) => ({ id })),
+  query: vi.fn(() => ({})),
+  orderBy: vi.fn(),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   serverTimestamp: vi.fn(),

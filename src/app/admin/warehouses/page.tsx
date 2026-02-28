@@ -92,21 +92,26 @@ export default function WarehousesPage() {
         const stockMap: Record<string, number> = {};
 
         pSnapshot.docs.forEach((pDoc) => {
-          const pData = pDoc.data();
-          // Mendukung field 'warehouseId' atau fallback ke pencocokan nama gudang
-          const wId = pData.warehouseId || pData.warehouse;
-          const stok = Number(pData.Stok || pData.stock || 0);
-
-          if (wId) {
-            stockMap[wId] = (stockMap[wId] || 0) + stok;
+          const pData = pDoc.data() as Record<string, unknown>;
+          const byMap = pData.stockByWarehouse as Record<string, number> | undefined;
+          if (byMap && typeof byMap === 'object') {
+            Object.entries(byMap).forEach(([key, val]) => {
+              const v = Number(val) || 0;
+              stockMap[key] = (stockMap[key] || 0) + v;
+            });
+          } else {
+            const wId = (pData.warehouseId as string | undefined) || (pData.warehouse as string | undefined);
+            const stok = Number((pData.Stok as number | string | undefined) ?? (pData.stock as number | string | undefined) ?? 0);
+            if (wId) {
+              stockMap[wId] = (stockMap[wId] || 0) + stok;
+            }
           }
         });
 
-        const warehouseList: Warehouse[] = wSnapshot.docs.map((doc) => {
+        const fromDocs: Warehouse[] = wSnapshot.docs.map((doc) => {
           const data = doc.data();
           const currentId = doc.id;
 
-          // Sinkronisasi: Ambil dari map atau cari berdasarkan nama jika ID tidak cocok
           const usedCapacity = stockMap[currentId] || stockMap[data.name] || 0;
 
           return {
@@ -120,7 +125,22 @@ export default function WarehousesPage() {
           };
         });
 
-        setWarehouses(warehouseList);
+        const knownIds = new Set(fromDocs.map(w => w.id));
+        const knownNames = new Set(fromDocs.map(w => w.name));
+        const virtuals: Warehouse[] = Object.entries(stockMap)
+          .filter(([key]) => !knownIds.has(key) && !knownNames.has(key))
+          .map(([key, used]) => ({
+            id: key,
+            name: key,
+            location: 'Lokasi Belum Diatur',
+            capacity: 0,
+            usedCapacity: used,
+            isActive: true,
+            createdAt: null
+          }));
+
+        const combined = [...fromDocs, ...virtuals].sort((a, b) => a.name.localeCompare(b.name));
+        setWarehouses(combined);
         setLoading(false);
         setError(null);
         setCurrentPage(1);

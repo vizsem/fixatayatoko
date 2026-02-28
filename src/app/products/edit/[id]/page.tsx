@@ -111,7 +111,9 @@ export default function EditProductPage() {
             id: doc.id,
             name: doc.data().name || ''
           }));
-          setWarehouses(list);
+          const known = new Set(list.map(w => w.id));
+          const extras: Warehouse[] = Object.keys((product.stockByWarehouse || {})).filter(id => !known.has(id)).map(id => ({ id, name: id }));
+          setWarehouses([...list, ...extras].sort((a, b) => a.name.localeCompare(b.name)));
         } catch (err) {
           console.error('Gagal memuat gudang:', err);
         }

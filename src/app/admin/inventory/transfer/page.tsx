@@ -12,7 +12,6 @@ import {
   addDoc,
   serverTimestamp,
   query,
-  where,
   orderBy
 } from 'firebase/firestore';
 
@@ -37,6 +36,8 @@ type Product = {
   stock: number;
   unit: string;
   stockByWarehouse?: Record<string, number>;
+  isActive?: boolean;
+  Status?: number;
 };
 
 type WarehouseType = {
@@ -63,14 +64,27 @@ export default function StockTransferPage() {
     const fetchData = async () => {
       const q = query(
         collection(db, 'products'),
-        where('isActive', '==', true),
         orderBy('name', 'asc')
       );
       const prodSnap = await getDocs(q);
-      setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+      const rawProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+      const activeProducts = rawProducts.filter((p) => (typeof p.isActive === 'boolean' ? p.isActive : typeof p.Status === 'number' ? p.Status === 1 : true));
+      setProducts(activeProducts);
 
       const whSnap = await getDocs(collection(db, 'warehouses'));
-      setWarehouses(whSnap.docs.map(d => ({ id: d.id, name: d.data().name } as WarehouseType)));
+      const baseWarehouses = whSnap.docs.map(d => ({ id: d.id, name: (d.data() as Record<string, unknown>).name as string } as WarehouseType));
+      const knownIds = new Set(baseWarehouses.map(w => w.id));
+      const knownNames = new Set(baseWarehouses.map(w => w.name));
+      const derivedIds = new Set<string>();
+      activeProducts.forEach(p => {
+        if (p.stockByWarehouse) {
+          Object.keys(p.stockByWarehouse).forEach(k => derivedIds.add(k));
+        }
+      });
+      const virtuals: WarehouseType[] = Array.from(derivedIds)
+        .filter(k => !knownIds.has(k) && !knownNames.has(k))
+        .map(k => ({ id: k, name: k }));
+      setWarehouses([...baseWarehouses, ...virtuals].sort((a, b) => a.name.localeCompare(b.name)));
     };
     fetchData();
   }, []);

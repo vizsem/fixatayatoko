@@ -49,13 +49,30 @@ export default function AddPurchase() {
       setSuppliers(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Supplier)));
     });
     const unsubWar = onSnapshot(collection(db, 'warehouses'), (s) => {
-      setWarehouses(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse)));
+      const base = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse));
+      const knownIds = new Set(base.map(w => w.id));
+      const knownNames = new Set(base.map(w => w.name));
+      const derived = new Set<string>();
+      type WarehouseInfo = { stockByWarehouse?: Record<string, number>; warehouseId?: string; warehouse?: string };
+      liveProducts.forEach((p) => {
+        const info = p as unknown as WarehouseInfo;
+        const by = info.stockByWarehouse;
+        if (by && typeof by === 'object') {
+          Object.keys(by).forEach(k => derived.add(k));
+        }
+        const wid = info.warehouseId || info.warehouse;
+        if (wid) derived.add(wid);
+      });
+      const virtuals = Array.from(derived)
+        .filter(k => !knownIds.has(k) && !knownNames.has(k))
+        .map(k => ({ id: k, name: k } as Warehouse));
+      setWarehouses([...base, ...virtuals].sort((a, b) => a.name.localeCompare(b.name)));
     });
     return () => {
       unsubSup();
       unsubWar();
     };
-  }, []);
+  }, [liveProducts]);
 
   const addToCart = (product: Product) => {
     const existing = cart.find(item => item.id === product.id);
