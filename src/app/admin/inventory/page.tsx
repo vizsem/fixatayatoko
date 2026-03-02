@@ -48,12 +48,14 @@ type Product = {
   imageUrl?: string;
   units?: UnitOption[];
   stockByWarehouse?: Record<string, number>;
+  updatedAt?: number;
+  createdAt?: number;
 };
 
 export default function InventoryDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const { products: liveProducts, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
+  const { products: liveProducts, loading: productsLoading } = useProducts({ isActive: true });
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
@@ -77,7 +79,14 @@ export default function InventoryDashboard() {
   const [batchValue, setBatchValue] = useState('');
 
   useEffect(() => {
-    setProducts(liveProducts as Product[]);
+    if (liveProducts) {
+      const sorted = [...(liveProducts as Product[])].sort((a, b) => {
+        const timeA = a.updatedAt || a.createdAt || 0;
+        const timeB = b.updatedAt || b.createdAt || 0;
+        return timeB - timeA;
+      });
+      setProducts(sorted);
+    }
   }, [liveProducts]);
 
   useEffect(() => {
@@ -208,7 +217,7 @@ export default function InventoryDashboard() {
     const batch = writeBatch(db);
     selectedIds.forEach(id => {
       const pRef = doc(db, 'products', id);
-      const updateData: Partial<Product> & { updatedAt: ReturnType<typeof serverTimestamp> } = { updatedAt: serverTimestamp() };
+      const updateData: Omit<Partial<Product>, 'updatedAt'> & { updatedAt: ReturnType<typeof serverTimestamp> } = { updatedAt: serverTimestamp() };
 
       if (batchAction === 'category') updateData.category = batchValue;
       if (batchAction === 'warehouse') updateData.warehouseId = batchValue;

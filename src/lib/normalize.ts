@@ -21,11 +21,21 @@ export type NormalizedProduct = {
   imageUrl?: string;
   purchasePrice?: number;
   units?: UnitOption[];
+  updatedAt?: number;
+  createdAt?: number;
 };
 
 export function normalizeProduct(id: string, raw: Record<string, unknown>): NormalizedProduct {
   const getNum = (v: unknown, def = 0) => typeof v === 'number' ? v : Number(v || def);
   const getStr = (v: unknown, def = '') => typeof v === 'string' ? v : String(v ?? def);
+  const getTimestamp = (v: unknown): number | undefined => {
+    if (v && typeof v === 'object' && 'seconds' in v) {
+      return (v as { seconds: number }).seconds * 1000;
+    }
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === 'number') return v;
+    return undefined;
+  };
   const toUpper = (s: string) => s.trim().toUpperCase();
   const parseUnits = (v: unknown, baseUnit: string, baseEcer: number, grosir: number, minGrosir: number): UnitOption[] => {
     if (Array.isArray(v)) {
@@ -69,6 +79,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
     isActive: typeof raw.isActive === 'boolean' ? raw.isActive : (getNum(raw.Status, 1) !== 0),
     imageUrl: getStr(raw.imageUrl ?? raw.image ?? raw.Link_Foto ?? raw.foto ?? raw.URL_Produk ?? raw.url_produk),
     purchasePrice: getNum(raw.purchasePrice ?? raw.Modal),
+    updatedAt: getTimestamp(raw.updatedAt),
+    createdAt: getTimestamp(raw.createdAt),
   };
 
   const rawUnits = (raw as Record<string, unknown>).units;

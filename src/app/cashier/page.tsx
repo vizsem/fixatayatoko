@@ -344,9 +344,60 @@ export default function CashierPOS() {
         }).filter(item => (item.stock || 0) > 0);
         setProducts(p);
         setFilteredProducts(p);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        toast.error('Gagal memuat produk. Silakan coba lagi.');
+      } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        const needsIndex =
+          String(err?.code) === 'failed-precondition' ||
+          /requires an index/i.test(String(err?.message || ''));
+        if (needsIndex) {
+          try {
+            const q2 = query(
+              collection(db, 'products'),
+              where('isActive', '==', true),
+              limit(200)
+            );
+            const snapshot2 = await getDocs(q2);
+            const list = snapshot2.docs.map(d => {
+              const data = d.data();
+              const baseUnit = String(data.unit || data.Satuan || 'PCS').toUpperCase();
+              const basePrice = Number(data.price || data.priceEcer || data.Ecer || 0);
+              const rawUnits = Array.isArray(data.units) ? data.units as Array<Record<string, unknown>> : [];
+              const units: UnitOption[] = rawUnits
+                .map(u => {
+                  const ru = u as Record<string, unknown>;
+                  const code = String(ru.code || '').toUpperCase();
+                  if (!code) return null;
+                  const contains = typeof ru.contains === 'number' ? ru.contains : Number(ru.contains || 0);
+                  const price = typeof ru.price === 'number' ? ru.price : Number(ru.price || 0);
+                  const rawMin = ru.minQty;
+                  const minQty = typeof rawMin === 'number' ? rawMin : (rawMin !== undefined ? Number(rawMin) : undefined);
+                  return { code, contains, price, minQty } as UnitOption;
+                })
+                .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
+              if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
+              return {
+                id: d.id,
+                name: data.name || 'TANPA NAMA',
+                price: basePrice,
+                unit: baseUnit,
+                stock: data.stock || data.Stok || 0,
+                barcode: data.barcode || '',
+                image: data.image || data.imageUrl || data.photo || null,
+                units,
+                channelPricing: data.channelPricing
+              } as Product;
+            }).filter(item => (item.stock || 0) > 0);
+            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            setProducts(list);
+            setFilteredProducts(list);
+          } catch (e) {
+            console.error('Fallback fetch products error:', e);
+            toast.error('Gagal memuat produk.');
+          }
+        } else {
+          console.error('Error fetching products:', err);
+          toast.error('Gagal memuat produk. Silakan coba lagi.');
+        }
       }
     };
     
