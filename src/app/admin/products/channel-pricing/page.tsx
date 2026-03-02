@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
@@ -37,47 +37,58 @@ export default function ChannelPricingPage() {
   const [selectedUnit, setSelectedUnit] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
 
-  // Init state harga channel dari data produk
-  // LiveProducts sudah ter-normalisasi; channelPricing tetap optional
-  if (liveProducts.length > 0) {
-    setPrices(prev => {
-      const next = { ...prev } as Record<string, Record<string, ChannelPricingState>>;
-      (liveProducts as Product[]).forEach(p => {
-        const unitList = (p.units || []).map(u => (u?.code || '').toString().toUpperCase());
+  useEffect(() => {
+    if (!liveProducts.length) return;
+
+    setSelectedUnit((prev) => {
+      const next = { ...prev };
+      (liveProducts as Product[]).forEach((p) => {
         const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
-        const units = unitList.length ? unitList : [baseUnit];
-        if (!next[p.id]) next[p.id] = {};
-        if (!selectedUnit[p.id]) setSelectedUnit(su => ({ ...su, [p.id]: baseUnit }));
-        units.forEach(uc => {
-          if (!next[p.id][uc]) {
-            // Compat: jika channelPricing lama (flat), pakai untuk baseUnit
-            const legacy = (p.channelPricing || {}) as {
-              offline?: { price?: number };
-              website?: { price?: number };
-              shopee?: { price?: number };
-              tiktok?: { price?: number };
-            };
-            const legacyState: ChannelPricingState = {
-              offline: legacy?.offline?.price,
-              website: legacy?.website?.price,
-              shopee: legacy?.shopee?.price,
-              tiktok: legacy?.tiktok?.price,
-            };
-            // Nested baru: channelPricing[channel]?.[unitCode]?.price
-            const nested = (p.channelPricing || {}) as Record<string, UnitChannelPricing>;
-            const fromNested: ChannelPricingState = {
-              offline: nested?.offline?.[uc]?.price,
-              website: nested?.website?.[uc]?.price,
-              shopee: nested?.shopee?.[uc]?.price,
-              tiktok: nested?.tiktok?.[uc]?.price,
-            };
-            next[p.id][uc] = uc === baseUnit ? { ...legacyState, ...fromNested } : fromNested;
-          }
-        });
+        if (!next[p.id]) next[p.id] = baseUnit;
       });
       return next;
     });
-  }
+
+    setPrices((prev) => {
+      const next = { ...prev } as Record<string, Record<string, ChannelPricingState>>;
+
+      (liveProducts as Product[]).forEach((p) => {
+        const unitList = (p.units || []).map((u) => (u?.code || '').toString().toUpperCase());
+        const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
+        const units = unitList.length ? unitList : [baseUnit];
+
+        if (!next[p.id]) next[p.id] = {};
+
+        units.forEach((uc) => {
+          if (next[p.id][uc]) return;
+
+          const legacy = (p.channelPricing || {}) as {
+            offline?: { price?: number };
+            website?: { price?: number };
+            shopee?: { price?: number };
+            tiktok?: { price?: number };
+          };
+          const legacyState: ChannelPricingState = {
+            offline: legacy?.offline?.price,
+            website: legacy?.website?.price,
+            shopee: legacy?.shopee?.price,
+            tiktok: legacy?.tiktok?.price,
+          };
+          const nested = (p.channelPricing || {}) as Record<string, UnitChannelPricing>;
+          const fromNested: ChannelPricingState = {
+            offline: nested?.offline?.[uc]?.price,
+            website: nested?.website?.[uc]?.price,
+            shopee: nested?.shopee?.[uc]?.price,
+            tiktok: nested?.tiktok?.[uc]?.price,
+          };
+
+          next[p.id][uc] = uc === baseUnit ? { ...legacyState, ...fromNested } : fromNested;
+        });
+      });
+
+      return next;
+    });
+  }, [liveProducts]);
 
   const filteredProducts = useMemo(() => {
     const products = liveProducts as Product[];

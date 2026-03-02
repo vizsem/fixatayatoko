@@ -52,32 +52,32 @@ describe('MemberCard', () => {
       render(<MemberCard {...defaultProps} level="Bronze" />);
       const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
-      expect(card).toHaveClass('from-orange-400');
-      expect(card).toHaveClass('to-orange-200');
+      expect(card).toHaveClass('from-emerald-500');
+      expect(card).toHaveClass('to-emerald-300');
     });
 
     it('should apply correct styling for Silver level', () => {
       render(<MemberCard {...defaultProps} level="Silver" />);
       const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
-      expect(card).toHaveClass('from-gray-400');
-      expect(card).toHaveClass('to-gray-200');
+      expect(card).toHaveClass('from-slate-400');
+      expect(card).toHaveClass('to-slate-200');
     });
 
     it('should apply correct styling for Gold level', () => {
       render(<MemberCard {...defaultProps} level="Gold" />);
       const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
-      expect(card).toHaveClass('from-yellow-500');
-      expect(card).toHaveClass('to-yellow-300');
+      expect(card).toHaveClass('from-amber-500');
+      expect(card).toHaveClass('to-amber-300');
     });
 
     it('should apply correct styling for Platinum level', () => {
       render(<MemberCard {...defaultProps} level="Platinum" />);
       const card = screen.getByTestId('member-card');
       expect(card).toHaveClass('bg-gradient-to-r');
-      expect(card).toHaveClass('from-slate-900');
-      expect(card).toHaveClass('to-slate-700');
+      expect(card).toHaveClass('from-slate-800');
+      expect(card).toHaveClass('to-slate-600');
     });
   });
 

@@ -219,26 +219,56 @@ export default function EditProductPage() {
       // 4. Update Dokumen Produk
       const baseUnit = String(product.Satuan || 'PCS').toUpperCase();
       const cleanedUnits = (units || [])
-        .map(u => ({
-          code: String(u.code || '').toUpperCase(),
-          contains: typeof u.contains === 'number' ? u.contains : Number(u.contains || 0),
-          price: typeof u.price === 'number' ? u.price : Number(u.price || 0),
-          minQty: typeof u.minQty === 'number' ? u.minQty : (u.minQty !== undefined ? Number(u.minQty) : undefined),
-          label: u.label ? String(u.label) : undefined,
-        } as UnitOption))
+        .map((u) => {
+          const code = String(u.code || '').toUpperCase();
+          const contains = typeof u.contains === 'number' ? u.contains : Number(u.contains || 0);
+          const price = typeof u.price === 'number' ? u.price : Number(u.price || 0);
+
+          const unitEntry: UnitOption = { code, contains, price };
+
+          if (u.minQty !== undefined && u.minQty !== null) {
+            unitEntry.minQty = typeof u.minQty === 'number' ? u.minQty : Number(u.minQty);
+          }
+
+          if (u.label) unitEntry.label = String(u.label);
+
+          return unitEntry;
+        })
         .filter(u => u.code);
 
       const baseUnitEntry = cleanedUnits.find(u => u.code === baseUnit) || { code: baseUnit, contains: 1, price: Number(product.Ecer || 0) };
       const nextEcer = Number(baseUnitEntry.price || product.Ecer || 0);
 
       const updatePayload = {
-        ...product,
-        Nama: product.Nama.toUpperCase(),
-        Stok: totalStock,
-        URL_Produk: finalImageUrl,
+        ID: product.ID || '',
+        Nama: String(product.Nama || '').toUpperCase(),
+        Kategori: product.Kategori || 'UMUM',
+        Satuan: baseUnit,
+        Barcode: product.Barcode || '',
+        Brand: product.Brand || '',
+        Supplier: product.Supplier || '',
+        Min_Stok: Number(product.Min_Stok || 0),
         Ecer: nextEcer,
+        Modal: Number(product.Modal || 0),
+        Grosir: Number(product.Grosir || 0),
+        Stok: totalStock,
+        Status: product.Status ?? 1,
+        expired_date: product.expired_date || '',
+        stockByWarehouse: newStocks,
         units: cleanedUnits,
-        updatedAt: serverTimestamp()
+        URL_Produk: finalImageUrl,
+        sku: product.ID || product.Barcode || id,
+        name: String(product.Nama || '').toUpperCase(),
+        category: product.Kategori || 'UMUM',
+        unit: baseUnit,
+        stock: totalStock,
+        minStock: Number(product.Min_Stok || 0),
+        purchasePrice: Number(product.Modal || 0),
+        priceEcer: nextEcer,
+        priceGrosir: Number(product.Grosir || 0),
+        isActive: (product.Status ?? 1) === 1,
+        imageUrl: finalImageUrl,
+        updatedAt: serverTimestamp(),
       };
 
       await updateDoc(doc(db, 'products', id), updatePayload);
@@ -370,7 +400,22 @@ export default function EditProductPage() {
                   const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
                   return (
                     <div key={code} className="p-4 rounded-2xl border bg-gray-50">
-                      <div className="text-[10px] font-black uppercase text-gray-400 mb-2">{code}</div>
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
+                        <input
+                          type="text"
+                          className="w-40 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                          placeholder="Nama satuan"
+                          value={current.label || ''}
+                          onChange={(e) => {
+                            const next = [...units];
+                            const nextLabel = e.target.value;
+                            if (idx >= 0) next[idx] = { ...current, label: nextLabel };
+                            else next.push({ code, price: current.price, contains: current.contains, label: nextLabel });
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>

@@ -3,13 +3,17 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
   Barcode, Image as ImageIcon, AlertCircle, Layers
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import type { UnitOption } from '@/lib/normalize';
+import Image from 'next/image';
+import imageCompression from 'browser-image-compression';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 export default function AddProductPage() {
@@ -17,6 +21,13 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [units, setUnits] = useState<UnitOption[]>([
+    { code: 'PCS', contains: 1, price: 0, label: '' },
+    { code: 'BOX', contains: 0, price: 0, label: '' },
+    { code: 'CTN', contains: 0, price: 0, label: '' },
+  ]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     ID: '',
@@ -51,32 +62,94 @@ export default function AddProductPage() {
     setErrorMsg('');
 
     try {
+      const baseId = formData.ID.trim();
+      if (!baseId) throw new Error('ID Produk wajib diisi.');
+
+      const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
+      const cleanedUnits = (units || [])
+        .map((u) => {
+          const code = String(u.code || '').trim().toUpperCase();
+          if (!code) return null;
+
+          const contains = typeof u.contains === 'number' ? u.contains : Number(u.contains || 0);
+          const price = typeof u.price === 'number' ? u.price : Number(u.price || 0);
+
+          const unitEntry: UnitOption = { code, contains, price };
+          if (u.minQty !== undefined && u.minQty !== null) {
+            unitEntry.minQty = typeof u.minQty === 'number' ? u.minQty : Number(u.minQty);
+          }
+          if (u.label) unitEntry.label = String(u.label);
+
+          return unitEntry;
+        })
+        .filter(Boolean) as UnitOption[];
+
+      const basePriceFromUnits = cleanedUnits.find((u) => u.code === baseUnit)?.price;
+      const nextEcer = (typeof basePriceFromUnits === 'number' && !Number.isNaN(basePriceFromUnits))
+        ? basePriceFromUnits
+        : Number(formData.Ecer || 0);
+
+      const ensuredBase = [
+        { code: baseUnit, contains: 1, price: nextEcer, label: '' },
+        ...cleanedUnits.filter((u) => u.code !== baseUnit),
+      ];
+
       // 1. Validasi ID Duplikat (Wajib Unik untuk Sinkronisasi Excel)
-      const q = query(collection(db, 'products'), where('ID', '==', formData.ID));
+      const q = query(collection(db, 'products'), where('ID', '==', baseId));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        throw new Error(`ID Produk "${formData.ID}" sudah terdaftar di database!`);
+        throw new Error(`ID Produk "${baseId}" sudah terdaftar di database!`);
       }
 
       // 2. Simpan ke Firestore (lengkap dengan field ter-normalisasi)
+      const totalStock = Number(formData.Stok || 0);
+      const byWarehouse = formData.warehouseId ? { [formData.warehouseId]: totalStock } : {};
+      const displayName = String(formData.Nama || '').toUpperCase();
+      let imageUrl = formData.Link_Foto || '';
+      if (imageFile) {
+        const compressed = await imageCompression(imageFile, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
+        const imageRef = ref(storage, `products/${baseId}/${Date.now()}`);
+        await uploadBytes(imageRef, compressed);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+
       await addDoc(collection(db, 'products'), {
         ...formData,
-        sku: formData.ID,
-        name: formData.Nama,
+        ID: baseId,
+        Nama: displayName,
+        Satuan: baseUnit,
+        sku: baseId,
+        name: displayName,
         category: formData.Kategori,
-        unit: formData.Satuan,
-        stock: Number(formData.Stok || 0),
+        unit: baseUnit,
+        description: formData.Deskripsi || '',
+        stock: totalStock,
+        Stok: totalStock,
+        stockByWarehouse: byWarehouse,
         minStock: Number(formData.Min_Stok || 0),
+        Min_Stok: Number(formData.Min_Stok || 0),
         purchasePrice: Number(formData.Modal || 0),
-        priceEcer: Number(formData.Ecer || 0),
+        Modal: Number(formData.Modal || 0),
+        priceEcer: nextEcer,
+        Ecer: nextEcer,
+        price: nextEcer,
         priceGrosir: Number(formData.Grosir || 0),
+        wholesalePrice: Number(formData.Grosir || 0),
         Min_Grosir: Number(formData.Min_Grosir || 0),
-        imageUrl: formData.Link_Foto,
+        minWholesale: Number(formData.Min_Grosir || 0),
+        barcode: formData.Barcode || '',
+        Barcode: formData.Barcode || '',
+        imageUrl,
+        image: imageUrl,
+        URL_Produk: imageUrl,
         isActive: Number(formData.Status) === 1,
+        Status: Number(formData.Status) === 1 ? 1 : 0,
         warehouseId: formData.warehouseId || '',
         tgl_masuk: formData.tgl_masuk || '',
         expired_date: formData.expired_date || formData.Expired_Default || '',
+        expiredDate: formData.expired_date || formData.Expired_Default || '',
         Lokasi: formData.Lokasi || '',
+        units: ensuredBase,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -140,6 +213,27 @@ export default function AddProductPage() {
               Identitas Barang
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                <input
+                  required
+                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  type="text"
+                  value={formData.ID}
+                  onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
+                  placeholder="Contoh: BRG-001"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Parent ID</label>
+                <input
+                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  type="text"
+                  value={formData.Parent_ID}
+                  onChange={(e) => setFormData({ ...formData, Parent_ID: e.target.value })}
+                  placeholder="Opsional"
+                />
+              </div>
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
                 <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
@@ -158,7 +252,10 @@ export default function AddProductPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
-                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+                <div className="relative">
+                  <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
@@ -255,11 +352,128 @@ export default function AddProductPage() {
             </div>
           </div>
 
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-gray-800">
+              <Tag size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {['PCS', 'BOX', 'CTN'].map((code) => {
+                const idx = units.findIndex((u) => String(u.code || '').toUpperCase() === code);
+                const current = idx >= 0 ? units[idx] : { code, contains: code === 'PCS' ? 1 : 0, price: 0, label: '' };
+                const basePrice = Number(formData.Ecer || 0);
+                const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
+                const unitPrice = Number(current.price || 0);
+                const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
+
+                return (
+                  <div key={code} className="p-4 rounded-2xl border bg-gray-50">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
+                      <input
+                        type="text"
+                        className="w-40 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                        placeholder="Nama satuan"
+                        value={current.label || ''}
+                        onChange={(e) => {
+                          const next = [...units];
+                          const nextLabel = e.target.value;
+                          if (idx >= 0) next[idx] = { ...current, label: nextLabel };
+                          else next.push({ code, price: current.price, contains: current.contains, label: nextLabel });
+                          setUnits(next);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
+                        <input
+                          type="number"
+                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.price ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            if (idx >= 0) next[idx] = { ...current, price: val };
+                            else next.push({ code, price: val, contains: current.contains, label: current.label });
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
+                        <input
+                          type="number"
+                          disabled={code === 'PCS'}
+                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
+                          value={code === 'PCS' ? 1 : (current.contains ?? '')}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            if (idx >= 0) next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
+                            else next.push({ code, price: current.price, contains: code === 'PCS' ? 1 : val, label: current.label });
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.minQty ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            if (idx >= 0) next[idx] = { ...current, minQty: val };
+                            else next.push({ code, price: current.price, contains: current.contains, minQty: val, label: current.label });
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+                      <div className="text-[10px] font-black text-gray-500">
+                        {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
+                        <span className="mx-1">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
+                        / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* BAGIAN 4: MEDIA & SUPPLIER */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
               <h3 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><ImageIcon size={14} /> Media</h3>
               <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
+                    {imagePreview ? (
+                      <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                    ) : (
+                      <ImageIcon size={20} className="text-gray-300" />
+                    )}
+                  </div>
+                  <label className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer text-xs font-bold text-gray-700">
+                    Pilih Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (!file.type.startsWith('image/')) return;
+                        const compressed = await imageCompression(file, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
+                        setImageFile(new File([compressed], file.name, { type: compressed.type }));
+                        setImagePreview(URL.createObjectURL(compressed));
+                      }}
+                    />
+                  </label>
+                </div>
                 <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => setFormData({ ...formData, Link_Foto: e.target.value })} />
                 <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}></textarea>
               </div>

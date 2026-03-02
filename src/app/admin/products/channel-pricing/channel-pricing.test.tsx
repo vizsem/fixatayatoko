@@ -33,6 +33,10 @@ vi.mock('firebase/firestore', () => {
     collection: vi.fn(),
     orderBy: vi.fn(),
     query: vi.fn(),
+    onSnapshot: vi.fn((_q: unknown, cb: (snap: { docs: typeof products }) => void) => {
+      cb({ docs: products });
+      return () => {};
+    }),
     getDocs: vi.fn(() =>
       Promise.resolve({
         docs: products,

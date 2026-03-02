@@ -15,15 +15,20 @@ export default function useProducts(options?: ProductQueryOptions) {
   const [products, setProducts] = useState<NormalizedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const category = options?.category;
+  const warehouseId = options?.warehouseId;
+  const orderByField = options?.orderByField;
+  const orderDirection = options?.orderDirection;
+
   const qRef = useMemo(() => {
     const constraints: QueryConstraint[] = [];
-    if (options?.category) constraints.push(where('category', '==', options.category));
-    if (options?.warehouseId) constraints.push(where('warehouseId', '==', options.warehouseId));
-    const field = options?.orderByField || 'name';
-    const dir = (options?.orderDirection || 'asc') === 'desc' ? 'desc' : 'asc';
+    if (category) constraints.push(where('category', '==', category));
+    if (warehouseId) constraints.push(where('warehouseId', '==', warehouseId));
+    const field = orderByField || 'name';
+    const dir = (orderDirection || 'asc') === 'desc' ? 'desc' : 'asc';
     constraints.push(orderBy(field, dir));
     return query(collection(db, 'products'), ...constraints);
-  }, [options]);
+  }, [category, warehouseId, orderByField, orderDirection]);
 
   useEffect(() => {
     const unsub = onSnapshot(qRef, (snap) => {

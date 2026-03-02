@@ -14,6 +14,7 @@ import { auth, db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
+import Image from 'next/image';
 import {
   Package,
   Download,
@@ -33,6 +34,8 @@ type InventoryItem = {
   stockOut: number;
   turnoverRate: number;
   stockValue: number;
+  imageUrl?: string;
+  warehouseId?: string;
 };
 
 export default function InventoryReport() {
@@ -41,6 +44,12 @@ export default function InventoryReport() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   const [building, setBuilding] = useState(false);
+  const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = useState<200 | 300 | 500>(200);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('ALL');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -84,7 +93,9 @@ export default function InventoryReport() {
             stockIn,
             stockOut,
             turnoverRate,
-            stockValue
+            stockValue,
+            imageUrl: p.imageUrl,
+            warehouseId: p.warehouseId
           };
         });
         setInventory(inv);
@@ -95,8 +106,24 @@ export default function InventoryReport() {
     if (!productsLoading) build();
   }, [productsLoading, products]);
 
+  // Load warehouses for filter
+  useEffect(() => {
+    getDocs(collection(db, 'warehouses')).then((s) => {
+      const arr = s.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        const name = (typeof data.name === 'string' && data.name) ? data.name : d.id;
+        return { id: d.id, name };
+      });
+      setWarehouses(arr);
+    });
+  }, []);
+
   const handleExport = () => {
-    const exportData = inventory.map(item => ({
+    const q = search.trim().toLowerCase();
+    const rows = q
+      ? inventory.filter(it => (it.name || '').toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))
+      : inventory;
+    const exportData = rows.map(item => ({
       Produk: item.name,
       Kategori: item.category,
       'Stok Saat Ini': item.currentStock,
@@ -123,9 +150,23 @@ export default function InventoryReport() {
     );
   }
 
-  const totalItems = inventory.reduce((sum, item) => sum + item.currentStock, 0);
-  const lowStockItems = inventory.filter(item => item.currentStock <= 10).length;
-  const totalValue = inventory.reduce((sum, item) => sum + item.stockValue, 0);
+  const filtered = inventory
+    .filter(it => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (it.name || '').toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q);
+    })
+    .filter(it => selectedCategory === 'ALL' ? true : (it.category || '') === selectedCategory)
+    .filter(it => selectedWarehouse === 'ALL' ? true : (it.warehouseId || '') === selectedWarehouse);
+  const categories = Array.from(new Set(inventory.map(i => i.category).filter(Boolean))).sort();
+  const totalItems = filtered.reduce((sum, item) => sum + item.currentStock, 0);
+  const lowStockItems = filtered.filter(item => item.currentStock <= 10).length;
+  const totalValue = filtered.reduce((sum, item) => sum + item.stockValue, 0);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(pageIndex, totalPages - 1);
+  const pageStart = currentPage * pageSize;
+  const pageEnd = Math.min(filtered.length, pageStart + pageSize);
+  const pageSlice = filtered.slice(pageStart, pageEnd);
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
@@ -188,14 +229,79 @@ export default function InventoryReport() {
       </div>
 
       <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <h2 className="text-lg font-semibold text-black">Detail Inventaris</h2>
+          <div className="flex items-center gap-3">
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
+              placeholder="Cari produk/kategori..."
+              className="px-3 py-2 bg-gray-50 rounded-xl text-sm font-bold outline-none border border-gray-200"
+              type="text"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-500 uppercase">Kategori</span>
+              <select
+                value={selectedCategory}
+                onChange={(e) => { setSelectedCategory(e.target.value); setPageIndex(0); }}
+                className="px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-gray-200"
+              >
+                <option value="ALL">Semua</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-500 uppercase">Gudang</span>
+              <select
+                value={selectedWarehouse}
+                onChange={(e) => { setSelectedWarehouse(e.target.value); setPageIndex(0); }}
+                className="px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-gray-200"
+              >
+                <option value="ALL">Semua</option>
+                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-500 uppercase">Per halaman</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value) as 200 | 300 | 500); setPageIndex(0); }}
+                className="px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-gray-200"
+              >
+                <option value={200}>200</option>
+                <option value={300}>300</option>
+                <option value={500}>500</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-2 rounded-xl bg-gray-100 text-xs font-bold disabled:opacity-40"
+                onClick={() => setPageIndex(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+                type="button"
+              >
+                Prev
+              </button>
+              <div className="text-xs font-bold text-gray-600">
+                {filtered.length ? `${pageStart + 1}-${pageEnd} dari ${filtered.length}` : '0-0 dari 0'}
+              </div>
+              <button
+                className="px-3 py-2 rounded-xl bg-gray-100 text-xs font-bold disabled:opacity-40"
+                onClick={() => setPageIndex(Math.min(totalPages - 1, currentPage + 1))}
+                disabled={currentPage >= totalPages - 1}
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 min-w-[860px] md:min-w-0">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Foto</th>
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Produk
                 </th>
@@ -205,6 +311,7 @@ export default function InventoryReport() {
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Stok Saat Ini
                 </th>
+                <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Status</th>
                 <th scope="col" className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                   Stok Masuk
                 </th>
@@ -220,16 +327,28 @@ export default function InventoryReport() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {inventory.length === 0 ? (
+              {pageSlice.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-black">
+                  <td colSpan={9} className="px-6 py-12 text-center text-black">
                     <Package className="mx-auto h-10 w-10 text-gray-400 mb-3" />
                     <p>Belum ada data inventaris</p>
                   </td>
                 </tr>
               ) : (
-                inventory.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
+                pageSlice.map((item) => {
+                  const status = item.currentStock <= 0 ? 'HABIS' : item.currentStock <= 10 ? 'RENDAH' : 'AMAN';
+                  const statusClass =
+                    status === 'HABIS' ? 'bg-red-100 text-red-700' :
+                    status === 'RENDAH' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-green-100 text-green-700';
+                  const img = item.imageUrl && item.imageUrl.length ? item.imageUrl : 'https://placehold.co/80x80/edf2f7/667085?text=IMG';
+                  return (
+                  <tr key={item.id} className="hover:bg-gray-50 odd:bg-gray-50/40">
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
+                        <Image src={img} alt={item.name} fill className="object-cover" />
+                      </div>
+                    </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap text-black">{item.name}</td>
                     <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.category}</td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
@@ -237,6 +356,9 @@ export default function InventoryReport() {
                         }`}>
                         {item.currentStock}
                       </span>
+                    </td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${statusClass}`}>{status}</span>
                     </td>
                     <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.stockIn}</td>
                     <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-black">{item.stockOut}</td>
@@ -259,7 +381,8 @@ export default function InventoryReport() {
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

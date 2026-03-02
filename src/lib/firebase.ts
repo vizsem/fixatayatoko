@@ -26,6 +26,8 @@ export const db: Firestore = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(), // Mendukung banyak tab terbuka sekaligus
   }),
+  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: false,
 });
 
 // 3. Ekspor Instance Storage & Auth
