@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { auth, db } from '@/lib/firebase';
 
 import useProducts from '@/lib/hooks/useProducts';
@@ -11,7 +11,7 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText, Filter, Smartphone, Bell, ClipboardList
+  FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -52,6 +52,15 @@ type SystemSettings = {
   }
 };
 
+type NotificationItem = {
+  id: string;
+  type: 'transaction' | 'info';
+  category?: string;
+  title: string;
+  body?: string;
+  createdAt?: string;
+};
+
 const SkeletonCard = () => (
   <div className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
     <div className="aspect-square bg-gray-200" />
@@ -67,6 +76,13 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [currentUserPhotoUrl, setCurrentUserPhotoUrl] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<'transaksi' | 'informasi'>('informasi');
+  const [notifCategory, setNotifCategory] = useState<string>('Semua');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const notifRef = useRef<HTMLDivElement | null>(null);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [randomProducts, setRandomProducts] = useState<Product[]>([]);
@@ -114,6 +130,36 @@ export default function Home() {
       .filter(p => getDiscountedPrice(p).hasPromo);
   }, [products, getDiscountedPrice]);
 
+  const notifTransaksi = useMemo(
+    () => notifications.filter(n => n.type === 'transaction'),
+    [notifications]
+  );
+  const notifInformasi = useMemo(
+    () => notifications.filter(n => n.type !== 'transaction'),
+    [notifications]
+  );
+  const filteredNotifications = useMemo(() => {
+    const base = notifTab === 'transaksi' ? notifTransaksi : notifInformasi;
+    if (notifCategory === 'Semua') return base;
+    return base.filter(n => (n.category || '').toLowerCase() === notifCategory.toLowerCase());
+  }, [notifTab, notifTransaksi, notifInformasi, notifCategory]);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [notifOpen]);
+
   useEffect(() => {
     setIsMounted(true);
     const updateCartCount = () => {
@@ -126,6 +172,28 @@ export default function Home() {
     
     // Fetch Repurchase Data (Jika User Login)
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentUserName(null);
+        setCurrentUserPhotoUrl(null);
+        setNotifications([]);
+        return;
+      }
+
+      setCurrentUserPhotoUrl(user.photoURL || null);
+      const fallbackName =
+        user.displayName ||
+        (user.email ? user.email.split('@')[0] : '') ||
+        'Pengguna';
+
+      try {
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const docName = userSnap.exists() ? userSnap.data()?.name : null;
+        const resolvedName = typeof docName === 'string' && docName.trim() ? docName.trim() : fallbackName;
+        setCurrentUserName(resolvedName);
+      } catch {
+        setCurrentUserName(fallbackName);
+      }
+
       if (user) {
         try {
           // Ambil 5 order terakhir user
@@ -158,6 +226,32 @@ export default function Home() {
               } as Product;
             });
             setRepurchaseProducts(reProducts);
+          }
+
+          // Ambil notifikasi
+          try {
+            const nq = query(
+              collection(db, 'notifications'),
+              where('userId', '==', user.uid),
+              orderBy('createdAt', 'desc'),
+              limit(30)
+            );
+            const nsnap = await getDocs(nq);
+            const items: NotificationItem[] = nsnap.docs.map(d => {
+              const data = d.data() as Record<string, unknown>;
+              const t = String(data.type || 'info').toLowerCase();
+              return {
+                id: d.id,
+                type: t === 'transaction' ? 'transaction' : 'info',
+                category: typeof data.category === 'string' ? data.category : undefined,
+                title: String(data.title || 'Notifikasi'),
+                body: typeof data.body === 'string' ? data.body : undefined,
+                createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined
+              };
+            });
+            setNotifications(items);
+          } catch {
+            setNotifications([]);
           }
         } catch (e) {
           console.error("Error fetching repurchase items:", e);
@@ -325,10 +419,10 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-6 text-gray-500 font-medium">
-              <Link href="/about" className="hover:text-green-600 transition-colors">Tentang Atayamarket</Link>
-              <Link href="/semua-kategori" className="hover:text-green-600 transition-colors">Produk Terlaris</Link>
-              <Link href="/semua-kategori" className="hover:text-green-600 transition-colors">Promo Atayamarket</Link>
-              <Link href="/bantuan" className="hover:text-green-600 transition-colors">Bantuan</Link>
+              <Link href="/tentang" className="hover:text-green-600 transition-colors">Tentang Atayamarket</Link>
+              <Link href="/promo" className="hover:text-green-600 transition-colors">Produk Terlaris</Link>
+              <Link href="/promo" className="hover:text-green-600 transition-colors">Promo Atayamarket</Link>
+              <Link href="https://wa.me/85790565666" className="hover:text-green-600 transition-colors">Bantuan</Link>
             </div>
           </div>
         </div>
@@ -351,21 +445,126 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-1 md:gap-2">
-              {/* Transaksi */}
-              <Link href="/orders" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Transaksi">
+              {currentUserName ? (
+                <Link
+                  href="/profil"
+                  className="hidden lg:flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+                  title="Profil"
+                >
+                  <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
+                    {currentUserPhotoUrl ? (
+                      <Image src={currentUserPhotoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
+                    ) : (
+                      <User size={20} className="text-gray-500" />
+                    )}
+                  </div>
+                  <div className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold capitalize text-gray-600">
+                    Hi, {currentUserName}
+                  </div>
+                  <ChevronDown size={18} className="text-gray-500" />
+                </Link>
+              ) : (
+                <Link
+                  href="/profil/login"
+                  className="hidden lg:flex items-center gap-2 h-10 px-3 rounded-full hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-[12px]"
+                  title="Masuk"
+                >
+                  <User size={18} className="text-gray-500" />
+                  Masuk
+                </Link>
+              )}
+
+              <Link href="/orders" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative" title="Transaksi">
                 <ClipboardList size={22} strokeWidth={1.8} />
               </Link>
 
-              {/* Notifikasi */}
-              <button className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Notifikasi">
-                <Bell size={22} strokeWidth={1.8} />
-                <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
-                  37
-                </span>
-              </button>
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen(v => !v)}
+                  className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
+                  title="Notifikasi"
+                >
+                  <Bell size={22} strokeWidth={1.8} />
+                  <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                    {(notifications?.length || 0) + 0}
+                  </span>
+                </button>
+                {notifOpen && (
+                  <div className="absolute right-0 top-10 w-[360px] overflow-hidden rounded-lg bg-white shadow-[0_2px_8px_rgba(112,114,125,0.40)] z-50">
+                    <div className="bg-white">
+                      <div className="px-4 py-4 text-sm font-bold border-b border-gray-100">
+                        Notifikasi
+                      </div>
+                      <div className="border-b border-[#EFF3F6]">
+                        <ul className="-mb-px grid grid-cols-2 text-center text-sm font-medium text-[#9C9DA6]">
+                          <li>
+                            <button
+                              onClick={() => setNotifTab('transaksi')}
+                              className={`inline-flex items-center justify-center gap-2 rounded-t-lg p-3 hover:text-gray-600 ${notifTab === 'transaksi' ? 'text-gray-700 border-b-2 border-gray-300' : ''}`}
+                            >
+                              <span className="font-semibold">Transaksi</span>
+                              <span className="bg-[#DCDEE3] text-white text-[10px] rounded-full px-2 py-[1px]">
+                                {notifTransaksi.length}
+                              </span>
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              onClick={() => setNotifTab('informasi')}
+                              className={`inline-flex items-center justify-center gap-2 rounded-t-lg p-3 ${notifTab === 'informasi' ? 'text-green-600 border-b-2 border-green-600' : 'hover:text-gray-600'}`}
+                            >
+                              <span className="font-semibold">Informasi</span>
+                              <span className={`text-white text-[10px] rounded-full px-2 py-[1px] ${notifTab === 'informasi' ? 'bg-green-600' : 'bg-[#DCDEE3]'}`}>
+                                {notifInformasi.length}
+                              </span>
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="px-4 py-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                        {['Semua', 'Akun', 'Info', 'Promo', 'Kupon', 'Poin', 'Bantuan'].map((label) => (
+                          <button
+                            key={label}
+                            onClick={() => setNotifCategory(label)}
+                            className={`${notifCategory === label ? 'bg-green-600 text-white' : 'bg-[#EFF3F6] text-gray-700'} inline-flex items-center rounded-full border border-neutral-200 px-3 py-1.5 text-[10px] font-medium mr-2`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="relative max-h-[440px] overflow-y-auto" style={{ maxHeight: 'calc(-300px + 100vh)' }}>
+                        {filteredNotifications.length === 0 ? (
+                          <div className="px-4 py-6 text-sm text-gray-500">Tidak ada notifikasi.</div>
+                        ) : (
+                          filteredNotifications.map((n) => (
+                            <div key={n.id} className="px-4 cursor-pointer">
+                              <div className="flex flex-col gap-2 py-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex h-6 items-center rounded bg-[#97b5d536] px-2 py-1">
+                                    <span className="text-xs text-[#1178D4]">
+                                      {n.category || (n.type === 'transaction' ? 'Transaksi' : 'Info')}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-medium text-[#9C9DA6]">
+                                    {n.createdAt || ''}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <h4 className="text-sm font-semibold">{n.title}</h4>
+                                  {n.body ? <p className="text-sm leading-5 text-[#70727D]">{n.body}</p> : null}
+                                </div>
+                              </div>
+                              <div className="w-full border-t border-[#DCDEE3]" />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              {/* Keranjang */}
-              <Link href="/cart" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Keranjang">
+              <Link href="/cart" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative" title="Keranjang">
                 <ShoppingCart size={22} strokeWidth={1.8} />
                 {cartCount > 0 && (
                   <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
