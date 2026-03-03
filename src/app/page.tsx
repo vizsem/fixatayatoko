@@ -11,7 +11,7 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText, Filter, Smartphone
+  FileText, Filter, Smartphone, Bell, ClipboardList
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -349,10 +349,31 @@ export default function Home() {
                 <Filter size={14} />
               </button>
             </div>
-            <Link href="/cart" className="relative text-gray-400">
-              <ShoppingCart size={22} />
-              {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full h-5 w-5 flex items-center justify-center border-2 border-white font-bold">{cartCount}</span>}
-            </Link>
+            
+            <div className="flex items-center gap-1 md:gap-2">
+              {/* Transaksi */}
+              <Link href="/orders" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Transaksi">
+                <ClipboardList size={22} strokeWidth={1.8} />
+              </Link>
+
+              {/* Notifikasi */}
+              <button className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Notifikasi">
+                <Bell size={22} strokeWidth={1.8} />
+                <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                  37
+                </span>
+              </button>
+
+              {/* Keranjang */}
+              <Link href="/cart" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative group" title="Keranjang">
+                <ShoppingCart size={22} strokeWidth={1.8} />
+                {cartCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
           </div>
         </div>
 
