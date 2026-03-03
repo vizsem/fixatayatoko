@@ -11,7 +11,7 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText, Filter
+  FileText, Filter, Smartphone
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -312,30 +312,52 @@ export default function Home() {
         </div>
       </div>
 
-      <header className="bg-white shadow-sm sticky top-0 z-50 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
-            <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYAMARKET</h1>
-          </Link>
-          <div className="flex-1 relative max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Cari produk..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-100 border-none rounded-xl py-2 pl-10 pr-10 text-sm outline-none focus:ring-1 focus:ring-green-500/20" />
-            <button 
-              onClick={() => setShowFilter(!showFilter)}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${showFilter ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}
-            >
-              <Filter size={14} />
-            </button>
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        {/* Top Notification Bar */}
+        <div className="bg-gray-50 border-b border-gray-100 hidden md:block">
+          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-2">
+              <div className="group relative cursor-pointer">
+                <div className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white px-3 py-1 rounded-full shadow-sm hover:shadow-md transition-all">
+                  <Smartphone size={14} className="animate-pulse" />
+                  <span className="font-bold tracking-tight">Download Atayamarket App</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-6 text-gray-500 font-medium">
+              <Link href="/about" className="hover:text-green-600 transition-colors">Tentang Atayamarket</Link>
+              <Link href="/semua-kategori" className="hover:text-green-600 transition-colors">Produk Terlaris</Link>
+              <Link href="/semua-kategori" className="hover:text-green-600 transition-colors">Promo Atayamarket</Link>
+              <Link href="/bantuan" className="hover:text-green-600 transition-colors">Bantuan</Link>
+            </div>
           </div>
-          <Link href="/cart" className="relative text-gray-400">
-            <ShoppingCart size={22} />
-            {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full h-5 w-5 flex items-center justify-center border-2 border-white font-bold">{cartCount}</span>}
-          </Link>
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <Image src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
+              <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYAMARKET</h1>
+            </Link>
+            <div className="flex-1 relative max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input type="text" placeholder="Cari produk..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-100 border-none rounded-xl py-2 pl-10 pr-10 text-sm outline-none focus:ring-1 focus:ring-green-500/20" />
+              <button 
+                onClick={() => setShowFilter(!showFilter)}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${showFilter ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}
+              >
+                <Filter size={14} />
+              </button>
+            </div>
+            <Link href="/cart" className="relative text-gray-400">
+              <ShoppingCart size={22} />
+              {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full h-5 w-5 flex items-center justify-center border-2 border-white font-bold">{cartCount}</span>}
+            </Link>
+          </div>
         </div>
 
         {showFilter && (
-          <div className="max-w-7xl mx-auto mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2">
+          <div className="max-w-7xl mx-auto px-4 mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2">
             <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Min Harga</label>
