@@ -335,8 +335,8 @@ export default function FinanceReport() {
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="relative">
+            <div className="">
               <p className="text-sm font-semibold text-gray-500">Pendapatan</p>
               <p className="text-2xl md:text-3xl font-black text-green-600 mt-1">
                 Rp{totalIncome.toLocaleString('id-ID')}
@@ -361,7 +361,7 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="h-12 w-12 shrink-0 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center"
+              className="absolute top-4 right-4 h-12 w-12 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center"
               title="Ringkasan pendapatan bulanan & mingguan"
             >
               <TrendingUp className="h-6 w-6" size={24} />
@@ -370,8 +370,8 @@ export default function FinanceReport() {
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="relative">
+            <div className="">
               <p className="text-sm font-semibold text-gray-500">Biaya Pokok</p>
               <p className="text-2xl md:text-3xl font-black text-red-600 mt-1">
                 Rp{totalCost.toLocaleString('id-ID')}
@@ -396,7 +396,7 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="h-12 w-12 shrink-0 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"
+              className="absolute top-4 right-4 h-12 w-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"
               title="Ringkasan biaya pokok bulanan & mingguan"
             >
               <TrendingDown className="h-6 w-6" size={24} />
@@ -405,8 +405,8 @@ export default function FinanceReport() {
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="relative">
+            <div className="">
               <p className="text-sm font-semibold text-gray-500">Laba Kotor</p>
               <p className={`text-2xl font-bold mt-1 ${totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'
                 }`}>
@@ -431,7 +431,7 @@ export default function FinanceReport() {
                 </div>
               </div>
             </div>
-            <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${totalProfit >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'
+            <div className={`absolute top-4 right-4 h-12 w-12 rounded-2xl flex items-center justify-center ${totalProfit >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'
               }`}>
               <Package className="h-6 w-6" size={24} />
             </div>
@@ -439,8 +439,8 @@ export default function FinanceReport() {
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="relative">
+            <div className="">
               <p className="text-sm font-semibold text-gray-500">Pengeluaran</p>
               <p className="text-2xl md:text-3xl font-black text-orange-600 mt-1">
                 Rp{totalExpense.toLocaleString('id-ID')}
@@ -465,7 +465,7 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="h-12 w-12 shrink-0 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"
+              className="absolute top-4 right-4 h-12 w-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"
               title="Ringkasan pengeluaran bulanan & mingguan"
             >
               <CreditCard className="h-6 w-6" size={24} />
@@ -474,8 +474,8 @@ export default function FinanceReport() {
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="relative">
+            <div className="">
               <p className="text-sm font-semibold text-gray-500">Laba Bersih</p>
               <p className={`text-2xl md:text-3xl font-black mt-1 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
@@ -500,7 +500,7 @@ export default function FinanceReport() {
                 </div>
               </div>
             </div>
-            <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+            <div className={`absolute top-4 right-4 h-12 w-12 rounded-2xl flex items-center justify-center ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
               }`}>
               {netProfit >= 0 ? (
                 <TrendingUp className="h-6 w-6" size={24} />
