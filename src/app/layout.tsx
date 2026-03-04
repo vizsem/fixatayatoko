@@ -45,7 +45,7 @@ export default function RootLayout({
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
       </head>
 
-      <body className="antialiased">
+      <body className="antialiased overflow-x-hidden">
         <Toaster position="top-center" />
         <FCMManager />
         {children}

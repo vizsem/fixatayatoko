@@ -427,11 +427,11 @@ export default function AdminProducts() {
             />
           </div>
 
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full sm:w-auto px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             >
               <option value="createdAt">Produk Baru</option>
               <option value="updatedAt">Terakhir Diupdate</option>
@@ -439,16 +439,16 @@ export default function AdminProducts() {
             </select>
             {/* Bulk Action Button */}
             {selectedIds.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <button
                   onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
-                  className="bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
+                  className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
                 >
                   <CheckSquare size={16} /> {showInactive ? 'Aktifkan' : 'Arsipkan'} ({selectedIds.length})
                 </button>
                 <button
                   onClick={handleBulkDelete}
-                  className="bg-gradient-to-r from-black to-gray-900 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
+                  className="w-full sm:w-auto bg-gradient-to-r from-black to-gray-900 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
                 >
                   <Trash2 size={16} /> Hapus ({selectedIds.length})
                 </button>
@@ -457,7 +457,7 @@ export default function AdminProducts() {
 
             <button
               onClick={() => setShowInactive(!showInactive)}
-              className={`px-5 py-3 rounded-2xl text-sm font-semibold border transition-all flex items-center gap-2 shadow-sm hover:shadow-md ${
+              className={`w-full sm:w-auto px-5 py-3 rounded-2xl text-sm font-semibold border transition-all flex items-center gap-2 shadow-sm hover:shadow-md ${
                 showInactive 
                   ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' 
                   : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'

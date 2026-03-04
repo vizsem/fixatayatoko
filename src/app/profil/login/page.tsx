@@ -109,9 +109,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50 p-6 font-sans relative overflow-hidden">
       <Toaster position="top-right" />
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] p-8 md:p-12 shadow-2xl shadow-slate-200 border border-slate-100 transition-all">
+      <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -right-24 h-80 w-80 rounded-full bg-sky-200/25 blur-3xl" />
+      <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 md:p-12 shadow-2xl shadow-slate-200 border border-slate-100/70 ring-1 ring-slate-200/40 transition-all hover:-translate-y-0.5">
         
         <div className="text-center mb-10">
           <div className="inline-flex p-4 bg-green-50 rounded-3xl text-green-600 mb-4">
@@ -154,10 +156,13 @@ export default function LoginPage() {
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
             <input 
               type="email" 
-              placeholder="ALAMAT EMAIL..." 
+              placeholder="Alamat email"
               required
               autoComplete="email"
-              className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl text-[11px] font-bold uppercase outline-none border-2 border-transparent focus:border-green-500 focus:bg-white transition-all"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl text-sm font-medium outline-none border-2 border-transparent focus:border-green-500 focus:bg-white transition-all"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -167,10 +172,13 @@ export default function LoginPage() {
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
             <input 
               type="password" 
-              placeholder="KATA SANDI..." 
+              placeholder="Kata sandi"
               required
               autoComplete="current-password"
-              className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl text-[11px] font-bold uppercase outline-none border-2 border-transparent focus:border-green-500 focus:bg-white transition-all"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl text-sm font-medium outline-none border-2 border-transparent focus:border-green-500 focus:bg-white transition-all"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
