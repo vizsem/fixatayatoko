@@ -470,19 +470,19 @@ export default function AdminProducts() {
         </div>
 
         <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full text-left min-w-[800px] md:min-w-0">
+          <table className="w-full text-left min-w-[640px] md:min-w-0">
             <thead className="bg-gray-50 text-xs font-semibold text-gray-600 border-b border-gray-200">
               <tr>
-                <th className="p-4 md:p-6 w-12">
+                <th className="p-3 md:p-6 w-12 sticky left-0 bg-gray-50 z-10">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
                   </button>
                 </th>
-                <th className="p-4 md:p-6">Produk</th>
-                <th className="p-4 md:p-6">Stok & Gudang</th>
-                <th className="hidden md:table-cell p-4 md:p-6">Harga (Avg)</th>
-                <th className="hidden md:table-cell p-4 md:p-6">Tgl & Exp</th>
-                <th className="p-4 md:p-6 text-center">Aksi</th>
+                <th className="p-3 md:p-6">Produk</th>
+                <th className="p-3 md:p-6">Stok & Gudang</th>
+                <th className="hidden md:table-cell p-3 md:p-6">Harga (Avg)</th>
+                <th className="hidden md:table-cell p-3 md:p-6">Tgl & Exp</th>
+                <th className="p-3 md:p-6 text-center sticky right-0 bg-gray-50 z-10">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -493,14 +493,14 @@ export default function AdminProducts() {
 
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50' : ''}`}>
-                    <td className="p-4 md:p-6">
+                    <td className="p-3 md:p-6 sticky left-0 bg-white z-10">
                       <button onClick={() => toggleSelectOne(p.id)} className="transition-colors">
                         {isSelected ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} className="text-gray-300 hover:text-gray-400" />}
                       </button>
                     </td>
-                    <td className="p-4 md:p-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                    <td className="p-3 md:p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 md:w-14 md:h-14 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                           {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                             <Image
                               key={p.id}
@@ -587,7 +587,7 @@ export default function AdminProducts() {
                       </div>
                     </td>
 
-                    <td className="p-4 md:p-6 text-center">
+                    <td className="p-3 md:p-6 text-center sticky right-0 bg-white z-10">
                       <div className="flex justify-center gap-2">
                         <button 
                           onClick={() => setSelectedProductRestock(p)} 
