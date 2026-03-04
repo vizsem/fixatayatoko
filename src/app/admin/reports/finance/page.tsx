@@ -361,10 +361,10 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="p-3 bg-green-100 text-green-600 rounded-2xl"
+              className="h-12 w-12 shrink-0 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center"
               title="Ringkasan pendapatan bulanan & mingguan"
             >
-              <TrendingUp size={24} />
+              <TrendingUp className="h-6 w-6" size={24} />
             </div>
           </div>
         </div>
@@ -396,10 +396,10 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="p-3 bg-red-100 text-red-600 rounded-2xl"
+              className="h-12 w-12 shrink-0 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"
               title="Ringkasan biaya pokok bulanan & mingguan"
             >
-              <TrendingDown size={24} />
+              <TrendingDown className="h-6 w-6" size={24} />
             </div>
           </div>
         </div>
@@ -431,14 +431,14 @@ export default function FinanceReport() {
                 </div>
               </div>
             </div>
-            <div className={`p-3 rounded-full ${totalProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'
+            <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${totalProfit >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'
               }`}>
-              <Package className="text-blue-600" size={24} />
+              <Package className="h-6 w-6" size={24} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-gray-500">Pengeluaran</p>
@@ -465,10 +465,10 @@ export default function FinanceReport() {
               </div>
             </div>
             <div
-              className="p-3 bg-orange-100 text-orange-600 rounded-2xl"
+              className="h-12 w-12 shrink-0 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"
               title="Ringkasan pengeluaran bulanan & mingguan"
             >
-              <CreditCard size={24} />
+              <CreditCard className="h-6 w-6" size={24} />
             </div>
           </div>
         </div>
@@ -500,12 +500,12 @@ export default function FinanceReport() {
                 </div>
               </div>
             </div>
-            <div className={`p-3 rounded-2xl ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+            <div className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
               }`}>
               {netProfit >= 0 ? (
-                <TrendingUp size={24} />
+                <TrendingUp className="h-6 w-6" size={24} />
               ) : (
-                <TrendingDown size={24} />
+                <TrendingDown className="h-6 w-6" size={24} />
               )}
             </div>
           </div>
