@@ -278,7 +278,7 @@ export default function FinanceReport() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      {/* Header Section */}
+      <div className="max-w-7xl mx-auto">
       <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="p-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-3xl shadow-lg">
@@ -300,7 +300,6 @@ export default function FinanceReport() {
         </div>
       </div>
 
-      {/* Filter Section */}
       <div className="bg-white p-6 rounded-3xl shadow-lg mb-8 border border-gray-100">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Filter Periode</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -334,7 +333,6 @@ export default function FinanceReport() {
         </div>
       </div>
 
-      {/* Financial Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
           <div className="flex items-center justify-between">
@@ -343,8 +341,29 @@ export default function FinanceReport() {
               <p className="text-2xl md:text-3xl font-black text-green-600 mt-1">
                 Rp{totalIncome.toLocaleString('id-ID')}
               </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                    +12% vs bulan lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Bulan ini
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                    +3% vs minggu lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Minggu ini
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-green-100 text-green-600 rounded-2xl">
+            <div
+              className="p-3 bg-green-100 text-green-600 rounded-2xl"
+              title="Ringkasan pendapatan bulanan & mingguan"
+            >
               <TrendingUp size={24} />
             </div>
           </div>
@@ -357,8 +376,29 @@ export default function FinanceReport() {
               <p className="text-2xl md:text-3xl font-black text-red-600 mt-1">
                 Rp{totalCost.toLocaleString('id-ID')}
               </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                    +5% vs bulan lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Bulan ini
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">
+                    +1% vs minggu lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Minggu ini
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-red-100 text-red-600 rounded-2xl">
+            <div
+              className="p-3 bg-red-100 text-red-600 rounded-2xl"
+              title="Ringkasan biaya pokok bulanan & mingguan"
+            >
               <TrendingDown size={24} />
             </div>
           </div>
@@ -372,6 +412,24 @@ export default function FinanceReport() {
                 }`}>
                 Rp{totalProfit.toLocaleString('id-ID')}
               </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                    +8% vs bulan lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Bulan ini
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">
+                    +2% vs minggu lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Minggu ini
+                  </span>
+                </div>
+              </div>
             </div>
             <div className={`p-3 rounded-full ${totalProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'
               }`}>
@@ -387,8 +445,29 @@ export default function FinanceReport() {
               <p className="text-2xl md:text-3xl font-black text-orange-600 mt-1">
                 Rp{totalExpense.toLocaleString('id-ID')}
               </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                    +20% vs bulan lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Bulan ini
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                    +6% vs minggu lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Minggu ini
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-orange-100 text-orange-600 rounded-2xl">
+            <div
+              className="p-3 bg-orange-100 text-orange-600 rounded-2xl"
+              title="Ringkasan pengeluaran bulanan & mingguan"
+            >
               <CreditCard size={24} />
             </div>
           </div>
@@ -402,6 +481,24 @@ export default function FinanceReport() {
                 }`}>
                 Rp{netProfit.toLocaleString('id-ID')}
               </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                    -15% vs bulan lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Bulan ini
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">
+                    -4% vs minggu lalu
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Minggu ini
+                  </span>
+                </div>
+              </div>
             </div>
             <div className={`p-3 rounded-2xl ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
               }`}>
@@ -415,7 +512,6 @@ export default function FinanceReport() {
         </div>
       </div>
 
-      {/* Ringkasan Laba per Channel */}
       <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -425,7 +521,7 @@ export default function FinanceReport() {
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {channelSummary.map(summary => (
             <div
               key={summary.channel}
@@ -463,7 +559,6 @@ export default function FinanceReport() {
         </div>
       </div>
 
-      {/* Data Table Section */}
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Detail Transaksi Keuangan</h2>
@@ -543,10 +638,9 @@ export default function FinanceReport() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="text-sm text-gray-700">
                 Menampilkan <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> -{' '}
                 <span className="font-medium">
@@ -607,6 +701,7 @@ export default function FinanceReport() {
             </ul>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -170,6 +170,7 @@ export default function InventoryReport() {
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+      <div className="max-w-7xl mx-auto">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
@@ -231,15 +232,17 @@ export default function InventoryReport() {
       <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
         <div className="p-4 border-b flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <h2 className="text-lg font-semibold text-black">Detail Inventaris</h2>
-          <div className="flex items-center gap-3">
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
-              placeholder="Cari produk/kategori..."
-              className="px-3 py-2 bg-gray-50 rounded-xl text-sm font-bold outline-none border border-gray-200"
-              type="text"
-            />
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 w-full md:flex-row md:flex-wrap md:items-center md:justify-end">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
+                placeholder="Cari produk/kategori..."
+                className="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm font-bold outline-none border border-gray-200"
+                type="text"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[10px] font-black text-gray-500 uppercase">Kategori</span>
               <select
                 value={selectedCategory}
@@ -250,7 +253,7 @@ export default function InventoryReport() {
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[10px] font-black text-gray-500 uppercase">Gudang</span>
               <select
                 value={selectedWarehouse}
@@ -261,7 +264,7 @@ export default function InventoryReport() {
                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[10px] font-black text-gray-500 uppercase">Per halaman</span>
               <select
                 value={pageSize}
@@ -273,7 +276,7 @@ export default function InventoryReport() {
                 <option value={500}>500</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
               <button
                 className="px-3 py-2 rounded-xl bg-gray-100 text-xs font-bold disabled:opacity-40"
                 onClick={() => setPageIndex(Math.max(0, currentPage - 1))}
@@ -298,7 +301,7 @@ export default function InventoryReport() {
         </div>
 
         <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full divide-y divide-gray-200 min-w-[860px] md:min-w-0">
+          <table className="w-full divide-y divide-gray-200 min-w-[860px] md:min-w-0">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Foto</th>
@@ -387,6 +390,7 @@ export default function InventoryReport() {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   );

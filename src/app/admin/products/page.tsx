@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
@@ -21,7 +21,9 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare,
-  Square
+  Square,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -189,11 +191,9 @@ export default function AdminProducts() {
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
 
-  const { products: liveProducts } = useProducts({ isActive: showInactive ? false : true, orderByField: 'name', orderDirection: 'asc' });
-
-
-
+  const { products: liveProducts } = useProducts({ isActive: showInactive ? false : true, orderByField: sortBy, orderDirection: 'desc' });
 
   // Effects
   useEffect(() => {
@@ -206,6 +206,7 @@ export default function AdminProducts() {
   }, [router]);
 
   const rows = liveProducts as unknown as ProductRow[];
+
   const displayWarehouses = useMemo(() => {
     const base = warehouses;
     const knownIds = new Set(base.map(w => w.id));
@@ -427,6 +428,15 @@ export default function AdminProducts() {
           </div>
 
           <div className="flex gap-3 items-center">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
+              className="px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            >
+              <option value="createdAt">Produk Baru</option>
+              <option value="updatedAt">Terakhir Diupdate</option>
+              <option value="name">Nama A-Z</option>
+            </select>
             {/* Bulk Action Button */}
             {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
@@ -505,7 +515,19 @@ export default function AdminProducts() {
                           )}
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-blue-600 tracking-tight mb-1">ID: {p.sku}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs font-semibold text-blue-600 tracking-tight">ID: {p.sku}</p>
+                          {/* Tampilkan badge "BARU" untuk produk yang dibuat dalam 7 hari terakhir */}
+                          {p.createdAt && (() => {
+                            const isNew = (Date.now() - new Date(p.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000;
+                            return isNew ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                <TrendingUp size={10} />
+                                BARU
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
                           <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{p.name}</h3>
                           <p className="text-xs text-gray-500 font-medium">{p.category}</p>
                         </div>
@@ -514,9 +536,11 @@ export default function AdminProducts() {
                     </td>
                     <td className="p-4 md:p-6">
                       <div className="flex flex-col gap-1">
-                        <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                          {p.stock} {p.unit}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                            {p.stock} {p.unit}
+                          </p>
+                        </div>
                         {Number(p.stock) <= Number(p.minStock) && (
                           <p className="text-xs font-medium text-red-500">
                             Min: {p.minStock}
@@ -529,9 +553,11 @@ export default function AdminProducts() {
                     </td>
                     <td className="hidden md:table-cell p-4 md:p-6">
                       <div className="flex flex-col gap-1">
-                        <p className="text-xs font-medium text-blue-600">
-                          Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-medium text-blue-600">
+                            Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                          </p>
+                        </div>
                         <p className="text-sm font-bold text-emerald-600">
                           Rp{(p.priceEcer || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()}
                         </p>

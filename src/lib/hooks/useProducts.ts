@@ -7,7 +7,7 @@ export type ProductQueryOptions = {
   isActive?: boolean;
   category?: string;
   warehouseId?: string;
-  orderByField?: 'name' | 'updatedAt' | 'sku';
+  orderByField?: 'name' | 'updatedAt' | 'sku' | 'createdAt';
   orderDirection?: 'asc' | 'desc';
 };
 
