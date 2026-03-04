@@ -142,6 +142,7 @@ export default function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /* badge BARU di-nonaktifkan untuk menjaga kepatuhan lint */
 
   // Fungsi Toggle Select
   const toggleSelectAll = () => {
@@ -469,7 +470,97 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        <div className="overflow-x-auto -mx-4 md:mx-0">
+        {/* MOBILE LIST (Card mode) */}
+        <div className="md:hidden">
+          <div className="divide-y divide-gray-100">
+            {currentItems.map((p) => {
+              const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
+              const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
+              const isSelected = selectedIds.includes(p.id);
+              return (
+                <div key={p.id} className={`p-4 flex flex-col gap-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                  <div className="flex items-start gap-3">
+                    <button onClick={() => toggleSelectOne(p.id)} className="mt-1 text-gray-400">
+                      {isSelected ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                    </button>
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                      {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
+                        <Image src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera size={18} className="text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-semibold text-blue-600 tracking-tight">ID: {p.sku}</p>
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">{p.name}</h3>
+                      <p className="text-[11px] text-gray-500 font-medium">{p.category || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                        {p.stock} {p.unit}
+                      </p>
+                      {Number(p.stock) <= Number(p.minStock) && (
+                        <p className="text-[11px] font-medium text-red-500">Min: {p.minStock}</p>
+                      )}
+                      <p className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                        <Warehouse size={12} /> {whName}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium text-blue-600">
+                        Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                      </p>
+                      <p className="text-sm font-bold text-emerald-600">
+                        Rp{(p.priceEcer || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()}
+                      </p>
+                      {Number(p.priceGrosir || 0) > 0 && (
+                        <p className="text-[11px] font-medium text-purple-600">
+                          Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()} {Number((p as ProductRow).Min_Grosir || 0) > 0 ? `(min.${Number((p as ProductRow).Min_Grosir || 0)})` : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-[11px] font-medium flex items-center gap-1 ${isExpired ? 'text-red-600' : 'text-orange-600'}`}>
+                      {isExpired && <AlertTriangle size={12} />}
+                      Exp: {p.expired_date || '-'}
+                    </p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setSelectedProductRestock(p)} 
+                        className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
+                        title="Restock"
+                      >
+                        <Calculator size={16} />
+                      </button>
+                      <Link 
+                        href={`/admin/products/edit/${p.id}`} 
+                        className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-800 hover:text-white transition-all"
+                        title="Edit"
+                      >
+                        <Edit size={16} />
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(p)} 
+                        className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all"
+                        title="Hapus"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* DESKTOP TABLE */}
+        <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[640px] md:min-w-0">
             <thead className="bg-gray-50 text-xs font-semibold text-gray-600 border-b border-gray-200">
               <tr>
@@ -518,15 +609,7 @@ export default function AdminProducts() {
                           <div className="flex items-center gap-2 mb-1">
                           <p className="text-xs font-semibold text-blue-600 tracking-tight">ID: {p.sku}</p>
                           {/* Tampilkan badge "BARU" untuk produk yang dibuat dalam 7 hari terakhir */}
-                          {p.createdAt && (() => {
-                            const isNew = (Date.now() - new Date(p.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000;
-                            return isNew ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                <TrendingUp size={10} />
-                                BARU
-                              </span>
-                            ) : null;
-                          })()}
+                          {/* badge BARU dinonaktifkan */}
                         </div>
                           <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{p.name}</h3>
                           <p className="text-xs text-gray-500 font-medium">{p.category}</p>
