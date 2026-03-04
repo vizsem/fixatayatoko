@@ -22,7 +22,8 @@ import {
   TrendingDown,
   Package,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  LayoutDashboard
 } from 'lucide-react';
 import notify from '@/lib/notify';
 
@@ -50,6 +51,7 @@ export default function FinanceReport() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -279,6 +281,20 @@ export default function FinanceReport() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+      <div className="md:hidden mb-4 flex items-center justify-between">
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Buka menu laporan"
+          className="p-2.5 bg-white rounded-xl shadow-sm border border-gray-100"
+        >
+          <LayoutDashboard size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-green-600 rounded-lg flex items-center justify-center text-white font-black text-[10px]">AT</div>
+          <span className="text-[10px] font-black text-green-600">Admin</span>
+        </div>
+        <div className="w-8" />
+      </div>
       <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="p-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-3xl shadow-lg">
@@ -512,6 +528,16 @@ export default function FinanceReport() {
         </div>
       </div>
 
+      <MobileSheet
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        startDate={dateRange.startDate}
+        endDate={dateRange.endDate}
+        onChangeStart={(v) => setDateRange({ ...dateRange, startDate: v })}
+        onChangeEnd={(v) => setDateRange({ ...dateRange, endDate: v })}
+        onExport={handleExport}
+      />
+
       <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -702,6 +728,73 @@ export default function FinanceReport() {
           </div>
         </div>
       </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileSheet({
+  open,
+  onClose,
+  startDate,
+  endDate,
+  onChangeStart,
+  onChangeEnd,
+  onExport
+}: {
+  open: boolean;
+  onClose: () => void;
+  startDate: string;
+  endDate: string;
+  onChangeStart: (v: string) => void;
+  onChangeEnd: (v: string) => void;
+  onExport: () => void;
+}) {
+  return (
+    <div className={`${open ? 'pointer-events-auto' : 'pointer-events-none'} md:hidden`}>
+      <div
+        className={`${open ? 'opacity-100' : 'opacity-0'} fixed inset-0 bg-black/40 transition-opacity`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={`${open ? 'translate-y-0' : 'translate-y-full'} fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl border-t border-gray-200 p-4 space-y-4 transition-transform`}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="h-1 w-12 bg-gray-300 rounded-full mx-auto" />
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Mulai</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => onChangeStart(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Akhir</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => onChangeEnd(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+          </div>
+          <button
+            onClick={onExport}
+            className="w-full bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3.5 rounded-xl text-sm font-bold"
+          >
+            Ekspor Laporan
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 px-6 py-3.5 rounded-xl text-sm font-bold"
+          >
+            Tutup
+          </button>
+        </div>
       </div>
     </div>
   );
