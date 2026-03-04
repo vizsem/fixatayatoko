@@ -68,7 +68,8 @@ export default function CartPage() {
   const [courierType] = useState<'toko' | 'ojol' | 'ekspedisi'>('toko');
 
 
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris' | 'wallet'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris' | 'wallet' | 'tempo'>('cash');
+  const [tempoDueDate, setTempoDueDate] = useState<string>('');
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
 
@@ -263,7 +264,8 @@ export default function CartPage() {
     return { ok: true, msg: "Siap dipesan" };
   })();
   const handleCheckout = async () => {
-    if (paymentMethod !== 'cash' && paymentMethod !== 'wallet' && !paymentProof) return notify.user.error("Upload bukti transfer!");
+    if (paymentMethod !== 'cash' && paymentMethod !== 'wallet' && paymentMethod !== 'tempo' && !paymentProof) return notify.user.error("Upload bukti transfer!");
+    if (paymentMethod === 'tempo' && !tempoDueDate) return notify.user.error("Pilih tanggal jatuh tempo untuk pembayaran tempo!");
     if (paymentMethod === 'wallet' && (!userData || userData.walletBalance === undefined)) return notify.user.error("Dompet tidak tersedia!");
     if (paymentMethod === 'wallet' && userData && (userData.walletBalance || 0) < subtotal) return notify.user.error("Saldo dompet tidak mencukupi!");
     
@@ -302,6 +304,8 @@ export default function CartPage() {
             method: paymentMethod,
             proof: proofUrl
           },
+          dueDate: paymentMethod === 'tempo' ? tempoDueDate : undefined,
+          status: paymentMethod === 'tempo' ? 'BELUM_LUNAS' : undefined,
           userId,
           voucherCode: appliedVoucher?.code,
           usePoints,
@@ -517,7 +521,7 @@ export default function CartPage() {
           <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 sticky top-24">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2"><CreditCard size={18} /> Metode Bayar</h2>
             <div className="grid grid-cols-1 gap-2 mb-8">
-              {(['cash', 'transfer', 'qris', 'wallet'] as const).map(m => (
+              {(['cash', 'transfer', 'qris', 'wallet', 'tempo'] as const).map(m => (
                 <button key={m} onClick={() => setPaymentMethod(m)} className={`p-4 border-2 rounded-2xl text-left transition-all flex items-center justify-between ${paymentMethod === m ? 'border-green-600 bg-green-50 text-green-700' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
                   <span className="text-[10px] font-black uppercase">{m}</span>
                   {paymentMethod === m && <CheckCircle2 size={16} />}
@@ -525,7 +529,7 @@ export default function CartPage() {
               ))}
             </div>
 
-            {paymentMethod !== 'cash' && (
+            {paymentMethod !== 'cash' && paymentMethod !== 'tempo' && (
               <label className="block bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-4 text-center cursor-pointer mb-8">
                 {proofPreview ? (
                   <NextImage src={proofPreview} alt="Bukti Transfer" width={200} height={128} className="h-32 mx-auto rounded-xl object-contain" />
@@ -540,6 +544,20 @@ export default function CartPage() {
                   if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
                 }} />
               </label>
+            )}
+
+            {paymentMethod === 'tempo' && (
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-3xl p-4 mb-8">
+                <p className="text-[10px] font-black uppercase text-amber-700 mb-2">Pembayaran Tempo</p>
+                <p className="text-[10px] text-amber-700/80 mb-3">Transaksi akan dicatat sebagai piutang. Tentukan tanggal jatuh tempo.</p>
+                <label className="text-[9px] font-black uppercase text-amber-700 ml-1 mb-1 block">Jatuh Tempo</label>
+                <input
+                  type="date"
+                  value={tempoDueDate}
+                  onChange={(e) => setTempoDueDate(e.target.value)}
+                  className="w-full bg-white p-4 rounded-2xl text-xs font-black outline-none border border-amber-200 focus:border-amber-400"
+                />
+              </div>
             )}
 
             {paymentMethod === 'wallet' && userData && (
