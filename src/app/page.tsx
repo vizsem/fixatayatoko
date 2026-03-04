@@ -214,14 +214,14 @@ export default function Home() {
               return {
                 id: doc.id,
                 ...data,
-                name: data.Nama || data.name || "Produk",
-                price: Number(data.Ecer || data.price) || 0,
-                wholesalePrice: Number(data.Grosir || data.wholesalePrice) || Number(data.Ecer) || 0,
-                minWholesale: Number(data.Min_Grosir || data.Min_Stok_Grosir || 1),
-                stock: Number(data.Stok || data.stock || 0),
-                unit: data.Satuan || data.unit || 'pcs',
-                category: data.Kategori || data.category || 'Umum',
-                image: data.Link_Foto || data.image || '/logo-atayatoko.png',
+                name: data.name || data.Nama || "Produk",
+                price: Number(data.price || data.Ecer) || 0,
+                wholesalePrice: Number(data.wholesalePrice || data.Grosir) || Number(data.Ecer) || 0,
+                minWholesale: Number(data.minWholesale || data.Min_Grosir || data.Min_Stok_Grosir || 1),
+                stock: Number(data.stock || data.Stok || 0),
+                unit: data.unit || data.Satuan || 'pcs',
+                category: data.category || data.Kategori || 'Umum',
+                image: data.image || data.Link_Foto || '/logo-atayatoko.png',
                 variant: data.variant || ''
               } as Product;
             });

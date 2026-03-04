@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
-import { ChevronLeft, Search, Save, Tag } from 'lucide-react';
+import { ChevronLeft, Search, Save, Tag, Upload, Download, ChevronRight } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
+import * as XLSX from 'xlsx';
 
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
@@ -29,6 +30,18 @@ type Product = NormalizedProduct & {
   };
 };
 
+type ExportRow = {
+  'Product ID': string;
+  'Product Name': string;
+  'Unit': string;
+  'Offline Price': number | '';
+  'Website Price': number | '';
+  'Shopee Price': number | '';
+  'TikTok Price': number | '';
+};
+
+type ImportRow = Partial<ExportRow> & Record<string, unknown>;
+
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
@@ -36,6 +49,11 @@ export default function ChannelPricingPage() {
   const [prices, setPrices] = useState<Record<string, Record<string, ChannelPricingState>>>({});
   const [selectedUnit, setSelectedUnit] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(200);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   useEffect(() => {
     if (!liveProducts.length) return;
@@ -99,6 +117,18 @@ export default function ChannelPricingPage() {
     });
   }, [liveProducts, search]);
 
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredProducts.slice(start, end);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, itemsPerPage]);
+
   const handleChangePrice = (productId: string, unitCode: string, channel: ChannelKey, value: string) => {
     setPrices(prev => ({
       ...prev,
@@ -136,6 +166,96 @@ export default function ChannelPricingPage() {
       notify.admin.error('Gagal menyimpan harga channel.', { id: toastId });
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleExport = () => {
+    const data: ExportRow[] = [];
+    filteredProducts.forEach(p => {
+      const unitList = (p.units || []).map(u => (u?.code || '').toString().toUpperCase());
+      const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
+      const units = unitList.length ? unitList : [baseUnit];
+
+      units.forEach(uc => {
+        const pState = prices[p.id]?.[uc] || {};
+        data.push({
+          'Product ID': p.id,
+          'Product Name': p.name,
+          'Unit': uc,
+          'Offline Price': pState.offline || '',
+          'Website Price': pState.website || '',
+          'Shopee Price': pState.shopee || '',
+          'TikTok Price': pState.tiktok || '',
+        });
+      });
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Channel Prices");
+    XLSX.writeFile(wb, "channel_pricing_export.xlsx");
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingFile(true);
+    const toastId = notify.admin.loading('Memproses file...');
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
+
+      // Group updates by product ID
+      const updates: Record<string, Record<string, Record<string, { price: number }>>> = {};
+
+      jsonData.forEach((row) => {
+        const pid = String(row['Product ID'] || '').trim();
+        const unit = String(row['Unit'] || '').trim();
+        if (!pid || !unit) return;
+
+        if (!updates[pid]) updates[pid] = {};
+
+        (['offline', 'website', 'shopee', 'tiktok'] as const).forEach(ch => {
+           // Map column names to channel keys
+           const colName = ch.charAt(0).toUpperCase() + ch.slice(1) + ' Price';
+            const val = row[colName] as unknown;
+            const num = typeof val === 'number' ? val : Number(val);
+            if (!Number.isNaN(num)) {
+             if (!updates[pid][ch]) updates[pid][ch] = {};
+              updates[pid][ch][unit] = { price: num };
+           }
+        });
+      });
+
+      // Batch update logic
+      // Since Firestore batch limit is 500, we process in chunks
+      const productIds = Object.keys(updates);
+      const chunkSize = 400; 
+      
+      for (let i = 0; i < productIds.length; i += chunkSize) {
+        const batch = writeBatch(db);
+        const chunk = productIds.slice(i, i + chunkSize);
+        
+        chunk.forEach(pid => {
+            const ref = doc(db, 'products', pid);
+            batch.update(ref, { channelPricing: updates[pid] });
+        });
+        
+        await batch.commit();
+      }
+
+      notify.admin.success(`Berhasil memperbarui harga untuk ${productIds.length} produk`, { id: toastId });
+      // Reset file input
+      e.target.value = '';
+    } catch (err) {
+      console.error(err);
+      notify.admin.error('Gagal memproses file import', { id: toastId });
+    } finally {
+      setIsProcessingFile(false);
     }
   };
 
@@ -178,6 +298,41 @@ export default function ChannelPricingPage() {
           </div>
         </div>
 
+        <div className="px-6 pb-6 flex items-center justify-between gap-4">
+           <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
+              >
+                <Download size={16} />
+                Export Excel
+              </button>
+              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer">
+                <Upload size={16} />
+                {isProcessingFile ? 'Processing...' : 'Import Excel'}
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleImport}
+                  disabled={isProcessingFile}
+                  className="hidden"
+                />
+              </label>
+           </div>
+           
+           <div className="flex items-center gap-2">
+             <span className="text-xs font-bold text-gray-500">Tampilkan:</span>
+             <select
+               value={itemsPerPage}
+               onChange={(e) => setItemsPerPage(Number(e.target.value))}
+               className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+             >
+               <option value={200}>200</option>
+               <option value={500}>500</option>
+             </select>
+           </div>
+        </div>
+
         {loading ? (
           <div className="p-10 text-center text-xs font-bold text-gray-400">
             Memuat data produk...
@@ -206,8 +361,7 @@ export default function ChannelPricingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredProducts.map((p) => {
-                  const state = prices[p.id] || {};
+                {paginatedProducts.map((p) => {
                   const displayName = p.name || 'Produk';
                   const unitList = ((p.units || []).map(u => (u?.code || '').toString().toUpperCase()));
                   const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
@@ -282,6 +436,28 @@ export default function ChannelPricingPage() {
             </table>
           </div>
         )}
+        
+        <div className="p-4 border-t border-gray-50 flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-400">
+            Halaman {currentPage} dari {totalPages || 1}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -202,19 +202,30 @@ export default function EditProductPage() {
       const imageUrl = await uploadImage();
 
       // Update produk
-      await updateDoc(doc(db, 'products', id), {
+      const updateData = {
         name: product.name,
+        Nama: product.name, // Sinkronisasi field lama
         price: product.price,
+        Ecer: product.price, // Sinkronisasi field lama
         wholesalePrice: product.wholesalePrice,
+        Grosir: product.wholesalePrice, // Sinkronisasi field lama
         stock: product.stock,
+        Stok: product.stock, // Sinkronisasi field lama
         stockByWarehouse: product.stockByWarehouse,
         category: product.category,
+        Kategori: product.category, // Sinkronisasi field lama
         unit: product.unit,
+        Satuan: product.unit, // Sinkronisasi field lama
         barcode: product.barcode,
+        Barcode: product.barcode, // Sinkronisasi field lama
         image: imageUrl,
+        Link_Foto: imageUrl, // Sinkronisasi field lama
         expiredDate: product.expiredDate || null,
+        Expired: product.expiredDate || null, // Sinkronisasi field lama
         updatedAt: new Date().toISOString()
-      });
+      };
+
+      await updateDoc(doc(db, 'products', id), updateData);
 
       toast.success('Produk berhasil diperbarui!');
       router.push('/admin/products');

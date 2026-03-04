@@ -13,6 +13,7 @@ export type NormalizedProduct = {
   category: string;
   warehouseId: string;
   stock: number;
+  stockByWarehouse?: Record<string, number>;
   minStock: number;
   priceEcer: number;
   priceGrosir: number;
@@ -72,6 +73,7 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
     category: getStr(raw.category ?? raw.Kategori),
     warehouseId: getStr(raw.warehouseId),
     stock: getNum(raw.stock ?? raw.Stok),
+    stockByWarehouse: raw.stockByWarehouse as Record<string, number> | undefined,
     minStock: getNum(raw.minStock ?? raw.Min_Stok),
     priceEcer,
     priceGrosir: priceGrosir,

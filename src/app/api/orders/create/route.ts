@@ -23,6 +23,7 @@ type ProductData = {
   minWholesale?: number;
   Min_Grosir?: number;
   stock: number;
+  stockByWarehouse?: Record<string, number>;
   image?: string;
   Link_Foto?: string;
   unit?: string;
@@ -170,16 +171,68 @@ export async function POST(req: Request) {
 
         if (!pSnap.exists) throw new Error(`Produk ${item.id} tidak ditemukan saat transaksi`);
         const pData = pSnap.data() as ProductData;
-        if ((pData.stock || 0) < item.quantity) {
+        
+        // Logika Pengurangan Stok Per Gudang
+        const currentStock = pData.stock || 0;
+        if (currentStock < item.quantity) {
           throw new Error(`Stok ${pData.name || pData.Nama} tidak mencukupi`);
         }
-        productRefsWithData.push({ ref: pRef, newStock: (pData.stock || 0) - item.quantity });
+
+        // 1. Ambil data stockByWarehouse (fallback ke kosong jika undefined)
+        const stockByWarehouse = pData.stockByWarehouse || {};
+        
+        // 2. Clone object agar aman dimutasi
+        const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+        
+        // 3. Tentukan prioritas pengurangan (Gudang Utama -> Lainnya)
+        let remainingToDeduct = item.quantity;
+        const mainWarehouseId = 'gudang-utama'; // ID gudang default
+        
+        // Coba kurangi dari gudang utama dulu
+        if (newStockByWarehouse[mainWarehouseId] && newStockByWarehouse[mainWarehouseId] > 0) {
+          const deduct = Math.min(newStockByWarehouse[mainWarehouseId], remainingToDeduct);
+          newStockByWarehouse[mainWarehouseId] -= deduct;
+          remainingToDeduct -= deduct;
+        }
+        
+        // Jika masih kurang, cari gudang lain yang punya stok
+        if (remainingToDeduct > 0) {
+          for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
+            if (whId === mainWarehouseId) continue; // Sudah diproses
+            if (remainingToDeduct <= 0) break;
+            
+            const deduct = Math.min(qty, remainingToDeduct);
+            newStockByWarehouse[whId] -= deduct;
+            remainingToDeduct -= deduct;
+          }
+        }
+        
+        // Jika setelah semua gudang dicek masih ada sisa (artinya data stock total vs per gudang tidak sinkron)
+        // Kita paksa kurangi total stock, tapi biarkan stockByWarehouse apa adanya untuk sisa tersebut (best effort)
+        // Idealnya ini tidak terjadi jika data konsisten.
+        
+        // Hitung total stok baru dari stockByWarehouse yang sudah diupdate
+        const newTotalStock = Object.values(newStockByWarehouse).reduce((a, b) => a + b, 0);
+        
+        // Jika newTotalStock berbeda dengan (currentStock - item.quantity), berarti ada inkonsistensi awal.
+        // Kita gunakan (currentStock - item.quantity) sebagai kebenaran utama untuk total stock,
+        // tapi simpan juga distribusi gudang yang baru.
+        const finalTotalStock = currentStock - item.quantity;
+
+        productRefsWithData.push({ 
+          ref: pRef, 
+          newStock: finalTotalStock,
+          newStockByWarehouse
+        });
       }
 
       // Step 2: LAKUKAN SEMUA WRITES SETELAH READS SELESAI
       t.set(orderRef, orderData); // WRITE
       for (const p of productRefsWithData) {
-        t.update(p.ref, { stock: p.newStock }); // WRITE
+        t.update(p.ref, { 
+          stock: p.newStock,
+          stockByWarehouse: p.newStockByWarehouse
+        }); // WRITE
       }
     });
 
