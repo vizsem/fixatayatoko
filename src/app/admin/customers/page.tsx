@@ -255,7 +255,76 @@ export default function AdminCustomers() {
 
       {/* Main Table */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
+        {/* Mobile View */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {filteredCustomers.length === 0 ? (
+            <div className="p-8 text-center">
+               <Activity className="mx-auto text-gray-200 mb-4" size={40} />
+               <p className="text-[10px] font-black text-gray-400 tracking-widest">Tidak ada data ditemukan</p>
+            </div>
+          ) : (
+            filteredCustomers.map(customer => (
+              <div key={customer.id} className="p-4 flex flex-col gap-4">
+                 <div className="flex justify-between items-start">
+                    <div>
+                       <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{customer.name}</h3>
+                       <div className="flex items-center gap-2 mt-1">
+                          <span className={`px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest ${customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                             {customer.type.toUpperCase()}
+                          </span>
+                          {customer.notes && (
+                            <span className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                              {customer.notes}
+                            </span>
+                          )}
+                       </div>
+                    </div>
+                    <div className="flex gap-2">
+                       <Link href={`/admin/customers/edit/${customer.id}`} className="p-2 bg-gray-50 rounded-xl text-blue-600">
+                          <Edit size={14} />
+                       </Link>
+                       <button onClick={() => handleDelete(customer.id, customer.name)} className="p-2 bg-gray-50 rounded-xl text-red-500">
+                          <Trash2 size={14} />
+                       </button>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                       <span className="text-[8px] font-black text-gray-400 tracking-widest uppercase">Kontak</span>
+                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
+                          <Phone size={10} className="text-green-500" /> {customer.phone}
+                       </div>
+                       {customer.email && (
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400">
+                             <Mail size={10} /> {customer.email}
+                          </div>
+                       )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[8px] font-black text-gray-400 tracking-widest uppercase">Keuangan</span>
+                        <div className={`text-xs font-black ${isOverLimit(customer) ? 'text-red-600' : 'text-gray-800'}`}>
+                           Rp{customer.outstandingDebt.toLocaleString()}
+                           <span className="text-[8px] font-normal text-gray-400 ml-1">(Hutang)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
+                           <TrendingUp size={10} className="text-green-500" /> Rp{customer.totalSpent.toLocaleString()}
+                        </div>
+                    </div>
+                 </div>
+                 
+                 {customer.address && (
+                    <div className="flex items-start gap-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 p-2 rounded-xl">
+                       <MapPin size={10} className="shrink-0 mt-0.5" /> {customer.address}
+                    </div>
+                 )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">

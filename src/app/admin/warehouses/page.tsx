@@ -237,7 +237,7 @@ export default function WarehousesPage() {
       </div>
 
       {/* Main Content: Warehouse Cards / Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+      <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0">
             <thead>
@@ -334,49 +334,67 @@ export default function WarehousesPage() {
         </div>
       </div>
 
-      <div className="md:hidden">
-        <table className="w-full">
-          <tbody>
-            {warehouses.slice((currentPage - 1) * ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE).map((warehouse) => {
-              const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
-              const isCritical = rate >= 90;
-              return (
-                <tr key={`${warehouse.id}-detail`}>
-                  <td colSpan={2} className="px-3 py-3 bg-gray-50 border-t">
-                    <div className="space-y-3">
-                      <div className="max-w-full">
-                        <div className="flex justify-between items-end mb-1">
-                          <span className="text-[11px] font-black text-gray-800">
-                            {warehouse.usedCapacity.toLocaleString()} <span className="text-gray-300 text-[9px]">/ {warehouse.capacity.toLocaleString()}</span>
-                          </span>
-                          <span className={`text-[10px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
-                            {rate}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-1000 ease-out ${isCritical ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-green-500'
-                              }`}
-                            style={{ width: `${rate}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      <div>
-                        <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-xl inline-flex items-center gap-1.5 ${warehouse.isActive
-                          ? 'bg-green-50 text-green-700 border border-green-100'
-                          : 'bg-gray-100 text-gray-400'
-                          }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${warehouse.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                          {warehouse.isActive ? 'Online' : 'Offline'}
-                        </span>
-                      </div>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {warehouses.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+             <Package className="mx-auto text-gray-200 mb-4" size={40} />
+             <p className="text-[10px] font-black text-gray-400 tracking-widest">DATA GUDANG KOSONG</p>
+          </div>
+        ) : (
+          warehouses.slice((currentPage - 1) * ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE).map((warehouse) => {
+            const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
+            const isCritical = rate >= 90;
+            return (
+              <div key={warehouse.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+                 <div className="flex justify-between items-start">
+                    <div>
+                       <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight uppercase">{warehouse.name}</h3>
+                       <div className="flex items-center gap-1 mt-1 text-gray-400">
+                          <MapPin size={12} />
+                          <span className="text-[10px] font-bold uppercase">{warehouse.location}</span>
+                       </div>
                     </div>
-                  </td>
-                </tr>
-                  );
-            })}
-          </tbody>
-        </table>
+                    <span className={`px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest uppercase flex items-center gap-1 ${warehouse.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                       <div className={`w-1 h-1 rounded-full ${warehouse.isActive ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                       {warehouse.isActive ? 'ON' : 'OFF'}
+                    </span>
+                 </div>
+                 
+                 <div className="space-y-2 pt-2 border-t border-gray-50">
+                    <div className="flex justify-between items-end">
+                       <span className="text-[10px] font-bold text-gray-400 uppercase">Kapasitas</span>
+                       <span className={`text-[10px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
+                          {rate}%
+                       </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                       <div
+                          className={`h-full rounded-full transition-all duration-1000 ease-out ${isCritical ? 'bg-red-500' : 'bg-green-500'}`}
+                          style={{ width: `${rate}%` }}
+                       ></div>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-bold text-gray-600">
+                       <span>{warehouse.usedCapacity.toLocaleString()} Unit</span>
+                       <span className="text-gray-300">/ {warehouse.capacity.toLocaleString()}</span>
+                    </div>
+                 </div>
+
+                 <div className="flex gap-2 pt-2">
+                    <Link href={`/admin/warehouses/mutasi/${warehouse.id}`} className="flex-1 p-2 bg-purple-50 rounded-xl text-purple-600 flex items-center justify-center">
+                       <ArrowRightLeft size={16} />
+                    </Link>
+                    <Link href={`/admin/warehouses/edit/${warehouse.id}`} className="flex-1 p-2 bg-blue-50 rounded-xl text-blue-600 flex items-center justify-center">
+                       <Edit size={16} />
+                    </Link>
+                    <button onClick={() => handleDelete(warehouse.id, warehouse.name, warehouse.usedCapacity)} className="flex-1 p-2 bg-red-50 rounded-xl text-red-500 flex items-center justify-center">
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="mt-8 flex items-center justify-between">

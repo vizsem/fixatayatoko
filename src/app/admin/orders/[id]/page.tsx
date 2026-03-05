@@ -458,7 +458,124 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           <div className="mb-12">
-            <div className="overflow-x-auto -mx-4 md:mx-0">
+            <div className="md:hidden space-y-3 px-4">
+              {editableItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-3xl border shadow-sm ${
+                    !item.selected ? 'opacity-50 bg-slate-50 border-slate-100' : 'bg-white border-slate-100'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black uppercase text-slate-900 line-clamp-2">{item.name}</p>
+                      <p className="text-xs font-mono text-slate-400 font-medium normal-case">
+                        Rp{item.price.toLocaleString()}
+                      </p>
+                    </div>
+                    {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
+                      <input
+                        type="checkbox"
+                        checked={item.selected}
+                        onChange={(e) =>
+                          setEditableItems((prev) =>
+                            prev.map((it, i) => (i === idx ? { ...it, selected: e.target.checked } : it))
+                          )
+                        }
+                        className="w-5 h-5 rounded-lg border-slate-300 text-emerald-600 focus:ring-emerald-500 shadow-sm mt-1"
+                      />
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-slate-50 p-3 rounded-2xl">
+                      <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Qty</p>
+                      {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value, 10);
+                            setEditableItems((prev) =>
+                              prev.map((it, i) =>
+                                i === idx
+                                  ? { ...it, quantity: isNaN(newQuantity) ? 0 : Math.max(0, newQuantity) }
+                                  : it
+                              )
+                            );
+                          }}
+                          className="w-full text-center font-black bg-white rounded-xl p-3 text-sm ring-1 ring-slate-200 focus:ring-emerald-600 outline-none"
+                          max={item.originalQuantity}
+                        />
+                      ) : (
+                        <p className="text-sm font-black text-slate-900">x{item.quantity}</p>
+                      )}
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-2xl">
+                      <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Subtotal</p>
+                      <p className="text-sm font-black text-slate-900">
+                        Rp {(item.quantity * item.price).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
+              <div className="md:hidden px-4 pt-6 space-y-4">
+                <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm font-bold text-slate-500">
+                      <span>Subtotal Awal</span>
+                      <span>Rp{originalSubtotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold text-slate-500">
+                      <span>Ongkos Kirim</span>
+                      <span>Rp{order.shippingCost?.toLocaleString() || 0}</span>
+                    </div>
+                    {refundAmount > 0 && (
+                      <div className="flex justify-between text-sm font-bold text-rose-500">
+                        <span>Refund ke Dompet</span>
+                        <span>- Rp{refundAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-black text-slate-900 pt-3 border-t border-slate-100 border-dashed">
+                      <span>Total Baru</span>
+                      <span>Rp{newTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleConfirmItems}
+                  disabled={isConfirmingItems || confirmedItems.length === 0}
+                  className="w-full bg-emerald-600 text-white font-black uppercase text-sm px-6 py-4 rounded-2xl shadow-lg hover:bg-emerald-700 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
+                >
+                  {isConfirmingItems ? 'Memproses...' : 'Konfirmasi & Proses Pesanan'}
+                </button>
+              </div>
+            ) : (
+              <div className="md:hidden px-4 pt-6">
+                <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                      <span>Subtotal Produk</span>
+                      <span>Rp{(order.subtotal || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                      <span>Ongkos Kirim</span>
+                      <span>Rp{(order.shippingCost || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100 border-dashed">
+                      <span>Total Pembayaran</span>
+                      <span>Rp{(order.total || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
             <table className="w-full min-w-[600px] md:min-w-0">
               <thead>
                 <tr className="text-[10px] font-black uppercase text-slate-400 border-b">

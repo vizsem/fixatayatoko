@@ -229,52 +229,98 @@ export default function AddPurchase() {
                 )}
               </div>
             </div>
-            <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full text-left min-w-[680px] md:min-w-0">
-              <thead className="bg-gray-50/50">
-                <tr>
-                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga Beli</th>
-                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {cart.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 md:px-8 py-3 md:py-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
-                        <button type="button" onClick={() => removeFromCart(item.id)} className="text-[9px] text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline">
-                          <Trash2 size={10} /> Hapus
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center justify-center">
-                        <input
-                          type="number"
-                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
-                          value={item.quantity}
-                          onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+            <div className="md:hidden space-y-3 px-4 pb-4">
+              {cart.map((item) => (
+                <div key={item.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-2">{item.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id)}
+                        className="mt-1 text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1"
+                      >
+                        <Trash2 size={12} /> Hapus
+                      </button>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-sm font-black text-gray-900">
+                        Rp {(item.quantity * item.purchasePrice).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Qty</p>
                       <input
                         type="number"
-                        className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
+                        className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
+                        value={item.quantity}
+                        onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
+                      <input
+                        type="number"
+                        className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
                         value={item.purchasePrice}
                         onChange={(e) => updateCartItem(item.id, 'purchasePrice', Number(e.target.value))}
                       />
-                    </td>
-                    <td className="px-3 md:px-8 py-3 md:py-4 text-right text-xs font-black text-gray-800">
-                      Rp {(item.quantity * item.purchasePrice).toLocaleString()}
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
+              <table className="w-full text-left min-w-[680px] md:min-w-0">
+                <thead className="bg-gray-50/50">
+                  <tr>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga Beli</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {cart.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-3 md:px-8 py-3 md:py-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
+                          <button type="button" onClick={() => removeFromCart(item.id)} className="text-[9px] text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline">
+                            <Trash2 size={10} /> Hapus
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-3 md:px-6 py-3 md:py-4">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="number"
+                            className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
+                            value={item.quantity}
+                            onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+                        <input
+                          type="number"
+                          className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
+                          value={item.purchasePrice}
+                          onChange={(e) => updateCartItem(item.id, 'purchasePrice', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-3 md:px-8 py-3 md:py-4 text-right text-xs font-black text-gray-800">
+                        Rp {(item.quantity * item.purchasePrice).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {cart.length === 0 && (

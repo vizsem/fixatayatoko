@@ -239,8 +239,64 @@ export default function PromotionsReport() {
           <h2 className="text-lg font-semibold text-black">Detail Promosi</h2>
         </div>
 
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
+        <div className="md:hidden space-y-4 px-4 pb-4">
+          {promotions.map((promo) => {
+            const now = new Date();
+            const start = new Date(promo.startDate);
+            const end = new Date(promo.endDate);
+            const isActive = now >= start && now <= end;
+            const isExpired = now > end;
+
+            return (
+              <div key={promo.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex justify-between items-start mb-3">
+                   <div>
+                     <h3 className="text-sm font-bold text-gray-900">{promo.name}</h3>
+                     <p className="text-xs text-gray-500 mt-0.5">
+                       {promo.type === 'product' ? 'Produk' : promo.type === 'category' ? 'Kategori' : 'Kupon'}
+                     </p>
+                   </div>
+                   {isActive ? (
+                      <span className="px-2 py-1 text-[10px] font-bold bg-green-100 text-green-700 rounded-lg">
+                        Aktif
+                      </span>
+                    ) : isExpired ? (
+                      <span className="px-2 py-1 text-[10px] font-bold bg-red-100 text-red-700 rounded-lg">
+                        Kedaluwarsa
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-[10px] font-bold bg-yellow-100 text-yellow-700 rounded-lg">
+                        Akan Datang
+                      </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Diskon</p>
+                     <p className="text-sm font-black text-blue-600">
+                       {promo.discountType === 'percentage'
+                          ? `${promo.discountValue}%`
+                          : `Rp${promo.discountValue.toLocaleString('id-ID')}`}
+                     </p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Penggunaan</p>
+                     <p className="text-sm font-black text-gray-900">{promo.usageCount}x</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-3">
+                   <span>Total Diskon: Rp {promo.totalDiscount.toLocaleString('id-ID')}</span>
+                   <span>Konversi: {(promo.conversionRate * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">

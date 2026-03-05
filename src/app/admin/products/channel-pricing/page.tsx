@@ -338,8 +338,78 @@ export default function ChannelPricingPage() {
             Memuat data produk...
           </div>
         ) : (
-          <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full text-left min-w-[720px] md:min-w-0">
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4 px-4">
+              {paginatedProducts.map((p) => {
+                  const displayName = p.name || 'Produk';
+                  const unitList = ((p.units || []).map(u => (u?.code || '').toString().toUpperCase()));
+                  const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
+                  const units = unitList.length ? unitList : [baseUnit];
+                  const currentUnit = selectedUnit[p.id] || baseUnit;
+                  const stateByUnit = prices[p.id]?.[currentUnit] || {};
+
+                  return (
+                      <div key={p.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
+                                  <p className="text-[10px] font-bold text-gray-400 mt-1">Dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}</p>
+                              </div>
+                              <select
+                                  value={currentUnit}
+                                  onChange={(e) => setSelectedUnit(su => ({ ...su, [p.id]: e.target.value }))}
+                                  className="text-[10px] font-black bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
+                              >
+                                  {units.map(uc => (
+                                      <option key={uc} value={uc}>{uc}</option>
+                                  ))}
+                              </select>
+                          </div>
+
+                          <div className="space-y-3 pt-2 border-t border-gray-50">
+                              {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => (
+                                  <div key={key} className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold text-gray-500 uppercase w-20">{key}</span>
+                                      <div className="flex items-center justify-end gap-1 flex-1">
+                                          <span className="text-[10px] font-bold text-gray-400">Rp</span>
+                                          <input
+                                              type="number"
+                                              className="w-full bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none border border-transparent focus:border-blue-500 focus:bg-white transition-all"
+                                              value={stateByUnit[key] ?? ''}
+                                              onChange={(e) =>
+                                                  handleChangePrice(p.id, currentUnit, key, e.target.value)
+                                              }
+                                              min={0}
+                                              placeholder="0"
+                                          />
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+
+                          <button
+                              type="button"
+                              onClick={() => handleSave(p)}
+                              disabled={savingId === p.id}
+                              className="w-full py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                              <Save size={14} />
+                              {savingId === p.id ? 'Menyimpan...' : 'Simpan Perubahan'}
+                          </button>
+                      </div>
+                  );
+              })}
+               {!paginatedProducts.length && !loading && (
+                  <div className="p-10 text-center text-xs font-bold text-gray-400 bg-white rounded-3xl border border-gray-100">
+                      Tidak ada produk yang cocok dengan pencarian.
+                  </div>
+               )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
+              <table className="w-full text-left min-w-[720px] md:min-w-0">
               <thead className="bg-gray-50/60">
                 <tr>
                   <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
@@ -435,6 +505,7 @@ export default function ChannelPricingPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         
         <div className="p-4 border-t border-gray-50 flex items-center justify-between">

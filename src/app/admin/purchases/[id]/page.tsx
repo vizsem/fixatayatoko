@@ -88,7 +88,37 @@ export default function PurchaseDetail() {
                 {purchase.items?.length || 0} Items
               </span>
             </div>
-            <div className="overflow-x-auto -mx-4 md:mx-0">
+            <div className="md:hidden space-y-3 px-4 pb-4">
+              {purchase.items?.map((item, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-2">{item.name}</p>
+                      <p className="text-[10px] font-bold text-gray-400 mt-1">Product ID: {item.id.slice(0, 8)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-sm font-black text-gray-900">
+                        Rp {(item.quantity * item.purchasePrice).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Qty</p>
+                      <p className="text-sm font-black text-gray-900">{item.quantity} {item.unit}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Unit Price</p>
+                      <p className="text-sm font-black text-gray-900">Rp {item.purchasePrice.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
               <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead>
                   <tr className="border-b border-gray-50">
@@ -100,7 +130,6 @@ export default function PurchaseDetail() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {purchase.items?.map((item, idx) => (
-
                     <tr key={idx} className="hover:bg-gray-50/50 transition-all">
                       <td className="px-3 md:px-8 py-3 md:py-5">
                         <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{item.name}</span>

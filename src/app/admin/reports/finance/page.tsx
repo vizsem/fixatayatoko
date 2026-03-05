@@ -594,8 +594,60 @@ export default function FinanceReport() {
           <h2 className="text-xl font-bold text-gray-900">Detail Transaksi Keuangan</h2>
         </div>
 
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full min-w-[720px] md:min-w-0">
+        <div className="md:hidden space-y-4 px-4 pb-4">
+          {paginatedRecords.map((record) => (
+            <div key={record.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    {new Date(record.date).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <h3 className="text-sm font-bold text-gray-900 line-clamp-2">{record.description}</h3>
+                </div>
+                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                  record.type === 'profit' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                }`}>
+                  {record.type === 'profit' ? 'Penjualan' : 'Pengeluaran'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Jumlah</p>
+                  <p className={`text-sm font-black ${record.type === 'profit' ? 'text-green-600' : 'text-orange-600'}`}>
+                    Rp {record.amount.toLocaleString('id-ID')}
+                  </p>
+                </div>
+                {record.type === 'profit' && (
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Laba</p>
+                    <p className={`text-sm font-black ${record.profit && record.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      {record.profit ? `Rp ${record.profit.toLocaleString('id-ID')}` : '-'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700">
+                  {record.paymentMethod}
+                </span>
+                {record.cost && record.cost > 0 && (
+                   <span className="text-xs text-gray-400">
+                     Modal: Rp {record.cost.toLocaleString('id-ID')}
+                   </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full">
             <thead className="bg-gray-50 text-xs md:text-sm">
               <tr>
                 <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">

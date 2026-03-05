@@ -167,9 +167,97 @@ export default function PromotionsPage() {
         </div>
       </div>
 
-      {/* Tabel Promosi */}
-      <div className="bg-white shadow-sm rounded-[2rem] border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4 mb-6">
+        {promotions.length === 0 ? (
+           <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+              <Gift className="mx-auto text-gray-200 mb-4" size={40} />
+              <p className="text-[10px] font-black text-gray-400 tracking-widest">BELUM ADA PROMO AKTIF</p>
+           </div>
+        ) : (
+          promotions.map((promo) => {
+            const expired = isExpired(promo.endDate);
+            const activeNow = isActiveNow(promo);
+            
+            return (
+              <div key={promo.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+                 <div className="flex justify-between items-start">
+                    <div>
+                       <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{promo.name}</h3>
+                       <div className="flex items-center gap-1 mt-1 text-gray-400">
+                          {promo.type === 'product' && <Tag size={12} className="text-blue-500" />}
+                          {promo.type === 'category' && <Layers size={12} className="text-purple-500" />}
+                          {promo.type === 'coupon' && <Gift size={12} className="text-pink-500" />}
+                          {promo.type === 'flash-sale' && <Zap size={12} className="text-orange-500" fill="currentColor" />}
+                          {promo.type === 'bundle' && <Plus size={12} className="text-green-500" />}
+                          <span className="text-[10px] font-bold uppercase">{promo.type}</span>
+                       </div>
+                    </div>
+                    {expired ? (
+                      <span className="px-2 py-1 text-[8px] font-black bg-red-50 text-red-500 rounded-md uppercase border border-red-100">
+                        Kedaluwarsa
+                      </span>
+                    ) : activeNow ? (
+                      <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-2 py-1 rounded-md border border-green-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></div>
+                        <span className="text-[8px] font-black uppercase tracking-widest">Berjalan</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-orange-500 bg-orange-50 px-2 py-1 rounded-md border border-orange-100">
+                        <Clock size={10} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Terjadwal</span>
+                      </div>
+                    )}
+                 </div>
+
+                 <div className="space-y-2 pt-2 border-t border-gray-50">
+                    <div className="flex justify-between items-center">
+                       <span className="text-[10px] font-bold text-gray-400 uppercase">Target</span>
+                       {promo.type === 'coupon' ? (
+                          <span className="px-2 py-1 bg-gray-100 text-black rounded-lg text-[10px] font-black font-mono border border-gray-200">
+                            {promo.code}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-gray-600 italic">{promo.targetName || 'Semua Produk'}</span>
+                        )}
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <span className="text-[10px] font-bold text-gray-400 uppercase">Potongan</span>
+                       <span className="text-xs font-black text-green-600">
+                          {promo.discountType === 'percentage'
+                            ? `${promo.discountValue}%`
+                            : `Rp${(promo.discountValue || 0).toLocaleString('id-ID')}`}
+                       </span>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-xl">
+                       <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          <span>Mulai</span>
+                          <span>{new Date(promo.startDate).toLocaleDateString('id-ID')}</span>
+                       </div>
+                       <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
+                          <span>Selesai</span>
+                          <span>{new Date(promo.endDate).toLocaleDateString('id-ID')}</span>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="flex gap-2 pt-2">
+                    <Link href={`/admin/promotions/edit/${promo.id}`} className="flex-1 p-2 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                       <Edit size={16} />
+                    </Link>
+                    <button onClick={() => handleDelete(promo.id, promo.name)} className="flex-1 p-2 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Tabel Promosi Desktop */}
+      <div className="hidden md:block bg-white shadow-sm rounded-[2rem] border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100 min-w-[720px] md:min-w-0">
             <thead>
               <tr className="bg-gray-50/50">

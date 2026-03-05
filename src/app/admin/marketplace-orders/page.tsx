@@ -349,7 +349,58 @@ export default function MarketplaceOrdersPage() {
                 )}
               </div>
             </div>
-            <div className="overflow-x-auto -mx-4 md:mx-0">
+            <div className="md:hidden space-y-4 mb-6">
+              {cart.length === 0 ? (
+                <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+                  <ShoppingBag className="mx-auto text-gray-200 mb-4" size={40} />
+                  <p className="text-[10px] font-black text-gray-400 tracking-widest">KERANJANG KOSONG</p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+                     <div className="flex justify-between items-start">
+                        <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">{item.name}</h3>
+                        <button
+                           type="button"
+                           onClick={() => removeFromCart(item.id)}
+                           className="p-2 bg-red-50 text-red-500 rounded-xl"
+                        >
+                           <Trash2 size={14} />
+                        </button>
+                     </div>
+                     
+                     <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 p-2 rounded-xl">
+                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Qty</label>
+                           <input
+                              type="number"
+                              className="w-full bg-transparent text-xs font-black text-center outline-none"
+                              value={item.quantity}
+                              onChange={(e) => updateCartItem(item.id, 'quantity', e.target.value)}
+                              min={1}
+                           />
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded-xl">
+                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Harga Satuan</label>
+                           <input
+                              type="number"
+                              className="w-full bg-transparent text-xs font-black text-center outline-none"
+                              value={item.price}
+                              onChange={(e) => updateCartItem(item.id, 'price', e.target.value)}
+                              min={0}
+                           />
+                        </div>
+                     </div>
+
+                     <div className="flex justify-between items-center border-t border-gray-50 pt-3">
+                        <span className="text-[10px] font-black text-gray-400 uppercase">Subtotal</span>
+                        <span className="text-sm font-black text-gray-900">Rp {(item.quantity * item.price).toLocaleString()}</span>
+                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
             <table className="w-full text-left min-w-[680px] md:min-w-0">
               <thead className="bg-gray-50/50">
                 <tr>

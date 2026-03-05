@@ -329,7 +329,94 @@ export default function InventoryDashboard() {
 
       {/* 3. Main Table */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
+        {/* Mobile View */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {currentItems.map(product => (
+            <div key={product.id} className={`p-4 flex flex-col gap-4 ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
+              <div className="flex items-start gap-3">
+                <button onClick={() => toggleSelect(product.id)} className="mt-1">
+                  {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-200" size={20} />}
+                </button>
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 overflow-hidden relative shrink-0">
+                  {product.imageUrl ? (
+                    <Image
+                      src={product.imageUrl}
+                      fill
+                      className="object-cover"
+                      alt={product.name}
+                      sizes="64px"
+                    />
+                  ) : <ImageIcon size={20} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight mb-1">{product.name}</h3>
+                  <p className="text-[10px] font-bold text-gray-400 tracking-wider mb-2">{product.sku} • {product.category}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-emerald-600">
+                      {(() => {
+                        const sel = (unitSelection[product.id] || product.unit).toUpperCase();
+                        if (sel === (product.unit || '').toUpperCase()) {
+                          return `Rp${Number(product.priceEcer || 0).toLocaleString('id-ID')} /${sel}`;
+                        }
+                        const found = (product.units || []).find(u => (u.code || '').toUpperCase() === sel);
+                        const price = Number(found?.price || 0);
+                        const contains = Number(found?.contains || 0);
+                        const partA = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : 'Rp -';
+                        const partB = contains > 0 ? ` (isi ${contains})` : '';
+                        return `${partA} /${sel}${partB}`;
+                      })()}
+                    </span>
+                    <Link href={`/admin/products/edit/${product.id}`} className="p-2 bg-gray-50 rounded-xl">
+                      <ChevronRight size={16} className="text-gray-400" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-400">STOCK:</span>
+                  {editingId === product.id ? (
+                    <div className="flex items-center gap-2">
+                      <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-xs font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
+                      <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={14} /></button>
+                      <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
+                      {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
+                    </button>
+                  )}
+                </div>
+                {unitCodes(product).length > 1 && !editingId && (
+                  <select
+                    className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 outline-none"
+                    value={(unitSelection[product.id] || product.unit).toUpperCase()}
+                    onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
+                  >
+                    {unitCodes(product).map(code => <option key={code} value={code}>{code}</option>)}
+                  </select>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                 <span className="text-[10px] font-black text-gray-500 flex items-center gap-1">
+                    <Warehouse size={12} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
+                 </span>
+                 {Object.entries(product.stockByWarehouse || {})
+                    .filter(([_, v]) => Number(v) > 0)
+                    .map(([wid, val]) => (
+                      <span key={wid} className="text-[8px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-500">
+                        {displayWarehouses.find(w => w.id === wid)?.name || wid}: {val}
+                      </span>
+                 ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50/50">
               <tr>

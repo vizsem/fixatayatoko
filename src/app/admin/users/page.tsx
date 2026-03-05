@@ -224,8 +224,8 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Tabel Pengguna */}
-      <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
+      {/* Tabel Pengguna Desktop */}
+      <div className="hidden md:block bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto -mx-4 md:mx-0">
           <table className="min-w-full divide-y divide-gray-200 min-w-[680px] md:min-w-0">
             <thead className="bg-gray-50">
@@ -273,7 +273,7 @@ export default function AdminUsers() {
                       )}
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1 ${getRoleColor(user.role)}`}>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1 w-fit ${getRoleColor(user.role)}`}>
                         {getRoleIcon(user.role)}
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </span>
@@ -309,6 +309,68 @@ export default function AdminUsers() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {users.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+             <Users className="mx-auto text-gray-200 mb-4" size={40} />
+             <p className="text-[10px] font-black text-gray-400 tracking-widest">TIDAK ADA PENGGUNA</p>
+          </div>
+        ) : (
+          users.map(user => (
+            <div key={user.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+               <div className="flex justify-between items-start">
+                  <div>
+                     <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{user.name}</h3>
+                     <p className="text-xs text-gray-500 font-medium mt-1">{user.email}</p>
+                     <div className="mt-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest flex items-center gap-1 w-fit ${getRoleColor(user.role)}`}>
+                           {getRoleIcon(user.role)}
+                           {user.role.toUpperCase()}
+                        </span>
+                     </div>
+                  </div>
+                  {user.id !== currentUser && (
+                    <button onClick={() => handleDeleteUser(user.id, user.name)} className="p-2 bg-red-50 rounded-xl text-red-500">
+                       <UserX size={16} />
+                    </button>
+                  )}
+               </div>
+               
+               <div className="space-y-3 pt-3 border-t border-gray-50">
+                  <div className="flex items-center gap-3 text-xs text-gray-600">
+                     <div className="p-1.5 bg-gray-50 text-gray-600 rounded-lg">
+                        <Phone size={12} />
+                     </div>
+                     <span className="font-medium">{user.phone || '-'}</span>
+                  </div>
+                  
+                  {user.id !== currentUser && (
+                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl">
+                       <span className="text-xs font-bold text-gray-500">Ubah Role:</span>
+                       <select
+                          value={user.role}
+                          onChange={(e) => handleUpdateRole(user.id, e.target.value as UserDoc['role'])}
+                          className="text-xs font-bold border-none bg-white rounded-lg px-2 py-1 shadow-sm focus:ring-0"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="cashier">Kasir</option>
+                          <option value="user">Pelanggan</option>
+                        </select>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-end">
+                     <span className="text-[10px] font-bold text-gray-300">
+                        Terdaftar: {new Date(user.createdAt).toLocaleDateString('id-ID')}
+                     </span>
+                  </div>
+               </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Catatan Keamanan */}

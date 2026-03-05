@@ -166,7 +166,43 @@ export default function AdminWalletDashboard() {
               <History size={16} className="text-gray-400" /> Riwayat Transaksi Dompet
             </h3>
             <div className="overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
-              <table className="w-full">
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {logs.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase">
+                    Belum ada riwayat transaksi
+                  </div>
+                ) : (
+                  logs.map((log) => (
+                    <div key={log.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      <div className="flex justify-between items-start mb-2">
+                         <div>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase">
+                              {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM HH:mm', { locale: localeID }) : '...'}
+                            </p>
+                            <p className="text-[10px] font-black uppercase mt-0.5">UID: {log.userId?.slice(0, 8)}</p>
+                         </div>
+                         <div className={`font-black text-xs ${log.amountChanged > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {log.amountChanged > 0 ? `+Rp${log.amountChanged.toLocaleString()}` : `-Rp${Math.abs(log.amountChanged).toLocaleString()}`}
+                         </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                         <span className={`inline-block px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${
+                            log.amountChanged > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                          }`}>
+                            {log.type.replace('_', ' ')}
+                         </span>
+                         <p className="text-[10px] text-gray-600 font-bold uppercase italic leading-tight">{log.description}</p>
+                         {log.orderId && <p className="text-[9px] text-blue-500 font-mono">Order: {log.orderId}</p>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <table className="hidden md:table w-full">
                 <tbody className="divide-y divide-gray-50">
                   {logs.map((log) => (
                     <tr key={log.id} className="group">

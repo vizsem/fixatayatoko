@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 
 import {
   ArrowLeft, Search,
-  ArrowUpCircle, ArrowDownCircle, User, Warehouse, Package
+  ArrowUpCircle, ArrowDownCircle, User, Warehouse, Package, Clock
 } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
@@ -92,9 +92,74 @@ export default function StockLogsPage() {
           </div>
         </div>
 
-        {/* TABEL LOGS */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto -mx-4 md:mx-0">
+        {/* MOBILE LOGS */}
+        <div className="md:hidden space-y-4 mb-6">
+          {loading ? (
+            <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+              <p className="text-[10px] font-black text-gray-400 tracking-widest">MEMUAT RIWAYAT...</p>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+              <Package className="mx-auto text-gray-200 mb-4" size={40} />
+              <p className="text-[10px] font-black text-gray-400 tracking-widest">BELUM ADA RIWAYAT</p>
+            </div>
+          ) : (
+            filteredLogs.map((log) => (
+              <div key={log.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+                 <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                       <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                          <User size={14} />
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black uppercase text-gray-800">{log.adminEmail?.split('@')[0]}</p>
+                          <div className="flex items-center gap-1 mt-0.5 text-gray-400">
+                             <Clock size={10} />
+                             <span className="text-[9px] font-bold uppercase">
+                                {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM yyyy, HH:mm', { locale: id }) : '-'}
+                             </span>
+                          </div>
+                       </div>
+                    </div>
+                    <span className="px-2 py-1 bg-gray-100 rounded-lg text-[8px] font-black uppercase text-gray-500 tracking-tighter">
+                       {log.type || 'SYSTEM'}
+                    </span>
+                 </div>
+
+                 <div className="bg-gray-50 p-3 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center">
+                       <div className="flex items-center gap-2 text-gray-500">
+                          <Package size={12} />
+                          <span className="text-[10px] font-bold uppercase">{log.productName}</span>
+                       </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <div className="flex items-center gap-2 text-gray-500">
+                          <Warehouse size={12} />
+                          <span className="text-[10px] font-bold uppercase">{log.warehouseName}</span>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="flex items-center justify-between border-t border-gray-50 pt-3">
+                     <span className="text-[10px] font-black text-gray-400 uppercase">Perubahan Stok</span>
+                     <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold text-gray-300 uppercase">{log.previousStock} → {log.newStock}</span>
+                        <div className={`flex items-center gap-1 font-black text-xs ${log.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                           {log.change > 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                           {log.change > 0 ? `+${log.change}` : log.change}
+                        </div>
+                     </div>
+                 </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* TABEL LOGS DESKTOP */}
+        <div className="hidden md:block bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[680px] md:min-w-0">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">

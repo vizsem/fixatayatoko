@@ -237,7 +237,7 @@ export default function AdminSuppliers() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden transition-all hover:scale-[1.02]">
+      <div className="hidden md:block bg-white rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden transition-all hover:scale-[1.02]">
         <div className="overflow-x-auto -mx-4 md:mx-0">
           <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50">
@@ -283,12 +283,6 @@ export default function AdminSuppliers() {
                     <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
                       <div className="font-semibold text-gray-900 text-base">{supplier.name}</div>
                       <div className="text-sm text-gray-600 mt-1">{supplier.contactPerson}</div>
-                      <button
-                        onClick={() => setExpandedRows(prev => ({ ...prev, [supplier.id]: !prev[supplier.id] }))}
-                        className="md:hidden mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600"
-                      >
-                        {expandedRows[supplier.id] ? 'Tutup' : 'Detail'}
-                      </button>
                     </td>
                     <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
                       <div className="flex items-center gap-2 mb-2">
@@ -342,38 +336,74 @@ export default function AdminSuppliers() {
         </div>
       </div>
 
-      <div className="md:hidden">
-        <table className="w-full">
-          <tbody>
-            {pageItems.map((supplier) => (
-              expandedRows[supplier.id] ? (
-                <tr key={`${supplier.id}-detail`}>
-                  <td colSpan={5} className="px-3 py-3 bg-gray-50 border-t">
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Phone size={12} className="text-gray-400" />
-                        <span>{supplier.phone || '-'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mail size={12} className="text-gray-400" />
-                        <span className="text-gray-500">{supplier.email || '-'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 text-[10px] bg-blue-100 text-blue-800 rounded-full">
-                          {supplier.category || 'Umum'}
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {filteredSuppliers.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+             <Users className="mx-auto text-gray-200 mb-4" size={40} />
+             <p className="text-[10px] font-black text-gray-400 tracking-widest">TIDAK ADA SUPPLIER</p>
+             <button
+                onClick={() => setShowAddModal(true)}
+                className="mt-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-wide shadow-lg inline-flex items-center gap-2"
+              >
+                <Plus size={14} /> Tambah Baru
+              </button>
+          </div>
+        ) : (
+          pageItems.map(supplier => (
+            <div key={supplier.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+               <div className="flex justify-between items-start">
+                  <div>
+                     <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{supplier.name}</h3>
+                     <p className="text-xs text-gray-500 font-medium mt-1">{supplier.contactPerson}</p>
+                     <div className="flex items-center gap-2 mt-2">
+                        <span className="px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest bg-blue-100 text-blue-700 uppercase">
+                           {supplier.category || 'Umum'}
                         </span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <MapPin size={12} className="text-gray-400 mt-0.5" />
-                        <span className="text-gray-700">{supplier.address || '-'}</span>
-                      </div>
+                        {supplier.unit && (
+                          <span className="px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest bg-gray-100 text-gray-600 uppercase">
+                             {supplier.unit}
+                          </span>
+                        )}
+                     </div>
+                  </div>
+                  <div className="flex gap-2">
+                     <button onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)} className="p-2 bg-blue-50 rounded-xl text-blue-600">
+                        <Edit size={16} />
+                     </button>
+                     <button onClick={() => handleDelete(supplier.id, supplier.name)} className="p-2 bg-red-50 rounded-xl text-red-500">
+                        <Trash2 size={16} />
+                     </button>
+                  </div>
+               </div>
+               
+               <div className="space-y-2 pt-2 border-t border-gray-50">
+                  <div className="flex items-center gap-3 text-xs text-gray-600">
+                     <div className="p-1.5 bg-green-50 text-green-600 rounded-lg">
+                        <Phone size={12} />
+                     </div>
+                     <span className="font-medium">{supplier.phone}</span>
+                  </div>
+                  {supplier.email && (
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                       <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
+                          <Mail size={12} />
+                       </div>
+                       <span className="font-medium truncate">{supplier.email}</span>
                     </div>
-                  </td>
-                </tr>
-              ) : null
-            ))}
-          </tbody>
-        </table>
+                  )}
+                  {supplier.address && (
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                       <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg">
+                          <MapPin size={12} />
+                       </div>
+                       <span className="font-medium line-clamp-2">{supplier.address}</span>
+                    </div>
+                  )}
+               </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="mt-6 flex items-center justify-between">

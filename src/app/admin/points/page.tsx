@@ -210,7 +210,42 @@ export default function AdminPointsDashboard() {
               <History size={16} className="text-gray-400" /> Riwayat Audit
             </h3>
             <div className="overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
-              <table className="w-full">
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {logs.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase">
+                    Belum ada riwayat audit
+                  </div>
+                ) : (
+                  logs.map((log) => (
+                    <div key={log.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      <div className="flex justify-between items-start mb-2">
+                         <div>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase">
+                              {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM HH:mm', { locale: localeID }) : '...'}
+                            </p>
+                            <p className="text-[10px] font-black uppercase mt-0.5">UID: {log.userId?.slice(0, 8)}</p>
+                         </div>
+                         <div className={`font-black text-xs ${log.pointsChanged > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {log.pointsChanged > 0 ? `+${log.pointsChanged}` : log.pointsChanged}
+                         </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                         <span className={`inline-block px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${
+                            log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                          }`}>
+                            {log.type}
+                         </span>
+                         <p className="text-[10px] text-gray-600 font-bold uppercase italic leading-tight">{log.description}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <table className="hidden md:table w-full">
                 <tbody className="divide-y divide-gray-50">
                   {logs.map((log) => (
                     <tr key={log.id} className="group">

@@ -196,8 +196,83 @@ export default function AdminPurchases() {
       </div>
 
       {/* Purchases Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4 mb-6">
+        {filteredPurchases.length === 0 ? (
+           <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
+              <ShoppingBag className="mx-auto text-gray-200 mb-4" size={40} />
+              <p className="text-[10px] font-black text-gray-400 tracking-widest">TIDAK ADA DATA PEMBELIAN</p>
+           </div>
+        ) : (
+          filteredPurchases.map((purchase) => (
+            <div key={purchase.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+               <div className="flex justify-between items-start">
+                  <div>
+                     <span className="text-xs font-black text-gray-800 uppercase italic">#{purchase.id.slice(-6)}</span>
+                     <div className="flex items-center gap-1 mt-1 text-gray-400">
+                        <Calendar size={12} />
+                        <span className="text-[10px] font-bold uppercase">{new Date(purchase.createdAt).toLocaleDateString('id-ID')}</span>
+                     </div>
+                  </div>
+                   <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-xl border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
+                      purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                        'bg-red-50 text-red-600 border-red-100'
+                      }`}>
+                      {purchase.status}
+                    </span>
+               </div>
+
+               <div className="space-y-2 pt-2 border-t border-gray-50">
+                  <div>
+                     <p className="text-[10px] font-bold text-gray-400 uppercase">Supplier</p>
+                     <p className="text-xs font-black text-gray-800 uppercase tracking-tight">{purchase.supplierName}</p>
+                  </div>
+                  <div className="flex justify-between">
+                      <div>
+                         <p className="text-[10px] font-bold text-gray-400 uppercase">Gudang</p>
+                         <p className="text-xs font-bold text-gray-600 uppercase">{purchase.warehouseName}</p>
+                      </div>
+                       <div className="text-right">
+                         <p className="text-[10px] font-bold text-gray-400 uppercase">Items</p>
+                         <p className="text-xs font-bold text-blue-500 uppercase">{purchase.items.length} Items</p>
+                      </div>
+                  </div>
+               </div>
+
+               <div className="bg-gray-50 p-3 rounded-xl flex justify-between items-center">
+                   <div>
+                       <p className="text-[10px] font-bold text-gray-400 uppercase">Total</p>
+                       <p className="text-sm font-black text-gray-900">Rp {purchase.total.toLocaleString()}</p>
+                   </div>
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                      }`}>
+                      {purchase.paymentStatus}
+                    </span>
+               </div>
+
+               <div className="flex gap-2 pt-2">
+                  {purchase.status === 'MENUNGGU' && (
+                    <>
+                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="flex-1 p-2 bg-green-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-green-100">
+                        <CheckCircle2 size={16} />
+                      </button>
+                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="flex-1 p-2 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
+                        <XCircle size={16} />
+                      </button>
+                    </>
+                  )}
+                  <Link href={`/admin/purchases/${purchase.id}`} className="flex-1 p-2 bg-gray-100 text-gray-400 rounded-xl flex items-center justify-center hover:bg-black hover:text-white transition-all">
+                     <span className="text-[10px] font-bold uppercase mr-2">Detail</span>
+                     <ChevronRight size={16} />
+                  </Link>
+               </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0">
           <thead className="bg-gray-50/50">
             <tr>

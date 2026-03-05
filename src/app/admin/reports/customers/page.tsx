@@ -20,7 +20,8 @@ import {
   TrendingUp,
   CreditCard,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Phone
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -355,8 +356,63 @@ export default function CustomerReport() {
           </div>
         </div>
 
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full min-w-[720px] md:min-w-0">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4 px-4 pb-4">
+          {paginatedCustomers.map((customer, index) => (
+            <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 line-clamp-1">{customer.name}</h3>
+                  <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                    <Phone size={12} />
+                    <span>{customer.phone || '-'}</span>
+                  </div>
+                </div>
+                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                  customer.type === 'grosir' 
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-green-100 text-green-700'
+                }`}>
+                  {customer.type === 'grosir' ? 'Grosir' : 'Ecer'}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Total Belanja</p>
+                  <p className="text-sm font-black text-green-600">Rp {customer.totalSpent.toLocaleString('id-ID')}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Frekuensi</p>
+                  <p className="text-sm font-black text-blue-600">{customer.orderCount}x</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Piutang</p>
+                  <p className={`text-sm font-bold ${customer.outstandingDebt > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    Rp {customer.outstandingDebt.toLocaleString('id-ID')}
+                  </p>
+                </div>
+                <div className="flex items-center">
+                   {isOverLimit(customer) ? (
+                    <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-lg">
+                      <AlertTriangle size={12} /> Limit
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-gray-400">
+                      Limit: {customer.creditLimit > 0 ? `Rp ${customer.creditLimit.toLocaleString('id-ID')}` : '-'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">

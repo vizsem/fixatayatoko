@@ -300,8 +300,74 @@ export default function InventoryReport() {
           </div>
         </div>
 
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full divide-y divide-gray-200 min-w-[860px] md:min-w-0">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4 px-4 pb-4">
+          {pageSlice.map((item) => {
+             const status = item.currentStock <= 0 ? 'HABIS' : item.currentStock <= 10 ? 'RENDAH' : 'AMAN';
+             const statusClass =
+                status === 'HABIS' ? 'bg-red-100 text-red-700' :
+                status === 'RENDAH' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-green-100 text-green-700';
+             const img = item.imageUrl && item.imageUrl.length ? item.imageUrl : 'https://placehold.co/80x80/edf2f7/667085?text=IMG';
+             
+             return (
+              <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex gap-4 mb-3">
+                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <Image src={img} alt={item.name} fill className="object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{item.name}</h3>
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase whitespace-nowrap ml-2 ${statusClass}`}>
+                        {status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-1">{item.category}</p>
+                    <p className="text-xs font-bold text-green-600">Rp {item.stockValue.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="bg-gray-50 p-2 rounded-lg text-center">
+                    <p className="text-[8px] text-gray-500 uppercase tracking-wider mb-1">Stok</p>
+                    <p className={`text-sm font-black ${item.currentStock <= 10 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {item.currentStock}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 p-2 rounded-lg text-center">
+                    <p className="text-[8px] text-green-700 uppercase tracking-wider mb-1">Masuk</p>
+                    <p className="text-sm font-black text-green-700">+{item.stockIn}</p>
+                  </div>
+                  <div className="bg-red-50 p-2 rounded-lg text-center">
+                    <p className="text-[8px] text-red-700 uppercase tracking-wider mb-1">Keluar</p>
+                    <p className="text-sm font-black text-red-700">-{item.stockOut}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                   <div className="flex items-center gap-1 text-xs text-gray-500">
+                     <span>Turnover:</span>
+                     {item.turnoverRate > 0.5 ? (
+                        <span className="text-green-600 font-bold flex items-center gap-1">
+                          <TrendingUp size={12} /> Cepat
+                        </span>
+                      ) : item.turnoverRate > 0.2 ? (
+                        <span className="text-yellow-600 font-bold">Sedang</span>
+                      ) : (
+                        <span className="text-red-600 font-bold flex items-center gap-1">
+                          <TrendingDown size={12} /> Lambat
+                        </span>
+                      )}
+                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th scope="col" className="px-3 md:px-6 py-3 md:py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Foto</th>
