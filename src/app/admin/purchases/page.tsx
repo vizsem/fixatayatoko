@@ -65,6 +65,13 @@ export default function AdminPurchases() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+
+  const openPaymentModal = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setPaymentModalOpen(true);
+  };
 
   const filteredPurchases = useMemo(() => {
     let result = purchases;
@@ -142,6 +149,33 @@ export default function AdminPurchases() {
       notify.admin.error('Gagal update status');
     }
 
+  };
+
+  const handlePayment = async (purchaseId: string, amountPaid: number) => {
+    if (!purchaseId) return;
+
+    try {
+      const purchaseRef = doc(db, 'purchases', purchaseId);
+      await updateDoc(purchaseRef, {
+        paymentStatus: 'LUNAS',
+        paidAmount: amountPaid,
+        paymentDate: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local state
+      setPurchases(prevPurchases =>
+        prevPurchases.map(p =>
+          p.id === purchaseId ? { ...p, paymentStatus: 'LUNAS' } : p
+        )
+      );
+
+      notify.admin.success('Pembayaran berhasil. Status telah lunas.');
+      setPaymentModalOpen(false);
+    } catch (error) {
+      console.error("Error processing payment: ", error);
+      notify.admin.error('Gagal memproses pembayaran.');
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs">Loading Purchases...</div>;
@@ -265,6 +299,11 @@ export default function AdminPurchases() {
                      <span className="text-[10px] font-bold uppercase mr-2">Detail</span>
                      <ChevronRight size={16} />
                   </Link>
+                  {purchase.paymentStatus === 'HUTANG' && (
+                    <button onClick={() => openPaymentModal(purchase)} className="p-2 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
+                      <CreditCard size={16} />
+                    </button>
+                  )}
                </div>
             </div>
           ))
@@ -332,6 +371,11 @@ export default function AdminPurchases() {
                     <Link href={`/admin/purchases/${purchase.id}`} className="p-2 bg-gray-100 text-gray-400 rounded-lg hover:bg-black hover:text-white transition-all">
                       <ChevronRight size={18} />
                     </Link>
+                    {purchase.paymentStatus === 'HUTANG' && (
+                      <button onClick={() => openPaymentModal(purchase)} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                        <CreditCard size={16} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -393,6 +437,17 @@ export default function AdminPurchases() {
         <Package size={120} className="absolute -right-5 -bottom-5 opacity-10 group-hover:rotate-12 transition-all duration-700" />
       </div>
 
+      <PaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        purchase={selectedPurchase}
+        onConfirm={(amount) => {
+          if (selectedPurchase) {
+            handlePayment(selectedPurchase.id, amount);
+          }
+        }}
+      />
+
     </div>
   );
 }
@@ -405,6 +460,62 @@ interface StatCardProps {
   icon: LucideIcon;
   isWide?: boolean;
 }
+
+interface PaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  purchase: Purchase | null;
+  onConfirm: (amount: number) => void;
+}
+function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProps) {
+  const [amount, setAmount] = useState(() => (purchase ? purchase.total : 0));
+
+  if (!isOpen || !purchase) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 m-4 transform transition-all">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3"><CreditCard size={24} className="text-blue-600"/>Konfirmasi Pembayaran</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-800"><XCircle size={24} /></button>
+        </div>
+        
+        <div className="space-y-4 mb-8">
+          <div className="bg-gray-50 p-4 rounded-xl">
+            <p className="text-[10px] font-bold text-gray-400 uppercase">Supplier</p>
+            <p className="text-sm font-black text-gray-800 uppercase">{purchase.supplierName}</p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-xl">
+            <p className="text-[10px] font-bold text-gray-400 uppercase">ID Pembelian</p>
+            <p className="text-sm font-bold text-gray-600 italic">#{purchase.id.slice(-6)}</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-center">
+            <p className="text-[10px] font-bold text-blue-500 uppercase">Total Hutang</p>
+            <p className="text-3xl font-black text-blue-600">Rp {purchase.total.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+           <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Jumlah Pembayaran</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="w-full bg-gray-50 mt-2 px-6 py-4 rounded-2xl text-lg font-bold outline-none text-center"
+              />
+           </div>
+          <button 
+            onClick={() => onConfirm(amount)}
+            className="w-full bg-black text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2">
+            LUNASI SEKARANG
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
   return (

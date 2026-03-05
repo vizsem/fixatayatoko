@@ -5,10 +5,21 @@ import Link from 'next/link';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
+import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 
 export default function AllCategoriesPage() {
   const [categories, setCategories] = useState<{ name: string, slug: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeChip, setActiveChip] = useState<ChipKey>('SEMUA');
+
+  // Kategori untuk ChipFilter
+  const CATEGORY_CHIPS: { key: ChipKey; label: string }[] = [
+    { key: 'SEMUA', label: 'Semua' },
+    { key: 'PROMO', label: 'Promo' },
+    { key: 'MAKANAN', label: 'Makanan' },
+    { key: 'MINUMAN', label: 'Minuman' },
+    { key: 'SEMBAKO', label: 'Sembako' },
+  ];
 
   // Daftar Emoji untuk ikon otomatis berdasarkan kata kunci
   const getIcon = (slug: string) => {
@@ -81,12 +92,14 @@ export default function AllCategoriesPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-10">
+        <div className="mb-6">
           <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-tight">
             Cari <span className="text-green-600">Sembako</span><br />dari database
           </h2>
-
         </div>
+
+        {/* ChipFilter untuk kategori */}
+        <ChipFilter items={CATEGORY_CHIPS} value={activeChip} onChange={setActiveChip} />
 
         {loading ? (
           <div className="flex flex-col items-center py-20 text-gray-400">
@@ -97,15 +110,24 @@ export default function AllCategoriesPage() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Promo Selalu Ada di Awal */}
-            <Link href="/kategori/promo" className="bg-red-50 border border-red-100 rounded-[2rem] p-6 text-center shadow-sm active:scale-95 transition-all">
-              <div className="w-20 h-20 bg-red-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg">🔥</div>
-              <h2 className="font-black text-[11px] text-red-600">Promo produk</h2>
-              <div className="mt-2 text-[8px] font-black text-red-400 animate-pulse">Diskon spesial</div>
+            {(activeChip === 'SEMUA' || activeChip === 'PROMO') && (
+              <Link href="/kategori/promo" className="bg-red-50 border border-red-100 rounded-[2rem] p-6 text-center shadow-sm active:scale-95 transition-all">
+                <div className="w-20 h-20 bg-red-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg">🔥</div>
+                <h2 className="font-black text-[11px] text-red-600">Promo produk</h2>
+                <div className="mt-2 text-[8px] font-black text-red-400 animate-pulse">Diskon spesial</div>
+              </Link>
+            )}
 
-            </Link>
-
-            {/* Kategori dari Database */}
-            {categories.map((cat, index) => (
+            {/* Kategori dari Database - difilter berdasarkan chip aktif */}
+            {categories
+              .filter(cat => {
+                if (activeChip === 'SEMUA') return true;
+                if (activeChip === 'MAKANAN') return cat.name.toLowerCase().includes('makanan') || cat.name.toLowerCase().includes('mie') || cat.name.toLowerCase().includes('biskuit');
+                if (activeChip === 'MINUMAN') return cat.name.toLowerCase().includes('minuman') || cat.name.toLowerCase().includes('susu') || cat.name.toLowerCase().includes('teh');
+                if (activeChip === 'SEMBAKO') return cat.name.toLowerCase().includes('sembako') || cat.name.toLowerCase().includes('beras') || cat.name.toLowerCase().includes('gula') || cat.name.toLowerCase().includes('minyak');
+                return true;
+              })
+              .map((cat, index) => (
               <Link
                 key={index}
                 href={`/kategori/${cat.name}`} // Menggunakan nama asli agar cocok dengan query where('Kategori', '==', cat.name)

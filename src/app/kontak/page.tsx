@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Store, Phone, Mail, MapPin, MessageCircle, Send } from 'lucide-react';
 import Link from 'next/link';
+import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,14 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [activeChip, setActiveChip] = useState<ChipKey>('SEMUA');
+
+  // Kategori untuk ChipFilter
+  const HELP_CHIPS: { key: ChipKey; label: string }[] = [
+    { key: 'SEMUA', label: 'Semua' },
+    { key: 'KONTAK', label: 'Kontak' },
+    { key: 'BANTUAN', label: 'Bantuan' },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -60,9 +69,13 @@ export default function ContactPage() {
           </p>
         </div>
 
+        {/* ChipFilter untuk jenis kontak */}
+        <ChipFilter items={HELP_CHIPS} value={activeChip} onChange={setActiveChip} />
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Form Kontak */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+            {/* Form Kontak - tampilkan jika SEMUA atau KONTAK */}
+            {(activeChip === 'SEMUA' || activeChip === 'KONTAK') && (
+              <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Kirim Pesan</h2>
             
             {submitSuccess && (
@@ -155,9 +168,11 @@ export default function ContactPage() {
               </button>
             </form>
           </div>
+            )}
 
-          {/* Info Kontak */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          {/* Info Kontak - tampilkan jika SEMUA atau BANTUAN */}
+          {(activeChip === 'SEMUA' || activeChip === 'BANTUAN') && (
+            <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Informasi Kontak</h2>
             
             <div className="space-y-5">
@@ -203,6 +218,7 @@ export default function ContactPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
