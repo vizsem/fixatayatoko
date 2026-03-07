@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { stockSyncService } from '@/lib/stockSyncService';
 
 type Product = {
   id: string;
@@ -96,6 +97,15 @@ export default function StockOutPage() {
         operator: user?.email || 'Admin',
         createdAt: serverTimestamp()
       });
+
+      // C. Trigger sinkronisasi otomatis
+      try {
+        await stockSyncService.syncWarehouseToProduct(selectedProduct.id, 'gudang-utama');
+        console.log('Sinkronisasi stok otomatis berhasil');
+      } catch (syncError) {
+        console.error('Gagal sinkronisasi otomatis:', syncError);
+        // Tidak menghentikan proses utama, hanya log error
+      }
 
       setStatus({ type: 'success', msg: 'Stok berhasil dikurangi!' });
       notify.admin.success('Stok berhasil dikurangi!');

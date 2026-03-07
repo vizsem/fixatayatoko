@@ -9,14 +9,14 @@ import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   doc,
-  getDoc,
   updateDoc,
   query,
   orderBy,
   serverTimestamp,
   getDocs,
   limit,
-  startAfter
+  startAfter,
+  runTransaction
 } from 'firebase/firestore';
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
@@ -131,15 +131,41 @@ export default function AdminPurchases() {
         if (p) {
           for (const item of p.items) {
             const productRef = doc(db, 'products', item.id);
-            const pSnap = await getDoc(productRef);
-            if (pSnap.exists()) {
-              const curData = pSnap.data();
-              await updateDoc(productRef, {
-                stock: (curData.stock || 0) + item.quantity,
-                purchasePrice: item.purchasePrice, // Update HPP terbaru
+            await runTransaction(db, async (tx) => {
+              const snap = await tx.get(productRef);
+              if (!snap.exists()) return;
+
+              const curData = snap.data() as Record<string, unknown>;
+              const currentStock = Number(curData.stock || curData.Stok || 0);
+              const incomingQty = Number(item.quantity || 0);
+              const incomingCost = Number(item.purchasePrice || 0);
+              const newStock = currentStock + incomingQty;
+
+              const currentCost = Number(curData.Modal || curData.purchasePrice || 0);
+              const effectiveOldCost = currentCost > 0 ? currentCost : incomingCost;
+              const nextAvgCost = newStock > 0
+                ? Math.round(((currentStock * effectiveOldCost) + (incomingQty * incomingCost)) / newStock)
+                : Math.round(incomingCost);
+
+              const curByWarehouse = (curData.stockByWarehouse && typeof curData.stockByWarehouse === 'object')
+                ? (curData.stockByWarehouse as Record<string, number>)
+                : {};
+              const whKey = p.warehouseId || 'gudang-utama';
+              const whStock = Number(curByWarehouse[whKey] || 0) + incomingQty;
+
+              tx.update(productRef, {
+                stock: newStock,
+                Stok: newStock,
+                stockByWarehouse: {
+                  ...curByWarehouse,
+                  [whKey]: whStock
+                },
+                purchasePrice: nextAvgCost,
+                Modal: nextAvgCost,
+                hargaBeli: nextAvgCost,
                 updatedAt: serverTimestamp()
               });
-            }
+            });
           }
         }
       }

@@ -22,6 +22,7 @@ import {
 import { ArrowDown, Plus, Calendar } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { stockSyncService } from '@/lib/stockSyncService';
 
 
 type Product = {
@@ -31,6 +32,8 @@ type Product = {
   stock: number;
   units?: { code: string; contains?: number }[];
   stockByWarehouse?: { [key: string]: number };
+  purchasePrice?: number;
+  Modal?: number;
 };
 
 type Supplier = {
@@ -85,6 +88,9 @@ function StockInContent() {
           unit: baseUnit,
           stock: Number(data.stock || 0),
           units,
+          stockByWarehouse: (data.stockByWarehouse as Record<string, number> | undefined) || {},
+          purchasePrice: typeof data.purchasePrice === 'number' ? data.purchasePrice : Number(data.purchasePrice || 0),
+          Modal: typeof data.Modal === 'number' ? data.Modal : Number(data.Modal || 0),
         } as Product;
       });
       setProducts(productList);
@@ -145,6 +151,7 @@ function StockInContent() {
       const selectedUnit = prod?.units?.find(u => u.code === formData.unitCode) || { code: 'PCS', contains: 1 };
       const contains = Number(selectedUnit.contains || 1);
       const pcsToAdd = formData.quantity * contains;
+      const incomingCostPerPcs = contains > 0 ? (formData.purchasePrice / contains) : formData.purchasePrice;
       // 1. Simpan transaksi stok masuk
       const transactionData = {
         type: 'STOCK_IN',
@@ -157,6 +164,7 @@ function StockInContent() {
         unitQty: formData.quantity,
         unitContains: contains,
         purchasePrice: formData.purchasePrice,
+        purchasePricePerPcs: incomingCostPerPcs,
         expiredDate: formData.expiredDate,
         createdAt: serverTimestamp()
       };
@@ -168,13 +176,33 @@ function StockInContent() {
       const productRef = doc(db, 'products', formData.productId);
       const currentStock = selectedProduct?.stock || 0;
       const newStock = currentStock + pcsToAdd;
+      const currentCost = Number(selectedProduct?.Modal || selectedProduct?.purchasePrice || 0);
+      const effectiveOldCost = currentCost > 0 ? currentCost : incomingCostPerPcs;
+      const nextAvgCost = newStock > 0
+        ? Math.round(((currentStock * effectiveOldCost) + (pcsToAdd * incomingCostPerPcs)) / newStock)
+        : Math.round(incomingCostPerPcs);
 
       await updateDoc(productRef, {
         stock: newStock,
+        Stok: newStock,
+        purchasePrice: nextAvgCost,
+        Modal: nextAvgCost,
+        hargaBeli: nextAvgCost,
+        updatedAt: serverTimestamp(),
         stockByWarehouse: {
+          ...(selectedProduct?.stockByWarehouse || {}),
           'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + pcsToAdd
-        }
+        },
       });
+
+      // 3. Trigger sinkronisasi otomatis
+      try {
+        await stockSyncService.syncWarehouseToProduct(formData.productId, 'gudang-utama');
+        console.log('Sinkronisasi stok otomatis berhasil');
+      } catch (syncError) {
+        console.error('Gagal sinkronisasi otomatis:', syncError);
+        // Tidak menghentikan proses utama, hanya log error
+      }
 
       notify.admin.success('Stok berhasil ditambahkan!');
       router.push('/admin/inventory');

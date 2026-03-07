@@ -21,9 +21,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare,
-  Square,
-  TrendingUp,
-  TrendingDown
+  Square
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';

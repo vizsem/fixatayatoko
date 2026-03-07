@@ -26,7 +26,7 @@ import {
   ClipboardCheck, Package, Warehouse, ChevronRight,
   ChevronLeft, Download, Activity, ListFilter, CheckSquare, Square,
   X, MapPinned, FolderInput, EyeOff, Check, ScanBarcode, Image as ImageIcon, Trash2,
-  LucideIcon
+  LucideIcon, BarChart3
 } from 'lucide-react';
 
 
@@ -268,8 +268,8 @@ export default function InventoryDashboard() {
         <NavCard icon={ArrowUpRight} label="Stock Out" href={`/admin/inventory/stock-out?ids=${selectedIds.join(',')}`} color="text-red-600" bg="bg-red-50" />
         <NavCard icon={RefreshCw} label="Transfer" href={`/admin/inventory/transfer?ids=${selectedIds.join(',')}`} color="text-blue-600" bg="bg-blue-50" />
         <NavCard icon={ClipboardCheck} label="Opname" href="/admin/inventory/opname" color="text-purple-600" bg="bg-purple-50" />
+        <NavCard icon={BarChart3} label="Sync Monitor" href="/admin/inventory/sync-monitor" color="text-indigo-600" bg="bg-indigo-50" />
         <NavCard icon={Box} label="History" href="/admin/inventory/history" color="text-orange-600" bg="bg-orange-50" />
-        <NavCard icon={Download} label="Export" onClick={handleExport} color="text-gray-600" bg="bg-gray-100" />
       </div>
 
       {/* Header */}

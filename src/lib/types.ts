@@ -163,3 +163,54 @@ export interface Category {
     name: string;
     slug: string;
 }
+
+export interface SyncConfig {
+    autoSync: boolean;
+    syncInterval: number; // in milliseconds
+    maxRetries: number;
+    batchSize: number;
+    validationThreshold: number;
+    enableValidation: boolean;
+    enableNotifications: boolean;
+    logLevel: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
+}
+
+export interface StockSyncLog {
+    id?: string;
+    productId: string;
+    productName?: string;
+    warehouseId: string;
+    warehouseName?: string;
+    type: 'WAREHOUSE_TO_PRODUCT' | 'BATCH_SYNC' | 'STOCK_VALIDATION' | 'STOCK_VALIDATION_ERROR' | 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT';
+    status?: 'SUCCESS' | 'COMPLETED' | 'ERROR';
+    quantity?: number;
+    previousStock?: number;
+    newStock?: number;
+    difference?: number;
+    systemStock?: number;
+    reason?: string;
+    timestamp: FirestoreTimestamp | Date;
+    synced?: boolean;
+    syncError?: string;
+    error?: string;
+    errorStack?: string;
+    executionTime?: number;
+    operator?: string;
+    validation?: {
+        productExists: boolean;
+        warehouseStockExists: boolean;
+        stockValuesValid: boolean;
+        totalStockValid: boolean;
+        paramsValid?: boolean;
+    };
+}
+
+export interface StockValidation {
+    productId: string;
+    warehouseId: string;
+    systemStock: number;
+    physicalStock: number;
+    difference: number;
+    lastSync: FirestoreTimestamp | Date;
+    status: 'VALID' | 'INVALID' | 'PENDING';
+}

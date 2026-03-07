@@ -70,7 +70,7 @@ export default function EditProductPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [units, setUnits] = useState<UnitOption[]>([]);
-
+  const [distUnit, setDistUnit] = useState<string>('PCS'); // Satuan untuk distribusi stok
 
 
 
@@ -85,6 +85,7 @@ export default function EditProductPage() {
       }
       const data = docSnap.data();
       const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
+      setDistUnit(baseUnit); // Set default dist unit
       const loadedProduct: ProductData = {
         ...data,
         id: docSnap.id,
@@ -265,9 +266,13 @@ export default function EditProductPage() {
         minStock: Number(product.Min_Stok || 0),
         purchasePrice: Number(product.Modal || 0),
         priceEcer: nextEcer,
+        price: nextEcer,
         priceGrosir: Number(product.Grosir || 0),
+        wholesalePrice: Number(product.Grosir || 0),
         isActive: (product.Status ?? 1) === 1,
         imageUrl: finalImageUrl,
+        image: finalImageUrl,
+        barcode: product.Barcode || '',
         updatedAt: serverTimestamp(),
       };
 
@@ -482,28 +487,69 @@ export default function EditProductPage() {
                 <h3 className="text-xs font-black uppercase flex items-center gap-2">
                   <Warehouse size={16} className="text-yellow-400" /> Distribusi Stok
                 </h3>
-                <div className="bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  Total: {(() => {
-                    const values = Object.values(product.stockByWarehouse || {});
-                    const total = values.reduce((acc: number, curr: unknown) => acc + (Number(curr) || 0), 0);
 
-                    return total.toLocaleString('id-ID'); // Menampilkan angka yang diformat
-                  })()}
+                <div className="flex items-center gap-3">
+                  <select
+                    value={distUnit}
+                    onChange={(e) => setDistUnit(e.target.value)}
+                    className="bg-white/10 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none border border-white/20 cursor-pointer hover:bg-white/20 transition-all"
+                  >
+                    {units.filter(u => u.code && (Number(u.contains) || 0) > 0).map(u => (
+                      <option key={u.code} value={u.code} className="text-black bg-white">
+                        {u.code} (Isi {u.contains})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="bg-yellow-400 text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    Total: {(() => {
+                      const values = Object.values(product.stockByWarehouse || {});
+                      const total = values.reduce((acc: number, curr: unknown) => acc + (Number(curr) || 0), 0);
+
+                      // Calculate total in selected unit
+                      const currentUnit = units.find(u => u.code === distUnit);
+                      const multiplier = Number(currentUnit?.contains || 1);
+                      const displayTotal = total / multiplier;
+
+                      return `${displayTotal.toLocaleString('id-ID')} ${distUnit}`;
+                    })()}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {warehouses.map(wh => (
-                  <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:bg-white/20 transition-all cursor-pointer">
-                    <span className="text-[9px] font-black uppercase opacity-60 block mb-2">{wh.name}</span>
-                    <input
-                      type="number"
-                      value={product.stockByWarehouse?.[wh.id] ?? ''}
-                      onChange={e => setProduct({ ...product, stockByWarehouse: { ...product.stockByWarehouse, [wh.id]: e.target.value === '' ? 0 : Number(e.target.value) } })}
-                      className="bg-transparent w-full font-black text-xl outline-none text-white"
-                      placeholder="0"
-                    />
-                  </div>
-                ))}
+                {warehouses.map(wh => {
+                  const currentUnit = units.find(u => u.code === distUnit);
+                  const multiplier = Number(currentUnit?.contains || 1);
+                  const stockVal = Number(product.stockByWarehouse?.[wh.id] || 0);
+                  const displayVal = stockVal / multiplier;
+
+                  return (
+                    <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:bg-white/20 transition-all cursor-pointer group">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[9px] font-black uppercase opacity-60 group-hover:opacity-100 transition-opacity">{wh.name}</span>
+                        <span className="text-[9px] font-bold opacity-40 group-hover:opacity-80 transition-opacity">
+                          {stockVal.toLocaleString('id-ID')} {product.Satuan}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={displayVal === 0 ? '' : displayVal}
+                          onChange={e => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            const realVal = Math.round(val * multiplier);
+                            setProduct({ ...product, stockByWarehouse: { ...product.stockByWarehouse, [wh.id]: realVal } });
+                          }}
+                          className="bg-transparent w-full font-black text-xl outline-none text-white placeholder-white/20"
+                          placeholder="0"
+                        />
+                        <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-40 pointer-events-none">
+                          {distUnit}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

@@ -77,18 +77,17 @@ export default function InventoryReport() {
             .filter(t => t.productId === productId && t.type === 'STOCK_OUT')
             .reduce((sum, t) => sum + t.quantity, 0);
           
-          // Asumsikan harga beli 80% dari harga jual
-          const purchasePrice = (data.price || 0) * 0.8;
-          const stockValue = (data.stock || 0) * purchasePrice;
+          const purchasePrice = Number(data.Modal || data.purchasePrice || 0);
+          const stockValue = (Number(data.stock || 0)) * purchasePrice;
           
           // Hitung turnover rate (sederhana: stockOut / currentStock)
           const turnoverRate = data.stock > 0 ? stockOut / data.stock : 0;
           
           inventoryList.push({
             id: doc.id,
-            name: data.name || '',
-            category: data.category || '',
-            currentStock: data.stock || 0,
+            name: data.name || data.Nama || '',
+            category: data.category || data.Kategori || '',
+            currentStock: Number(data.stock || 0),
             stockIn,
             stockOut,
             turnoverRate,
