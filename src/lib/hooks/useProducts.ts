@@ -15,6 +15,7 @@ export default function useProducts(options?: ProductQueryOptions) {
   const [products, setProducts] = useState<NormalizedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isActive = options?.isActive;
   const category = options?.category;
   const warehouseId = options?.warehouseId;
   const orderByField = options?.orderByField;
@@ -32,11 +33,18 @@ export default function useProducts(options?: ProductQueryOptions) {
 
   useEffect(() => {
     const unsub = onSnapshot(qRef, (snap) => {
-      setProducts(snap.docs.map((d) => normalizeProduct(d.id, d.data() as Record<string, unknown>)));
+      let data = snap.docs.map((d) => normalizeProduct(d.id, d.data() as Record<string, unknown>));
+      
+      // Filter isActive client-side untuk menangani mixed schema (Status vs isActive)
+      if (isActive === true) {
+        data = data.filter(p => p.isActive);
+      }
+      
+      setProducts(data);
       setLoading(false);
     });
     return () => unsub();
-  }, [qRef]);
+  }, [qRef, isActive]);
 
   return { products, loading };
 }

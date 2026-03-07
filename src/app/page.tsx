@@ -210,22 +210,28 @@ export default function Home() {
             const productsQ = query(collection(db, 'products'), where('__name__', 'in', uniqueItemIds));
             const pSnap = await getDocs(productsQ);
             
-            const reProducts = pSnap.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                ...data,
-                name: data.name || data.Nama || "Produk",
-                price: Number(data.price || data.Ecer) || 0,
-                wholesalePrice: Number(data.wholesalePrice || data.Grosir) || Number(data.Ecer) || 0,
-                minWholesale: Number(data.minWholesale || data.Min_Grosir || data.Min_Stok_Grosir || 1),
-                stock: Number(data.stock || data.Stok || 0),
-                unit: data.unit || data.Satuan || 'pcs',
-                category: data.category || data.Kategori || 'Umum',
-                image: data.image || data.Link_Foto || '/logo-atayatoko.png',
-                variant: data.variant || ''
-              } as Product;
-            });
+            const reProducts = pSnap.docs
+              .map(doc => ({ id: doc.id, ...doc.data() } as Record<string, unknown>))
+              .filter(data => {
+                const isActive = typeof data.isActive === 'boolean' 
+                  ? data.isActive 
+                  : (Number(data.Status ?? 1) !== 0);
+                return isActive;
+              })
+              .map(data => {
+                return {
+                  id: data.id as string,
+                  name: String(data.name || data.Nama || "Produk"),
+                  price: Number(data.price || data.Ecer) || 0,
+                  wholesalePrice: Number(data.wholesalePrice || data.Grosir) || Number(data.Ecer) || 0,
+                  minWholesale: Number(data.minWholesale || data.Min_Grosir || data.Min_Stok_Grosir || 1),
+                  stock: Number(data.stock || data.Stok || 0),
+                  unit: String(data.unit || data.Satuan || 'pcs'),
+                  category: String(data.category || data.Kategori || 'Umum'),
+                  image: String(data.image || data.Link_Foto || '/logo-atayatoko.png'),
+                  variant: String(data.variant || '')
+                } as Product;
+              });
             setRepurchaseProducts(reProducts);
           }
 
