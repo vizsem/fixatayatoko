@@ -70,42 +70,13 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
           orderBy('name', 'asc')
         );
         const indexedSnap = await getDocs(qIndexed);
-        let products: Product[] = indexedSnap.docs.map(docSnap => {
-          const d = docSnap.data() as Record<string, unknown>;
-          
-          let stock = Number(d.Stok ?? d.stock ?? 0);
-          const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
-
-          if (displayWarehouseId && stockByWarehouse) {
-            stock = Number(stockByWarehouse[displayWarehouseId] || 0);
-          } else if (displayWarehouseId && !stockByWarehouse) {
-            stock = 0;
-          }
-
-          return {
-            id: docSnap.id,
-            name: String(d.Nama ?? d.name ?? 'Produk'),
-            price: Number(d.Ecer ?? d.price ?? 0),
-            wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
-            minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
-            category: String(d.Kategori ?? d.category ?? 'Umum'),
-            image: String(d.Link_Foto ?? d.image ?? ''),
-            unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-            stock: stock
-          };
-        });
-
-        // Fallback: jika tidak ada hasil (mungkin field bukan 'category' atau link memakai slug)
-        if (products.length === 0) {
-          const qActive = query(
-            collection(db, 'products'),
-            where('isActive', '==', true),
-            orderBy('name', 'asc')
-          );
-          const activeSnap = await getDocs(qActive);
-          const mapped = activeSnap.docs.map(docSnap => {
+        let products: Product[] = indexedSnap.docs
+          .map(docSnap => {
             const d = docSnap.data() as Record<string, unknown>;
-            
+            // Tambahan filter client-side untuk keamanan (Status 0 / isActive false)
+            const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
+            if (!isActive) return null;
+
             let stock = Number(d.Stok ?? d.stock ?? 0);
             const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
 
@@ -125,8 +96,47 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
               image: String(d.Link_Foto ?? d.image ?? ''),
               unit: String(d.Satuan ?? d.unit ?? 'pcs'),
               stock: stock
-            } as Product;
-          });
+            };
+          })
+          .filter(Boolean) as Product[];
+
+        // Fallback: jika tidak ada hasil (mungkin field bukan 'category' atau link memakai slug)
+        if (products.length === 0) {
+          const qActive = query(
+            collection(db, 'products'),
+            where('isActive', '==', true),
+            orderBy('name', 'asc')
+          );
+          const activeSnap = await getDocs(qActive);
+          const mapped = activeSnap.docs
+            .map(docSnap => {
+              const d = docSnap.data() as Record<string, unknown>;
+              // Filter client-side
+              const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
+              if (!isActive) return null;
+
+              let stock = Number(d.Stok ?? d.stock ?? 0);
+              const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
+
+              if (displayWarehouseId && stockByWarehouse) {
+                stock = Number(stockByWarehouse[displayWarehouseId] || 0);
+              } else if (displayWarehouseId && !stockByWarehouse) {
+                stock = 0;
+              }
+
+              return {
+                id: docSnap.id,
+                name: String(d.Nama ?? d.name ?? 'Produk'),
+                price: Number(d.Ecer ?? d.price ?? 0),
+                wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
+                minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
+                category: String(d.Kategori ?? d.category ?? 'Umum'),
+                image: String(d.Link_Foto ?? d.image ?? ''),
+                unit: String(d.Satuan ?? d.unit ?? 'pcs'),
+                stock: stock
+              } as Product;
+            })
+            .filter(Boolean) as Product[];
           products = mapped.filter(p => {
             const generatedSlug = p.category.toLowerCase()
               .replace(/&/g, 'dan')

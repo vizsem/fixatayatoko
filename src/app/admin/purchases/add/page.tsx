@@ -12,12 +12,19 @@ import {
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
-
+import { type NormalizedProduct, type UnitOption } from '@/lib/normalize';
 
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
-interface Product { id: string; name: string; purchasePrice: number; unit?: string; stock?: number; sku?: string; }
-interface CartItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
+interface CartItem { 
+  id: string; 
+  name: string; 
+  purchasePrice: number; 
+  quantity: number; 
+  unit: string; 
+  conversion: number;
+  availableUnits?: UnitOption[]; 
+}
 
 export default function AddPurchase() {
   const router = useRouter();
@@ -27,7 +34,7 @@ export default function AddPurchase() {
   // Data References
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<NormalizedProduct[]>([]);
   const [searchProduct, setSearchProduct] = useState('');
 
   // Form States
@@ -41,7 +48,7 @@ export default function AddPurchase() {
 
 
   useEffect(() => {
-    setProducts(liveProducts as Product[]);
+    setProducts(liveProducts);
   }, [liveProducts]);
 
   useEffect(() => {
@@ -74,19 +81,26 @@ export default function AddPurchase() {
     };
   }, [liveProducts]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: NormalizedProduct) => {
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
       setCart(cart.map(item =>
         item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
       ));
     } else {
+      // Tentukan unit default (prioritas: satuan beli/terbesar atau base unit)
+      const defaultUnit = product.units && product.units.length > 0 
+        ? product.units[0] 
+        : { code: product.unit || 'PCS', contains: 1 };
+      
       setCart([...cart, {
         id: product.id,
         name: product.name,
         purchasePrice: product.purchasePrice || 0,
         quantity: 1,
-        unit: product.unit || 'Pcs'
+        unit: defaultUnit.code,
+        conversion: defaultUnit.contains || 1,
+        availableUnits: product.units || []
       }]);
     }
     setSearchProduct('');
@@ -280,7 +294,9 @@ export default function AddPurchase() {
                 <thead className="bg-gray-50/50">
                   <tr>
                     <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Satuan</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
                     <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga Beli</th>
                     <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
                   </tr>
@@ -296,7 +312,7 @@ export default function AddPurchase() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-3 md:px-6 py-3 md:py-4">
+                      <td className="px-3 md:px-4 py-3 md:py-4 text-center">
                         <div className="flex items-center justify-center">
                           <input
                             type="number"
@@ -305,6 +321,38 @@ export default function AddPurchase() {
                             onChange={(e) => updateCartItem(item.id, 'quantity', Number(e.target.value))}
                           />
                         </div>
+                      </td>
+                      <td className="px-3 md:px-4 py-3 md:py-4 text-center">
+                        <select
+                          className="bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none uppercase"
+                          value={item.unit}
+                          onChange={(e) => {
+                            const newUnit = e.target.value;
+                            const found = item.availableUnits?.find(u => u.code === newUnit);
+                            // Update unit & conversion otomatis
+                            setCart(cart.map(c => c.id === item.id ? { 
+                              ...c, 
+                              unit: newUnit, 
+                              conversion: found?.contains || 1 
+                            } : c));
+                          }}
+                        >
+                          {item.availableUnits && item.availableUnits.length > 0 ? (
+                            item.availableUnits.map(u => (
+                              <option key={u.code} value={u.code}>{u.code}</option>
+                            ))
+                          ) : (
+                            <option value={item.unit}>{item.unit}</option>
+                          )}
+                        </select>
+                      </td>
+                      <td className="px-3 md:px-4 py-3 md:py-4 text-center">
+                        <input
+                          type="number"
+                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
+                          value={item.conversion}
+                          onChange={(e) => updateCartItem(item.id, 'conversion', Number(e.target.value))}
+                        />
                       </td>
                       <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                         <input

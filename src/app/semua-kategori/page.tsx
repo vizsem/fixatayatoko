@@ -47,11 +47,15 @@ export default function AllCategoriesPage() {
           orderBy('name', 'asc')
         );
         const querySnapshot = await getDocs(q);
-        const allKategori = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          // Ambil dari field 'Kategori' atau 'category'
-          return data.Kategori || data.category || 'Lainnya';
-        });
+        const allKategori = querySnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            // Filter client-side
+            const isActive = typeof data.isActive === 'boolean' ? data.isActive : (Number(data.Status ?? 1) !== 0);
+            if (!isActive) return null;
+            return data.Kategori || data.category || 'Lainnya';
+          })
+          .filter(Boolean) as string[];
 
         // Hilangkan duplikat
         const uniqueCategories = Array.from(new Set(allKategori));

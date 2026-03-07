@@ -11,7 +11,7 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown
+  FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown, Store
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -93,7 +93,13 @@ export default function Home() {
   const [othersLoading, setOthersLoading] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const { products: normalizedProducts, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const { products: normalizedProducts, loading: productsLoading } = useProducts({ 
+    isActive: true, 
+    orderByField: 'name',
+    warehouseId: selectedWarehouseId || undefined // Pass selected warehouse ID if available
+  });
   
   // Filter States
   const [showFilter, setShowFilter] = useState(false);
@@ -275,10 +281,11 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [promoSnap, bannerSnap, sysSnap] = await Promise.all([
+        const [promoSnap, bannerSnap, sysSnap, whSnap] = await Promise.all([
           getDocs(collection(db, 'promotions')),
           getDocs(collection(db, 'banners')),
-          getDoc(doc(db, 'settings', 'system'))
+          getDoc(doc(db, 'settings', 'system')),
+          getDocs(collection(db, 'warehouses'))
         ]);
 
         const now = new Date();
@@ -290,7 +297,16 @@ export default function Home() {
         const bannerList = bannerSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Banner[];
         setBanners(bannerList.filter(b => b.isActive));
 
-        if (sysSnap.exists()) setSystemSettings(sysSnap.data() as SystemSettings);
+        const whList = whSnap.docs.map(d => ({ id: d.id, name: String(d.data().name || '') }));
+        setWarehouses(whList);
+
+        if (sysSnap.exists()) {
+          const sysData = sysSnap.data() as SystemSettings;
+          setSystemSettings(sysData);
+          if (sysData.displayWarehouseId) {
+            setSelectedWarehouseId(sysData.displayWarehouseId);
+          }
+        }
 
         const savedWish = localStorage.getItem('atayatoko-wishlist');
         if (savedWish) setWishlist(JSON.parse(savedWish));
@@ -430,13 +446,30 @@ export default function Home() {
         {/* Top Notification Bar */}
         <div className="bg-gray-50 border-b border-gray-100 hidden md:block">
           <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               <div className="group relative cursor-pointer">
                 <div className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white px-3 py-1 rounded-full shadow-sm hover:shadow-md transition-all">
                   <Smartphone size={14} className="animate-pulse" />
                   <span className="font-bold tracking-tight">Download Atayamarket App</span>
                 </div>
               </div>
+              
+              {/* Warehouse Selector */}
+              {warehouses.length > 0 && (
+                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-200">
+                  <Store size={14} className="text-gray-400" />
+                  <select 
+                    value={selectedWarehouseId} 
+                    onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                    className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer uppercase"
+                  >
+                    <option value="">Semua Gudang</option>
+                    {warehouses.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-6 text-gray-500 font-medium">
               <Link href="/tentang" className="hover:text-green-600 transition-colors">Tentang Atayamarket</Link>
@@ -445,6 +478,25 @@ export default function Home() {
               <Link href="https://wa.me/85790565666" className="hover:text-green-600 transition-colors">Bantuan</Link>
             </div>
           </div>
+        </div>
+
+        {/* Mobile Header Warehouse Selector */}
+        <div className="md:hidden px-4 pt-3 pb-0 bg-white">
+          {warehouses.length > 0 && (
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 w-full mb-2">
+              <Store size={14} className="text-gray-400" />
+              <select 
+                value={selectedWarehouseId} 
+                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer uppercase w-full"
+              >
+                <option value="">Semua Gudang (Total Stock)</option>
+                {warehouses.map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="px-4 py-3">

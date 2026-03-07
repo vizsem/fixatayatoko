@@ -37,6 +37,7 @@ type ProductItem = {
   purchasePrice: number;
   quantity: number;
   unit: string;
+  conversion?: number;
 };
 
 type Purchase = {
@@ -137,21 +138,30 @@ export default function AdminPurchases() {
 
               const curData = snap.data() as Record<string, unknown>;
               const currentStock = Number(curData.stock || curData.Stok || 0);
-              const incomingQty = Number(item.quantity || 0);
-              const incomingCost = Number(item.purchasePrice || 0);
-              const newStock = currentStock + incomingQty;
+              
+              // Handle conversion (Satuan Beli -> Satuan Dasar)
+              const conversion = Number(item.conversion || 1);
+              const qtyInUnit = Number(item.quantity || 0);
+              const pricePerUnit = Number(item.purchasePrice || 0);
 
-              const currentCost = Number(curData.Modal || curData.purchasePrice || 0);
-              const effectiveOldCost = currentCost > 0 ? currentCost : incomingCost;
+              const incomingQtyPcs = qtyInUnit * conversion; // Total PCS
+              const incomingCostPerPcs = conversion > 0 ? (pricePerUnit / conversion) : 0;
+
+              const newStock = currentStock + incomingQtyPcs;
+
+              const currentCostPerPcs = Number(curData.Modal || curData.purchasePrice || 0);
+              const effectiveOldCost = currentCostPerPcs > 0 ? currentCostPerPcs : incomingCostPerPcs;
+              
+              // Hitung Average Cost Baru
               const nextAvgCost = newStock > 0
-                ? Math.round(((currentStock * effectiveOldCost) + (incomingQty * incomingCost)) / newStock)
-                : Math.round(incomingCost);
+                ? Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock)
+                : Math.round(incomingCostPerPcs);
 
               const curByWarehouse = (curData.stockByWarehouse && typeof curData.stockByWarehouse === 'object')
                 ? (curData.stockByWarehouse as Record<string, number>)
                 : {};
               const whKey = p.warehouseId || 'gudang-utama';
-              const whStock = Number(curByWarehouse[whKey] || 0) + incomingQty;
+              const whStock = Number(curByWarehouse[whKey] || 0) + incomingQtyPcs;
 
               tx.update(productRef, {
                 stock: newStock,
