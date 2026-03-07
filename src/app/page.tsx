@@ -49,7 +49,8 @@ type SystemSettings = {
     phone: string;
     address: string;
     footerMsg?: string;
-  }
+  };
+  displayWarehouseId?: string;
 };
 
 type NotificationItem = {
@@ -295,13 +296,26 @@ export default function Home() {
   useEffect(() => {
     const mapped = normalizedProducts.map((p) => {
       const minQtyUnit = (p.units || []).find((u) => typeof u.minQty === 'number' && u.minQty > 0);
+
+      // Gunakan stok gudang jika ada setting displayWarehouseId
+      let finalStock = Number(p.stock || 0);
+      if (systemSettings?.displayWarehouseId && p.stockByWarehouse) {
+        finalStock = Number(p.stockByWarehouse[systemSettings.displayWarehouseId] || 0);
+      } else if (systemSettings?.displayWarehouseId && !p.stockByWarehouse) {
+        // Jika produk tidak punya data stockByWarehouse tapi gudang dipilih -> anggap 0 atau tetap total?
+        // Asumsi: jika stockByWarehouse kosong, mungkin data lama, gunakan total stock atau 0.
+        // Lebih aman 0 jika kita ketat, tapi mungkin total stock lebih baik untuk fallback.
+        // Mari kita gunakan 0 agar konsisten "hanya stok gudang itu".
+        finalStock = 0; 
+      }
+
       return {
         id: p.id,
         name: p.name || 'Produk',
         price: Number(p.priceEcer || 0),
         wholesalePrice: Number(p.priceGrosir || p.priceEcer || 0),
         minWholesale: Number(minQtyUnit?.minQty || 1),
-        stock: Number(p.stock || 0),
+        stock: finalStock,
         unit: p.unit || 'pcs',
         category: p.category || 'Umum',
         image: p.imageUrl || '/logo-atayatoko.png',
@@ -317,7 +331,7 @@ export default function Home() {
       }))
       .sort(() => 0.5 - Math.random());
     setCategories(catList);
-  }, [normalizedProducts]);
+  }, [normalizedProducts, systemSettings]);
 
   const isLoading = productsLoading || othersLoading;
 

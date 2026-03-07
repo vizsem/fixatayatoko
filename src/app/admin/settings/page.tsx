@@ -33,11 +33,13 @@ type SystemSettings = {
   deliveryMethods: DeliveryMethod[];
   printer: PrinterSettings;
   createdAt: string;
+  displayWarehouseId?: string;
 };
 
 type Employee = { id?: string; name: string; role: 'admin' | 'kasir'; phone: string; email: string; isActive: boolean; };
 type Category = { id?: string; name: string; slug: string; };
 type Banner = { id?: string; title: string; subtitle: string; buttonText: string; gradient: string; imageUrl?: string; linkUrl: string; isActive: boolean; };
+type Warehouse = { id: string; name: string; };
 
 // --- DEFAULT SETTINGS ---
 const defaultSettings: SystemSettings = {
@@ -69,6 +71,7 @@ export default function AdminSettings() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   // UI States
   const [newBanner, setNewBanner] = useState<Banner>({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
@@ -83,7 +86,7 @@ export default function AdminSettings() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
 
-      await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners()]);
+      await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners(), loadWarehouses()]);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -112,6 +115,11 @@ export default function AdminSettings() {
   const loadBanners = async () => {
     const snap = await getDocs(collection(db, 'banners'));
     setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)));
+  };
+
+  const loadWarehouses = async () => {
+    const snap = await getDocs(collection(db, 'warehouses'));
+    setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
   };
 
   const handleSaveSystem = async () => {
@@ -263,6 +271,21 @@ export default function AdminSettings() {
                   <label className="text-[9px] font-black text-gray-400 px-2">Alamat operasional</label>
 
                   <textarea value={settings.store.address} onChange={e => setSettings({ ...settings, store: { ...settings.store, address: e.target.value } })} className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-bold text-sm h-24" />
+                </div>
+                
+                <div className="md:col-span-2 space-y-1 pt-4 border-t border-dashed border-gray-100">
+                  <label className="text-[9px] font-black text-gray-400 px-2">Gudang Display (Storefront)</label>
+                  <p className="text-[9px] text-gray-400 px-2 mb-2">Pilih gudang yang stoknya akan ditampilkan kepada pembeli di halaman utama.</p>
+                  <select
+                    value={settings.displayWarehouseId || ''}
+                    onChange={e => setSettings({ ...settings, displayWarehouseId: e.target.value })}
+                    className="w-full p-4 rounded-2xl bg-gray-50 border-none ring-1 ring-gray-100 font-bold text-sm"
+                  >
+                    <option value="">-- Semua Gudang (Total Stock) --</option>
+                    {warehouses.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </section>

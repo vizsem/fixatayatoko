@@ -26,6 +26,8 @@ export default function AddProductPage() {
     { code: 'BOX', contains: 0, price: 0, label: '' },
     { code: 'CTN', contains: 0, price: 0, label: '' },
   ]);
+  const [newUnitCode, setNewUnitCode] = useState('');
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -55,6 +57,17 @@ export default function AddProductPage() {
     Lokasi: '',
     warehouseId: ''
   });
+
+  const handleAddUnit = () => {
+    if (!newUnitCode) return;
+    const code = newUnitCode.toUpperCase();
+    if (units.some(u => u.code === code)) {
+      notify.admin.error('Satuan sudah ada');
+      return;
+    }
+    setUnits([...units, { code, contains: 0, price: 0, label: '' }]);
+    setNewUnitCode('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -353,33 +366,64 @@ export default function AddProductPage() {
           </div>
 
           <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-gray-800">
-              <Tag size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2 text-gray-800">
+                <Tag size={18} />
+                <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Kode Satuan (Ex: LUSIN)"
+                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500 w-40"
+                  value={newUnitCode}
+                  onChange={(e) => setNewUnitCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddUnit}
+                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all"
+                >
+                  + Tambah
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {['PCS', 'BOX', 'CTN'].map((code) => {
-                const idx = units.findIndex((u) => String(u.code || '').toUpperCase() === code);
-                const current = idx >= 0 ? units[idx] : { code, contains: code === 'PCS' ? 1 : 0, price: 0, label: '' };
+              {units.map((u, index) => {
+                const code = u.code || '';
+                const idx = index;
+                const current = u;
                 const basePrice = Number(formData.Ecer || 0);
                 const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
                 const unitPrice = Number(current.price || 0);
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={code} className="p-4 rounded-2xl border bg-gray-50">
+                  <div key={code} className="p-4 rounded-2xl border bg-gray-50 relative group">
+                    {code !== 'PCS' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...units];
+                          next.splice(idx, 1);
+                          setUnits(next);
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    )}
                     <div className="flex items-center justify-between gap-3 mb-2">
                       <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
                       <input
                         type="text"
-                        className="w-40 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                        className="w-32 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
                         placeholder="Nama satuan"
                         value={current.label || ''}
                         onChange={(e) => {
                           const next = [...units];
-                          const nextLabel = e.target.value;
-                          if (idx >= 0) next[idx] = { ...current, label: nextLabel };
-                          else next.push({ code, price: current.price, contains: current.contains, label: nextLabel });
+                          next[idx] = { ...current, label: e.target.value };
                           setUnits(next);
                         }}
                       />
@@ -389,13 +433,12 @@ export default function AddProductPage() {
                         <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
                         <input
                           type="number"
-                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
-                          value={current.price ?? ''}
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.price || ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
                             const next = [...units];
-                            if (idx >= 0) next[idx] = { ...current, price: val };
-                            else next.push({ code, price: val, contains: current.contains, label: current.label });
+                            next[idx] = { ...current, price: val };
                             setUnits(next);
                           }}
                         />
@@ -405,13 +448,12 @@ export default function AddProductPage() {
                         <input
                           type="number"
                           disabled={code === 'PCS'}
-                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
-                          value={code === 'PCS' ? 1 : (current.contains ?? '')}
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
+                          value={code === 'PCS' ? 1 : (current.contains || '')}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
                             const next = [...units];
-                            if (idx >= 0) next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
-                            else next.push({ code, price: current.price, contains: code === 'PCS' ? 1 : val, label: current.label });
+                            next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
                             setUnits(next);
                           }}
                         />
@@ -421,20 +463,19 @@ export default function AddProductPage() {
                         <input
                           type="number"
                           min="0"
-                          className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
-                          value={current.minQty ?? ''}
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.minQty || ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
                             const next = [...units];
-                            if (idx >= 0) next[idx] = { ...current, minQty: val };
-                            else next.push({ code, price: current.price, contains: current.contains, minQty: val, label: current.label });
+                            next[idx] = { ...current, minQty: val };
                             setUnits(next);
                           }}
                         />
                       </div>
-                      <div className="text-[10px] font-black text-gray-500">
+                      <div className="text-[10px] font-black text-gray-500 pt-2 border-t border-gray-200">
                         {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
-                        <span className="mx-1">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
+                        <span className="mx-1 font-bold text-gray-800">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
                         / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
                       </div>
                     </div>

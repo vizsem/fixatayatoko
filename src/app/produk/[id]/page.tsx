@@ -117,18 +117,30 @@ export default function ProductDetailPage() {
     const fetchData = async () => {
       if (!productId) return;
       try {
-        const docRef = doc(db, 'products', productId);
-        const docSnap = await getDoc(docRef);
+        const [docSnap, settingsSnap] = await Promise.all([
+          getDoc(doc(db, 'products', productId)),
+          getDoc(doc(db, 'settings', 'system'))
+        ]);
         
+        const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
+
         if (docSnap.exists()) {
           const data = docSnap.data();
+          
+          let stock = Number(data.Stok || data.stock) || 0;
+          if (displayWarehouseId && data.stockByWarehouse) {
+            stock = Number(data.stockByWarehouse[displayWarehouseId] || 0);
+          } else if (displayWarehouseId && !data.stockByWarehouse) {
+            stock = 0;
+          }
+
           const mappedProduct: Product = {
             id: docSnap.id,
             name: data.Nama || data.name || "Produk",
             price: Number(data.Ecer || data.price) || 0,
             wholesalePrice: Number(data.Grosir || data.wholesalePrice) || 0,
             minWholesale: Number(data.Min_Stok_Grosir || data.Min_Grosir || data.minWholesale) || 12,
-            stock: Number(data.Stok || data.stock) || 0,
+            stock: stock,
             unit: data.Satuan || data.unit || 'pcs',
             category: data.Kategori || data.category || 'Umum',
             image: data.Link_Foto || data.image || '/logo-atayatoko.png',

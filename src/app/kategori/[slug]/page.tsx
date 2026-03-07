@@ -8,7 +8,7 @@ import {
   ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
   ChevronLeft, ChevronRight, Sparkles, Package 
 } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -57,6 +57,11 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
     const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Fetch settings first
+        const settingsSnap = await getDoc(doc(db, 'settings', 'system'));
+        const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
+
         // Coba query terindeks berdasarkan kategori asli (nama kategori penuh)
         const qIndexed = query(
           collection(db, 'products'),
@@ -67,6 +72,16 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
         const indexedSnap = await getDocs(qIndexed);
         let products: Product[] = indexedSnap.docs.map(docSnap => {
           const d = docSnap.data() as Record<string, unknown>;
+          
+          let stock = Number(d.Stok ?? d.stock ?? 0);
+          const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
+
+          if (displayWarehouseId && stockByWarehouse) {
+            stock = Number(stockByWarehouse[displayWarehouseId] || 0);
+          } else if (displayWarehouseId && !stockByWarehouse) {
+            stock = 0;
+          }
+
           return {
             id: docSnap.id,
             name: String(d.Nama ?? d.name ?? 'Produk'),
@@ -76,7 +91,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
             category: String(d.Kategori ?? d.category ?? 'Umum'),
             image: String(d.Link_Foto ?? d.image ?? ''),
             unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-            stock: Number(d.Stok ?? d.stock ?? 0)
+            stock: stock
           };
         });
 
@@ -90,6 +105,16 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
           const activeSnap = await getDocs(qActive);
           const mapped = activeSnap.docs.map(docSnap => {
             const d = docSnap.data() as Record<string, unknown>;
+            
+            let stock = Number(d.Stok ?? d.stock ?? 0);
+            const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
+
+            if (displayWarehouseId && stockByWarehouse) {
+              stock = Number(stockByWarehouse[displayWarehouseId] || 0);
+            } else if (displayWarehouseId && !stockByWarehouse) {
+              stock = 0;
+            }
+
             return {
               id: docSnap.id,
               name: String(d.Nama ?? d.name ?? 'Produk'),
@@ -99,7 +124,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
               category: String(d.Kategori ?? d.category ?? 'Umum'),
               image: String(d.Link_Foto ?? d.image ?? ''),
               unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-              stock: Number(d.Stok ?? d.stock ?? 0)
+              stock: stock
             } as Product;
           });
           products = mapped.filter(p => {
