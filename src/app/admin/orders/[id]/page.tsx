@@ -245,11 +245,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
         tx.update(orderRef, {
           items: editableItems.map((item) => ({
-            name: item.name,
-            price: item.price,
-            quantity: item.selected && item.quantity > 0 ? item.quantity : 0,
-            productId: item.productId,
-            originalQuantity: item.originalQuantity,
+            name: item.name || 'Produk Tanpa Nama',
+            price: Number(item.price) || 0,
+            quantity: item.selected && item.quantity > 0 ? Number(item.quantity) : 0,
+            productId: item.productId || '',
+            originalQuantity: Number(item.originalQuantity) || 0,
             status: item.selected && item.quantity > 0
               ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
               : 'unfulfilled',
@@ -291,11 +291,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           ? {
               ...prev,
               items: editableItems.map((item) => ({
-                name: item.name,
-                price: item.price,
-                quantity: item.selected && item.quantity > 0 ? item.quantity : 0,
-                productId: item.productId,
-                originalQuantity: item.originalQuantity,
+                name: item.name || 'Produk Tanpa Nama',
+                price: Number(item.price) || 0,
+                quantity: item.selected && item.quantity > 0 ? Number(item.quantity) : 0,
+                productId: item.productId || '',
+                originalQuantity: Number(item.originalQuantity) || 0,
                 status: item.selected && item.quantity > 0
                   ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
                   : 'unfulfilled',
@@ -307,8 +307,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           : prev
       );
       notify.admin.success('Pesanan dikonfirmasi dan dompet pelanggan diperbarui');
-    } catch {
-      notify.admin.error('Gagal mengkonfirmasi item pesanan');
+    } catch (error: unknown) {
+      console.error('Error confirming items:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan internal';
+      notify.admin.error(`Gagal: ${errorMessage}`);
     } finally {
       setIsConfirmingItems(false);
     }
