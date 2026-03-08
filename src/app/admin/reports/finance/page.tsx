@@ -179,10 +179,40 @@ export default function FinanceReport() {
             id: `PUR-${doc.id}`,
             date: created.toISOString(),
             description: `Pembelian dari ${data.supplierName}`,
-            category: 'Pembelian',
+            category: 'Pembelian Stok',
             type: 'expense',
             amount: Number(data.total || 0),
             paymentMethod: data.paymentMethod || 'TRANSFER'
+          });
+        });
+
+        // Ambil pengeluaran operasional (Operational Expenses)
+        const expensesSnapshot = await getDocs(collection(db, 'operational_expenses'));
+        
+        expensesSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          // Handle date field which can be Timestamp or Date object or string
+          let created: Date;
+          if (data.date instanceof Timestamp) {
+            created = data.date.toDate();
+          } else if (data.date instanceof Date) {
+            created = data.date;
+          } else if (data.date && (data.date as any).seconds) {
+             created = new Date((data.date as any).seconds * 1000);
+          } else {
+            created = new Date(data.date || new Date().toISOString());
+          }
+
+          if (!(created >= startDate && created <= endDate)) return;
+          
+          financeRecords.push({
+            id: `OPR-${doc.id}`,
+            date: created.toISOString(),
+            description: `${data.description} (${data.category})`,
+            category: 'Operasional',
+            type: 'expense',
+            amount: Number(data.amount || 0),
+            paymentMethod: 'CASH' // Default, or add field if needed
           });
         });
 

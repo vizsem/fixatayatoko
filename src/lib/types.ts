@@ -218,3 +218,14 @@ export interface StockValidation {
     lastSync: FirestoreTimestamp | Date;
     status: 'VALID' | 'INVALID' | 'PENDING';
 }
+
+export interface OperationalExpense {
+    id: string;
+    category: string; // Listrik, Air, Gaji, Packing, Bensin, Lainnya
+    amount: number;
+    date: FirestoreTimestamp | Date | null;
+    description: string;
+    proofOfPayment?: string; // URL gambar bukti pembayaran
+    recordedBy?: string; // User ID yang mencatat
+    createdAt?: FirestoreTimestamp | Date | null;
+}

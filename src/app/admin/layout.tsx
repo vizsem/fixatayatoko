@@ -9,7 +9,8 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users,
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
-  ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon
+  ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
+  Banknote
 } from 'lucide-react';
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
@@ -90,6 +91,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       group: "Pembelian & Suplai", items: [
         { name: 'Pembelian (Purchases)', href: '/admin/purchases', icon: Receipt },
         { name: 'Supplier', href: '/admin/suppliers', icon: Truck },
+      ]
+    },
+    {
+      group: "Keuangan & Operasional", items: [
+        { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
       ]
     },
     {

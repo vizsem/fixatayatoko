@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { Store, Phone, Mail, MapPin, MessageCircle, Send } from 'lucide-react';
 import Link from 'next/link';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import notify from '@/lib/notify';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -29,20 +32,30 @@ export default function ContactPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulasi pengiriman (Anda bisa ganti dengan API nanti)
-    setTimeout(() => {
-      console.log('Form dikirim:', formData);
+    try {
+      await addDoc(collection(db, 'messages'), {
+        ...formData,
+        createdAt: Timestamp.now(),
+        status: 'unread',
+        type: 'contact_form'
+      });
+
       setSubmitSuccess(true);
       setFormData({ name: '', email: '', whatsapp: '', message: '' });
-      setIsSubmitting(false);
+      notify.success('Pesan Anda berhasil terkirim!');
       
       // Reset pesan sukses setelah 5 detik
       setTimeout(() => setSubmitSuccess(false), 5000);
-    }, 1000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      notify.error('Gagal mengirim pesan. Silakan coba lagi atau hubungi via WhatsApp.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
