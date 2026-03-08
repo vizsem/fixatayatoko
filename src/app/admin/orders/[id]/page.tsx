@@ -42,7 +42,15 @@ type OrderStatus =
   | 'BELUM_LUNAS'
   | 'PENDING';
 
-type OrderItem = { productId?: string; name: string; quantity: number; price: number };
+type OrderItem = {
+  productId?: string;
+  name: string;
+  quantity: number;
+  price: number;
+  originalQuantity?: number;
+  status?: 'fulfilled' | 'unfulfilled' | 'partial';
+  note?: string;
+};
 
 type Order = {
   id: string;
@@ -66,6 +74,7 @@ type Order = {
 
 type EditableOrderItem = OrderItem & {
   originalQuantity: number;
+  fulfillmentStatus: 'fulfilled' | 'unfulfilled' | 'partial';
   selected: boolean;
 };
 
@@ -113,8 +122,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           setEditableItems(
             data.items.map((item) => ({
               ...item,
-              originalQuantity: item.quantity,
-              selected: true
+              originalQuantity: item.originalQuantity || item.quantity,
+              quantity: item.status === 'unfulfilled' ? 0 : item.quantity,
+              selected: item.status !== 'unfulfilled',
+              fulfillmentStatus: (item.status || 'fulfilled') as 'fulfilled' | 'unfulfilled' | 'partial'
             }))
           );
         }
@@ -233,11 +244,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           calculatedRefund > 0 ? Math.max(0, currentTotal - calculatedRefund) : currentTotal;
 
         tx.update(orderRef, {
-          items: confirmedItems.map((item) => ({
+          items: editableItems.map((item) => ({
             name: item.name,
             price: item.price,
-            quantity: item.quantity,
-            productId: item.productId
+            quantity: item.selected && item.quantity > 0 ? item.quantity : 0,
+            productId: item.productId,
+            originalQuantity: item.originalQuantity,
+            status: item.selected && item.quantity > 0
+              ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
+              : 'unfulfilled',
           })),
           subtotal: calculatedNewSubtotal,
           total: calculatedNewTotal,
@@ -275,11 +290,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         prev
           ? {
               ...prev,
-              items: confirmedItems.map((item) => ({
+              items: editableItems.map((item) => ({
                 name: item.name,
                 price: item.price,
-                quantity: item.quantity,
-                productId: item.productId
+                quantity: item.selected && item.quantity > 0 ? item.quantity : 0,
+                productId: item.productId,
+                originalQuantity: item.originalQuantity,
+                status: item.selected && item.quantity > 0
+                  ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
+                  : 'unfulfilled',
               })),
               subtotal: newSubtotal,
               total: newTotal,
@@ -479,7 +498,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         checked={item.selected}
                         onChange={(e) =>
                           setEditableItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, selected: e.target.checked } : it))
+                            prev.map((it, i) => {
+                              if (i !== idx) return it;
+                              const isSelected = e.target.checked;
+                              const newQty = isSelected ? it.originalQuantity : 0;
+                              return {
+                                ...it,
+                                selected: isSelected,
+                                quantity: newQty,
+                                fulfillmentStatus: isSelected ? 'fulfilled' : 'unfulfilled'
+                              };
+                            })
                           )
                         }
                         className="w-5 h-5 rounded-lg border-slate-300 text-emerald-600 focus:ring-emerald-500 shadow-sm mt-1"
@@ -489,17 +518,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-slate-50 p-3 rounded-2xl">
-                      <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Qty</p>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-[10px] font-black uppercase text-slate-400">Qty Proc</p>
+                        <span className="text-[9px] text-slate-400">/ {item.originalQuantity}</span>
+                      </div>
                       {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
                         <input
                           type="number"
                           value={item.quantity}
                           onChange={(e) => {
                             const newQuantity = parseInt(e.target.value, 10);
+                            const safeQuantity = isNaN(newQuantity) ? 0 : Math.max(0, Math.min(item.originalQuantity, newQuantity));
                             setEditableItems((prev) =>
                               prev.map((it, i) =>
                                 i === idx
-                                  ? { ...it, quantity: isNaN(newQuantity) ? 0 : Math.max(0, newQuantity) }
+                                  ? {
+                                      ...it,
+                                      quantity: safeQuantity,
+                                      fulfillmentStatus: safeQuantity === it.originalQuantity ? 'fulfilled' : (safeQuantity === 0 ? 'unfulfilled' : 'partial'),
+                                      selected: safeQuantity > 0
+                                    }
                                   : it
                               )
                             );
@@ -508,14 +546,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           max={item.originalQuantity}
                         />
                       ) : (
-                        <p className="text-sm font-black text-slate-900">x{item.quantity}</p>
+                        <p className="text-sm font-black text-slate-900 text-center">x{item.quantity}</p>
                       )}
                     </div>
-                    <div className="bg-slate-50 p-3 rounded-2xl">
-                      <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Subtotal</p>
-                      <p className="text-sm font-black text-slate-900">
-                        Rp {(item.quantity * item.price).toLocaleString()}
-                      </p>
+                    <div className="bg-slate-50 p-3 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Subtotal</p>
+                        <p className="text-sm font-black text-slate-900">
+                          Rp {(item.quantity * item.price).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="mt-2 text-right">
+                        <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider ${
+                            item.quantity === item.originalQuantity ? 'bg-emerald-100 text-emerald-700' :
+                            item.quantity > 0 ? 'bg-amber-100 text-amber-700' :
+                            'bg-rose-100 text-rose-700'
+                        }`}>
+                            {item.quantity === item.originalQuantity ? 'OK' : 
+                             item.quantity > 0 ? 'Parsial' : 'Kosong'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -580,10 +630,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <thead>
                 <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
                   <th className="px-3 md:px-0 py-3 md:py-4 text-left">Item</th>
-                  <th className="px-3 md:px-0 py-3 md:py-4 text-center w-24">Qty</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-center w-20">Req</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-center w-24">Proc</th>
+                  <th className="px-3 md:px-0 py-3 md:py-4 text-center w-24">Status</th>
                   <th className="px-3 md:px-0 py-3 md:py-4 text-right">Subtotal</th>
                   {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
-                    <th className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-right w-24">Stok Ada</th>
+                    <th className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-center w-10">Act</th>
                   )}
                 </tr>
               </thead>
@@ -599,6 +651,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         Rp{item.price.toLocaleString()}
                       </p>
                     </td>
+                    <td className="px-3 md:px-0 py-3 md:py-4 text-center font-bold text-slate-400">
+                      {item.originalQuantity}
+                    </td>
                     <td className="px-3 md:px-0 py-3 md:py-4 text-center">
                       {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
                         <input
@@ -606,42 +661,62 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           value={item.quantity}
                           onChange={(e) => {
                             const newQuantity = parseInt(e.target.value, 10);
+                            const safeQuantity = isNaN(newQuantity) ? 0 : Math.max(0, Math.min(item.originalQuantity, newQuantity));
+                            
                             setEditableItems((prev) =>
                               prev.map((it, i) =>
                                 i === idx
                                   ? {
                                       ...it,
-                                      quantity: isNaN(newQuantity)
-                                        ? 0
-                                        : Math.max(0, newQuantity)
+                                      quantity: safeQuantity,
+                                      fulfillmentStatus: safeQuantity === it.originalQuantity ? 'fulfilled' : (safeQuantity === 0 ? 'unfulfilled' : 'partial'),
+                                      selected: safeQuantity > 0 // Auto select/deselect based on qty
                                     }
                                   : it
                               )
                             );
                           }}
-                          className="w-16 text-center font-bold bg-slate-100 rounded-lg p-2 text-sm"
+                          className="w-16 text-center font-bold bg-slate-100 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                           max={item.originalQuantity}
                         />
                       ) : (
-                        <span className="font-bold text-slate-400">x{item.quantity}</span>
+                        <span className="font-bold text-slate-900">{item.quantity}</span>
                       )}
+                    </td>
+                    <td className="px-3 md:px-0 py-3 md:py-4 text-center">
+                      <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
+                          item.quantity === item.originalQuantity ? 'bg-emerald-100 text-emerald-700' :
+                          item.quantity > 0 ? 'bg-amber-100 text-amber-700' :
+                          'bg-rose-100 text-rose-700'
+                      }`}>
+                          {item.quantity === item.originalQuantity ? 'Penuh' : 
+                           item.quantity > 0 ? 'Parsial' : 'Kosong'}
+                      </span>
                     </td>
                     <td className="px-3 md:px-0 py-3 md:py-4 text-right font-black">
                       Rp {(item.quantity * item.price).toLocaleString()}
                     </td>
                     {(order.status === 'MENUNGGU' || order.status === 'PENDING') && (
-                      <td className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-right">
+                      <td className="hidden md:table-cell px-3 md:px-0 py-3 md:py-4 text-center">
                         <input
                           type="checkbox"
                           checked={item.selected}
                           onChange={(e) =>
                             setEditableItems((prev) =>
-                              prev.map((it, i) =>
-                                i === idx ? { ...it, selected: e.target.checked } : it
-                              )
+                              prev.map((it, i) => {
+                                if (i !== idx) return it;
+                                const isSelected = e.target.checked;
+                                const newQty = isSelected ? it.originalQuantity : 0;
+                                return { 
+                                    ...it, 
+                                    selected: isSelected,
+                                    quantity: newQty,
+                                    fulfillmentStatus: isSelected ? 'fulfilled' : 'unfulfilled'
+                                };
+                              })
                             )
                           }
-                          className="w-5 h-5 rounded-lg border-slate-300 text-emerald-600 focus:ring-emerald-500 shadow-sm"
+                          className="w-5 h-5 rounded-lg border-slate-300 text-emerald-600 focus:ring-emerald-500 shadow-sm cursor-pointer"
                         />
                       </td>
                     )}

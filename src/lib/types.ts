@@ -75,6 +75,10 @@ export interface OrderItem {
     quantity: number;
     unit: string;
     image?: string;
+    // Fields untuk status pemenuhan
+    originalQuantity?: number;
+    status?: 'fulfilled' | 'unfulfilled' | 'partial';
+    note?: string;
 }
 
 export interface Order {
