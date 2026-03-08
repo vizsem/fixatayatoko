@@ -163,42 +163,65 @@ export async function POST(req: Request) {
 
     // --- FIX: TRANSACTION LOGIC ---
     await adminDb.runTransaction(async (t) => {
-      // Step 1: LAKUKAN SEMUA READS TERLEBIH DAHULU
-      const productRefsWithData = [];
-      for (const item of validatedItems) {
-        const pRef = adminDb.collection('products').doc(item.id);
-        const pSnap = await t.get(pRef); // READ
+      // Step 1: READS (Produk, User, Voucher)
+      
+      // A. Baca Data Produk
+      const productReads = validatedItems.map(async (item) => {
+        const ref = adminDb.collection('products').doc(item.id);
+        const snap = await t.get(ref);
+        return { item, ref, snap };
+      });
+      
+      const productResults = await Promise.all(productReads);
+      
+      // B. Baca Data User (untuk Point & Wallet)
+      let userRef: FirebaseFirestore.DocumentReference | null = null;
+      let userSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+      if (userId) {
+        userRef = adminDb.collection('users').doc(userId);
+        userSnap = await t.get(userRef);
+      }
 
-        if (!pSnap.exists) throw new Error(`Produk ${item.id} tidak ditemukan saat transaksi`);
-        const pData = pSnap.data() as ProductData;
+      // C. Baca Data Voucher (untuk Validasi Status)
+      let voucherRef: FirebaseFirestore.DocumentReference | null = null;
+      let voucherSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+      if (appliedVoucherId) {
+        voucherRef = adminDb.collection('user_vouchers').doc(appliedVoucherId);
+        voucherSnap = await t.get(voucherRef);
+      }
+
+      // Step 2: VALIDATION & CALCULATION
+
+      // A. Validasi & Kalkulasi Stok Produk
+      const productUpdates = [];
+      const MAIN_WAREHOUSE_ID = 'gudang-utama'; // Configurable ID
+
+      for (const { item, ref, snap } of productResults) {
+        if (!snap.exists) throw new Error(`Produk ${item.id} tidak ditemukan saat transaksi`);
+        const pData = snap.data() as ProductData;
         
-        // Logika Pengurangan Stok Per Gudang
         const currentStock = pData.stock || 0;
         if (currentStock < item.quantity) {
           throw new Error(`Stok ${pData.name || pData.Nama} tidak mencukupi`);
         }
 
-        // 1. Ambil data stockByWarehouse (fallback ke kosong jika undefined)
+        // Logika Pengurangan Stok Per Gudang
         const stockByWarehouse = pData.stockByWarehouse || {};
-        
-        // 2. Clone object agar aman dimutasi
         const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
         
-        // 3. Tentukan prioritas pengurangan (Gudang Utama -> Lainnya)
         let remainingToDeduct = item.quantity;
-        const mainWarehouseId = 'gudang-utama'; // ID gudang default
         
-        // Coba kurangi dari gudang utama dulu
-        if (newStockByWarehouse[mainWarehouseId] && newStockByWarehouse[mainWarehouseId] > 0) {
-          const deduct = Math.min(newStockByWarehouse[mainWarehouseId], remainingToDeduct);
-          newStockByWarehouse[mainWarehouseId] -= deduct;
+        // 1. Prioritas Gudang Utama
+        if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
+          const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
+          newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
           remainingToDeduct -= deduct;
         }
         
-        // Jika masih kurang, cari gudang lain yang punya stok
+        // 2. Gudang Lainnya
         if (remainingToDeduct > 0) {
           for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
-            if (whId === mainWarehouseId) continue; // Sudah diproses
+            if (whId === MAIN_WAREHOUSE_ID) continue;
             if (remainingToDeduct <= 0) break;
             
             const deduct = Math.min(qty, remainingToDeduct);
@@ -207,48 +230,101 @@ export async function POST(req: Request) {
           }
         }
         
-        // Jika setelah semua gudang dicek masih ada sisa (artinya data stock total vs per gudang tidak sinkron)
-        // Kita paksa kurangi total stock, tapi biarkan stockByWarehouse apa adanya untuk sisa tersebut (best effort)
-        // Idealnya ini tidak terjadi jika data konsisten.
-        
-        // Hitung total stok baru dari stockByWarehouse yang sudah diupdate
-        const newTotalStock = Object.values(newStockByWarehouse).reduce((a, b) => a + b, 0);
-        
-        // Jika newTotalStock berbeda dengan (currentStock - item.quantity), berarti ada inkonsistensi awal.
-        // Kita gunakan (currentStock - item.quantity) sebagai kebenaran utama untuk total stock,
-        // tapi simpan juga distribusi gudang yang baru.
         const finalTotalStock = currentStock - item.quantity;
-
-        productRefsWithData.push({ 
-          ref: pRef, 
-          newStock: finalTotalStock,
-          newStockByWarehouse
-        });
+        productUpdates.push({ ref, newStock: finalTotalStock, newStockByWarehouse });
       }
 
-      // Step 2: LAKUKAN SEMUA WRITES SETELAH READS SELESAI
-      t.set(orderRef, orderData); // WRITE
-      for (const p of productRefsWithData) {
+      // B. Validasi Voucher
+      if (voucherRef && voucherSnap) {
+        if (!voucherSnap.exists || voucherSnap.data()?.status !== 'ACTIVE') {
+          throw new Error('Voucher tidak valid atau sudah digunakan');
+        }
+      }
+
+      // C. Kalkulasi Final Points & Wallet
+      let finalPointsUsed = 0;
+      let finalWalletUsed = 0;
+
+      if (userId && userSnap && userSnap.exists) {
+        const userData = userSnap.data() as UserData;
+        const currentPoints = userData.points || 0;
+        const currentWallet = userData.walletBalance || 0;
+
+        if (usePoints) {
+          finalPointsUsed = Math.min(currentPoints, calculatedSubtotal * 0.5);
+        }
+        if (useWallet) {
+          const remainingBill = Math.max(0, calculatedSubtotal - finalPointsUsed - voucherDiscount);
+          finalWalletUsed = Math.min(currentWallet, remainingBill);
+        }
+      }
+
+      const finalTotal = Math.max(0, calculatedSubtotal - finalPointsUsed - voucherDiscount - finalWalletUsed);
+
+      // Update Order Data dengan nilai final
+      const finalOrderData = {
+        ...orderData,
+        pointsUsed: finalPointsUsed,
+        walletUsed: finalWalletUsed,
+        discountTotal: finalPointsUsed + voucherDiscount,
+        total: finalTotal,
+      };
+
+      // Step 3: WRITES
+
+      // 1. Simpan Order
+      t.set(orderRef, finalOrderData);
+
+      // 2. Update Produk
+      for (const p of productUpdates) {
         t.update(p.ref, { 
           stock: p.newStock,
           stockByWarehouse: p.newStockByWarehouse
-        }); // WRITE
+        });
+      }
+
+      // 3. Update User & Logs
+      if (userId && userRef) {
+        if (finalPointsUsed > 0 || finalWalletUsed > 0) {
+          t.update(userRef, {
+            points: FieldValue.increment(-finalPointsUsed),
+            walletBalance: FieldValue.increment(-finalWalletUsed)
+          });
+        }
+        
+        if (finalPointsUsed > 0) {
+          const logRef = adminDb.collection('point_logs').doc();
+          t.set(logRef, { 
+            userId, 
+            pointsChanged: -finalPointsUsed, 
+            type: 'REDEEM', 
+            description: `Order #${orderId}`, 
+            createdAt: FieldValue.serverTimestamp() 
+          });
+        }
+        
+        if (finalWalletUsed > 0) {
+          const logRef = adminDb.collection('wallet_logs').doc();
+          t.set(logRef, { 
+            userId, 
+            orderId, 
+            amountChanged: -finalWalletUsed, 
+            type: 'PAYMENT', 
+            description: `Order #${orderId}`, 
+            createdAt: FieldValue.serverTimestamp() 
+          });
+        }
+
+        // 4. Clear Cart
+        const cartRef = adminDb.collection('carts').doc(userId);
+        t.set(cartRef, { items: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
+
+      // 5. Update Voucher
+      if (voucherRef) {
+        t.update(voucherRef, { status: 'USED' });
       }
     });
-
-    // 6. Side Effects
-    if (userId) {
-      if (pointsUsed > 0) {
-        await adminDb.collection('users').doc(userId).update({ points: FieldValue.increment(-pointsUsed) });
-        await adminDb.collection('point_logs').add({ userId, pointsChanged: -pointsUsed, type: 'REDEEM', description: `Order #${orderId}`, createdAt: FieldValue.serverTimestamp() });
-      }
-      if (walletUsed > 0) {
-        await adminDb.collection('users').doc(userId).update({ walletBalance: FieldValue.increment(-walletUsed) });
-        await adminDb.collection('wallet_logs').add({ userId, orderId, amountChanged: -walletUsed, type: 'PAYMENT', description: `Order #${orderId}`, createdAt: FieldValue.serverTimestamp() });
-      }
-      if (appliedVoucherId) await adminDb.collection('user_vouchers').doc(String(appliedVoucherId)).update({ status: 'USED' });
-      await adminDb.collection('carts').doc(userId).update({ items: [], updatedAt: FieldValue.serverTimestamp() });
-    }
 
     return NextResponse.json({ success: true, orderId, firebaseId: orderRef.id });
 

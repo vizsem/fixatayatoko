@@ -276,6 +276,39 @@ export default function AddPurchase() {
                       />
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Satuan</p>
+                      <select
+                        className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black uppercase"
+                        value={item.unit}
+                        onChange={(e) => {
+                          const newUnit = e.target.value;
+                          const found = item.availableUnits?.find(u => u.code === newUnit);
+                          setCart(cart.map(c => c.id === item.id ? { 
+                            ...c, 
+                            unit: newUnit, 
+                            conversion: found?.contains || 1 
+                          } : c));
+                        }}
+                      >
+                        {item.availableUnits && item.availableUnits.length > 0 ? (
+                          item.availableUnits.map(u => (
+                            <option key={u.code} value={u.code}>{u.code}</option>
+                          ))
+                        ) : (
+                          <option value={item.unit}>{item.unit}</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Isi (Pcs)</p>
+                      <input
+                        type="number"
+                        className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
+                        value={item.conversion}
+                        onChange={(e) => updateCartItem(item.id, 'conversion', Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
                       <input
                         type="number"

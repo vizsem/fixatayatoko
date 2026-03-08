@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { stockSyncService, type StockSyncLog, type StockValidation, type SyncConfig } from '@/lib/stockSyncService';
+import { stockSyncService } from '@/lib/stockSyncService';
+import { type StockSyncLog, type StockValidation, type SyncConfig } from '@/lib/types';
 import { onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
