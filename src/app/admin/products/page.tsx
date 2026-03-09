@@ -504,9 +504,22 @@ export default function AdminProducts() {
                       {Number(p.stock) <= Number(p.minStock) && (
                         <p className="text-[11px] font-medium text-red-500">Min: {p.minStock}</p>
                       )}
-                      <p className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-                        <Warehouse size={12} /> {whName}
-                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
+                          Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
+                            const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
+                            return (
+                              <span key={whId} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                                {wName}: {qty}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                            {whName}: {p.stock}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] font-medium text-blue-600">
@@ -627,9 +640,22 @@ export default function AdminProducts() {
                             Min: {p.minStock}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
-                          <Warehouse size={12} /> {whName}
-                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
+                            Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
+                              const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
+                              return (
+                                <span key={whId} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                                  {wName}: {qty}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                              {whName}: {p.stock}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="hidden md:table-cell p-4 md:p-6">

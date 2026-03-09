@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -32,7 +32,10 @@ import {
   Filter,
   Download,
   BarChart3,
-  Settings
+  Settings,
+  XCircle,
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -76,6 +79,14 @@ export default function StockSyncMonitorPage() {
   }>({ total: 0, success: 0, failed: 0, averageExecutionTime: 0 });
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
   const [isAuth, setIsAuth] = useState(false);
+  
+  // Batch Sync States
+  const [isBatchSyncing, setIsBatchSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
+  const cancelSyncRef = useRef(false);
+  
+  // Help Modal State
+  const [showHelp, setShowHelp] = useState(false);
 
   const stats = useMemo<SyncStats>(() => {
     return {
@@ -199,14 +210,14 @@ export default function StockSyncMonitorPage() {
 
   // Auto refresh
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || isBatchSyncing) return; // Jangan refresh jika sedang sync
 
     const interval = setInterval(() => {
       window.location.reload();
     }, 30000); // Refresh setiap 30 detik
 
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, isBatchSyncing]);
 
   // Sinkronisasi manual
   const handleManualSync = async (productId: string, warehouseId: string) => {
@@ -224,6 +235,12 @@ export default function StockSyncMonitorPage() {
     }
   };
 
+  // Cancel Batch Sync
+  const handleCancelBatch = () => {
+    cancelSyncRef.current = true;
+    notify.admin.info('Membatalkan sinkronisasi...');
+  };
+
   // Batch sync
   const handleBatchSync = async () => {
     const outOfSyncItems = syncStatuses.filter(s => s.status === 'OUT_OF_SYNC');
@@ -232,18 +249,44 @@ export default function StockSyncMonitorPage() {
       return;
     }
 
+    setIsBatchSyncing(true);
+    cancelSyncRef.current = false;
+    setSyncProgress({ current: 0, total: outOfSyncItems.length });
+
     try {
       let successCount = 0;
-      for (const item of outOfSyncItems) {
+      let cancelled = false;
+
+      for (let i = 0; i < outOfSyncItems.length; i++) {
+        // Cek apakah dibatalkan
+        if (cancelSyncRef.current) {
+          cancelled = true;
+          break;
+        }
+
+        const item = outOfSyncItems[i];
+        setSyncProgress({ current: i + 1, total: outOfSyncItems.length });
+        
         const result = await stockSyncService.syncWarehouseToProduct(item.productId, item.warehouseId);
         if (result) successCount++;
+        
+        // Sedikit delay untuk UI update dan membiarkan event loop bernafas
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      notify.admin.success(`${successCount} dari ${outOfSyncItems.length} item berhasil disinkronkan`);
+      if (cancelled) {
+        notify.admin.info(`Sinkronisasi dibatalkan. ${successCount} item berhasil disinkronkan.`);
+      } else {
+        notify.admin.success(`${successCount} dari ${outOfSyncItems.length} item berhasil disinkronkan`);
+      }
+      
       window.location.reload();
     } catch (error) {
       console.error('Batch sync error:', error);
       notify.admin.error('Gagal melakukan batch sync');
+    } finally {
+      setIsBatchSyncing(false);
+      setSyncProgress({ current: 0, total: 0 });
     }
   };
 
@@ -292,6 +335,61 @@ export default function StockSyncMonitorPage() {
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-right" />
       
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <HelpCircle className="text-blue-600" />
+                Panduan Penggunaan
+              </h2>
+              <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-sm text-gray-700">
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <h3 className="font-bold text-blue-800 mb-2">Fitur Utama</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>Sync All:</strong> Memperbaiki semua item yang stoknya tidak sesuai secara otomatis.</li>
+                  <li><strong>Cancel Sync:</strong> Menghentikan proses sinkronisasi massal yang sedang berjalan.</li>
+                  <li><strong>Auto Refresh:</strong> Data diperbarui otomatis setiap 30 detik (mati saat sync berjalan).</li>
+                </ul>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <h3 className="font-bold text-gray-800 mb-2">Arti Status</h3>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">SYNCED</span>
+                    <span>Stok aman (selisih 0).</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">OUT_OF_SYNC</span>
+                    <span>Selisih besar ({'>'}5), perlu disinkronkan.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-bold">PENDING</span>
+                    <span>Selisih kecil (1-5), biasanya karena transaksi baru.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowHelp(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
@@ -309,7 +407,16 @@ export default function StockSyncMonitorPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowHelp(true)}
+              className="px-3 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              title="Panduan Penggunaan"
+            >
+              <HelpCircle size={18} />
+              <span className="hidden md:inline">Panduan</span>
+            </button>
+
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
@@ -317,23 +424,33 @@ export default function StockSyncMonitorPage() {
               }`}
             >
               <RefreshCw size={16} className={autoRefresh ? 'animate-spin' : ''} />
-              Auto Refresh
+              <span className="hidden md:inline">Auto Refresh</span>
             </button>
             
-            <button
-              onClick={handleBatchSync}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-            >
-              <RefreshCw size={16} />
-              Sync All
-            </button>
+            {isBatchSyncing ? (
+              <button
+                onClick={handleCancelBatch}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 animate-pulse"
+              >
+                <XCircle size={16} />
+                Cancel Sync ({syncProgress.current}/{syncProgress.total})
+              </button>
+            ) : (
+              <button
+                onClick={handleBatchSync}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <RefreshCw size={16} />
+                Sync All
+              </button>
+            )}
             
             <Link
               href="/admin/inventory/sync-logs"
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
             >
               <Activity size={16} />
-              View Logs
+              <span className="hidden md:inline">Logs</span>
             </Link>
             
             <Link
@@ -341,27 +458,13 @@ export default function StockSyncMonitorPage() {
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
             >
               <Settings size={16} />
-              Settings
             </Link>
-            
-            <button
-              onClick={() => {
-                const activeListeners = stockSyncService.getActiveListeners();
-                notify.admin.info(`Auto-sync aktif: ${activeListeners.length} listener`);
-                console.log('Active listeners:', activeListeners);
-              }}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
-            >
-              <BarChart3 size={16} />
-              Status
-            </button>
             
             <button
               onClick={handleExport}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
             >
               <Download size={16} />
-              Export
             </button>
           </div>
         </div>
@@ -529,14 +632,14 @@ export default function StockSyncMonitorPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       onClick={() => handleManualSync(status.productId, status.warehouseId)}
-                      disabled={status.status === 'SYNCED'}
+                      disabled={status.status === 'SYNCED' || isBatchSyncing}
                       className={`text-sm px-3 py-1 rounded-lg font-medium ${
-                        status.status === 'SYNCED'
+                        status.status === 'SYNCED' || isBatchSyncing
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                       }`}
                     >
-                      <RefreshCw size={14} className="inline mr-1" />
+                      <RefreshCw size={14} className={`inline mr-1 ${isBatchSyncing ? 'animate-spin' : ''}`} />
                       Sync
                     </button>
                   </td>
