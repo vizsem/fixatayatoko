@@ -1,4 +1,3 @@
-// src/app/(admin)/reports/operations/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,10 +7,10 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   query,
   where,
-  orderBy
+  orderBy,
+  onSnapshot
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
@@ -27,7 +26,6 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 
-
 type OperationalMetric = {
   id: string;
   name: string;
@@ -42,6 +40,14 @@ export default function OperationsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
+
+  // State for each data source
+  const [employeesData, setEmployeesData] = useState<any[]>([]);
+  const [usersData, setUsersData] = useState<any[]>([]);
+  const [warehousesData, setWarehousesData] = useState<any[]>([]);
+  const [productsData, setProductsData] = useState<any[]>([]);
+  const [ordersData, setOrdersData] = useState<any[]>([]);
+  const [inventoryData, setInventoryData] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,268 +67,293 @@ export default function OperationsReport() {
     return () => unsubscribe();
   }, [router]);
 
+  // Real-time listeners
   useEffect(() => {
-    const fetchOperationsData = async () => {
-      try {
-        // Ambil data karyawan
-        const employeesSnapshot = await getDocs(collection(db, 'employees'));
-        type EmployeeDoc = {
-          status?: string;
-          manualSalary?: number;
-          totalAttendance?: number;
-        };
-        const employees = employeesSnapshot.docs.map(doc => doc.data() as EmployeeDoc);
-        const totalEmployees = employees.length;
-        const activeEmployees = employees.filter((e) => String(e.status || '').toUpperCase() === 'AKTIF').length;
-        const totalPayroll = employees
-          .filter((e) => String(e.status || '').toUpperCase() === 'AKTIF')
-          .reduce((sum: number, e) => sum + Number(e.manualSalary || 0), 0);
-        const avgSalary = activeEmployees > 0 ? Math.round(totalPayroll / activeEmployees) : 0;
-        const totalAttendanceDays = employees.reduce((sum: number, e) => sum + Number(e.totalAttendance || 0), 0);
+    if (loading) return;
 
-        // Ambil data pengguna
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const totalUsers = usersSnapshot.size;
-        const activeUsers = usersSnapshot.docs.filter(doc =>
-          doc.data().lastActive &&
-          (Date.now() - new Date(doc.data().lastActive).getTime()) < 7 * 24 * 60 * 60 * 1000
-        ).length;
+    // 1. Employees
+    const unsubEmployees = onSnapshot(collection(db, 'employees'), (snapshot) => {
+      setEmployeesData(snapshot.docs.map(doc => doc.data()));
+    });
 
-        // Ambil data gudang
-        const warehousesSnapshot = await getDocs(collection(db, 'warehouses'));
-        const warehouses = warehousesSnapshot.docs.map(doc => doc.data());
-        const totalWarehouses = warehouses.length;
-        const fullWarehouses = warehouses.filter(wh =>
-          (wh.usedCapacity / wh.capacity) >= 0.9
-        ).length;
+    // 2. Users
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setUsersData(snapshot.docs.map(doc => doc.data()));
+    });
 
-        // Ambil data produk
-        const productsQ = query(
-          collection(db, 'products'),
-          where('isActive', '==', true),
-          orderBy('name', 'asc')
-        );
-        const productsSnapshot = await getDocs(productsQ);
-        const products = productsSnapshot.docs.map(doc => doc.data());
-        const totalProducts = products.length;
-        const outOfStockProducts = products.filter(p => p.stock === 0).length;
-        const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 10).length;
+    // 3. Warehouses
+    const unsubWarehouses = onSnapshot(collection(db, 'warehouses'), (snapshot) => {
+      setWarehousesData(snapshot.docs.map(doc => doc.data()));
+    });
 
-        // Ambil data pesanan
-        const ordersSnapshot = await getDocs(collection(db, 'orders'));
-        const orders = ordersSnapshot.docs.map(doc => doc.data());
-        const totalOrders = orders.length;
-        const pendingOrders = orders.filter(o => o.status === 'MENUNGGU').length;
-        const avgProcessingTime = totalOrders > 0
-          ? (orders.reduce((sum, o) => {
-            if (o.updatedAt && o.createdAt) {
-              return sum + (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime());
-            }
-            return sum;
-          }, 0) / totalOrders / (60 * 1000)) // dalam menit
-          : 0;
+    // 4. Products (Active only)
+    const productsQ = query(
+      collection(db, 'products'),
+      where('isActive', '==', true),
+      orderBy('name', 'asc')
+    );
+    const unsubProducts = onSnapshot(productsQ, (snapshot) => {
+      setProductsData(snapshot.docs.map(doc => doc.data()));
+    });
 
-        // Ambil data transaksi inventaris
-        const inventorySnapshot = await getDocs(collection(db, 'inventory_transactions'));
-        const inventoryTransactions = inventorySnapshot.docs.map(doc => doc.data());
-        const totalTransactions = inventoryTransactions.length;
-        const stockInTransactions = inventoryTransactions.filter(t => t.type === 'STOCK_IN').length;
-        const stockOutTransactions = inventoryTransactions.filter(t => t.type === 'STOCK_OUT').length;
-        const transferTransactions = inventoryTransactions.filter(t => t.type === 'TRANSFER').length;
+    // 5. Orders
+    const unsubOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
+      setOrdersData(snapshot.docs.map(doc => doc.data()));
+    });
 
-        const operationalMetrics: OperationalMetric[] = [
-          // Karyawan
-          {
-            id: 'active-employees',
-            name: 'Karyawan Aktif',
-            category: 'Karyawan',
-            value: activeEmployees,
-            unit: 'orang',
-            status: activeEmployees > 0 ? 'good' : 'warning',
-            description: 'Jumlah karyawan dengan status AKTIF'
-          },
-          {
-            id: 'total-employees',
-            name: 'Total Karyawan',
-            category: 'Karyawan',
-            value: totalEmployees,
-            unit: 'orang',
-            status: 'good',
-            description: 'Jumlah seluruh karyawan terdaftar'
-          },
-          {
-            id: 'monthly-payroll',
-            name: 'Total Gaji Bulanan',
-            category: 'Karyawan',
-            value: totalPayroll,
-            unit: 'Rp',
-            status: totalPayroll > 0 ? 'good' : 'warning',
-            description: 'Akumulasi take home pay karyawan aktif'
-          },
-          {
-            id: 'average-salary',
-            name: 'Rata-rata Gaji',
-            category: 'Karyawan',
-            value: avgSalary,
-            unit: 'Rp',
-            status: avgSalary > 0 ? 'good' : 'warning',
-            description: 'Rata-rata gaji per karyawan aktif'
-          },
-          {
-            id: 'attendance-total',
-            name: 'Total Absensi',
-            category: 'Karyawan',
-            value: totalAttendanceDays,
-            unit: 'hari',
-            status: 'good',
-            description: 'Akumulasi absensi seluruh karyawan'
-          },
-          // Pengguna
-          {
-            id: 'active-users',
-            name: 'Pengguna Aktif',
-            category: 'Pengguna',
-            value: activeUsers,
-            unit: 'pengguna',
-            status: activeUsers > 0 ? 'good' : 'warning',
-            description: 'Pengguna yang aktif dalam 7 hari terakhir'
-          },
-          {
-            id: 'total-users',
-            name: 'Total Pengguna',
-            category: 'Pengguna',
-            value: totalUsers,
-            unit: 'pengguna',
-            status: 'good',
-            description: 'Jumlah total pengguna sistem'
-          },
+    // 6. Inventory Transactions
+    const unsubInventory = onSnapshot(collection(db, 'inventory_transactions'), (snapshot) => {
+      setInventoryData(snapshot.docs.map(doc => doc.data()));
+    });
 
-          // Gudang
-          {
-            id: 'full-warehouses',
-            name: 'Gudang Penuh',
-            category: 'Gudang',
-            value: fullWarehouses,
-            unit: 'gudang',
-            status: fullWarehouses > 0 ? 'critical' : 'good',
-            description: 'Gudang dengan kapasitas terisi >90%'
-          },
-          {
-            id: 'total-warehouses',
-            name: 'Total Gudang',
-            category: 'Gudang',
-            value: totalWarehouses,
-            unit: 'gudang',
-            status: 'good',
-            description: 'Jumlah total gudang aktif'
-          },
-
-          // Produk
-          {
-            id: 'out-of-stock',
-            name: 'Produk Habis',
-            category: 'Produk',
-            value: outOfStockProducts,
-            unit: 'produk',
-            status: outOfStockProducts > 0 ? 'critical' : 'good',
-            description: 'Produk dengan stok 0'
-          },
-          {
-            id: 'low-stock',
-            name: 'Stok Rendah',
-            category: 'Produk',
-            value: lowStockProducts,
-            unit: 'produk',
-            status: lowStockProducts > 5 ? 'critical' : lowStockProducts > 0 ? 'warning' : 'good',
-            description: 'Produk dengan stok ≤10 unit'
-          },
-          {
-            id: 'total-products',
-            name: 'Total Produk',
-            category: 'Produk',
-            value: totalProducts,
-            unit: 'produk',
-            status: 'good',
-            description: 'Jumlah total produk dalam sistem'
-          },
-
-          // Pesanan
-          {
-            id: 'pending-orders',
-            name: 'Pesanan Tertunda',
-            category: 'Pesanan',
-            value: pendingOrders,
-            unit: 'pesanan',
-            status: pendingOrders > 5 ? 'critical' : pendingOrders > 0 ? 'warning' : 'good',
-            description: 'Pesanan dengan status "Menunggu"'
-          },
-          {
-            id: 'avg-processing',
-            name: 'Waktu Proses Rata-rata',
-            category: 'Pesanan',
-            value: avgProcessingTime > 0 ? Math.round(avgProcessingTime) : 0,
-            unit: 'menit',
-            status: avgProcessingTime > 60 ? 'warning' : 'good',
-            description: 'Rata-rata waktu pemrosesan pesanan'
-          },
-          {
-            id: 'total-orders',
-            name: 'Total Pesanan',
-            category: 'Pesanan',
-            value: totalOrders,
-            unit: 'pesanan',
-            status: 'good',
-            description: 'Jumlah total pesanan sepanjang waktu'
-          },
-
-          // Inventaris
-          {
-            id: 'inventory-transactions',
-            name: 'Transaksi Inventaris',
-            category: 'Inventaris',
-            value: totalTransactions,
-            unit: 'transaksi',
-            status: 'good',
-            description: 'Total transaksi stok (masuk/keluar/transfer)'
-          },
-          {
-            id: 'stock-in-transactions',
-            name: 'Stok Masuk',
-            category: 'Inventaris',
-            value: stockInTransactions,
-            unit: 'transaksi',
-            status: 'good',
-            description: 'Jumlah transaksi stok masuk'
-          },
-          {
-            id: 'stock-out-transactions',
-            name: 'Stok Keluar',
-            category: 'Inventaris',
-            value: stockOutTransactions,
-            unit: 'transaksi',
-            status: 'good',
-            description: 'Jumlah transaksi stok keluar'
-          },
-          {
-            id: 'transfer-transactions',
-            name: 'Mutasi Stok',
-            category: 'Inventaris',
-            value: transferTransactions,
-            unit: 'transaksi',
-            status: 'good',
-            description: 'Jumlah transaksi mutasi antar gudang'
-          }
-        ];
-
-        setMetrics(operationalMetrics);
-      } catch {
-        // Error is logged to console
-      }
-
+    return () => {
+      unsubEmployees();
+      unsubUsers();
+      unsubWarehouses();
+      unsubProducts();
+      unsubOrders();
+      unsubInventory();
     };
+  }, [loading]);
 
-    fetchOperationsData();
-  }, []);
+  // Calculate metrics whenever data changes
+  useEffect(() => {
+    if (loading) return;
+
+    // --- Karyawan ---
+    const totalEmployees = employeesData.length;
+    const activeEmployees = employeesData.filter((e) => String(e.status || '').toUpperCase() === 'AKTIF').length;
+    const totalPayroll = employeesData
+      .filter((e) => String(e.status || '').toUpperCase() === 'AKTIF')
+      .reduce((sum: number, e) => sum + Number(e.manualSalary || 0), 0);
+    const avgSalary = activeEmployees > 0 ? Math.round(totalPayroll / activeEmployees) : 0;
+    const totalAttendanceDays = employeesData.reduce((sum: number, e) => sum + Number(e.totalAttendance || 0), 0);
+
+    // --- Pengguna ---
+    const totalUsers = usersData.length;
+    const activeUsers = usersData.filter(u =>
+      u.lastActive &&
+      (Date.now() - new Date(u.lastActive).getTime()) < 7 * 24 * 60 * 60 * 1000
+    ).length;
+
+    // --- Gudang ---
+    const totalWarehouses = warehousesData.length;
+    const fullWarehouses = warehousesData.filter(wh =>
+      (wh.usedCapacity / wh.capacity) >= 0.9
+    ).length;
+
+    // --- Produk ---
+    const totalProducts = productsData.length;
+    const outOfStockProducts = productsData.filter(p => p.stock === 0).length;
+    const lowStockProducts = productsData.filter(p => p.stock > 0 && p.stock <= 10).length;
+
+    // --- Pesanan ---
+    const totalOrders = ordersData.length;
+    const pendingOrders = ordersData.filter(o => o.status === 'MENUNGGU').length;
+    const avgProcessingTime = totalOrders > 0
+      ? (ordersData.reduce((sum, o) => {
+        if (o.updatedAt && o.createdAt) {
+          // Handle Firestore Timestamp or Date string
+          const updated = o.updatedAt.toDate ? o.updatedAt.toDate() : new Date(o.updatedAt);
+          const created = o.createdAt.toDate ? o.createdAt.toDate() : new Date(o.createdAt);
+          return sum + (updated.getTime() - created.getTime());
+        }
+        return sum;
+      }, 0) / totalOrders / (60 * 1000)) // dalam menit
+      : 0;
+
+    // --- Inventaris ---
+    const totalTransactions = inventoryData.length;
+    const stockInTransactions = inventoryData.filter(t => t.type === 'STOCK_IN').length;
+    const stockOutTransactions = inventoryData.filter(t => t.type === 'STOCK_OUT').length;
+    const transferTransactions = inventoryData.filter(t => t.type === 'TRANSFER').length;
+
+    const operationalMetrics: OperationalMetric[] = [
+      // Karyawan
+      {
+        id: 'active-employees',
+        name: 'Karyawan Aktif',
+        category: 'Karyawan',
+        value: activeEmployees,
+        unit: 'orang',
+        status: activeEmployees > 0 ? 'good' : 'warning',
+        description: 'Jumlah karyawan dengan status AKTIF'
+      },
+      {
+        id: 'total-employees',
+        name: 'Total Karyawan',
+        category: 'Karyawan',
+        value: totalEmployees,
+        unit: 'orang',
+        status: 'good',
+        description: 'Jumlah seluruh karyawan terdaftar'
+      },
+      {
+        id: 'monthly-payroll',
+        name: 'Total Gaji Bulanan',
+        category: 'Karyawan',
+        value: totalPayroll,
+        unit: 'Rp',
+        status: totalPayroll > 0 ? 'good' : 'warning',
+        description: 'Akumulasi take home pay karyawan aktif'
+      },
+      {
+        id: 'average-salary',
+        name: 'Rata-rata Gaji',
+        category: 'Karyawan',
+        value: avgSalary,
+        unit: 'Rp',
+        status: avgSalary > 0 ? 'good' : 'warning',
+        description: 'Rata-rata gaji per karyawan aktif'
+      },
+      {
+        id: 'attendance-total',
+        name: 'Total Absensi',
+        category: 'Karyawan',
+        value: totalAttendanceDays,
+        unit: 'hari',
+        status: 'good',
+        description: 'Akumulasi absensi seluruh karyawan'
+      },
+      // Pengguna
+      {
+        id: 'active-users',
+        name: 'Pengguna Aktif',
+        category: 'Pengguna',
+        value: activeUsers,
+        unit: 'pengguna',
+        status: activeUsers > 0 ? 'good' : 'warning',
+        description: 'Pengguna yang aktif dalam 7 hari terakhir'
+      },
+      {
+        id: 'total-users',
+        name: 'Total Pengguna',
+        category: 'Pengguna',
+        value: totalUsers,
+        unit: 'pengguna',
+        status: 'good',
+        description: 'Jumlah total pengguna sistem'
+      },
+
+      // Gudang
+      {
+        id: 'full-warehouses',
+        name: 'Gudang Penuh',
+        category: 'Gudang',
+        value: fullWarehouses,
+        unit: 'gudang',
+        status: fullWarehouses > 0 ? 'critical' : 'good',
+        description: 'Gudang dengan kapasitas terisi >90%'
+      },
+      {
+        id: 'total-warehouses',
+        name: 'Total Gudang',
+        category: 'Gudang',
+        value: totalWarehouses,
+        unit: 'gudang',
+        status: 'good',
+        description: 'Jumlah total gudang aktif'
+      },
+
+      // Produk
+      {
+        id: 'out-of-stock',
+        name: 'Produk Habis',
+        category: 'Produk',
+        value: outOfStockProducts,
+        unit: 'produk',
+        status: outOfStockProducts > 0 ? 'critical' : 'good',
+        description: 'Produk dengan stok 0'
+      },
+      {
+        id: 'low-stock',
+        name: 'Stok Rendah',
+        category: 'Produk',
+        value: lowStockProducts,
+        unit: 'produk',
+        status: lowStockProducts > 5 ? 'critical' : lowStockProducts > 0 ? 'warning' : 'good',
+        description: 'Produk dengan stok ≤10 unit'
+      },
+      {
+        id: 'total-products',
+        name: 'Total Produk',
+        category: 'Produk',
+        value: totalProducts,
+        unit: 'produk',
+        status: 'good',
+        description: 'Jumlah total produk dalam sistem'
+      },
+
+      // Pesanan
+      {
+        id: 'pending-orders',
+        name: 'Pesanan Tertunda',
+        category: 'Pesanan',
+        value: pendingOrders,
+        unit: 'pesanan',
+        status: pendingOrders > 5 ? 'critical' : pendingOrders > 0 ? 'warning' : 'good',
+        description: 'Pesanan dengan status "Menunggu"'
+      },
+      {
+        id: 'avg-processing',
+        name: 'Waktu Proses Rata-rata',
+        category: 'Pesanan',
+        value: avgProcessingTime > 0 ? Math.round(avgProcessingTime) : 0,
+        unit: 'menit',
+        status: avgProcessingTime > 60 ? 'warning' : 'good',
+        description: 'Rata-rata waktu pemrosesan pesanan'
+      },
+      {
+        id: 'total-orders',
+        name: 'Total Pesanan',
+        category: 'Pesanan',
+        value: totalOrders,
+        unit: 'pesanan',
+        status: 'good',
+        description: 'Jumlah total pesanan sepanjang waktu'
+      },
+
+      // Inventaris
+      {
+        id: 'inventory-transactions',
+        name: 'Transaksi Inventaris',
+        category: 'Inventaris',
+        value: totalTransactions,
+        unit: 'transaksi',
+        status: 'good',
+        description: 'Total transaksi stok (masuk/keluar/transfer)'
+      },
+      {
+        id: 'stock-in-transactions',
+        name: 'Stok Masuk',
+        category: 'Inventaris',
+        value: stockInTransactions,
+        unit: 'transaksi',
+        status: 'good',
+        description: 'Jumlah transaksi stok masuk'
+      },
+      {
+        id: 'stock-out-transactions',
+        name: 'Stok Keluar',
+        category: 'Inventaris',
+        value: stockOutTransactions,
+        unit: 'transaksi',
+        status: 'good',
+        description: 'Jumlah transaksi stok keluar'
+      },
+      {
+        id: 'transfer-transactions',
+        name: 'Mutasi Stok',
+        category: 'Inventaris',
+        value: transferTransactions,
+        unit: 'transaksi',
+        status: 'good',
+        description: 'Jumlah transaksi mutasi antar gudang'
+      }
+    ];
+
+    setMetrics(operationalMetrics);
+  }, [loading, employeesData, usersData, warehousesData, productsData, ordersData, inventoryData]);
 
   const handleExport = async () => {
     const exportData = metrics.map(metric => ({
@@ -365,8 +396,8 @@ export default function OperationsReport() {
             <Activity size={22} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Laporan Operasional</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Analisis kinerja sistem</p>
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Laporan Operasional (Real-time)</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Analisis kinerja sistem terkini</p>
           </div>
         </div>
         <button
