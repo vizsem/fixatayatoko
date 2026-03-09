@@ -223,6 +223,64 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           throw new Error('Pesanan tidak ditemukan saat konfirmasi');
         }
         const current = snap.data() as Order;
+
+        // --- SYNC STOCK LOGIC ---
+        for (const newItem of editableItems) {
+          if (!newItem.productId) continue;
+          
+          const oldItem = current.items.find(i => i.productId === newItem.productId);
+          const oldQty = oldItem ? (Number(oldItem.quantity) || 0) : 0;
+          const newQty = newItem.selected && newItem.quantity > 0 ? Number(newItem.quantity) : 0;
+          const diff = newQty - oldQty;
+          
+          if (diff !== 0) {
+            const productRef = doc(db, 'products', newItem.productId);
+            const pSnap = await tx.get(productRef);
+            
+            if (pSnap.exists()) {
+              const pData = pSnap.data();
+              const currentStock = Number(pData.stock || pData.Stok || 0);
+              const stockByWarehouse = pData.stockByWarehouse || {};
+              const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+              
+              // Tentukan Gudang Target (Prioritas: warehouseId -> gudang-utama)
+              const whId = pData.warehouseId || 'gudang-utama';
+              
+              if (diff > 0) { // Pengurangan Stok (Deduct)
+                let remaining = diff;
+                
+                // 1. Cek Gudang Utama/Target
+                if (newStockByWarehouse[whId] && newStockByWarehouse[whId] > 0) {
+                  const take = Math.min(newStockByWarehouse[whId], remaining);
+                  newStockByWarehouse[whId] -= take;
+                  remaining -= take;
+                }
+                
+                // 2. Ambil dari Gudang Lain jika masih kurang
+                if (remaining > 0) {
+                  for (const key in newStockByWarehouse) {
+                    if (key === whId) continue;
+                    const take = Math.min(newStockByWarehouse[key], remaining);
+                    newStockByWarehouse[key] -= take;
+                    remaining -= take;
+                    if (remaining <= 0) break;
+                  }
+                }
+              } else { // Penambahan Stok (Restock/Refund)
+                const add = -diff;
+                newStockByWarehouse[whId] = (newStockByWarehouse[whId] || 0) + add;
+              }
+              
+              tx.update(productRef, {
+                stock: currentStock - diff,
+                stockByWarehouse: newStockByWarehouse,
+                updatedAt: serverTimestamp()
+              });
+            }
+          }
+        }
+        // -------------------------
+
         const currentSubtotal =
           typeof current.subtotal === 'number'
             ? current.subtotal
@@ -260,11 +318,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           updatedAt: serverTimestamp()
         });
 
+        const isRefundablePayment = !['CASH', 'TEMPO', 'COD'].includes((current.paymentMethod || '').toUpperCase());
+
         if (
           calculatedRefund > 0 &&
           typeof current.userId === 'string' &&
           current.userId &&
-          current.userId !== 'guest'
+          current.userId !== 'guest' &&
+          isRefundablePayment
         ) {
           const userRef = doc(db, 'users', current.userId);
           tx.update(userRef, { walletBalance: increment(calculatedRefund) });
@@ -274,7 +335,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (
         refundAmount > 0 &&
         order.userId &&
-        order.userId !== 'guest'
+        order.userId !== 'guest' &&
+        !['CASH', 'TEMPO', 'COD'].includes((order.paymentMethod || '').toUpperCase())
       ) {
         await addDoc(collection(db, 'wallet_logs'), {
           userId: order.userId,

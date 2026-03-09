@@ -51,9 +51,15 @@ type ReportSummary = {
 
 const getInitialDateRange = () => {
   const now = new Date();
+  const toLocal = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   return {
-    startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-    endDate: now.toISOString().split('T')[0]
+    startDate: toLocal(new Date(now.getFullYear(), now.getMonth(), 1)),
+    endDate: toLocal(now)
   };
 };
 

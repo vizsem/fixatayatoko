@@ -45,7 +45,12 @@ type ImportRow = Partial<ExportRow> & Record<string, unknown>;
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
-  // prices[productId][unitCode] = ChannelPricingState
+  
+  // Admin Fee Rates (in percentage)
+  const [adminFees, setAdminFees] = useState({
+    shopee: 6.5, // Default 6.5%
+    tiktok: 4.5  // Default 4.5%
+  });
   const [prices, setPrices] = useState<Record<string, Record<string, ChannelPricingState>>>({});
   const [selectedUnit, setSelectedUnit] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
@@ -294,11 +299,40 @@ export default function ChannelPricingPage() {
           </div>
           <div className="text-[10px] font-black uppercase text-gray-400 tracking-[0.25em] flex items-center gap-2">
             <Tag size={14} />
-            {filteredProducts.length} Produk
+            {filteredProducts.length} Produk Aktif
           </div>
         </div>
 
-        <div className="px-6 pb-6 flex items-center justify-between gap-4">
+        {/* Admin Fee Settings */}
+        <div className="px-6 py-4 bg-blue-50 border-b border-blue-100 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
+          <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">Potongan Admin Marketplace:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-600">Shopee</span>
+            <div className="relative">
+              <input 
+                type="number" 
+                value={adminFees.shopee}
+                onChange={(e) => setAdminFees(prev => ({ ...prev, shopee: Number(e.target.value) }))}
+                className="w-16 pl-2 pr-6 py-1 rounded-lg text-xs font-bold border border-blue-200 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-600">TikTok</span>
+            <div className="relative">
+              <input 
+                type="number" 
+                value={adminFees.tiktok}
+                onChange={(e) => setAdminFees(prev => ({ ...prev, tiktok: Number(e.target.value) }))}
+                className="w-16 pl-2 pr-6 py-1 rounded-lg text-xs font-bold border border-blue-200 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 pt-6 flex items-center justify-between gap-4">
            <div className="flex items-center gap-2">
               <button
                 onClick={handleExport}
@@ -368,24 +402,50 @@ export default function ChannelPricingPage() {
                           </div>
 
                           <div className="space-y-3 pt-2 border-t border-gray-50">
-                              {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => (
-                                  <div key={key} className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold text-gray-500 uppercase w-20">{key}</span>
-                                      <div className="flex items-center justify-end gap-1 flex-1">
-                                          <span className="text-[10px] font-bold text-gray-400">Rp</span>
-                                          <input
-                                              type="number"
-                                              className="w-full bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none border border-transparent focus:border-blue-500 focus:bg-white transition-all"
-                                              value={stateByUnit[key] ?? ''}
-                                              onChange={(e) =>
-                                                  handleChangePrice(p.id, currentUnit, key, e.target.value)
-                                              }
-                                              min={0}
-                                              placeholder="0"
-                                          />
+                              {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => {
+                                  const price = stateByUnit[key];
+                                  const modal = p.purchasePrice || 0;
+                                  let profit = 0;
+                                  let fee = 0;
+
+                                  if (price) {
+                                    if (key === 'shopee') {
+                                      fee = price * (adminFees.shopee / 100);
+                                    } else if (key === 'tiktok') {
+                                      fee = price * (adminFees.tiktok / 100);
+                                    }
+                                    profit = price - modal - fee;
+                                  }
+
+                                  return (
+                                    <div key={key} className="flex flex-col gap-1">
+                                      <div className="flex items-center justify-between">
+                                          <span className="text-[10px] font-bold text-gray-500 uppercase w-20">{key}</span>
+                                          <div className="flex items-center justify-end gap-1 flex-1">
+                                              <span className="text-[10px] font-bold text-gray-400">Rp</span>
+                                              <input
+                                                  type="number"
+                                                  className="w-full bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none border border-transparent focus:border-blue-500 focus:bg-white transition-all"
+                                                  value={stateByUnit[key] ?? ''}
+                                                  onChange={(e) =>
+                                                      handleChangePrice(p.id, currentUnit, key, e.target.value)
+                                                  }
+                                                  min={0}
+                                                  placeholder="0"
+                                              />
+                                          </div>
                                       </div>
-                                  </div>
-                              ))}
+                                      {(key === 'shopee' || key === 'tiktok') && price ? (
+                                        <div className="flex justify-end gap-3 text-[9px]">
+                                          <span className="text-gray-400">Fee: Rp{Math.round(fee).toLocaleString()}</span>
+                                          <span className={`font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                            Laba: Rp{Math.round(profit).toLocaleString()}
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  );
+                              })}
                           </div>
 
                           <button
@@ -462,22 +522,50 @@ export default function ChannelPricingPage() {
                           </div>
                         </div>
                       </td>
-                      {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => (
-                        <td key={key} className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <span className="text-[9px] font-bold text-gray-400">Rp</span>
-                            <input
-                              type="number"
-                              className="w-24 bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none"
-                              value={stateByUnit[key] ?? ''}
-                              onChange={(e) =>
-                                handleChangePrice(p.id, currentUnit, key, e.target.value)
-                              }
-                              min={0}
-                            />
-                          </div>
-                        </td>
-                      ))}
+                      {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => {
+                        const price = stateByUnit[key];
+                        const modal = p.purchasePrice || 0;
+                        let profit = 0;
+                        let fee = 0;
+
+                        if (price) {
+                          if (key === 'shopee') {
+                            fee = price * (adminFees.shopee / 100);
+                          } else if (key === 'tiktok') {
+                            fee = price * (adminFees.tiktok / 100);
+                          }
+                          profit = price - modal - fee;
+                        }
+
+                        return (
+                          <td key={key} className="px-4 py-4">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-[9px] font-bold text-gray-400">Rp</span>
+                                <input
+                                  type="number"
+                                  className="w-24 bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none"
+                                  value={stateByUnit[key] ?? ''}
+                                  onChange={(e) =>
+                                    handleChangePrice(p.id, currentUnit, key, e.target.value)
+                                  }
+                                  min={0}
+                                />
+                              </div>
+                              {(key === 'shopee' || key === 'tiktok') && price ? (
+                                <div className="text-right space-y-0.5">
+                                  <p className="text-[9px] text-gray-400">
+                                    Fee: -Rp{Math.round(fee).toLocaleString()}
+                                  </p>
+                                  <p className={`text-[9px] font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                    Laba: Rp{Math.round(profit).toLocaleString()}
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        );
+                      })}
                       <td className="px-6 py-4 text-right">
                         <button
                           type="button"

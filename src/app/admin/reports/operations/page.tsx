@@ -22,7 +22,8 @@ import {
   Clock,
   AlertTriangle,
   ShoppingCart,
-  Database
+  Database,
+  DollarSign
 } from 'lucide-react';
 import notify from '@/lib/notify';
 
@@ -48,6 +49,7 @@ export default function OperationsReport() {
   const [productsData, setProductsData] = useState<any[]>([]);
   const [ordersData, setOrdersData] = useState<any[]>([]);
   const [inventoryData, setInventoryData] = useState<any[]>([]);
+  const [expensesData, setExpensesData] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -106,6 +108,11 @@ export default function OperationsReport() {
       setInventoryData(snapshot.docs.map(doc => doc.data()));
     });
 
+    // 7. Operational Expenses
+    const unsubExpenses = onSnapshot(collection(db, 'operational_expenses'), (snapshot) => {
+      setExpensesData(snapshot.docs.map(doc => doc.data()));
+    });
+
     return () => {
       unsubEmployees();
       unsubUsers();
@@ -113,6 +120,7 @@ export default function OperationsReport() {
       unsubProducts();
       unsubOrders();
       unsubInventory();
+      unsubExpenses();
     };
   }, [loading]);
 
@@ -167,6 +175,38 @@ export default function OperationsReport() {
     const stockInTransactions = inventoryData.filter(t => t.type === 'STOCK_IN').length;
     const stockOutTransactions = inventoryData.filter(t => t.type === 'STOCK_OUT').length;
     const transferTransactions = inventoryData.filter(t => t.type === 'TRANSFER').length;
+
+    // --- Pengeluaran Operasional ---
+    const totalExpenses = expensesData.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const totalExpenseTransactions = expensesData.length;
+    
+    // Filter bulan ini
+    const now = new Date();
+    const thisMonthExpenses = expensesData.filter(e => {
+      let date: Date;
+      if (e.date?.toDate) date = e.date.toDate();
+      else if (e.date instanceof Date) date = e.date;
+      else if (e.date?.seconds) date = new Date(e.date.seconds * 1000);
+      else date = new Date(e.date);
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    });
+    const totalThisMonthExpenses = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    // Cari kategori tertinggi
+    const expenseCategoryMap: Record<string, number> = {};
+    expensesData.forEach(e => {
+      const cat = e.category || 'Lainnya';
+      expenseCategoryMap[cat] = (expenseCategoryMap[cat] || 0) + Number(e.amount || 0);
+    });
+    let topExpenseCategory = '-';
+    let topExpenseValue = 0;
+    Object.entries(expenseCategoryMap).forEach(([cat, val]) => {
+      if (val > topExpenseValue) {
+        topExpenseValue = val;
+        topExpenseCategory = cat;
+      }
+    });
+
 
     const operationalMetrics: OperationalMetric[] = [
       // Karyawan
@@ -349,11 +389,49 @@ export default function OperationsReport() {
         unit: 'transaksi',
         status: 'good',
         description: 'Jumlah transaksi mutasi antar gudang'
+      },
+
+      // Pengeluaran Operasional
+      {
+        id: 'total-expenses-month',
+        name: 'Pengeluaran (Bulan Ini)',
+        category: 'Pengeluaran',
+        value: totalThisMonthExpenses,
+        unit: 'Rp',
+        status: totalThisMonthExpenses > 10000000 ? 'warning' : 'good', // Threshold contoh
+        description: 'Total pengeluaran operasional bulan ini'
+      },
+      {
+        id: 'total-expenses-all',
+        name: 'Total Pengeluaran',
+        category: 'Pengeluaran',
+        value: totalExpenses,
+        unit: 'Rp',
+        status: 'good',
+        description: 'Total pengeluaran operasional sepanjang waktu'
+      },
+      {
+        id: 'top-expense-category',
+        name: 'Kategori Terbesar',
+        category: 'Pengeluaran',
+        value: topExpenseCategory,
+        unit: '',
+        status: 'warning',
+        description: 'Kategori dengan total pengeluaran tertinggi'
+      },
+      {
+        id: 'total-expense-trx',
+        name: 'Jumlah Transaksi',
+        category: 'Pengeluaran',
+        value: totalExpenseTransactions,
+        unit: 'trx',
+        status: 'good',
+        description: 'Total frekuensi transaksi pengeluaran'
       }
     ];
 
     setMetrics(operationalMetrics);
-  }, [loading, employeesData, usersData, warehousesData, productsData, ordersData, inventoryData]);
+  }, [loading, employeesData, usersData, warehousesData, productsData, ordersData, inventoryData, expensesData]);
 
   const handleExport = async () => {
     const exportData = metrics.map(metric => ({
@@ -449,7 +527,7 @@ export default function OperationsReport() {
 
       {/* Operational Metrics by Category */}
       <div className="space-y-8">
-        {['Karyawan', 'Pengguna', 'Gudang', 'Produk', 'Pesanan', 'Inventaris'].map(category => {
+        {['Karyawan', 'Pengguna', 'Gudang', 'Produk', 'Pesanan', 'Inventaris', 'Pengeluaran'].map(category => {
           const categoryMetrics = metrics.filter(m => m.category === category);
           if (categoryMetrics.length === 0) return null;
 
@@ -463,6 +541,7 @@ export default function OperationsReport() {
                   {category === 'Produk' && <Package size={20} />}
                   {category === 'Pesanan' && <ShoppingCart size={20} />}
                   {category === 'Inventaris' && <Database size={20} />}
+                  {category === 'Pengeluaran' && <DollarSign size={20} />}
                   {category}
                 </h2>
               </div>
@@ -482,7 +561,9 @@ export default function OperationsReport() {
                         </span>
                       </div>
                       <div className="text-2xl font-bold text-black mb-1">
-                        {metric.value} <span className="text-sm font-normal">{metric.unit}</span>
+                        {typeof metric.value === 'number' && (metric.unit === 'Rp' || metric.name.includes('Gaji')) ? 
+                          `Rp ${metric.value.toLocaleString('id-ID')}` : metric.value} 
+                        <span className="text-sm font-normal ml-1">{metric.unit !== 'Rp' ? metric.unit : ''}</span>
                       </div>
                       <p className="text-sm text-gray-600">{metric.description}</p>
                     </div>

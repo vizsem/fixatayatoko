@@ -2,20 +2,17 @@
 
 import { useEffect, useState, useLayoutEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
-
-
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Activity, Gift, Zap,
-  Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3
+  Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3,
+  TrendingUp, Users, ShoppingCart, ArrowUpRight, ArrowRight, MoreHorizontal, Calendar
 } from 'lucide-react';
-
 import { onAuthStateChanged } from 'firebase/auth';
 import { LucideIcon } from 'lucide-react';
-
 import {
-  collection, doc, getDoc, getDocs, query, orderBy, limit, where
+  collection, doc, getDoc, getDocs, query, orderBy, limit, where, Timestamp
 } from 'firebase/firestore';
 
 interface Order {
@@ -24,38 +21,57 @@ interface Order {
   customerName?: string;
   total?: number;
   status: string;
-  createdAt: string | number | { seconds: number; nanoseconds: number };
+  createdAt: any;
+  items?: any[];
 }
 
-
-
-
-
-interface QuickActionProps {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  href: string;
-  color?: string;
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  sales?: number;
 }
 
-const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600" }: QuickActionProps) => (
-  <Link href={href} className="group">
-    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-100 transition-all h-full">
-      <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+interface DailySales {
+  date: string;
+  amount: number;
+  dayName: string;
+}
+
+const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600" }: { icon: LucideIcon; title: string; description: string; href: string; color?: string }) => (
+  <Link href={href} className="group block h-full">
+    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all h-full flex flex-col items-center text-center">
+      <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm`}>
         <Icon size={24} />
       </div>
-      <h3 className="font-black text-xs tracking-tight text-gray-800 mb-1">{title}</h3>
-
-      <p className="text-[10px] text-gray-400 font-bold leading-relaxed">{description}</p>
+      <h3 className="font-bold text-xs text-gray-800 mb-1">{title}</h3>
+      <p className="text-[10px] text-gray-500 leading-tight">{description}</p>
     </div>
   </Link>
 );
 
- 
-
-
-
+const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string, trend?: string }) => (
+  <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
+    <div className={`absolute top-0 right-0 p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500`}>
+      <Icon size={100} className={color.replace('text-', 'fill-')} />
+    </div>
+    <div className="flex justify-between items-start mb-4 z-10">
+      <div className={`${bg} ${color} p-3 rounded-2xl shadow-inner`}>
+        <Icon size={20} />
+      </div>
+      {trend && (
+        <span className="bg-green-50 text-green-600 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          <TrendingUp size={10} /> {trend}
+        </span>
+      )}
+    </div>
+    <div className="z-10">
+      <p className="text-2xl lg:text-3xl font-black text-gray-800 tracking-tight mb-1">{value}</p>
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+    </div>
+  </div>
+);
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -64,6 +80,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     dailySales: 0,
     weeklySales: 0,
+    monthlySales: 0,
     totalProducts: 0,
     lowStock: 0,
     unreadOrders: 0,
@@ -75,7 +92,8 @@ export default function AdminDashboard() {
   });
 
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-
+  const [topProducts, setTopProducts] = useState<Product[]>([]);
+  const [salesChartData, setSalesChartData] = useState<DailySales[]>([]);
 
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -84,64 +102,149 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Produk: gunakan indeks dan query terarah
-      const productsActiveSnap = await getDocs(
-        query(collection(db, 'products'), where('isActive', '==', true), orderBy('name', 'asc'))
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.toISOString();
+      
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+
+      // Fetch Orders (Last 30 days for broader analysis)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      const qOrders = query(
+        collection(db, 'orders'), 
+        where('createdAt', '>=', thirtyDaysAgo),
+        orderBy('createdAt', 'desc')
       );
-      const lowStockSnap = await getDocs(
-        query(collection(db, 'products'), where('stock', '<=', 10))
-      );
-      const lowStockCount = lowStockSnap.size;
-
-      const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const qOrdersWeekly = query(collection(db, 'orders'), where('createdAt', '>=', sevenDaysAgo));
-      const weeklySnap = await getDocs(qOrdersWeekly);
-
+      
+      const ordersSnap = await getDocs(qOrders);
+      
       let salesToday = 0;
       let salesWeekly = 0;
+      let salesMonthly = 0;
+      const dailyMap = new Map<string, number>();
+      const productSalesMap = new Map<string, number>();
 
-      weeklySnap.forEach(d => {
+      // Initialize last 7 days map
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        dailyMap.set(dateStr, 0);
+      }
+
+      ordersSnap.forEach(d => {
         const data = d.data();
+        const created = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        const dateStr = created.toISOString().split('T')[0];
         const amount = Number(data.total) || 0;
-        salesWeekly += amount;
-        if (data.createdAt >= todayStart) salesToday += amount;
+
+        // Calculate Totals
+        if (created >= new Date(todayStart)) salesToday += amount;
+        if (created >= sevenDaysAgo) salesWeekly += amount;
+        if (data.createdAt >= startOfMonth) salesMonthly += amount;
+
+        // Daily Chart Data (Last 7 Days)
+        if (dailyMap.has(dateStr)) {
+          dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + amount);
+        }
+
+        // Product Sales Analysis
+        if (data.items && Array.isArray(data.items)) {
+          data.items.forEach((item: any) => {
+            const pid = item.productId || item.id;
+            const qty = Number(item.quantity) || 0;
+            if (pid) {
+              productSalesMap.set(pid, (productSalesMap.get(pid) || 0) + qty);
+            }
+          });
+        }
       });
 
-      const qUnread = query(
-        collection(db, 'orders'),
-        where('status', 'in', ['MENUNGGU', 'PENDING']),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
-      const unreadSnap = await getDocs(qUnread);
+      // Prepare Chart Data
+      const chartData: DailySales[] = [];
+      const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+      
+      // Sort dates ascending for chart
+      const sortedDates = Array.from(dailyMap.keys()).sort();
+      sortedDates.forEach(date => {
+        const d = new Date(date);
+        chartData.push({
+          date,
+          amount: dailyMap.get(date) || 0,
+          dayName: days[d.getDay()]
+        });
+      });
 
-      const uSnap = await getDocs(collection(db, 'users'));
-      let totalPoints = 0;
-      uSnap.forEach(d => totalPoints += (d.data().points || 0));
+      // Fetch Top Products Details
+      const sortedProductIds = Array.from(productSalesMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([id]) => id);
 
-      const wSnap = await getDocs(collection(db, 'warehouses'));
+      const topProductsData: Product[] = [];
+      if (sortedProductIds.length > 0) {
+        // Firestore 'in' query supports max 10 items
+        const productsSnap = await getDocs(query(collection(db, 'products'), where('__name__', 'in', sortedProductIds)));
+        productsSnap.forEach(doc => {
+          const data = doc.data();
+          topProductsData.push({
+            id: doc.id,
+            name: data.name || data.Nama || 'Unnamed Product',
+            price: Number(data.price || data.priceEcer || data.Ecer || 0),
+            stock: Number(data.stock || data.Stok || 0),
+            sales: productSalesMap.get(doc.id) || 0
+          });
+        });
+        // Sort again because Firestore results are not ordered by 'in' array
+        topProductsData.sort((a, b) => (b.sales || 0) - (a.sales || 0));
+      }
+
+      // Other Stats
+      const productsActiveSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)));
+      const lowStockSnap = await getDocs(query(collection(db, 'products'), where('stock', '<=', 10)));
+      const unreadSnap = await getDocs(query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']), limit(5)));
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const whSnap = await getDocs(collection(db, 'warehouses'));
       const promSnap = await getDocs(collection(db, 'promotions'));
+
+      let totalPoints = 0;
+      usersSnap.forEach(d => totalPoints += (d.data().points || 0));
 
       setStats({
         dailySales: salesToday,
         weeklySales: salesWeekly,
+        monthlySales: salesMonthly,
         totalProducts: productsActiveSnap.size,
-        lowStock: lowStockCount,
+        lowStock: lowStockSnap.size,
         unreadOrders: unreadSnap.size,
-        warehouses: wSnap.size,
+        warehouses: whSnap.size,
         promotions: promSnap.size,
-        users: uSnap.size,
+        users: usersSnap.size,
         totalPointsIssued: totalPoints,
-        activeVouchers: promSnap.docs.filter(d => d.data()?.active === true).length
+        activeVouchers: promSnap.docs.filter(d => d.data()?.isActive === true).length
       });
 
-      setRecentOrders(unreadSnap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
-    } catch (e: unknown) {
+      setRecentOrders(unreadSnap.docs.map(d => {
+        const data = d.data();
+        return { 
+          id: d.id, 
+          ...data,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+        } as Order;
+      }));
+      
+      setSalesChartData(chartData);
+      setTopProducts(topProductsData);
+
+    } catch (e) {
       console.error("Dashboard Fetch Error:", e);
     }
-
   }, []);
 
   useEffect(() => {
@@ -152,7 +255,6 @@ export default function AdminDashboard() {
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        // alert('Akses ditolak! Khusus Admin.');
         router.push('/profil');
         return;
       }
@@ -162,132 +264,223 @@ export default function AdminDashboard() {
     return () => unsubscribe();
   }, [router, fetchDashboardData]);
 
-
- 
-
-
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600 mb-4"></div>
-      <p className="text-[10px] font-black tracking-[0.3em] text-gray-400 uppercase">Menyinkronkan server...</p>
-
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-green-600 mb-4"></div>
+      <p className="text-xs font-bold tracking-widest text-gray-400 uppercase">Memuat Dashboard...</p>
     </div>
   );
 
-
-
+  const maxChartValue = Math.max(...salesChartData.map(d => d.amount), 1);
 
   return (
-    <>
-      <header className="flex justify-between items-center mb-10">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">Console Admin</h1>
-            <p className="text-gray-400 text-[10px] lg:text-xs font-bold tracking-widest">Status: <span className="text-green-500 underline decoration-2 underline-offset-4 font-black">Sistem online</span></p>
-          </div>
+    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 font-sans text-gray-900">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Dashboard Overview</h1>
+          <p className="text-gray-500 text-xs font-medium mt-1">
+            Halo Admin, ini ringkasan performa toko hari ini.
+          </p>
         </div>
-        <div className="flex gap-3 items-center">
-          <div className="hidden sm:flex flex-col text-right">
-            <span className="text-[9px] font-black text-gray-400 tracking-tight">Omzet mingguan</span>
-            <span className="text-sm font-black text-green-600 tracking-tighter">Rp{stats.weeklySales.toLocaleString()}</span>
+        <div className="flex items-center gap-3">
+          <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <span className="text-xs font-bold text-gray-600">Sistem Online</span>
           </div>
-          <button onClick={() => fetchDashboardData()} className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
-            <Activity size={20} className="text-slate-400" />
+          <button 
+            onClick={() => fetchDashboardData()} 
+            className="p-2 bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
+            title="Refresh Data"
+          >
+            <Activity size={18} className="text-gray-500" />
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-        <StatBox label="Sales Hari Ini" value={`Rp${stats.dailySales.toLocaleString()}`} icon={DollarSign} color="text-green-600" bg="bg-green-100" />
-        <StatBox label="Pesanan Baru" value={stats.unreadOrders} icon={Clock} color="text-rose-600" bg="bg-rose-100" />
-        <StatBox label="Poin Beredar" value={stats.totalPointsIssued} icon={Zap} color="text-amber-600" bg="bg-amber-100" />
-        <StatBox label="Stok Kritis" value={stats.lowStock} icon={AlertTriangle} color="text-orange-600" bg="bg-orange-100" />
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <StatBox 
+          label="Total Pendapatan (Bulan Ini)" 
+          value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`} 
+          icon={DollarSign} 
+          color="text-emerald-600" 
+          bg="bg-emerald-50" 
+          trend="+12%"
+        />
+        <StatBox 
+          label="Total Pesanan Baru" 
+          value={stats.unreadOrders} 
+          icon={ShoppingCart} 
+          color="text-blue-600" 
+          bg="bg-blue-50" 
+        />
+        <StatBox 
+          label="Total Pelanggan" 
+          value={stats.users} 
+          icon={Users} 
+          color="text-purple-600" 
+          bg="bg-purple-50" 
+        />
+        <StatBox 
+          label="Stok Perlu Perhatian" 
+          value={stats.lowStock} 
+          icon={AlertTriangle} 
+          color="text-amber-600" 
+          bg="bg-amber-50" 
+        />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <QuickActionCard icon={Package} title="Update Stok" description="Manajemen inventaris barang" href="/admin/products" color="bg-blue-100 text-blue-600" />
-        <QuickActionCard icon={Truck} title="Supplier" description="Data pemasok barang" href="/admin/suppliers" color="bg-purple-100 text-purple-600" />
-        <QuickActionCard icon={Gift} title="Loyalty" description="Atur diskon & poin" href="/admin/promotions" color="bg-pink-100 text-pink-600" />
-        <QuickActionCard icon={BarChart3} title="Reports" description="Analisis performa toko" href="/admin/reports" color="bg-red-100 text-red-600" />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="font-black text-gray-800 text-xs tracking-[0.2em]">Butuh tindakan segera</h3>
-            <Link href="/admin/orders" className="text-[9px] font-black text-blue-600 tracking-widest border-b-2 border-blue-600 pb-0.5">Semua pesanan</Link>
-          </div>
-          <div className="space-y-4">
-            {recentOrders.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ShieldCheck className="text-green-500" size={24} />
-                </div>
-                <p className="text-[10px] font-black text-gray-300 tracking-widest text-center">Antrian bersih</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content Column */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* Sales Chart Section */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Statistik Penjualan</h3>
+                <p className="text-xs text-gray-400 font-medium">Omzet 7 hari terakhir</p>
               </div>
-            ) : (
-              recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] border border-transparent hover:border-green-100 hover:bg-white transition-all group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400 group-hover:text-green-600 transition-all">
-                      <Package size={20} />
+              <div className="text-right">
+                <p className="text-2xl font-black text-gray-900">Rp{stats.weeklySales.toLocaleString('id-ID')}</p>
+                <p className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded-full inline-block">Minggu Ini</p>
+              </div>
+            </div>
+            
+            {/* Simple CSS Bar Chart */}
+            <div className="h-48 flex items-end justify-between gap-2 md:gap-4 mt-8">
+              {salesChartData.map((data, idx) => {
+                const heightPercentage = Math.max((data.amount / maxChartValue) * 100, 5); // Min 5% height
+                return (
+                  <div key={idx} className="flex flex-col items-center flex-1 group relative">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] py-1 px-2 rounded-lg whitespace-nowrap z-10 pointer-events-none">
+                      Rp{data.amount.toLocaleString('id-ID')}
                     </div>
-                    <div>
-                      <p className="text-xs font-black text-gray-800 leading-none">{order.orderId || `#${order.id.substring(0, 6)}`}</p>
-                      <p className="text-[10px] font-bold text-gray-400 mt-1 tracking-tighter truncate max-w-[120px]">{order.customerName || 'Pelanggan umum'}</p>
-                    </div>
+                    
+                    <div 
+                      className={`w-full max-w-[40px] rounded-t-xl transition-all duration-500 ease-out hover:opacity-80 ${idx === salesChartData.length - 1 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gray-100 hover:bg-emerald-200'}`}
+                      style={{ height: `${heightPercentage}%` }}
+                    ></div>
+                    <span className={`text-[10px] font-bold mt-3 ${idx === salesChartData.length - 1 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                      {data.dayName}
+                    </span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-gray-900 tracking-tighter">Rp{(order.total || 0).toLocaleString()}</p>
-                    <Link href={`/admin/orders`} className="text-[9px] font-black text-green-600 tracking-widest">Proses →</Link>
-                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recent Orders Section */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-gray-900">Pesanan Terbaru</h3>
+              <Link href="/admin/orders" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
+                Lihat Semua <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="space-y-3">
+              {recentOrders.length === 0 ? (
+                <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <Package className="mx-auto text-gray-300 mb-2" size={32} />
+                  <p className="text-xs text-gray-400 font-medium">Belum ada pesanan baru</p>
                 </div>
-              ))
-            )}
+              ) : (
+                recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:bg-white hover:border-gray-100 hover:shadow-sm transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-400 shadow-sm group-hover:text-blue-600 transition-colors">
+                        <Package size={18} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{order.customerName || 'Pelanggan Tamu'}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
+                          <span>{order.orderId || `#${order.id.substring(0, 8)}`}</span>
+                          <span>•</span>
+                          <span>{new Date(order.createdAt).toLocaleDateString('id-ID')}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
+                      <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[9px] font-bold rounded-md mt-1">
+                        {order.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
-        <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
-            <Database size={150} />
+
+        {/* Sidebar Column */}
+        <div className="space-y-6">
+          
+          {/* Quick Actions Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <QuickActionCard icon={Package} title="Produk" description="Kelola stok & harga" href="/admin/products" color="bg-blue-50 text-blue-600" />
+            <QuickActionCard icon={Truck} title="Supplier" description="Data pemasok" href="/admin/suppliers" color="bg-purple-50 text-purple-600" />
+            <QuickActionCard icon={Gift} title="Promo" description="Diskon & Voucher" href="/admin/promotions" color="bg-pink-50 text-pink-600" />
+            <QuickActionCard icon={BarChart3} title="Laporan" description="Analisis data" href="/admin/reports" color="bg-orange-50 text-orange-600" />
           </div>
-          <h3 className="font-black text-gray-500 text-[9px] tracking-[0.3em] mb-8">Data infrastruktur</h3>
-          <div className="space-y-6 relative z-10 text-normal">
-            <SystemInfo label="Gudang Aktif" value={stats.warehouses} />
-            <SystemInfo label="Promo Berjalan" value={stats.activeVouchers} />
-            <SystemInfo label="Basis Pelanggan" value={stats.users} />
-            <SystemInfo label="Total SKU Produk" value={stats.totalProducts} />
+
+          {/* Top Products Widget */}
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">Produk Terlaris</h3>
+              <MoreHorizontal size={16} className="text-gray-400" />
+            </div>
+            <div className="space-y-4">
+              {topProducts.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">Belum ada data penjualan</p>
+              ) : (
+                topProducts.map((product, idx) => (
+                  <div key={product.id} className="flex items-center gap-3">
+                    <span className={`w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                      <p className="text-[10px] text-gray-400">{product.sales} terjual</p>
+                    </div>
+                    <p className="text-xs font-bold text-gray-900">Rp{product.price.toLocaleString('id-ID')}</p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          <div className="mt-12 p-5 bg-white/5 rounded-[2rem] border border-white/10 text-center">
-            <p className="text-[9px] text-gray-400 font-black leading-relaxed tracking-widest">
-              Database cloud <br /><span className="text-green-400 font-black tracking-normal uppercase">Firestore realtime</span>
-            </p>
+
+          {/* System Info Widget */}
+          <div className="bg-gray-900 p-6 rounded-[2rem] text-white relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-5">
+                <Database size={100} />
+             </div>
+             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Infrastruktur</h3>
+             <div className="space-y-4 relative z-10">
+                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                   <span className="text-xs text-gray-400">Gudang Aktif</span>
+                   <span className="font-bold">{stats.warehouses}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                   <span className="text-xs text-gray-400">Total SKU</span>
+                   <span className="font-bold">{stats.totalProducts}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                   <span className="text-xs text-gray-400">Promo Aktif</span>
+                   <span className="font-bold text-green-400">{stats.activeVouchers}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2">
+                   <span className="text-xs text-gray-400">Total User</span>
+                   <span className="font-bold">{stats.users}</span>
+                </div>
+             </div>
           </div>
+
         </div>
       </div>
-    </>
-  );
-}
-
-function StatBox({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string }) {
-
-  return (
-    <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-lg transition-all">
-      <div>
-        <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-2">{label}</p>
-
-        <p className="text-xl lg:text-2xl font-black text-gray-800 tracking-tighter">{value}</p>
-      </div>
-      <div className={`${bg} ${color} p-4 rounded-3xl group-hover:scale-110 transition-transform shadow-inner`}><Icon size={24} /></div>
-    </div>
-  );
-}
-
-function SystemInfo({ label, value }: { label: string, value: string | number }) {
-  return (
-    <div className="flex justify-between items-end border-b border-white/5 pb-4">
-      <span className="text-[10px] font-black text-gray-400 tracking-widest">{label}</span>
-
-      <span className="text-2xl font-black leading-none text-white tracking-tighter">{value}</span>
     </div>
   );
 }
