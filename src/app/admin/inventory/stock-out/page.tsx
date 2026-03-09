@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-
+import { addInventoryLog } from '@/lib/inventory';
 
 import {
   collection,
   getDocs,
   doc,
   updateDoc,
-  addDoc,
   serverTimestamp,
   increment
 } from 'firebase/firestore';
@@ -86,16 +85,15 @@ export default function StockOutPage() {
       });
 
       // B. Catat ke Inventory Logs (Agar muncul di halaman History)
-      await addDoc(collection(db, 'inventory_logs'), {
+      await addInventoryLog({
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         type: 'KELUAR',
-        quantity: qty,
-        prevStock: selectedProduct.stock,
-        nextStock: selectedProduct.stock - qty,
-        reason: reason,
-        operator: user?.email || 'Admin',
-        createdAt: serverTimestamp()
+        amount: qty,
+        adminId: user?.uid || 'system',
+        source: 'MANUAL',
+        note: `Manual Stock Out: ${reason}. Prev: ${selectedProduct.stock}, New: ${selectedProduct.stock - qty}`,
+        fromWarehouseId: 'gudang-utama'
       });
 
       // C. Trigger sinkronisasi otomatis

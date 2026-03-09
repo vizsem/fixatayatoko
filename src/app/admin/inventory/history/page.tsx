@@ -17,10 +17,16 @@ import {
   MinusCircle,
   Search,
   Calendar,
-  Loader2
+  Loader2,
+  ShoppingCart,
+  Package,
+  Store,
+  FileText,
+  User,
+  Truck
 } from 'lucide-react';
 
- 
+
 
 type InventoryLog = {
   id: string;
@@ -34,7 +40,9 @@ type InventoryLog = {
   toWarehouseName?: string;
   adminId: string;
   date: Date;
-
+  source?: 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER';
+  note?: string;
+  referenceId?: string;
 };
 
 export default function InventoryHistoryPage() {
@@ -42,6 +50,7 @@ export default function InventoryHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const [filterSource, setFilterSource] = useState('ALL');
 
   useEffect(() => {
     // 1. Ambil data gudang dulu untuk mapping ID ke Nama
@@ -85,10 +94,36 @@ export default function InventoryHistoryPage() {
   }, []);
 
   const filteredLogs = logs.filter(log => {
-    const matchesSearch = log.productName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = log.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          log.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          log.referenceId?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'ALL' || log.type === filterType;
-    return matchesSearch && matchesType;
+    const matchesSource = filterSource === 'ALL' || log.source === filterSource;
+    return matchesSearch && matchesType && matchesSource;
   });
+
+  const getSourceIcon = (source?: string) => {
+    switch (source) {
+      case 'PURCHASE': return <Truck size={14} />;
+      case 'ORDER': return <Package size={14} />;
+      case 'CASHIER': return <Store size={14} />;
+      case 'MANUAL': return <User size={14} />;
+      case 'OPNAME': return <FileText size={14} />;
+      default: return <History size={14} />;
+    }
+  };
+
+  const getSourceLabel = (source?: string) => {
+    switch (source) {
+      case 'PURCHASE': return 'Pembelian';
+      case 'ORDER': return 'Pesanan Online';
+      case 'CASHIER': return 'Kasir Toko';
+      case 'MANUAL': return 'Manual';
+      case 'OPNAME': return 'Stok Opname';
+      case 'TRANSFER': return 'Transfer Gudang';
+      default: return source || 'Sistem';
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
@@ -125,10 +160,22 @@ export default function InventoryHistoryPage() {
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
-              <option value="ALL">Semua</option>
+              <option value="ALL">Tipe: Semua</option>
               <option value="MASUK">Masuk</option>
               <option value="KELUAR">Keluar</option>
               <option value="MUTASI">Mutasi</option>
+            </select>
+            <select
+              className="bg-gray-50 border-none rounded-xl text-[10px] font-black uppercase px-4 focus:ring-2 focus:ring-black"
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+            >
+              <option value="ALL">Sumber: Semua</option>
+              <option value="PURCHASE">Pembelian</option>
+              <option value="ORDER">Order Online</option>
+              <option value="CASHIER">Kasir</option>
+              <option value="MANUAL">Manual</option>
+              <option value="OPNAME">Opname</option>
             </select>
           </div>
         </div>
@@ -156,17 +203,30 @@ export default function InventoryHistoryPage() {
 
                     <div>
                       <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{log.productName}</h3>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${log.type === 'MASUK' ? 'bg-green-600 text-white' :
                             log.type === 'KELUAR' ? 'bg-red-600 text-white' :
                               'bg-purple-600 text-white'
                           }`}>
                           {log.type}
                         </span>
+                        
+                        {/* Source Badge */}
+                         <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider bg-gray-100 text-gray-600 flex items-center gap-1">
+                          {getSourceIcon(log.source)} {getSourceLabel(log.source)}
+                        </span>
+
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 uppercase">
                           <Calendar size={10} /> {log.date.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
+                      {/* Note / Reference */}
+                      {(log.note || log.referenceId) && (
+                        <div className="mt-2 text-[10px] text-gray-500 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100">
+                           {log.note && <p>Note: {log.note}</p>}
+                           {log.referenceId && <p className="font-mono text-gray-400 mt-0.5">Ref: {log.referenceId}</p>}
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -29,6 +29,7 @@ import {
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
+import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
 
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
@@ -217,12 +218,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     try {
       const orderRef = doc(db, 'orders', order.id);
 
-      await runTransaction(db, async (tx) => {
+      const logsToAdd = await runTransaction(db, async (tx) => {
         const snap = await tx.get(orderRef);
         if (!snap.exists()) {
           throw new Error('Pesanan tidak ditemukan saat konfirmasi');
         }
         const current = snap.data() as Order;
+        const logs: InventoryLogData[] = [];
 
         // --- SYNC STOCK LOGIC ---
         for (const newItem of editableItems) {
@@ -244,41 +246,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
               
               // Tentukan Gudang Target (Prioritas: warehouseId -> gudang-utama)
-              const whId = pData.warehouseId || 'gudang-utama';
+              const targetWarehouseId = pData.warehouseId || 'gudang-utama';
+              const currentWarehouseStock = stockByWarehouse[targetWarehouseId] || 0;
               
-              if (diff > 0) { // Pengurangan Stok (Deduct)
-                let remaining = diff;
-                
-                // 1. Cek Gudang Utama/Target
-                if (newStockByWarehouse[whId] && newStockByWarehouse[whId] > 0) {
-                  const take = Math.min(newStockByWarehouse[whId], remaining);
-                  newStockByWarehouse[whId] -= take;
-                  remaining -= take;
-                }
-                
-                // 2. Ambil dari Gudang Lain jika masih kurang
-                if (remaining > 0) {
-                  for (const key in newStockByWarehouse) {
-                    if (key === whId) continue;
-                    const take = Math.min(newStockByWarehouse[key], remaining);
-                    newStockByWarehouse[key] -= take;
-                    remaining -= take;
-                    if (remaining <= 0) break;
-                  }
-                }
-              } else { // Penambahan Stok (Restock/Refund)
-                const add = -diff;
-                newStockByWarehouse[whId] = (newStockByWarehouse[whId] || 0) + add;
-              }
+              // Update Stok Gudang
+              // Jika diff < 0 (stok berkurang karena pesanan bertambah), kurangi stok gudang
+              // Jika diff > 0 (stok bertambah karena pesanan berkurang), tambah stok gudang
+              // Note: Logic di sini agak counter-intuitive.
+              // diff = newQty - oldQty.
+              // Jika newQty > oldQty (pesanan nambah), maka stok gudang harus BERKURANG.
+              // Jadi change = -diff.
+              const stockChange = -diff;
+              
+              newStockByWarehouse[targetWarehouseId] = currentWarehouseStock + stockChange;
               
               tx.update(productRef, {
-                stock: currentStock - diff,
-                stockByWarehouse: newStockByWarehouse,
-                updatedAt: serverTimestamp()
+                stock: currentStock + stockChange,
+                stockByWarehouse: newStockByWarehouse
+              });
+
+              logs.push({
+                productId: newItem.productId!,
+                productName: newItem.name,
+                type: stockChange > 0 ? 'MASUK' : 'KELUAR',
+                amount: Math.abs(stockChange),
+                adminId: auth.currentUser?.uid || 'system',
+                source: 'ORDER',
+                orderId: order.id,
+                referenceId: order.id,
+                note: `Update pesanan #${order.id}`,
+                fromWarehouseId: stockChange < 0 ? targetWarehouseId : undefined,
+                toWarehouseId: stockChange > 0 ? targetWarehouseId : undefined
               });
             }
           }
-        }
         // -------------------------
 
         const currentSubtotal =
@@ -330,7 +331,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           const userRef = doc(db, 'users', current.userId);
           tx.update(userRef, { walletBalance: increment(calculatedRefund) });
         }
+
+        return logs;
       });
+
+      // Execute logs
+      if (logsToAdd && logsToAdd.length > 0) {
+        await Promise.all(logsToAdd.map(log => addInventoryLog(log)));
+      }
 
       if (
         refundAmount > 0 &&

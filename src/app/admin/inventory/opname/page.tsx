@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { auth, db } from '@/lib/firebase';
+import { addInventoryLog } from '@/lib/inventory';
 
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
@@ -10,7 +11,6 @@ import {
   collection,
   doc,
   updateDoc,
-  addDoc,
   serverTimestamp
 } from 'firebase/firestore';
 import {
@@ -63,16 +63,16 @@ export default function StockOpnamePage() {
       });
 
       // B. Catat Riwayat Mutasi sebagai OPNAME
-      await addDoc(collection(db, 'inventory_logs'), {
+      await addInventoryLog({
         productId: selectedProduct.id,
         productName: selectedProduct.name,
-        type: 'OPNAME',
-        quantity: Math.abs(diff), // Jumlah selisih
-        prevStock: selectedProduct.stock,
-        nextStock: physicalStock,
-        reason: `Opname: ${note || (diff >= 0 ? 'Kelebihan barang' : 'Barang kurang/hilang')}`,
-        operator: auth.currentUser?.email || 'Admin',
-        createdAt: serverTimestamp()
+        type: diff >= 0 ? 'MASUK' : 'KELUAR',
+        amount: Math.abs(diff),
+        adminId: auth.currentUser?.uid || 'system',
+        source: 'OPNAME',
+        note: `Opname: ${note || (diff >= 0 ? 'Kelebihan barang' : 'Barang kurang/hilang')}. Prev: ${selectedProduct.stock}, New: ${physicalStock}`,
+        toWarehouseId: diff >= 0 ? 'gudang-utama' : undefined,
+        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined
       });
 
       setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });

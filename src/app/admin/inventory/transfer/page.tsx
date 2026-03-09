@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-
+import { addInventoryLog } from '@/lib/inventory';
 
 import {
   collection,
   getDocs,
   doc,
   updateDoc,
-  addDoc,
   serverTimestamp,
   query,
   orderBy
@@ -123,14 +122,16 @@ export default function StockTransferPage() {
       await updateDoc(productRef, { stockByWarehouse: newStockByWarehouse });
 
       // Catat Log
-      await addDoc(collection(db, 'inventory_logs'), {
+      await addInventoryLog({
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         type: 'MUTASI',
-        quantity: qty,
-        reason: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`,
-        operator: auth.currentUser?.email || 'Admin',
-        createdAt: serverTimestamp()
+        amount: qty,
+        adminId: auth.currentUser?.uid || 'system',
+        source: 'TRANSFER',
+        fromWarehouseId: fromWarehouse,
+        toWarehouseId: toWarehouse,
+        note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
       });
 
       setStatus({ type: 'success', msg: 'Transfer stok berhasil!' });

@@ -18,6 +18,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
 import notify from '@/lib/notify';
+import { addInventoryLog } from '@/lib/inventory';
 
 
 
@@ -142,6 +143,19 @@ export default function StockInFormInner({ productId }: { productId: string }) {
         stockByWarehouse: {
           'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + formData.quantity
         }
+      });
+
+      // 3. Tambah log inventaris
+      await addInventoryLog({
+        productId: formData.productId,
+        productName: selectedProduct?.name || 'Unknown Product',
+        type: 'MASUK',
+        amount: formData.quantity,
+        adminId: auth.currentUser?.uid || 'system',
+        source: 'PURCHASE',
+        supplierId: formData.supplierId,
+        note: `Pembelian dari ${transactionData.supplierName}`,
+        toWarehouseId: 'gudang-utama'
       });
 
       notify.admin.success('Stok berhasil ditambahkan!');

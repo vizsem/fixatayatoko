@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
+import { addInventoryLog } from '@/lib/inventory';
 
 // Types
 type UnitOption = {
@@ -504,6 +505,20 @@ export default function CashierPOS() {
           const contains = Number(item.contains || 1);
           const pcsToDeduct = item.quantity * contains;
           batch.update(pRef, { stock: (pSnap.data().stock || 0) - pcsToDeduct });
+
+          // Log Inventory
+          await addInventoryLog({
+            productId: item.id,
+            productName: item.name,
+            type: 'KELUAR',
+            amount: pcsToDeduct,
+            adminId: auth.currentUser?.uid || 'cashier',
+            source: 'CASHIER',
+            referenceId: newOrderRef.id,
+            orderId: newOrderRef.id,
+            note: `Transaksi Kasir via ${paymentMethod}`,
+            fromWarehouseId: 'gudang-utama'
+          }, batch);
         }
       }
 

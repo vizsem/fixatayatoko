@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { auth, db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
 import type { UnitOption } from '@/lib/normalize';
+import { addInventoryLog } from '@/lib/inventory';
 
 
 import { useRouter } from 'next/navigation';
@@ -186,13 +187,35 @@ export default function InventoryDashboard() {
 
   const handleQuickUpdate = async (id: string) => {
     try {
+      const product = products.find(p => p.id === id);
+      if (!product) return;
+
+      const diff = tempStock - product.stock;
+      if (diff === 0) {
+        setEditingId(null);
+        return;
+      }
+
       const ref = doc(db, 'products', id);
       await updateDoc(ref, { stock: tempStock, updatedAt: serverTimestamp() });
+
+      // Log it
+      await addInventoryLog({
+        productId: id,
+        productName: product.name,
+        type: diff > 0 ? 'MASUK' : 'KELUAR',
+        amount: Math.abs(diff),
+        adminId: auth.currentUser?.uid || 'system',
+        source: 'MANUAL',
+        note: `Quick Update via Dashboard. Prev: ${product.stock}, New: ${tempStock}`,
+        toWarehouseId: diff > 0 ? 'gudang-utama' : undefined,
+        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined
+      });
+
       setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: tempStock } : p));
       setEditingId(null);
       notify.admin.success('Stok diperbarui');
     } catch { notify.admin.error('Gagal memperbarui stok'); }
-
   };
 
   // --- PAGINATION LOGIC ---
