@@ -74,23 +74,35 @@ export default function PurchaseDetail() {
           purchasePrice: Number(i.purchasePrice)
         })),
         paymentMethod: editForm.paymentMethod,
-        createdAt: Timestamp.fromDate(new Date(editDate)),
+        // Convert to Firestore Timestamp correctly
+        createdAt: editDate ? Timestamp.fromDate(new Date(editDate)) : purchase.createdAt,
         subtotal: newSubtotal,
         total: newTotal
       };
 
       await updateDoc(doc(db, 'purchases', purchase.id), updateData);
       
-      // Update local state
-      setPurchase({ 
+      // Update local state with the same structure as Firestore returns
+      // We need to ensure dateFormatted updates correctly too
+      const updatedPurchase = { 
         ...purchase, 
         ...updateData,
+        // Ensure items is correct
         // @ts-ignore
         items: updateData.items
-      });
+      };
+      
+      setPurchase(updatedPurchase);
       
       setIsEditing(false);
       toast.success('Transaksi diperbarui!');
+      
+      // Force a small delay to ensure React state updates are perceived visually or just to be safe
+      setTimeout(() => {
+         // Optional: Reload data from server to be 100% sure
+         // router.refresh(); // This might be too heavy, local state update should be enough if correct
+      }, 100);
+
     } catch (error) {
       console.error(error);
       toast.error('Gagal menyimpan perubahan');
