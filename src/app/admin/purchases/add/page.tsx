@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -129,7 +129,7 @@ export default function AddPurchase() {
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      await addDoc(collection(db, 'purchases'), {
+      const purchaseRef = await addDoc(collection(db, 'purchases'), {
         supplierId: selectedSupplier,
         supplierName,
         warehouseId: selectedWarehouse,
@@ -144,6 +144,55 @@ export default function AddPurchase() {
         status: 'MENUNGGU', // Default status awal
         createdAt: serverTimestamp(),
       });
+
+      // Update Product Cost (Average Cost Method) & Log Changes
+      for (const item of cart) {
+        const productRef = doc(db, 'products', item.id);
+        const productSnap = await getDoc(productRef);
+        
+        if (productSnap.exists()) {
+          const productData = productSnap.data();
+          const currentStock = productData.stock || 0; // Stok saat ini (sebelum tambah)
+          const currentCost = productData.cost || productData.Modal || 0; // HPP lama
+          
+          const newQty = item.quantity * (item.conversion || 1); // Qty beli dalam satuan dasar
+          const newCostTotal = item.purchasePrice * item.quantity; // Total harga beli item ini
+          const unitCostNew = newCostTotal / newQty; // Harga beli per satuan dasar baru
+
+          // Rumus Average Cost: ((Stok Lama * HPP Lama) + (Qty Baru * HPP Baru)) / (Stok Lama + Qty Baru)
+          let newAverageCost = currentCost;
+          if (currentStock + newQty > 0) {
+             newAverageCost = ((currentStock * currentCost) + (newQty * unitCostNew)) / (currentStock + newQty);
+          } else {
+             newAverageCost = unitCostNew;
+          }
+          
+          // Bulatkan
+          newAverageCost = Math.round(newAverageCost);
+
+          // Update HPP di Produk jika berbeda
+          if (newAverageCost !== currentCost) {
+            await updateDoc(productRef, {
+              cost: newAverageCost,
+              Modal: newAverageCost // Update field legacy juga
+            });
+
+            // Catat Log Perubahan Harga
+            await addDoc(collection(db, 'product_cost_logs'), {
+              productId: item.id,
+              productName: item.name,
+              oldCost: currentCost,
+              newCost: newAverageCost,
+              purchaseId: purchaseRef.id,
+              purchasePrice: unitCostNew,
+              quantity: newQty,
+              changeDate: serverTimestamp(),
+              adminId: 'system', // Atau ambil current user ID
+              reason: 'PURCHASE_AVG_CALCULATION'
+            });
+          }
+        }
+      }
 
       router.push('/admin/purchases');
     } catch (err) {

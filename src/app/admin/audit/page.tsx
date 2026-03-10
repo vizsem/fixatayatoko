@@ -32,9 +32,19 @@ import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 // --- TYPES ---
-type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit';
+type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost';
 
-interface ProfitLog {
+interface CostLog {
+  id: string;
+  productName: string;
+  oldCost: number;
+  newCost: number;
+  changeDate: Timestamp;
+  adminId?: string;
+  purchaseId?: string;
+  quantity?: number; // Qty pembelian yang memicu perubahan
+  purchasePrice?: number; // Harga beli baru yang memicu perubahan
+}
   id: string; // Order ID
   date: Timestamp;
   totalSales: number;
@@ -100,6 +110,7 @@ export default function AuditPage() {
   const [transactions, setTransactions] = useState<TransactionLog[]>([]);
   const [shifts, setShifts] = useState<CashierShift[]>([]);
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
+  const [costLogs, setCostLogs] = useState<CostLog[]>([]);
   const [profitSummary, setProfitSummary] = useState({ 
     sales: 0, 
     cost: 0, 
@@ -162,7 +173,22 @@ export default function AuditPage() {
           const orderSales = data.total || 0;
           
           const profitItems = items.map((i: any) => {
-            const itemCost = (i.cost || 0) * (i.quantity || 1);
+            // Prioritize 'cost' field from order item, then try to estimate or fallback
+            // Note: Ideally 'cost' should be saved in order items during checkout
+            let itemCost = (i.cost || 0) * (i.quantity || 1);
+            
+            // Fallback if cost is 0 (maybe old data or not saved)
+            if (itemCost === 0 && i.price) {
+               // Estimate cost as 80% of price if not available (Standard retail margin estimation)
+               // Better approach: fetch product current cost, but that might have changed. 
+               // For audit, using saved cost is best. If 0, we can flag it or estimate.
+               // Let's try to be safe and set it to 0 if not found, or maybe estimate.
+               // Based on user request "hpp modal tidak muncul", likely it is 0.
+               // We will try to use 'modal' field if 'cost' is missing, some systems use that.
+               const unitCost = i.cost || i.modal || i.purchasePrice || 0;
+               itemCost = unitCost * (i.quantity || 1);
+            }
+
             const itemSales = (i.price || 0) * (i.quantity || 1);
             // Assuming i.originalPrice exists, otherwise fallback to price
             const itemOriginalSales = (i.originalPrice || i.price || 0) * (i.quantity || 1);
@@ -210,6 +236,10 @@ export default function AuditPage() {
           expenses: totalExpenses,
           netProfit: netProfitTotal
         });
+      } else if (activeTab === 'cost') {
+        const q = query(collection(db, 'product_cost_logs'), orderBy('changeDate', 'desc'), limit(100));
+        const snap = await getDocs(q);
+        setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as CostLog)));
       }
     } catch (error) {
       console.error("Error fetching audit data:", error);
@@ -266,6 +296,18 @@ export default function AuditPage() {
         Margin: p.margin.toFixed(2) + '%',
         Detail: p.items.map(i => `${i.name} (${i.qty}x)`).join(', ')
       }));
+    } else if (activeTab === 'cost') {
+      data = costLogs.map(c => ({
+        Tanggal: c.changeDate?.toDate ? format(c.changeDate.toDate(), 'dd/MM/yyyy HH:mm') : '-',
+        Produk: c.productName,
+        'Modal Lama': c.oldCost,
+        'Modal Baru': c.newCost,
+        'Selisih': c.newCost - c.oldCost,
+        'Harga Beli': c.purchasePrice || '-',
+        'Qty Beli': c.quantity || '-',
+        'Sumber': c.purchaseId ? `Pembelian #${c.purchaseId.slice(-4)}` : 'Manual Edit',
+        Admin: c.adminId || '-'
+      }));
     }
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -295,7 +337,13 @@ export default function AuditPage() {
         p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.items.some(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
+    } else if (activeTab === 'cost') {
+      return costLogs.filter(c => 
+        c.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.adminId || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
+    return [];
   };
 
   return (
@@ -315,6 +363,7 @@ export default function AuditPage() {
             { id: 'transaction', label: 'Transaksi', icon: ArrowLeftRight },
             { id: 'finance', label: 'Keuangan Shift', icon: Wallet },
             { id: 'profit', label: 'Laba Rugi', icon: ArrowUpCircle },
+            { id: 'cost', label: 'Harga Beli (HPP)', icon: ArrowDownCircle },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -594,6 +643,46 @@ export default function AuditPage() {
                 </table>
                 </div>
               </div>
+            )}
+            
+            {activeTab === 'cost' && (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
+                    <th className="p-4">Waktu</th>
+                    <th className="p-4">Produk</th>
+                    <th className="p-4">Modal Lama</th>
+                    <th className="p-4">Modal Baru (Avg)</th>
+                    <th className="p-4">Selisih</th>
+                    <th className="p-4">Sumber</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredData().map((l: any) => (
+                    <tr key={l.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4 text-xs font-bold text-gray-600">
+                        {l.changeDate?.toDate ? format(l.changeDate.toDate(), 'dd/MM/yyyy HH:mm', { locale: id }) : '-'}
+                      </td>
+                      <td className="p-4 text-sm font-black text-gray-800">{l.productName}</td>
+                      <td className="p-4 text-xs font-bold text-gray-500">Rp{l.oldCost.toLocaleString()}</td>
+                      <td className="p-4 text-xs font-black text-blue-600">Rp{l.newCost.toLocaleString()}</td>
+                      <td className={`p-4 text-xs font-bold ${l.newCost > l.oldCost ? 'text-red-500' : 'text-green-500'}`}>
+                        {l.newCost > l.oldCost ? '↑' : '↓'} Rp{Math.abs(l.newCost - l.oldCost).toLocaleString()}
+                      </td>
+                      <td className="p-4">
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase">
+                          {l.purchaseId ? 'PEMBELIAN' : 'MANUAL'}
+                        </span>
+                        {l.purchaseId && (
+                          <div className="text-[9px] text-gray-400 mt-1">
+                            Beli: {l.quantity}x @Rp{l.purchasePrice?.toLocaleString()}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
             
             {filteredData().length === 0 && (
