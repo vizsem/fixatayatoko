@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { auth, db } from '@/lib/firebase';
-
-
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -13,10 +11,11 @@ import {
   getDocs,
   query,
   where,
-  orderBy
+  orderBy,
+  Timestamp
 } from 'firebase/firestore';
 import Link from 'next/link';
-import * as XLSX from 'xlsx'; // Import library XLSX
+import * as XLSX from 'xlsx';
 import {
   TrendingUp,
   Users,
@@ -31,12 +30,20 @@ import {
   Activity,
   ArrowUpRight,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  BarChart3,
+  PieChart,
+  Package,
+  Truck
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
-
+type DailySales = {
+  date: string;
+  total: number;
+  label: string;
+};
 
 type ReportSummary = {
   totalSales: number;
@@ -47,6 +54,7 @@ type ReportSummary = {
   outstandingDebt: number;
   activeCustomers: number;
   averageOrderValue: number;
+  dailySales: DailySales[];
 };
 
 const getInitialDateRange = () => {
@@ -57,6 +65,7 @@ const getInitialDateRange = () => {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+  // Default to first day of current month
   return {
     startDate: toLocal(new Date(now.getFullYear(), now.getMonth(), 1)),
     endDate: toLocal(now)
@@ -75,73 +84,13 @@ export default function ReportsDashboard() {
     totalCustomers: 0,
     outstandingDebt: 0,
     activeCustomers: 0,
-    averageOrderValue: 0
+    averageOrderValue: 0,
+    dailySales: []
   });
 
   const [dateRange, setDateRange] = useState(getInitialDateRange());
 
-
-  // 1. Proteksi Admin & Auth
-  const fetchReportSummary = useCallback(async () => {
-    try {
-      const start = new Date(dateRange.startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(dateRange.endDate);
-      end.setHours(23, 59, 59, 999);
-
-      // Fetch Orders dalam periode
-      const ordersRef = collection(db, 'orders');
-      const qOrders = query(
-        ordersRef,
-        where('createdAt', '>=', start),
-        where('createdAt', '<=', end),
-        orderBy('createdAt', 'desc')
-      );
-      const ordersSnap = await getDocs(qOrders);
-
-      let tSales = 0;
-      let tDebt = 0;
-      const customerIds = new Set<string>();
-
-      ordersSnap.forEach((doc) => {
-        const data = doc.data();
-        const status = String(data.status || '').toUpperCase();
-        if (['SELESAI', 'SUCCESS'].includes(status)) {
-          tSales += Number(data.total || 0);
-        }
-
-        // Hitung Piutang (Status selain Selesai/Batal dianggap piutang berjalan/pending)
-        if (!['SELESAI', 'DIBATALKAN', 'SUCCESS'].includes(data.status?.toUpperCase())) {
-          tDebt += Number(data.total || 0);
-        }
-
-        if (data.customerId) customerIds.add(data.customerId);
-      });
-
-      // Fetch Produk & Stok
-      const productsSnap = await getDocs(collection(db, 'products'));
-      const lowStock = productsSnap.docs.filter(d => ((d.data().stock as number) || 0) <= 10).length;
-
-      // Fetch Total Basis Pelanggan
-      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
-
-      setSummary({
-        totalSales: tSales,
-        totalOrders: ordersSnap.size,
-        totalProducts: productsSnap.size,
-        lowStockCount: lowStock,
-        totalCustomers: usersSnap.size,
-        outstandingDebt: tDebt,
-        activeCustomers: customerIds.size,
-        averageOrderValue: ordersSnap.size > 0 ? tSales / ordersSnap.size : 0
-      });
-    } catch {
-      // Error is logged to console during dev
-    }
-
-  }, [dateRange]);
-
-  // 1. Proteksi Admin & Auth
+  // 1. Admin Protection & Auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -155,18 +104,107 @@ export default function ReportsDashboard() {
         router.push('/profil');
         return;
       }
-      setLoading(false);
+      // Don't set loading false here, wait for data fetch
     });
     return () => unsubscribe();
   }, [router]);
 
-  // 2. Fetch Data Laporan
+  // 2. Fetch Report Data
+  const fetchReportSummary = useCallback(async () => {
+    setLoading(true);
+    try {
+      const start = new Date(dateRange.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(dateRange.endDate);
+      end.setHours(23, 59, 59, 999);
+
+      // Fetch Orders in period
+      const ordersRef = collection(db, 'orders');
+      const qOrders = query(
+        ordersRef,
+        where('createdAt', '>=', start),
+        where('createdAt', '<=', end),
+        orderBy('createdAt', 'asc') // Ascending for chart
+      );
+      const ordersSnap = await getDocs(qOrders);
+
+      let tSales = 0;
+      let tDebt = 0;
+      const customerIds = new Set<string>();
+      const salesMap: Record<string, number> = {};
+
+      // Initialize sales map for the entire range (to fill gaps)
+      const currentDate = new Date(start);
+      while (currentDate <= end) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        salesMap[dateKey] = 0;
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      ordersSnap.forEach((doc) => {
+        const data = doc.data();
+        const status = String(data.status || '').toUpperCase();
+        
+        // Count Sales
+        if (['SELESAI', 'SUCCESS'].includes(status)) {
+          const total = Number(data.total || 0);
+          tSales += total;
+          
+          // Daily Sales for Chart
+          if (data.createdAt) {
+            const dateKey = data.createdAt.toDate().toISOString().split('T')[0];
+            if (salesMap[dateKey] !== undefined) {
+              salesMap[dateKey] += total;
+            }
+          }
+        }
+
+        // Count Debt (Pending/Not Finished/Not Cancelled)
+        if (!['SELESAI', 'DIBATALKAN', 'SUCCESS'].includes(status)) {
+          tDebt += Number(data.total || 0);
+        }
+
+        if (data.customerId) customerIds.add(data.customerId);
+      });
+
+      // Convert salesMap to array
+      const dailySales = Object.entries(salesMap).map(([date, total]) => ({
+        date,
+        total,
+        label: new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+      })).sort((a, b) => a.date.localeCompare(b.date));
+
+      // Fetch Products & Stock
+      const productsSnap = await getDocs(collection(db, 'products'));
+      const lowStock = productsSnap.docs.filter(d => ((d.data().stock as number) || 0) <= 10).length;
+
+      // Fetch Total Customer Base
+      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
+
+      setSummary({
+        totalSales: tSales,
+        totalOrders: ordersSnap.size,
+        totalProducts: productsSnap.size,
+        lowStockCount: lowStock,
+        totalCustomers: usersSnap.size,
+        outstandingDebt: tDebt,
+        activeCustomers: customerIds.size,
+        averageOrderValue: ordersSnap.size > 0 ? tSales / ordersSnap.size : 0,
+        dailySales
+      });
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      notify.admin.error("Gagal memuat data laporan");
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => {
-    if (!loading) fetchReportSummary();
-  }, [fetchReportSummary, loading]);
+    fetchReportSummary();
+  }, [fetchReportSummary]);
 
-
-  // 3. Fungsi Ekspor ke Excel
+  // 3. Export to Excel
   const handleExportSummary = () => {
     setIsExporting(true);
     try {
@@ -179,55 +217,57 @@ export default function ReportsDashboard() {
         { Kategori: 'Pelanggan Aktif (Periode Ini)', Nilai: summary.activeCustomers },
         { Kategori: 'Total Produk SKU', Nilai: summary.totalProducts },
         { Kategori: 'Produk Stok Kritis', Nilai: summary.lowStockCount },
+        { Kategori: '', Nilai: '' },
+        { Kategori: 'Detail Harian', Nilai: '' },
+        ...summary.dailySales.map(d => ({
+          Kategori: d.date,
+          Nilai: d.total
+        }))
       ];
 
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Summary");
       XLSX.writeFile(workbook, `Laporan_AtayaToko_${dateRange.startDate}.xlsx`);
+      notify.success("Laporan berhasil diekspor!");
     } catch {
       notify.admin.error("Gagal mengekspor data");
     } finally {
-
       setIsExporting(false);
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="flex flex-col items-center gap-3">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-green-600 border-gray-200"></div>
-        <p className="text-xs font-black tracking-widest text-gray-400">Menyusun data...</p>
-
-      </div>
-    </div>
-  );
-
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8 bg-[#FBFBFE] min-h-screen">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 bg-gray-50/50 min-h-screen">
       <Toaster position="top-right" />
+      
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 tracking-tighter">Business analytics</h1>
-          <p className="text-gray-400 text-xs font-bold tracking-widest mt-1">Laporan operasional Atayatoko</p>
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
+            Business Analytics
+          </h1>
+          <p className="text-gray-500 font-medium">
+            Overview performa & kesehatan bisnis Anda
+          </p>
         </div>
 
-
-        <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 px-3 border-r border-gray-100">
-            <Calendar size={16} className="text-gray-400" />
+        {/* Date Filter */}
+        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
+            <Calendar size={16} className="text-gray-400 group-focus-within:text-blue-600" />
             <input
               type="date"
-              className="text-xs font-bold outline-none bg-transparent"
+              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-28 cursor-pointer"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
             />
           </div>
-          <div className="flex items-center gap-2 px-3">
+          <span className="text-gray-300 font-bold">-</span>
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
             <input
               type="date"
-              className="text-xs font-bold outline-none bg-transparent"
+              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-28 cursor-pointer"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
@@ -235,223 +275,304 @@ export default function ReportsDashboard() {
         </div>
       </div>
 
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <StatCard
-          label="Total Revenue"
-          value={`Rp${summary.totalSales.toLocaleString()}`}
-          icon={TrendingUp}
-          color="text-green-600"
-          bg="bg-green-50"
-          trend="+12.5%"
-        />
-        <StatCard
-          label="Total Orders"
-          value={summary.totalOrders}
-          icon={ShoppingCart}
-          color="text-blue-600"
-          bg="bg-blue-50"
-          trend={`${summary.activeCustomers} Users`}
-        />
-        <StatCard
-          label="Avg. Order Value"
-          value={`Rp${Math.round(summary.averageOrderValue).toLocaleString()}`}
-          icon={CreditCard}
-          color="text-purple-600"
-          bg="bg-purple-50"
-        />
-        <StatCard
-          label="Inventory Health"
-          value={`${summary.lowStockCount} Low`}
-          icon={AlertTriangle}
-          color="text-orange-600"
-          bg="bg-orange-50"
-          subValue={`${summary.totalProducts} Total SKU`}
-        />
-      </div>
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          {/* Main Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              label="Total Revenue"
+              value={`Rp${summary.totalSales.toLocaleString('id-ID')}`}
+              icon={TrendingUp}
+              color="text-emerald-600"
+              bg="bg-emerald-100/50"
+              borderColor="border-emerald-100"
+              trend="Periode ini"
+            />
+            <StatCard
+              label="Total Orders"
+              value={summary.totalOrders}
+              icon={ShoppingCart}
+              color="text-blue-600"
+              bg="bg-blue-100/50"
+              borderColor="border-blue-100"
+              trend={`${summary.activeCustomers} Active Users`}
+            />
+            <StatCard
+              label="Avg. Order Value"
+              value={`Rp${Math.round(summary.averageOrderValue).toLocaleString('id-ID')}`}
+              icon={CreditCard}
+              color="text-violet-600"
+              bg="bg-violet-100/50"
+              borderColor="border-violet-100"
+            />
+            <StatCard
+              label="Stok Kritis"
+              value={`${summary.lowStockCount} SKU`}
+              icon={AlertTriangle}
+              color="text-amber-600"
+              bg="bg-amber-100/50"
+              borderColor="border-amber-100"
+              subValue={`${summary.totalProducts} Total Produk`}
+            />
+          </div>
 
-      {/* Second Row: Debt & Customer Base */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-gray-400 text-[10px] font-black tracking-[0.2em]">Piutang & transaksi pending</h3>
-
-                <p className="text-3xl font-black text-gray-800 mt-1 tracking-tighter">
-                  Rp{summary.outstandingDebt.toLocaleString()}
-                </p>
+          {/* Charts & Secondary Stats */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            
+            {/* Sales Chart Card */}
+            <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-gray-900 font-extrabold text-xl">Tren Penjualan</h3>
+                  <p className="text-gray-400 text-xs font-medium mt-1">Grafik pendapatan harian periode ini</p>
+                </div>
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <BarChart3 size={20} />
+                </div>
               </div>
+              
+              <div className="h-64 w-full">
+                <SimpleAreaChart data={summary.dailySales} />
+              </div>
+            </div>
+
+            {/* Financial & Debt Card */}
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between group">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2.5 bg-rose-50 rounded-xl">
+                    <Activity size={18} className="text-rose-500" />
+                  </div>
+                  <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Piutang Berjalan</h3>
+                </div>
+                <p className="text-4xl font-black text-gray-900 tracking-tight">
+                  Rp{summary.outstandingDebt.toLocaleString('id-ID')}
+                </p>
+                
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1.5">
+                      <span>Rasio Piutang</span>
+                      <span>{((summary.outstandingDebt / (summary.totalSales || 1)) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-50 h-2.5 rounded-full overflow-hidden border border-gray-100">
+                      <div 
+                        className="bg-gradient-to-r from-rose-500 to-rose-400 h-full rounded-full" 
+                        style={{ width: `${Math.min((summary.outstandingDebt / (summary.totalSales || 1)) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <button
                 onClick={handleExportSummary}
                 disabled={isExporting}
-                className="bg-green-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-green-700 transition-all active:scale-95 shadow-lg shadow-green-100"
-
+                className="mt-8 w-full bg-gray-900 text-white px-6 py-4 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200"
               >
-                {isExporting ? <Activity className="animate-spin" size={16} /> : <Download size={16} />}
-                Export Report
+                {isExporting ? <Activity className="animate-spin" size={18} /> : <Download size={18} />}
+                Export Laporan Excel
               </button>
-            </div>
-            <div className="w-full bg-gray-100 h-2 rounded-full mb-4">
-              <div className="bg-red-500 h-2 rounded-full" style={{ width: `${(summary.outstandingDebt / (summary.totalSales || 1)) * 100}%` }}></div>
-            </div>
-            <p className="text-[10px] font-bold text-gray-400 tracking-widest">
 
-              Rasio Piutang: {((summary.outstandingDebt / (summary.totalSales || 1)) * 100).toFixed(1)}% dari total omzet periode ini
-            </p>
-          </div>
-          <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
-            <TrendingUp size={200} />
-          </div>
-        </div>
-
-        <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-between shadow-2xl">
-          <div>
-            <Users className="text-green-400 mb-4" size={32} />
-            <h3 className="text-gray-400 text-[10px] font-black tracking-[0.2em]">Customer database</h3>
-
-            <p className="text-4xl font-black mt-2 tracking-tighter">{summary.totalCustomers}</p>
-            <div className="mt-4 flex items-center gap-2">
-              <span className="bg-green-500/20 text-green-400 text-[9px] font-black px-2 py-1 rounded-md">
-
-                {summary.activeCustomers} Aktif
-              </span>
-              <span className="text-[9px] font-bold text-gray-500 tracking-widest">Bulan ini</span>
-
+              {/* Decorative */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
             </div>
           </div>
-          <Link href="/admin/customers" className="mt-8 flex items-center justify-between group">
-            <span className="text-xs font-black tracking-widest">Detail pelanggan</span>
 
-            <div className="bg-white/10 p-2 rounded-xl group-hover:bg-green-600 transition-all">
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        </div>
+          {/* Module Links Grid */}
+          <div className="mb-6 flex items-center gap-3">
+            <div className="h-8 w-1.5 bg-blue-600 rounded-full"></div>
+            <h3 className="text-xl font-bold text-gray-900">Modul Laporan Detail</h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <ReportLink
+              title="Laporan Penjualan"
+              desc="Analisis detail omzet, produk terlaris, dan tren waktu."
+              icon={FileText}
+              href="/admin/reports/sales"
+              color="text-emerald-600"
+              bg="bg-emerald-50"
+              hoverBorder="group-hover:border-emerald-200"
+            />
+            <ReportLink
+              title="Laporan Inventaris"
+              desc="Mutasi stok, valuasi aset, dan riwayat opname."
+              icon={Database}
+              href="/admin/reports/inventory"
+              color="text-violet-600"
+              bg="bg-violet-50"
+              hoverBorder="group-hover:border-violet-200"
+            />
+            <ReportLink
+              title="Laporan Keuangan"
+              desc="Arus kas masuk/keluar, laba rugi, dan pengeluaran."
+              icon={DollarSign}
+              href="/admin/reports/finance"
+              color="text-cyan-600"
+              bg="bg-cyan-50"
+              hoverBorder="group-hover:border-cyan-200"
+            />
+            <ReportLink
+              title="Laporan Operasional"
+              desc="Kinerja karyawan, pengiriman, dan logistik."
+              icon={Package}
+              href="/admin/reports/operations"
+              color="text-amber-600"
+              bg="bg-amber-50"
+              hoverBorder="group-hover:border-amber-200"
+            />
+             <ReportLink
+              title="Database Pelanggan"
+              desc="Analisis demografi, riwayat belanja, dan loyalitas."
+              icon={Users}
+              href="/admin/reports/customers"
+              color="text-blue-600"
+              bg="bg-blue-50"
+              hoverBorder="group-hover:border-blue-200"
+            />
+            <ReportLink
+              title="Promo & Diskon"
+              desc="Efektivitas kupon dan program promosi berjalan."
+              icon={Gift}
+              href="/admin/reports/promotions"
+              color="text-rose-600"
+              bg="bg-rose-50"
+              hoverBorder="group-hover:border-rose-200"
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- Components ---
+
+function SimpleAreaChart({ data }: { data: DailySales[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm font-medium">
+        Tidak ada data penjualan
       </div>
+    );
+  }
 
-      {/* Grid Menu Laporan Detail */}
-      <h3 className="text-xs font-black text-gray-400 tracking-[0.3em] mb-6">Modul analisis detail</h3>
+  const maxVal = Math.max(...data.map(d => d.total), 1);
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1 || 1)) * 100;
+    const y = 100 - (d.total / maxVal) * 100;
+    return `${x},${y}`;
+  });
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <ReportLink
-          title="Penjualan"
-          desc="Analisis tren omzet & item terlaris"
-          icon={FileText}
-          href="/admin/reports/sales"
-          color="text-green-600"
-          bg="bg-green-50"
-        />
-        <ReportLink
-          title="Inventaris"
-          desc="Valuasi stok & audit gudang"
-          icon={Database}
-          href="/admin/reports/inventory"
-          color="text-purple-600"
-          bg="bg-purple-50"
-        />
-        <ReportLink
-          title="Keuangan"
-          desc="Arus kas & margin keuntungan"
-          icon={DollarSignIcon}
-          href="/admin/reports/finance"
-          color="text-emerald-600"
-          bg="bg-emerald-50"
-        />
-        <ReportLink
-          title="Promosi"
-          desc="ROI diskon & penggunaan kupon"
-          icon={Gift}
-          href="/admin/reports/promotions"
-          color="text-pink-600"
-          bg="bg-pink-50"
-        />
-        <ReportLink
-          title="Operasional"
-          desc="Produktivitas & logistik"
-          icon={Activity}
-          href="/admin/reports/operations"
-          color="text-amber-600"
-          bg="bg-amber-50"
-        />
-        <ReportLink
-          title="Pelanggan"
-          desc="LTV & segmentasi pasar"
-          icon={Users}
-          href="/admin/reports/customers"
-          color="text-blue-600"
-          bg="bg-blue-50"
-        />
+  const pathD = `M0,100 L0,${100 - (data[0].total / maxVal) * 100} ${points.map((p, i) => `L${p.split(',')[0]},${p.split(',')[1]}`).join(' ')} L100,100 Z`;
+  const lineD = `M0,${100 - (data[0].total / maxVal) * 100} ${points.map((p, i) => `L${p.split(',')[0]},${p.split(',')[1]}`).join(' ')}`;
+
+  return (
+    <div className="relative h-full w-full pb-6">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full overflow-visible">
+        {/* Grid Lines */}
+        <line x1="0" y1="25" x2="100" y2="25" stroke="#f3f4f6" strokeWidth="0.5" strokeDasharray="2" />
+        <line x1="0" y1="50" x2="100" y2="50" stroke="#f3f4f6" strokeWidth="0.5" strokeDasharray="2" />
+        <line x1="0" y1="75" x2="100" y2="75" stroke="#f3f4f6" strokeWidth="0.5" strokeDasharray="2" />
+
+        {/* Area */}
+        <path d={pathD} fill="url(#gradient)" opacity="0.2" />
+        <defs>
+          <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Line */}
+        <path d={lineD} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        
+        {/* Points (Only show if few data points) */}
+        {data.length < 20 && data.map((d, i) => {
+           const x = (i / (data.length - 1 || 1)) * 100;
+           const y = 100 - (d.total / maxVal) * 100;
+           return (
+             <circle key={i} cx={x} cy={y} r="1.5" fill="#fff" stroke="#10b981" strokeWidth="0.5" className="hover:r-2 transition-all" />
+           )
+        })}
+      </svg>
+      
+      {/* X Axis Labels */}
+      <div className="absolute bottom-0 w-full flex justify-between text-[10px] text-gray-400 font-medium px-1">
+        <span>{data[0]?.label}</span>
+        <span>{data[Math.floor(data.length / 2)]?.label}</span>
+        <span>{data[data.length - 1]?.label}</span>
       </div>
     </div>
   );
 }
 
-// --- Sub Komponen ---
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-
-  color: string;
-  bg: string;
-  trend?: string;
-  subValue?: string;
-}
-
-function StatCard({ label, value, icon: Icon, color, bg, trend, subValue }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, color, bg, borderColor, trend, subValue }: any) {
   return (
-    <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`${bg} ${color} p-3 rounded-2xl group-hover:scale-110 transition-transform`}>
-          <Icon size={20} />
+    <div className={`bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden`}>
+      <div className="flex justify-between items-start mb-4 relative z-10">
+        <div className={`${bg} ${color} p-3.5 rounded-2xl border ${borderColor} group-hover:scale-110 transition-transform duration-300`}>
+          <Icon size={22} />
         </div>
         {trend && (
-          <span className="flex items-center gap-1 text-[10px] font-black text-green-500 bg-green-50 px-2 py-1 rounded-lg uppercase">
+          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
             <ArrowUpRight size={12} /> {trend}
           </span>
         )}
       </div>
-      <p className="text-[10px] font-black text-gray-400 tracking-widest">{label}</p>
+      
+      <div className="relative z-10">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+        <h3 className="text-2xl font-black text-gray-900 tracking-tight">{value}</h3>
+        {subValue && (
+          <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50 text-[10px] font-semibold text-gray-500">
+            <AlertTriangle size={10} /> {subValue}
+          </div>
+        )}
+      </div>
 
-      <h3 className="text-xl font-black text-gray-800 tracking-tighter mt-1">{value}</h3>
-      {subValue && <p className="text-[9px] font-bold text-gray-400 mt-1">{subValue}</p>}
-
+      <div className={`absolute inset-0 bg-gradient-to-br ${bg} opacity-0 group-hover:opacity-20 transition-opacity duration-500`}></div>
     </div>
   );
 }
 
-
-interface ReportLinkProps {
-  title: string;
-  desc: string;
-  icon: React.ElementType;
-
-  href: string;
-  color: string;
-  bg: string;
-}
-
-function ReportLink({ title, desc, icon: Icon, href, color, bg }: ReportLinkProps) {
+function ReportLink({ title, desc, icon: Icon, href, color, bg, hoverBorder }: any) {
   return (
-    <Link href={href} className="group">
-      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:border-green-100 hover:shadow-lg hover:shadow-green-100/20 transition-all flex flex-col h-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`${bg} ${color} p-3 rounded-2xl group-hover:rotate-12 transition-transform`}>
-            <Icon size={22} />
+    <Link href={href} className="group h-full">
+      <div className={`bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm ${hoverBorder} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col`}>
+        <div className="flex items-center justify-between mb-5">
+          <div className={`${bg} ${color} p-4 rounded-2xl group-hover:rotate-6 transition-transform duration-300`}>
+            <Icon size={24} />
           </div>
-          <ChevronRight size={18} className="text-gray-300 group-hover:text-green-600 group-hover:translate-x-1 transition-all" />
+          <div className="bg-gray-50 p-2 rounded-full group-hover:bg-gray-100 transition-colors">
+            <ChevronRight size={18} className="text-gray-300 group-hover:text-gray-600 transition-colors" />
+          </div>
         </div>
-        <h4 className="font-black text-gray-800 text-xs tracking-widest mb-2">{title}</h4>
-
-        <p className="text-xs text-gray-500 leading-relaxed font-medium">{desc}</p>
+        
+        <div className="mt-auto">
+          <h4 className="font-extrabold text-gray-900 text-sm tracking-wide mb-1.5">{title}</h4>
+          <p className="text-xs text-gray-500 font-medium leading-relaxed">{desc}</p>
+        </div>
       </div>
     </Link>
   );
 }
 
-// Helper untuk icon yang mungkin tidak ter-import otomatis
-function DollarSignIcon(props: { className?: string, size?: number }) {
-  return <DollarSign {...props} />
+function DashboardSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="bg-white h-40 rounded-[2rem] border border-gray-100"></div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <div className="lg:col-span-2 bg-white h-80 rounded-[2.5rem] border border-gray-100"></div>
+        <div className="bg-white h-80 rounded-[2.5rem] border border-gray-100"></div>
+      </div>
+    </div>
+  );
 }
