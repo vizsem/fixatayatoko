@@ -10,7 +10,7 @@ import {
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
-  Banknote
+  Banknote, Bell
 } from 'lucide-react';
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
@@ -110,6 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       group: "Pemasaran", items: [
         { name: 'Promosi', href: '/admin/promotions', icon: Star },
+        { name: 'Notifikasi', href: '/admin/notifications', icon: Bell },
       ]
     },
     {

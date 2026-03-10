@@ -2,11 +2,12 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { AlertTriangle, Package, ChevronLeft } from 'lucide-react'; // Tambah ChevronLeft
+import { AlertTriangle, Package, ChevronLeft, CheckCircle } from 'lucide-react'; // Tambah ChevronLeft
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast'; // Pastikan Toaster ada di layout atau tambahkan disini
 
 type OrderItem = {
   id: string;
@@ -39,6 +40,7 @@ export default function PublicOrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +77,28 @@ export default function PublicOrderDetailPage() {
 
     fetchOrder();
   }, [id]);
+
+  const handleCompleteOrder = async () => {
+    if (!order) return;
+    if (!confirm('Apakah Anda yakin pesanan sudah diterima dan ingin menyelesaikannya?')) return;
+
+    setUpdating(true);
+    try {
+      const orderRef = doc(db, 'orders', order.id);
+      await updateDoc(orderRef, {
+        status: 'SELESAI',
+        updatedAt: Timestamp.now()
+      });
+      
+      setOrder(prev => prev ? { ...prev, status: 'SELESAI' } : null);
+      toast.success('Pesanan berhasil diselesaikan!');
+    } catch (err) {
+      console.error('Error completing order:', err);
+      toast.error('Gagal menyelesaikan pesanan.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -191,6 +215,22 @@ export default function PublicOrderDetailPage() {
                     <span className="text-3xl font-black italic tracking-tighter">Rp{order.total.toLocaleString('id-ID')}</span>
                 </div>
             </div>
+
+            {/* Complete Order Button (Only for DIKIRIM status) */}
+            {order.status === 'DIKIRIM' && (
+              <button
+                onClick={handleCompleteOrder}
+                disabled={updating}
+                className="w-full mt-6 bg-green-600 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-green-200 hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updating ? 'Memproses...' : (
+                  <>
+                    <CheckCircle size={18} />
+                    Pesanan Diterima
+                  </>
+                )}
+              </button>
+            )}
 
             <div className="mt-10 text-center">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] mb-4">--- Terima Kasih Telah Berbelanja ---</p>

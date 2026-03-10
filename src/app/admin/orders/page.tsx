@@ -10,7 +10,7 @@ import {
 import {
   ShoppingCart, Search, Truck, Printer, XCircle,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
-  Clock, CheckCircle2, Trash2, AlertTriangle, Filter, RefreshCcw, Calendar
+  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -24,6 +24,7 @@ type Order = {
   total: number;
   status: 'MENUNGGU' | 'DIPROSES' | 'DIKIRIM' | 'SELESAI' | 'DIBATALKAN';
   deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
+  userId?: string;
 };
 
 export default function AdminOrders() {
@@ -66,7 +67,94 @@ export default function AdminOrders() {
     return () => unsubscribe();
   }, []);
 
-  // 3. Fungsi Cetak Cepat
+  // 6. Fungsi Auto-Update Status (Simulasi Cron Job)
+  // Menjalankan logika update status otomatis setiap kali halaman ini dimuat oleh admin
+  useEffect(() => {
+    const runAutoUpdate = async () => {
+      // Hanya jalankan jika data sudah ada
+      if (orders.length === 0) return;
+
+      const batch = writeBatch(db);
+      let batchCount = 0;
+      const now = new Date().getTime();
+
+      orders.forEach((order) => {
+        if (!order.createdAt) return;
+        const createdTime = order.createdAt.toDate().getTime();
+        const diffHours = (now - createdTime) / (1000 * 60 * 60);
+        
+        let newStatus = '';
+
+        // Aturan 1: 'MENUNGGU' -> 'DIPROSES' (Max 24 Jam)
+        if (order.status === 'MENUNGGU' && diffHours > 24) {
+          newStatus = 'DIPROSES';
+        }
+        
+        // Aturan 2: 'DIPROSES' -> 'DIKIRIM' (Setelah 12 Jam)
+        // Kita asumsikan 'updatedAt' jika ada, tapi pakai createdAt sebagai estimasi kasar jika tidak
+        else if (order.status === 'DIPROSES' && diffHours > 36) { // 24 + 12
+          newStatus = 'DIKIRIM';
+        }
+
+        // Aturan 3: 'DIKIRIM' -> 'SELESAI'
+        else if (order.status === 'DIKIRIM') {
+          // Estimasi berdasarkan deliveryMethod
+          let finishThresholdHours = 24; // Default 24 jam untuk lokal/toko
+          
+          // @ts-ignore - Check for channel property
+          if (order.channel === 'SHOPEE') finishThresholdHours = 72; // 3 Hari
+          // @ts-ignore
+          else if (order.channel === 'TIKTOK') finishThresholdHours = 216; // 9 Hari
+
+          // Total waktu sejak dibuat > waktu proses + waktu kirim
+          if (diffHours > (36 + finishThresholdHours)) {
+             newStatus = 'SELESAI';
+          }
+        }
+
+        if (newStatus && batchCount < 400) { // Limit batch size
+          const ref = doc(db, 'orders', order.id);
+          batch.update(ref, { 
+            status: newStatus,
+            // @ts-ignore
+            updatedAt: Timestamp.now() 
+          });
+          
+          // Kirim Notifikasi ke User
+          if (order.userId) {
+            const notifRef = doc(collection(db, 'notifications'));
+            batch.set(notifRef, {
+              title: `Pesanan ${newStatus}`,
+              body: `Status pesanan #${order.id.slice(0, 8)} telah diperbarui menjadi ${newStatus}.`,
+              type: 'transaction',
+              category: 'Pesanan',
+              userId: order.userId,
+              createdAt: Timestamp.now(),
+              read: false,
+              orderId: order.id
+            });
+          }
+          
+          batchCount++;
+        }
+      });
+
+      if (batchCount > 0) {
+        console.log(`Auto-updating ${batchCount} orders...`);
+        await batch.commit();
+        notify.admin.success(`${batchCount} pesanan diperbarui otomatis.`);
+      }
+    };
+
+    // Jalankan dengan debounce/timeout agar tidak spamming saat data baru load
+    const timer = setTimeout(() => {
+      runAutoUpdate();
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [orders]); // Depend on orders to check when loaded
+
+  // 7. Fungsi Cetak Cepat
   const handlePrint = (orderId: string) => {
     router.push(`/admin/orders/print/${orderId}`);
   };
@@ -81,6 +169,22 @@ export default function AdminOrders() {
       selectedOrders.forEach((orderId) => {
         const orderRef = doc(db, 'orders', orderId);
         batch.update(orderRef, { status: newStatus });
+        
+        // Kirim Notifikasi
+        const order = orders.find(o => o.id === orderId);
+        if (order?.userId) {
+          const notifRef = doc(collection(db, 'notifications'));
+          batch.set(notifRef, {
+            title: `Pesanan ${newStatus}`,
+            body: `Status pesanan #${order.id.slice(0, 8)} telah diperbarui menjadi ${newStatus}.`,
+            type: 'transaction',
+            category: 'Pesanan',
+            userId: order.userId,
+            createdAt: Timestamp.now(),
+            read: false,
+            orderId: order.id
+          });
+        }
       });
       await batch.commit();
       setSelectedOrders([]);
@@ -218,7 +322,7 @@ export default function AdminOrders() {
         <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
 
         <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar p-1">
-          {['SEMUA', 'MENUNGGU', 'DIPROSES', 'SELESAI'].map((tab) => (
+          {['SEMUA', 'MENUNGGU', 'DIPROSES', 'DIKIRIM', 'SELESAI'].map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab as any); setCurrentPage(1); }}

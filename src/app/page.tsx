@@ -11,7 +11,8 @@ import {
   Search, ShoppingCart, User, Heart, Package,
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
-  FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown, Store
+  FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown, Store,
+  Ticket, Settings, LogOut
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -245,7 +246,7 @@ export default function Home() {
           try {
             const nq = query(
               collection(db, 'notifications'),
-              where('userId', '==', user.uid),
+              where('userId', 'in', [user.uid, 'all']),
               orderBy('createdAt', 'desc'),
               limit(30)
             );
@@ -518,23 +519,65 @@ export default function Home() {
             
             <div className="flex items-center gap-1 md:gap-2">
               {currentUserName ? (
-                <Link
-                  href="/profil"
-                  className="flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
-                  title="Profil"
-                >
-                  <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
-                    {currentUserPhotoUrl ? (
-                      <Image src={currentUserPhotoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
-                    ) : (
-                      <User size={20} className="text-gray-500" />
-                    )}
+                <div className="relative group">
+                  <Link
+                    href="/profil"
+                    className="flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+                    title="Profil"
+                  >
+                    <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
+                      {currentUserPhotoUrl ? (
+                        <Image src={currentUserPhotoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
+                      ) : (
+                        <User size={20} className="text-gray-500" />
+                      )}
+                    </div>
+                    <div className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold capitalize text-gray-600 hidden md:block">
+                      Hi, {currentUserName}
+                    </div>
+                    <ChevronDown size={18} className="text-gray-500 hidden md:block" />
+                  </Link>
+
+                  {/* HOVER DROPDOWN MENU */}
+                  <div className="absolute right-0 top-full pt-2 hidden group-hover:block z-50">
+                    <div className="w-[320px] bg-white rounded-2xl shadow-xl border border-gray-100 p-4 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-2">
+                        <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+                           {currentUserPhotoUrl ? (
+                             <Image src={currentUserPhotoUrl} alt="User" width={48} height={48} className="h-full w-full object-cover" />
+                           ) : (
+                             <User size={24} className="text-gray-400" />
+                           )}
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="font-bold text-gray-900 truncate">{currentUserName}</p>
+                          <Link href="/profil" className="text-[10px] text-green-600 font-bold hover:underline">Lihat Profil Saya</Link>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Link href="/orders" className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+                          <ClipboardList size={16} /> Pesanan Saya
+                        </Link>
+                        <Link href="/vouchers" className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+                          <Ticket size={16} /> Voucher Saya
+                        </Link>
+                        <Link href="/wishlist" className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+                          <Heart size={16} /> Wishlist
+                        </Link>
+                        <Link href="/profil/edit" className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+                          <Settings size={16} /> Pengaturan
+                        </Link>
+                        <button 
+                          onClick={() => auth.signOut()}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 text-sm font-medium transition-colors mt-2"
+                        >
+                          <LogOut size={16} /> Keluar
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold capitalize text-gray-600 hidden lg:block">
-                    Hi, {currentUserName}
-                  </div>
-                  <ChevronDown size={18} className="text-gray-500 hidden lg:block" />
-                </Link>
+                </div>
               ) : (
                 <Link
                   href="/profil/login"
