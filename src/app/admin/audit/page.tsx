@@ -100,7 +100,14 @@ export default function AuditPage() {
   const [transactions, setTransactions] = useState<TransactionLog[]>([]);
   const [shifts, setShifts] = useState<CashierShift[]>([]);
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
-  const [profitSummary, setProfitSummary] = useState({ sales: 0, cost: 0, profit: 0, discount: 0 });
+  const [profitSummary, setProfitSummary] = useState({ 
+    sales: 0, 
+    cost: 0, 
+    profit: 0, 
+    discount: 0,
+    expenses: 0,
+    netProfit: 0
+  });
 
   // Fetch Data based on active tab
   useEffect(() => {
@@ -127,14 +134,27 @@ export default function AuditPage() {
       }
       else if (activeTab === 'profit') {
         // Fetch orders and calculate profit
-        const q = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']), orderBy('createdAt', 'desc'), limit(100));
-        const snap = await getDocs(q);
+        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']), orderBy('createdAt', 'desc'), limit(100));
+        const qExpenses = query(collection(db, 'operational_expenses'), orderBy('date', 'desc'), limit(100)); // Should ideally filter by date range same as orders
+
+        const [snapOrders, snapExpenses] = await Promise.all([
+          getDocs(qOrders),
+          getDocs(qExpenses)
+        ]);
         
+        // Calculate Expenses
+        let totalExpenses = 0;
+        snapExpenses.docs.forEach(doc => {
+          const data = doc.data();
+          totalExpenses += (data.amount || 0);
+        });
+
+        // Calculate Sales & COGS
         let totalSales = 0;
         let totalCost = 0;
         let totalDiscount = 0;
         
-        const logs: ProfitLog[] = snap.docs.map(d => {
+        const logs: ProfitLog[] = snapOrders.docs.map(d => {
           const data = d.data();
           const items = data.items || [];
           let orderCost = 0;
@@ -178,8 +198,18 @@ export default function AuditPage() {
           };
         });
 
+        const grossProfitTotal = totalSales - totalCost;
+        const netProfitTotal = grossProfitTotal - totalExpenses;
+
         setProfitLogs(logs);
-        setProfitSummary({ sales: totalSales, cost: totalCost, profit: totalSales - totalCost, discount: totalDiscount });
+        setProfitSummary({ 
+          sales: totalSales, 
+          cost: totalCost, 
+          profit: grossProfitTotal, 
+          discount: totalDiscount,
+          expenses: totalExpenses,
+          netProfit: netProfitTotal
+        });
       }
     } catch (error) {
       console.error("Error fetching audit data:", error);
@@ -456,27 +486,60 @@ export default function AuditPage() {
             )}
 
             {activeTab === 'profit' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <p className="text-xs text-blue-500 font-bold uppercase">Total Penjualan</p>
-                    <p className="text-xl font-black text-blue-700">Rp{profitSummary.sales.toLocaleString()}</p>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-between">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pendapatan Kotor</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Penjualan</span>
+                        <span className="font-bold text-gray-800">Rp{profitSummary.sales.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">HPP (Modal)</span>
+                        <span className="font-bold text-red-600">-Rp{profitSummary.cost.toLocaleString()}</span>
+                      </div>
+                      <div className="h-px bg-gray-100 my-2"></div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-gray-700">Laba Kotor</span>
+                        <span className="font-black text-green-600">Rp{profitSummary.profit.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                    <p className="text-xs text-orange-500 font-bold uppercase">Total Diskon</p>
-                    <p className="text-xl font-black text-orange-700">Rp{profitSummary.discount.toLocaleString()}</p>
+
+                  <div className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-between">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pengeluaran & Diskon</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Total Diskon</span>
+                        <span className="font-bold text-orange-600">Rp{profitSummary.discount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Beban Operasional</span>
+                        <span className="font-bold text-red-600">Rp{profitSummary.expenses.toLocaleString()}</span>
+                      </div>
+                      <div className="h-px bg-gray-100 my-2"></div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-gray-700">Total Beban</span>
+                        <span className="font-black text-red-700">Rp{(profitSummary.discount + profitSummary.expenses).toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                    <p className="text-xs text-red-500 font-bold uppercase">Total Modal (HPP)</p>
-                    <p className="text-xl font-black text-red-700">Rp{profitSummary.cost.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                    <p className="text-xs text-green-500 font-bold uppercase">Laba Kotor</p>
-                    <p className="text-xl font-black text-green-700">Rp{profitSummary.profit.toLocaleString()}</p>
+
+                  <div className={`p-5 rounded-2xl border shadow-sm flex flex-col justify-center items-center text-center ${profitSummary.netProfit >= 0 ? 'bg-green-600 text-white border-green-700' : 'bg-red-600 text-white border-red-700'}`}>
+                    <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">Laba Bersih (Net Profit)</p>
+                    <p className="text-3xl font-black">Rp{profitSummary.netProfit.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold opacity-70 mt-2 uppercase">
+                      {profitSummary.netProfit >= 0 ? 'Keuntungan Bersih' : 'Kerugian Bersih'}
+                    </p>
                   </div>
                 </div>
 
-                <table className="w-full text-left border-collapse">
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                    <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wide">Rincian Transaksi Penjualan</h3>
+                  </div>
+                  <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
                       <th className="p-3 font-bold">Waktu & ID</th>
@@ -529,6 +592,7 @@ export default function AuditPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
             
