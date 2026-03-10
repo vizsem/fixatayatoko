@@ -8,7 +8,7 @@ import { auth, db } from '@/lib/firebase';
 
 import {
   ArrowLeft, Save, Warehouse, MapPin,
-  Phone, User, Package, Loader2
+  Phone, User, Package, Loader2, Database
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -203,18 +203,36 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
-            {/* Status Gudang */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Status Operasional</label>
-              <select
-                value={formData?.status || 'AKTIF'}
-                onChange={(e) => setFormData(prev => prev ? { ...prev, status: e.target.value as 'AKTIF' | 'NONAKTIF' } : null)}
+            {/* Kapasitas & Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Kapasitas Gudang */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Kapasitas Maksimal</label>
+                <div className="relative">
+                  <Database className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData?.capacity ?? ''}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, capacity: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
 
-                className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all appearance-none cursor-pointer text-sm"
-              >
-                <option value="AKTIF">AKTIF</option>
-                <option value="NONAKTIF">NONAKTIF / MAINTENANCE</option>
-              </select>
+              {/* Status Gudang */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Status Operasional</label>
+                <select
+                  value={formData?.status || 'AKTIF'}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, status: e.target.value as 'AKTIF' | 'NONAKTIF' } : null)}
+                  className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-black outline-none transition-all appearance-none cursor-pointer text-sm h-full"
+                >
+                  <option value="AKTIF">AKTIF</option>
+                  <option value="NONAKTIF">NONAKTIF / MAINTENANCE</option>
+                </select>
+              </div>
             </div>
 
             {/* Tombol Simpan */}

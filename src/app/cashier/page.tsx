@@ -157,7 +157,7 @@ export default function CashierPOS() {
   }, []);
 
   const addToCart = useCallback((product: Product) => {
-    if (product.stock <= 0) return toast.error("Stok habis!");
+    // if (product.stock <= 0) return toast.error("Stok habis!"); // Allow add empty stock
     const channel = getChannelKey(transactionType);
     const baseCode = (product.unit || 'PCS').toUpperCase();
     const containsBase = 1;
@@ -180,7 +180,7 @@ export default function CashierPOS() {
   }, [transactionType, getChannelKey]);
 
   const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
-    if (product.stock <= 0) return toast.error("Stok habis!");
+    // if (product.stock <= 0) return toast.error("Stok habis!"); // Allow add empty stock
     const code = (unit.code || product.unit || 'PCS').toUpperCase();
     const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
     const channel = getChannelKey(transactionType);
@@ -342,7 +342,7 @@ export default function CashierPOS() {
             units,
             channelPricing: data.channelPricing
           } as Product;
-        }).filter(item => (item.stock || 0) > 0);
+        }); // REMOVE FILTER HERE TO SHOW EMPTY STOCK
         setProducts(p);
         setFilteredProducts(p);
       } catch (error: unknown) {
@@ -387,7 +387,7 @@ export default function CashierPOS() {
                 units,
                 channelPricing: data.channelPricing
               } as Product;
-            }).filter(item => (item.stock || 0) > 0);
+            }); // REMOVE FILTER HERE TOO
             list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             setProducts(list);
             setFilteredProducts(list);
@@ -627,14 +627,17 @@ export default function CashierPOS() {
               data-testid="product-grid-view"
             >
               {filteredProducts.map(p => (
-                <div key={p.id} className={`bg-white border border-gray-100 shadow-sm hover:border-green-500 transition-all text-left flex ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'}`}>
+                <div key={p.id} className={`bg-white border shadow-sm hover:border-green-500 transition-all text-left flex relative ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'} ${(p.stock || 0) <= 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+                  {(p.stock || 0) <= 0 && (
+                    <div className="absolute top-2 right-2 bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
+                  )}
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
                   {p.image ? (
                     <Image 
                       src={p.image} 
                       alt={p.name}
                       fill
-                      className="object-cover"
+                      className={`object-cover ${(p.stock || 0) <= 0 ? 'grayscale' : ''}`}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
@@ -644,7 +647,7 @@ export default function CashierPOS() {
                     <p className="text-green-600 font-black text-sm">Rp{p.price.toLocaleString()}</p>
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
-                      <span className={`text-[10px] font-bold ${p.stock < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
+                      <span className={`text-[10px] font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
                     </div>
                     <div className="mt-2 space-y-1">
                       {(p.units || []).slice(0,3).map(u => {
