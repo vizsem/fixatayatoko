@@ -124,6 +124,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ]
     },
     {
+      group: "Audit & Keamanan", items: [
+        { name: 'Audit Log', href: '/admin/audit', icon: History },
+      ]
+    },
+    {
       group: "Sistem", items: [
         { name: 'Pengaturan', href: '/admin/settings', icon: Settings },
       ]

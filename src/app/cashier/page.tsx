@@ -17,7 +17,8 @@ import {
   getDoc,
   getDocs,
   limit,
-  writeBatch
+  writeBatch,
+  addDoc
 } from 'firebase/firestore';
 import {
   ref,
@@ -49,6 +50,7 @@ type Product = {
   id: string;
   name: string;
   price: number; // base unit price (ecer)
+  cost: number; // base unit cost (modal)
   unit: string; // base unit code
   stock: number;
   barcode?: string;
@@ -66,6 +68,8 @@ type CartItem = {
   id: string;
   name: string;
   price: number; // price per chosen unit (e.g., per CTN)
+  originalPrice: number; // original price before discount/channel pricing
+  cost: number; // cost per chosen unit
   quantity: number; // number of chosen units
   unit: string; // unit code (PCS/BOX/CTN)
   contains?: number; // how many pcs per chosen unit
@@ -87,6 +91,23 @@ type Order = {
   transactionType: string;
   payAmount?: number;
   changeAmount?: number;
+  shiftId?: string; // Link to cashier shift
+};
+
+type CashierShift = {
+  id: string;
+  cashierId: string;
+  cashierName: string;
+  openedAt: any; // Timestamp
+  closedAt: any | null; // Timestamp
+  initialCash: number;
+  expectedCash: number;
+  actualCash: number | null;
+  difference: number | null;
+  status: 'OPEN' | 'CLOSED';
+  totalCashSales: number;
+  totalNonCashSales: number;
+  notes?: string;
 };
 
 
@@ -129,6 +150,12 @@ export default function CashierPOS() {
   const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number} | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerResults, setCustomerResults] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number}>>([]);
+
+  // Shift States
+  const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
+  const [showShiftModal, setShowShiftModal] = useState<'open' | 'close' | null>(null);
+  const [shiftInput, setShiftInput] = useState({ initialCash: '', actualCash: '', notes: '' });
+  const [shiftSummary, setShiftSummary] = useState<{ totalCash: number, totalNonCash: number, expected: number } | null>(null);
 
 
   // No redundant state for calculated values
@@ -177,7 +204,17 @@ export default function CashierPOS() {
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
       if (exist) return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { id: product.id, name: product.name, price: priceToUse, quantity: 1, unit: baseCode, contains: containsBase, channel }];
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: priceToUse, 
+        originalPrice: product.price, // Store base price
+        cost: product.cost, // Include base cost
+        quantity: 1, 
+        unit: baseCode, 
+        contains: containsBase, 
+        channel 
+      }];
     });
   }, [transactionType, getChannelKey]);
 
@@ -197,10 +234,25 @@ export default function CashierPOS() {
       unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
     }
 
+    // Calculate unit cost based on contains
+    const unitCost = product.cost * contains;
+    // Calculate unit original price based on contains (assuming price scales linearly)
+    const unitOriginalPrice = product.price * contains;
+
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === code);
       if (exist) return prev.map(i => (i.id === product.id && i.unit === code) ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { id: product.id, name: product.name, price: unitPrice, quantity: 1, unit: code, contains, channel }];
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: unitPrice, 
+        originalPrice: unitOriginalPrice,
+        cost: unitCost,
+        quantity: 1, 
+        unit: code, 
+        contains, 
+        channel 
+      }];
     });
   }, [transactionType, getChannelKey]);
 
@@ -276,6 +328,20 @@ export default function CashierPOS() {
            if (userDoc.data()?.role !== 'cashier' && userDoc.data()?.role !== 'admin') {
              router.push('/profil'); return;
            }
+
+           // Check Open Shift
+           const q = query(
+             collection(db, 'cashier_shifts'), 
+             where('cashierId', '==', user.uid), 
+             where('status', '==', 'OPEN'),
+             limit(1)
+           );
+           const snap = await getDocs(q);
+           if (!snap.empty) {
+             setCurrentShift({ id: snap.docs[0].id, ...snap.docs[0].data() } as CashierShift);
+           } else {
+             setShowShiftModal('open');
+           }
          } catch (e) { console.log("Offline or error fetching user role", e); }
       }
       
@@ -319,6 +385,7 @@ export default function CashierPOS() {
           const data = d.data();
           const baseUnit = String(data.unit || data.Satuan || 'PCS').toUpperCase();
           const basePrice = Number(data.price || data.priceEcer || data.Ecer || 0);
+          const baseCost = Number(data.cost || data.Modal || 0); // Ambil Modal
           const rawUnits = Array.isArray(data.units) ? data.units as Array<Record<string, unknown>> : [];
           const units: UnitOption[] = rawUnits
             .map(u => {
@@ -337,6 +404,7 @@ export default function CashierPOS() {
             id: d.id,
             name: data.name || 'TANPA NAMA',
             price: basePrice,
+            cost: baseCost,
             unit: baseUnit,
             stock: data.stock || data.Stok || 0,
             barcode: data.barcode || '',
@@ -450,8 +518,167 @@ export default function CashierPOS() {
   }, [loading]);
 
 
+  // --- SHIFT MANAGEMENT ---
+  const handleOpenShift = async () => {
+    if (!shiftInput.initialCash) return toast.error('Masukkan modal awal!');
+    
+    setLoading(true);
+    try {
+      const initial = parseInt(shiftInput.initialCash.replace(/\D/g, '')) || 0;
+      const newShift: Partial<CashierShift> = {
+        cashierId: auth.currentUser?.uid || '',
+        cashierName: auth.currentUser?.displayName || 'Cashier',
+        openedAt: serverTimestamp(),
+        initialCash: initial,
+        status: 'OPEN',
+        totalCashSales: 0,
+        totalNonCashSales: 0,
+        expectedCash: initial,
+      };
+      
+      const ref = await addDoc(collection(db, 'cashier_shifts'), newShift);
+      setCurrentShift({ id: ref.id, ...newShift } as CashierShift);
+      setShowShiftModal(null);
+      setShiftInput({ initialCash: '', actualCash: '', notes: '' });
+      toast.success('Kasir Dibuka!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal membuka kasir');
+    } finally { setLoading(false); }
+  };
+
+  const prepareCloseShift = async () => {
+    if (!currentShift) return;
+    setLoading(true);
+    try {
+      // Calculate totals from orders
+      const q = query(
+        collection(db, 'orders'), 
+        where('shiftId', '==', currentShift.id),
+        where('status', 'in', ['SELESAI', 'DIPROSES'])
+      );
+      const snap = await getDocs(q);
+      
+      let cashSales = 0;
+      let nonCashSales = 0;
+      
+      snap.forEach(d => {
+        const data = d.data() as Order;
+        if (data.paymentMethod === 'CASH') {
+          cashSales += (data.payAmount || data.total);
+        } else {
+          nonCashSales += data.total;
+        }
+      });
+      
+      setShiftSummary({
+        totalCash: cashSales,
+        totalNonCash: nonCashSales,
+        expected: (currentShift.initialCash || 0) + cashSales
+      });
+      setShowShiftModal('close');
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal menghitung rekap');
+    } finally { setLoading(false); }
+  };
+
+  const handleCloseShift = async () => {
+    if (!currentShift || !shiftSummary) return;
+    
+    setLoading(true);
+    try {
+      const actual = parseInt(shiftInput.actualCash.replace(/\D/g, '')) || 0;
+      const diff = actual - shiftSummary.expected;
+      
+      const updateData = {
+        closedAt: serverTimestamp(),
+        status: 'CLOSED',
+        actualCash: actual,
+        difference: diff,
+        totalCashSales: shiftSummary.totalCash,
+        totalNonCashSales: shiftSummary.totalNonCash,
+        notes: shiftInput.notes
+      };
+
+      await updateDoc(doc(db, 'cashier_shifts', currentShift.id), updateData);
+      
+      printShiftReport({
+        ...currentShift,
+        ...updateData,
+        closedAt: new Date()
+      });
+      
+      setCurrentShift(null);
+      setShowShiftModal(null);
+      setShiftInput({ initialCash: '', actualCash: '', notes: '' });
+      setShiftSummary(null);
+      toast.success('Kasir Ditutup!');
+      router.push('/profil');
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal menutup kasir');
+    } finally { setLoading(false); }
+  };
+
+  const printShiftReport = useCallback((shift: Partial<CashierShift>) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+
+    const dateStr = new Date().toLocaleString('id-ID');
+    const formatRp = (num: number = 0) => 'Rp' + num.toLocaleString('id-ID');
+
+    w.document.write(`
+      <html>
+        <head>
+          <title>Laporan Shift Kasir</title>
+          <style>
+            @page { size: 58mm auto; margin: 0; }
+            body { font-family: 'Courier New', monospace; width: 58mm; margin: 0; padding: 5px; font-size: 10px; }
+            .text-center { text-align: center; }
+            .bold { font-weight: bold; }
+            .flex { display: flex; justify-content: space-between; }
+            .line { border-bottom: 1px dashed black; margin: 5px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="text-center bold">LAPORAN TUTUP KASIR</div>
+          <div class="text-center">${dateStr}</div>
+          <div class="line"></div>
+          
+          <div class="flex"><span>Kasir</span><span>${shift.cashierName}</span></div>
+          <div class="flex"><span>Shift ID</span><span>#${(shift.id || '').slice(-4)}</span></div>
+          
+          <div class="line"></div>
+          
+          <div class="flex"><span>Modal Awal</span><span>${formatRp(shift.initialCash)}</span></div>
+          <div class="flex"><span>Total Tunai</span><span>${formatRp(shift.totalCashSales)}</span></div>
+          <div class="flex"><span>Total Non-Tunai</span><span>${formatRp(shift.totalNonCashSales)}</span></div>
+          
+          <div class="line"></div>
+          
+          <div class="flex bold"><span>Total Diharapkan</span><span>${formatRp(shift.expectedCash)}</span></div>
+          <div class="flex bold"><span>Uang Fisik</span><span>${formatRp(shift.actualCash || 0)}</span></div>
+          
+          <div class="line"></div>
+          
+          <div class="flex bold"><span>Selisih</span><span>${formatRp(shift.difference || 0)}</span></div>
+          
+          <br>
+          <div class="text-center">Tanda Tangan</div>
+          <br><br>
+          <div class="text-center">( ${shift.cashierName} )</div>
+        </body>
+        <script>window.print();window.close();</script>
+      </html>
+    `);
+    w.document.close();
+  }, []);
+
+
   // --- HANDLE TRANSACTION (DIUBAH UNTUK KOMPRESI) ---
   const handleTransaction = async () => {
+    if (!currentShift) return toast.error('Kasir belum dibuka!');
     if (cart.length === 0) return;
     if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof && !isOffline) return toast.error('Wajib upload bukti!');
     if (paymentMethod === 'CASH' && change < 0) return toast.error('Uang kurang!');
@@ -501,6 +728,7 @@ export default function CashierPOS() {
         userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
         payAmount: finalPayAmount,
         changeAmount: finalChange,
+        shiftId: currentShift.id,
       };
 
       const newOrderRef = doc(collection(db, 'orders'));
@@ -696,6 +924,17 @@ export default function CashierPOS() {
             <button onClick={() => setActiveTab('pos')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
             <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
+          {currentShift && (
+            <div className="flex items-center gap-2 ml-4 border-l pl-4">
+              <div className="flex flex-col text-right">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Shift Aktif</span>
+                <span className="text-xs font-black text-gray-700">{currentShift.cashierName}</span>
+              </div>
+              <button onClick={prepareCloseShift} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-100 border border-red-100 uppercase">
+                Tutup Shift
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => setIsDrawerOpen(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
@@ -911,11 +1150,13 @@ export default function CashierPOS() {
                               unitPrice = (prod?.channelPricing as ChannelPricing)['website']![code].price!;
                             }
                             const minQty = Number(u.minQty || 0);
+                            const unitCost = (prod?.cost || 0) * contains;
+                            const unitOriginalPrice = (prod?.price || 0) * contains;
                             setCart(prev => prev.map(ci => {
                               if (ci.id !== item.id) return ci;
                               const nextQty = minQty && ci.quantity < minQty ? minQty : ci.quantity;
                               if (minQty && ci.quantity < minQty) toast.success(`Min. qty ${code}: ${minQty}. Qty disesuaikan.`);
-                              return { ...ci, unit: code, contains, price: unitPrice, quantity: nextQty, channel };
+                              return { ...ci, unit: code, contains, price: unitPrice, originalPrice: unitOriginalPrice, cost: unitCost, quantity: nextQty, channel };
                             }));
                           }}
                           className="text-[10px] font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"
@@ -1137,6 +1378,100 @@ export default function CashierPOS() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHIFT MODALS */}
+      {showShiftModal === 'open' && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+            <h2 className="text-lg font-black mb-4 text-center uppercase text-green-600">Buka Kasir</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Modal Awal (Cash)</label>
+                <input 
+                  autoFocus
+                  type="number" 
+                  value={shiftInput.initialCash}
+                  onChange={e => setShiftInput({ ...shiftInput, initialCash: e.target.value })}
+                  className="w-full p-3 text-lg font-black border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-center"
+                  placeholder="Rp0"
+                />
+              </div>
+              <button onClick={handleOpenShift} className="w-full py-3 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 uppercase text-sm">
+                BUKA KASIR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showShiftModal === 'close' && shiftSummary && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
+            <h2 className="text-lg font-black mb-4 text-center uppercase text-red-600">Tutup Kasir</h2>
+            
+            <div className="space-y-2 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <div className="flex justify-between text-xs uppercase font-bold">
+                <span className="text-gray-400">Modal Awal</span>
+                <span className="text-gray-700">Rp{(currentShift?.initialCash || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs uppercase font-bold">
+                <span className="text-gray-400">Penjualan Tunai</span>
+                <span className="text-green-600">+ Rp{shiftSummary.totalCash.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs uppercase font-bold border-b border-dashed pb-2">
+                <span className="text-gray-400">Non-Tunai (Info)</span>
+                <span className="text-blue-600">Rp{shiftSummary.totalNonCash.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black pt-2">
+                <span>Total Diharapkan (Tunai)</span>
+                <span>Rp{shiftSummary.expected.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Uang Fisik di Laci</label>
+                <input 
+                  autoFocus
+                  type="number" 
+                  value={shiftInput.actualCash}
+                  onChange={e => setShiftInput({ ...shiftInput, actualCash: e.target.value })}
+                  className="w-full p-3 text-lg font-black border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  placeholder="Rp0"
+                />
+              </div>
+              
+              {shiftInput.actualCash && (
+                <div className={`text-center p-2 rounded-lg font-black text-xs uppercase ${
+                  (parseInt(shiftInput.actualCash.replace(/\D/g, '')) - shiftSummary.expected) === 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  Selisih: Rp{(parseInt(shiftInput.actualCash.replace(/\D/g, '')) - shiftSummary.expected).toLocaleString()}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Catatan (Opsional)</label>
+                <textarea 
+                  value={shiftInput.notes}
+                  onChange={e => setShiftInput({ ...shiftInput, notes: e.target.value })}
+                  className="w-full p-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-gray-300"
+                  placeholder="Catatan..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setShowShiftModal(null)} className="flex-1 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl hover:bg-gray-200 text-xs uppercase">
+                  BATAL
+                </button>
+                <button onClick={handleCloseShift} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 text-xs uppercase">
+                  TUTUP & CETAK
+                </button>
+              </div>
             </div>
           </div>
         </div>
