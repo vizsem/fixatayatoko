@@ -67,6 +67,14 @@ export default function PurchaseDetail() {
       const newSubtotal = editForm.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.purchasePrice)), 0);
       const newTotal = newSubtotal + (Number(editForm.shippingCost) || 0);
 
+      // Determine Payment Status
+      let paymentStatus = 'LUNAS';
+      if (editForm.paymentMethod === 'HUTANG') {
+        paymentStatus = 'HUTANG'; // Or 'BELUM LUNAS' depending on your convention
+      } else if (editForm.paymentMethod === 'TEMPO') {
+        paymentStatus = 'TEMPO';
+      }
+
       const updateData = {
         items: editForm.items.map(i => ({
           ...i,
@@ -74,6 +82,7 @@ export default function PurchaseDetail() {
           purchasePrice: Number(i.purchasePrice)
         })),
         paymentMethod: editForm.paymentMethod,
+        paymentStatus: paymentStatus, // Explicitly update status
         // Convert to Firestore Timestamp correctly
         createdAt: editDate ? Timestamp.fromDate(new Date(editDate)) : purchase.createdAt,
         subtotal: newSubtotal,
