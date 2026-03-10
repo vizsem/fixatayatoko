@@ -213,7 +213,7 @@ export default function AuditPage() {
         Pembayaran: t.paymentMethod,
         Status: t.status,
       }));
-    } else {
+    } else if (activeTab === 'finance') {
       data = shifts.map(s => ({
         'Buka': s.openedAt?.toDate ? format(s.openedAt.toDate(), 'dd/MM/yyyy HH:mm') : '-',
         'Tutup': s.closedAt?.toDate ? format(s.closedAt.toDate(), 'dd/MM/yyyy HH:mm') : '-',
@@ -226,8 +226,6 @@ export default function AuditPage() {
         'Selisih': s.difference || 0,
         Catatan: s.notes
       }));
-    }
-
     } else if (activeTab === 'profit') {
       data = profitLogs.map(p => ({
         ID: p.id,

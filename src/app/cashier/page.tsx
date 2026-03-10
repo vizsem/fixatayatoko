@@ -593,7 +593,7 @@ export default function CashierPOS() {
       
       const updateData = {
         closedAt: serverTimestamp(),
-        status: 'CLOSED',
+        status: 'CLOSED' as const,
         actualCash: actual,
         difference: diff,
         totalCashSales: shiftSummary.totalCash,
