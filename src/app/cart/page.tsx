@@ -264,6 +264,35 @@ export default function CartPage() {
     return { ok: true, msg: "Siap dipesan" };
   })();
   const handleCheckout = async () => {
+    // 1. Validasi Stok Sebelum Checkout
+    for (const item of cart) {
+      try {
+        // @ts-ignore
+        const prodId = item.id || item.productId;
+        const productRef = doc(db, 'products', prodId);
+        const productSnap = await getDoc(productRef);
+        
+        if (productSnap.exists()) {
+          const productData = productSnap.data();
+          const currentStock = productData.Stok || productData.stock || 0;
+          
+          if (currentStock < item.quantity) {
+            // @ts-ignore
+            notify.user.error(`Stok ${item.name || item.Nama} tidak cukup! Sisa: ${currentStock}`);
+            return;
+          }
+        } else {
+          // @ts-ignore
+          notify.user.error(`Produk ${item.name || item.Nama} tidak ditemukan!`);
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking stock:", error);
+        notify.user.error("Gagal memvalidasi stok. Coba lagi.");
+        return;
+      }
+    }
+
     if (paymentMethod !== 'cash' && paymentMethod !== 'wallet' && paymentMethod !== 'tempo' && !paymentProof) return notify.user.error("Upload bukti transfer!");
     if (paymentMethod === 'tempo' && !tempoDueDate) return notify.user.error("Pilih tanggal jatuh tempo untuk pembayaran tempo!");
     if (paymentMethod === 'wallet' && (!userData || userData.walletBalance === undefined)) return notify.user.error("Dompet tidak tersedia!");

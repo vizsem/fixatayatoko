@@ -267,8 +267,8 @@ export default function MarketplaceOrdersPage() {
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as Channel)}
                 >
-                  <option value="SHOPEE">Shopee</option>
-                  <option value="TIKTOK">TikTok Shop</option>
+                  <option value="SHOPEE">Shopee (Estimasi 2-3 Hari)</option>
+                  <option value="TIKTOK">TikTok Shop (Estimasi 7-9 Hari)</option>
                 </select>
               </div>
               <div className="space-y-2">

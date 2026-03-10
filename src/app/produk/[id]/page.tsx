@@ -182,13 +182,27 @@ export default function ProductDetailPage() {
       toast.error("Maaf, stok barang sedang habis");
       return;
     }
+
     setIsAdding(true);
     const localCart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
     const idToMatch = p.id;
+
+    // Check existing quantity in cart
+    const localIdx = localCart.findIndex((item) => (item.productId === idToMatch || item.id === idToMatch));
+    let currentQtyInCart = 0;
+    if (localIdx > -1) {
+      currentQtyInCart = localCart[localIdx].quantity;
+    }
+
+    if (currentQtyInCart + q > p.stock) {
+      toast.error(`Stok tidak mencukupi! Sisa stok: ${p.stock}, di keranjang: ${currentQtyInCart}`);
+      setIsAdding(false);
+      return;
+    }
+
     const isWholesale = p.wholesalePrice > 0 && q >= p.minWholesale;
     const finalPrice = isWholesale ? p.wholesalePrice : p.price;
 
-    const localIdx = localCart.findIndex((item) => (item.productId === idToMatch || item.id === idToMatch));
     if (localIdx > -1) {
       localCart[localIdx].quantity += q;
       const totalQ = localCart[localIdx].quantity;

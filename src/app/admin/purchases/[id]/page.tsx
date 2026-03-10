@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import toast, { Toaster } from 'react-hot-toast';
 
 
 import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
-  History, Receipt
+  History, Receipt, Edit, Save, X, Trash2
 } from 'lucide-react';
 
  
@@ -25,7 +26,76 @@ export default function PurchaseDetail() {
   const router = useRouter();
   const [purchase, setPurchase] = useState<PurchaseData | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<PurchaseData | null>(null);
+  const [editDate, setEditDate] = useState('');
 
+  const handleEditClick = () => {
+    if (!purchase) return;
+    setEditForm(JSON.parse(JSON.stringify(purchase)));
+    
+    let date = new Date();
+    // @ts-ignore
+    if (purchase.createdAt?.toDate) date = purchase.createdAt.toDate();
+    // @ts-ignore
+    else if (purchase.createdAt?.seconds) date = new Date(purchase.createdAt.seconds * 1000);
+    
+    setEditDate(date.toISOString().slice(0, 16)); // datetime-local format
+    setIsEditing(true);
+  };
+
+  const handleItemChange = (idx: number, field: keyof PurchaseItem, value: any) => {
+    if (!editForm) return;
+    const newItems = [...editForm.items];
+    newItems[idx] = { ...newItems[idx], [field]: value };
+    setEditForm({ ...editForm, items: newItems });
+  };
+
+  const handleDeleteItem = (idx: number) => {
+    if (!editForm) return;
+    const newItems = editForm.items.filter((_, i) => i !== idx);
+    setEditForm({ ...editForm, items: newItems });
+  };
+
+  const handleSave = async () => {
+    if (!editForm || !purchase) return;
+    
+    try {
+      // Recalculate totals
+      const newSubtotal = editForm.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.purchasePrice)), 0);
+      const newTotal = newSubtotal + (Number(editForm.shippingCost) || 0);
+
+      const updateData = {
+        items: editForm.items.map(i => ({
+          ...i,
+          quantity: Number(i.quantity),
+          purchasePrice: Number(i.purchasePrice)
+        })),
+        paymentMethod: editForm.paymentMethod,
+        createdAt: Timestamp.fromDate(new Date(editDate)),
+        subtotal: newSubtotal,
+        total: newTotal
+      };
+
+      await updateDoc(doc(db, 'purchases', purchase.id), updateData);
+      
+      // Update local state
+      setPurchase({ 
+        ...purchase, 
+        ...updateData,
+        // @ts-ignore
+        items: updateData.items
+      });
+      
+      setIsEditing(false);
+      toast.success('Transaksi diperbarui!');
+    } catch (error) {
+      console.error(error);
+      toast.error('Gagal menyimpan perubahan');
+    }
+  };
 
   useEffect(() => {
     const fetchPurchase = async () => {
@@ -58,6 +128,7 @@ export default function PurchaseDetail() {
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-32 font-sans text-black">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <Toaster position="top-right" />
         <div className="flex items-center gap-3">
           <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
             <Receipt size={22} />
@@ -67,12 +138,20 @@ export default function PurchaseDetail() {
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
           </div>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
-        >
-          <Printer size={16} /> Cetak
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleEditClick}
+            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"
+          >
+            <Edit size={16} /> Edit
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+          >
+            <Printer size={16} /> Cetak
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -256,6 +335,136 @@ export default function PurchaseDetail() {
 
         </div>
       </div>
+
+      {/* EDIT MODAL */}
+      {isEditing && editForm && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-lg font-black uppercase tracking-tight flex items-center gap-2 text-gray-800">
+                <Edit size={20} className="text-blue-600" /> Edit Transaksi
+              </h2>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-8">
+              {/* Header Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Tanggal Transaksi</label>
+                  <input 
+                    type="datetime-local" 
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 border-transparent border transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Metode Pembayaran</label>
+                  <select 
+                    value={editForm.paymentMethod}
+                    onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}
+                    className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 uppercase border-transparent border transition-all appearance-none"
+                  >
+                    <option value="CASH">CASH</option>
+                    <option value="TRANSFER">TRANSFER</option>
+                    <option value="HUTANG">HUTANG</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block tracking-widest">Item Produk ({editForm.items.length})</label>
+                </div>
+                
+                <div className="space-y-3">
+                  {editForm.items.map((item, idx) => (
+                    <div key={idx} className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black uppercase truncate text-gray-800">{item.name}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 bg-white inline-block px-2 py-0.5 rounded">{item.unit}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="w-24">
+                          <label className="text-[8px] font-bold uppercase text-gray-400 block mb-1">Qty</label>
+                          <input 
+                            type="number" 
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                            className="w-full p-2 bg-white rounded-xl text-sm font-black text-center border border-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          />
+                        </div>
+                        <div className="w-36">
+                          <label className="text-[8px] font-bold uppercase text-gray-400 block mb-1">Harga Beli</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                            <input 
+                              type="number" 
+                              value={item.purchasePrice}
+                              onChange={(e) => handleItemChange(idx, 'purchasePrice', e.target.value)}
+                              className="w-full pl-8 p-2 bg-white rounded-xl text-sm font-black text-right border border-gray-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </div>
+                        </div>
+                        <div className="w-10 pt-4 flex justify-end">
+                          <button 
+                            onClick={() => handleDeleteItem(idx)}
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Hapus Item"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {editForm.items.length === 0 && (
+                    <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
+                      <p className="text-xs font-bold text-gray-400 uppercase">Tidak ada item</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Summary */}
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-blue-600 uppercase">Estimasi Total Baru</span>
+                  <span className="text-xl font-black text-blue-800">
+                    Rp {(
+                      editForm.items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.purchasePrice)), 0) + 
+                      (Number(editForm.shippingCost) || 0)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsEditing(false)}
+                className="px-6 py-3 rounded-xl font-bold text-xs uppercase text-gray-500 hover:bg-gray-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleSave}
+                disabled={loading}
+                className="px-8 py-3 rounded-xl font-black text-xs uppercase bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {loading ? <span className="animate-spin">⏳</span> : <Save size={16} />}
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

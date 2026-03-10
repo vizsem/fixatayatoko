@@ -285,7 +285,7 @@ export default function AdminCategories() {
                   <Package size={14} className="text-gray-400" />
                   <span className="text-xs font-black text-gray-800">{cat.productCount} <span className="text-gray-400 font-bold text-[9px]">Items</span></span>
                 </div>
-                <Link href={`/admin/produk?category=${cat.name}`} className="text-[10px] font-black text-green-600 tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
+                <Link href={`/admin/products?category=${cat.name}`} className="text-[10px] font-black text-green-600 tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
                   Lihat stok <ChevronRight size={14} />
                 </Link>
 
@@ -350,6 +350,68 @@ export default function AdminCategories() {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Form */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-black text-gray-800 tracking-tight">
+                {editId ? 'Edit Kategori' : 'Tambah Kategori Baru'}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Nama Kategori</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Contoh: Sembako, Minuman, Alat Tulis..."
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-green-500 transition-all border border-transparent focus:bg-white"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Deskripsi (Opsional)</label>
+                <textarea 
+                  placeholder="Deskripsi singkat kategori ini..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-green-500 transition-all border border-transparent focus:bg-white min-h-[120px] resize-none"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest text-gray-500 bg-gray-50 hover:bg-gray-100 transition-all"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isSaving ? (
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                  ) : (
+                    <>
+                      <Save size={16} /> Simpan
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>

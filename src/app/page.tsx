@@ -520,7 +520,7 @@ export default function Home() {
               {currentUserName ? (
                 <Link
                   href="/profil"
-                  className="hidden lg:flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+                  className="flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
                   title="Profil"
                 >
                   <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
@@ -530,19 +530,19 @@ export default function Home() {
                       <User size={20} className="text-gray-500" />
                     )}
                   </div>
-                  <div className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold capitalize text-gray-600">
+                  <div className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold capitalize text-gray-600 hidden lg:block">
                     Hi, {currentUserName}
                   </div>
-                  <ChevronDown size={18} className="text-gray-500" />
+                  <ChevronDown size={18} className="text-gray-500 hidden lg:block" />
                 </Link>
               ) : (
                 <Link
                   href="/profil/login"
-                  className="hidden lg:flex items-center gap-2 h-10 px-3 rounded-full hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-[12px]"
+                  className="flex items-center gap-2 h-10 px-3 rounded-full hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-[12px]"
                   title="Masuk"
                 >
                   <User size={18} className="text-gray-500" />
-                  Masuk
+                  <span className="hidden lg:inline">Masuk</span>
                 </Link>
               )}
 

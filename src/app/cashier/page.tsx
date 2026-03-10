@@ -186,7 +186,8 @@ export default function CashierPOS() {
   }, []);
 
   const addToCart = useCallback((product: Product) => {
-    // if (product.stock <= 0) return toast.error("Stok habis!"); // Allow add empty stock
+    if (product.stock <= 0) return toast.error("Stok habis!");
+    
     const channel = getChannelKey(transactionType);
     const baseCode = (product.unit || 'PCS').toUpperCase();
     const containsBase = 1;
@@ -203,7 +204,16 @@ export default function CashierPOS() {
 
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
-      if (exist) return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+      
+      // Check stock limit
+      if (exist) {
+        if (exist.quantity + 1 > product.stock) {
+          toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
+          return prev;
+        }
+        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+
       return [...prev, { 
         id: product.id, 
         name: product.name, 
@@ -219,9 +229,17 @@ export default function CashierPOS() {
   }, [transactionType, getChannelKey]);
 
   const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
-    // if (product.stock <= 0) return toast.error("Stok habis!"); // Allow add empty stock
+    // Check basic stock availability
+    if (product.stock <= 0) return toast.error("Stok habis!");
+
     const code = (unit.code || product.unit || 'PCS').toUpperCase();
     const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
+    
+    // Check if adding this unit exceeds stock
+    // Since we don't know the exact current quantity of this unit in cart yet (inside set state), 
+    // we do a preliminary check. Real check happens inside setCart.
+    if (contains > product.stock) return toast.error(`Stok tidak cukup untuk satuan ini! Butuh: ${contains}, Sisa: ${product.stock}`);
+
     const channel = getChannelKey(transactionType);
     
     let unitPrice = Number(unit.price || (contains > 0 ? product.price * contains : product.price));
@@ -241,6 +259,20 @@ export default function CashierPOS() {
 
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === code);
+      
+      // Calculate total requested quantity in base units
+      // Current quantity in cart (all units converted to base)
+      const currentTotalQtyBase = prev
+        .filter(i => i.id === product.id)
+        .reduce((sum, i) => sum + (i.quantity * (i.contains || 1)), 0);
+      
+      const requestedQtyBase = contains; // Adding 1 of this unit = 'contains' base units
+
+      if (currentTotalQtyBase + requestedQtyBase > product.stock) {
+        toast.error(`Stok tidak cukup! Total di keranjang: ${currentTotalQtyBase}, Sisa Stok: ${product.stock}`);
+        return prev;
+      }
+
       if (exist) return prev.map(i => (i.id === product.id && i.unit === code) ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { 
         id: product.id, 
@@ -257,9 +289,34 @@ export default function CashierPOS() {
   }, [transactionType, getChannelKey]);
 
   const updateQuantity = useCallback((id: string, q: number) => {
-    if (q <= 0) setCart(prev => prev.filter(i => i.id !== id));
-    else setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: q } : i));
-  }, []);
+    if (q <= 0) {
+      setCart(prev => prev.filter(i => i.id !== id));
+      return;
+    }
+
+    setCart(prev => {
+      const item = prev.find(i => i.id === id);
+      if (!item) return prev;
+      
+      // Find the product to check stock
+      const product = products.find(p => p.id === item.id);
+      if (!product) return prev; // Should not happen
+
+      // Calculate total quantity for this product in cart EXCLUDING the current item we are updating
+      const otherItemsQtyBase = prev
+        .filter(i => i.id === item.id && i !== item) // Filter other units of same product
+        .reduce((sum, i) => sum + (i.quantity * (i.contains || 1)), 0);
+      
+      const newQtyBase = q * (item.contains || 1);
+
+      if (otherItemsQtyBase + newQtyBase > product.stock) {
+        toast.error(`Stok tidak cukup! Maksimum tersedia: ${Math.floor((product.stock - otherItemsQtyBase) / (item.contains || 1))}`);
+        return prev; // Do not update
+      }
+
+      return prev.map(i => i.id === id ? { ...i, quantity: q } : i);
+    });
+  }, [products]);
 
   const updatePrice = useCallback((id: string, newTotal: number, quantity: number) => {
     setCart(prev => prev.map(i => i.id === id ? { ...i, price: newTotal / quantity } : i));
