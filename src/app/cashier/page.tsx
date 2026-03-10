@@ -85,6 +85,8 @@ type Order = {
   subtotal: number;
   shippingCost: number;
   transactionType: string;
+  payAmount?: number;
+  changeAmount?: number;
 };
 
 
@@ -482,7 +484,11 @@ export default function CashierPOS() {
          // Bisa simpan di indexedDB jika mau canggih, tapi untuk sekarang skip
       }
 
-      const orderData = {
+    // Hitung dulu sebelum membuat orderData
+    const finalPayAmount = paymentMethod === 'CASH' ? (parseFloat(cashGiven) || total) : total;
+    const finalChange = paymentMethod === 'CASH' ? change : 0;
+
+    const orderData = {
         customerName: paymentMethod === 'TEMPO' ? customerName : (paymentMethod === 'DOMPET' ? selectedCustomer?.name : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko')),
         customerPhone: paymentMethod === 'TEMPO' ? customerPhone : '',
         items: cart,
@@ -493,6 +499,8 @@ export default function CashierPOS() {
         dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
         createdAt: serverTimestamp(),
         userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
+        payAmount: finalPayAmount,
+        changeAmount: finalChange,
       };
 
       const newOrderRef = doc(collection(db, 'orders'));
@@ -538,9 +546,15 @@ export default function CashierPOS() {
         });
       }
       // --- AKHIR LOGIKA DOMPET ---
-
+  
       await batch.commit();
-      printReceipt({ ...orderData, id: newOrderRef.id, createdAt: new Date() });
+      
+      printReceipt({ 
+        ...orderData, 
+        id: newOrderRef.id, 
+        createdAt: new Date()
+      });
+
       setCart([]);
       localStorage.removeItem('pos-cart');
       setCashGiven('');
@@ -561,20 +575,108 @@ export default function CashierPOS() {
   const printReceipt = useCallback((order: Partial<Order>) => {
     const w = window.open('', '_blank');
     if (!w) return;
+
+    const date = order.createdAt 
+      ? (order.createdAt instanceof Date ? order.createdAt : new Date((order.createdAt as { seconds: number }).seconds * 1000)) 
+      : new Date();
+    
+    const dateStr = date.toLocaleString('id-ID', { 
+      day: '2-digit', month: '2-digit', year: 'numeric', 
+      hour: '2-digit', minute: '2-digit' 
+    });
+
+    const formatRp = (num: number = 0) => 'Rp' + num.toLocaleString('id-ID');
+
+    // Pastikan nilai pembayaran dan kembalian ada
+    const payAmount = order.payAmount || order.total || 0;
+    const changeAmount = order.changeAmount || 0;
+
     w.document.write(`
-      <html><body style="font-family:monospace;width:80mm;padding:5px;">
-        <center><b>ATAYATOKO</b><br>Kediri - 085853161174<br>--------------------------</center>
-        ${order.items?.map((i: CartItem) => `<div>${i.name}<br>${i.quantity}x @${i.price.toLocaleString()} = ${(i.price * i.quantity).toLocaleString()}</div>`).join('')}
-        --------------------------<br>
-        TOTAL: Rp${order.total?.toLocaleString()}<br>
-        BAYAR: ${order.paymentMethod}<br>
-        --------------------------<br>
-        <center>Terima Kasih</center>
-      </body></html>
+      <html>
+        <head>
+          <title>Struk Belanja - ATAYATOKO</title>
+          <style>
+            @page { size: 58mm auto; margin: 0; }
+            body { 
+              font-family: 'Courier New', monospace; 
+              width: 58mm; 
+              margin: 0; 
+              padding: 4px; 
+              font-size: 10px; 
+              color: black; 
+              line-height: 1.2;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .bold { font-weight: bold; }
+            .flex { display: flex; justify-content: space-between; }
+            .line { border-bottom: 1px dashed black; margin: 4px 0; }
+            .item-row { margin-bottom: 2px; }
+            .item-name { font-weight: bold; }
+            .item-detail { display: flex; justify-content: space-between; padding-left: 0px; }
+            .footer { margin-top: 8px; font-size: 9px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="text-center bold" style="font-size: 14px;">ATAYATOKO</div>
+          <div class="text-center">Pusat Grosir & Eceran</div>
+          <div class="text-center">Kediri - 085853161174</div>
+          <div class="line"></div>
+          
+          <div class="flex"><span>Tgl: ${dateStr}</span></div>
+          <div class="flex"><span>No : #${(order.id || '').slice(-6).toUpperCase()}</span></div>
+          <div class="flex"><span>Ksr: ${auth.currentUser?.displayName || 'Admin'}</span></div>
+          <div class="flex"><span>Plg: ${order.customerName || 'Umum'}</span></div>
+          
+          <div class="line"></div>
+          
+          ${order.items?.map((i: CartItem) => `
+            <div class="item-row">
+              <div class="item-name">${i.name}</div>
+              <div class="item-detail">
+                <span>${i.quantity} x ${i.price.toLocaleString('id-ID')}</span>
+                <span>${(i.price * i.quantity).toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          `).join('')}
+          
+          <div class="line"></div>
+          
+          <div class="flex"><span>Subtotal</span><span>${formatRp(order.subtotal)}</span></div>
+          ${(order.shippingCost || 0) > 0 ? `<div class="flex"><span>Ongkir</span><span>${formatRp(order.shippingCost)}</span></div>` : ''}
+          
+          <div class="flex bold" style="font-size: 12px; margin-top: 2px;">
+            <span>TOTAL</span><span>${formatRp(order.total)}</span>
+          </div>
+          
+          <div class="line"></div>
+          
+          <div class="flex">
+            <span>Bayar (${order.paymentMethod})</span>
+            <span>${formatRp(payAmount)}</span>
+          </div>
+          <div class="flex">
+            <span>Kembali</span>
+            <span>${formatRp(changeAmount)}</span>
+          </div>
+          
+          <div class="line"></div>
+          <div class="footer">
+            Terima Kasih atas Kunjungan Anda<br>
+            Barang yang sudah dibeli tidak dapat<br>
+            ditukar/dikembalikan
+          </div>
+          <br>
+        </body>
+        <script>
+          window.onload = function() {
+            window.print();
+            window.close();
+          }
+        </script>
+      </html>
     `);
     w.document.close();
-    w.print();
-    w.close();
   }, []);
 
 
