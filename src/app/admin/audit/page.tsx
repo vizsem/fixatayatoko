@@ -45,6 +45,8 @@ interface CostLog {
   quantity?: number; // Qty pembelian yang memicu perubahan
   purchasePrice?: number; // Harga beli baru yang memicu perubahan
 }
+
+interface ProfitLog {
   id: string; // Order ID
   date: Timestamp;
   totalSales: number;
@@ -332,7 +334,7 @@ export default function AuditPage() {
         (s.cashierName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (s.notes?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       );
-    } else {
+    } else if (activeTab === 'profit') {
       return profitLogs.filter(p => 
         p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.items.some(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()))
