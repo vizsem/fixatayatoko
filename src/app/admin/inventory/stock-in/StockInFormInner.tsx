@@ -155,7 +155,9 @@ export default function StockInFormInner({ productId }: { productId: string }) {
         source: 'PURCHASE',
         supplierId: formData.supplierId,
         note: `Pembelian dari ${transactionData.supplierName}`,
-        toWarehouseId: 'gudang-utama'
+        toWarehouseId: 'gudang-utama',
+        prevStock: currentStock,
+        nextStock: newStock
       });
 
       notify.admin.success('Stok berhasil ditambahkan!');

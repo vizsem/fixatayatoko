@@ -7,11 +7,12 @@ import { auth, db } from '@/lib/firebase';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
+import { addInventoryLog } from '@/lib/inventory';
 
 
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, doc, addDoc, deleteDoc,
+  collection, doc, deleteDoc,
   onSnapshot, serverTimestamp, writeBatch, updateDoc
 } from 'firebase/firestore';
 
@@ -96,10 +97,15 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
         tgl_masuk: new Date().toISOString().split('T')[0]
       });
 
-      await addDoc(collection(db, 'inventory_logs'), {
-        productId: product.id, productName: product.Nama, type: 'MASUK',
-        amount: stokMasuk, hargaBeliAtMoment: hargaBaru, averagePriceAfter: simulasiHargaAvg,
-        toWarehouseId: product.warehouseId || '', date: serverTimestamp(), note: 'Restock (Avg Price)'
+      await addInventoryLog({
+        productId: product.id,
+        productName: product.Nama || '',
+        type: 'MASUK',
+        amount: stokMasuk,
+        adminId: auth.currentUser?.uid || 'system',
+        source: 'MANUAL',
+        toWarehouseId: product.warehouseId || '',
+        note: `Restock (Avg Price). Old Price: ${hargaLama}, New Buy Price: ${hargaBaru}, Avg: ${simulasiHargaAvg}`
       });
 
       notify.admin.success("Restock Berhasil!");
@@ -301,8 +307,47 @@ export default function AdminProducts() {
         data.forEach((item) => {
           const exist = rows.find(p => p.sku === String(item.ID));
           const pData = { ...item, updatedAt: serverTimestamp() };
-          if (exist) batch.update(doc(db, 'products', exist.id), pData);
-          else batch.set(doc(collection(db, 'products')), { ...pData, createdAt: serverTimestamp() });
+          if (exist) {
+            batch.update(doc(db, 'products', exist.id), pData);
+            
+            // Log if stock changed
+            const newStock = Number(item.Stok);
+            const oldStock = Number(exist.stock || exist.Stok || 0);
+            const diff = newStock - oldStock;
+            if (diff !== 0) {
+              const logRef = doc(collection(db, 'inventory_logs'));
+              batch.set(logRef, {
+                productId: exist.id,
+                productName: exist.name || '',
+                type: diff > 0 ? 'MASUK' : 'KELUAR',
+                amount: Math.abs(diff),
+                adminId: auth.currentUser?.uid || 'system',
+                source: 'MANUAL',
+                note: `Bulk Import Update. Prev: ${oldStock}, New: ${newStock}`,
+                date: serverTimestamp()
+              });
+            }
+          } else {
+             // New Product
+             const newRef = doc(collection(db, 'products'));
+             batch.set(newRef, { ...pData, createdAt: serverTimestamp() });
+             
+             // Log Initial Stock
+             const stock = Number(item.Stok || 0);
+             if (stock > 0) {
+               const logRef = doc(collection(db, 'inventory_logs'));
+               batch.set(logRef, {
+                  productId: newRef.id,
+                  productName: String(item.Nama || 'New Product'),
+                  type: 'MASUK',
+                  amount: stock,
+                  adminId: auth.currentUser?.uid || 'system',
+                  source: 'MANUAL',
+                  note: 'Bulk Import (New Product)',
+                  date: serverTimestamp()
+               });
+             }
+          }
         });
 
         await batch.commit();

@@ -92,8 +92,10 @@ export default function StockOutPage() {
         amount: qty,
         adminId: user?.uid || 'system',
         source: 'MANUAL',
-        note: `Manual Stock Out: ${reason}. Prev: ${selectedProduct.stock}, New: ${selectedProduct.stock - qty}`,
-        fromWarehouseId: 'gudang-utama'
+        note: `Manual Stock Out: ${reason}`,
+        fromWarehouseId: 'gudang-utama',
+        prevStock: selectedProduct.stock,
+        nextStock: selectedProduct.stock - qty
       });
 
       // C. Trigger sinkronisasi otomatis

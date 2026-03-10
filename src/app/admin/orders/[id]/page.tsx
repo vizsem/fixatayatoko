@@ -276,10 +276,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 referenceId: order.id,
                 note: `Update pesanan #${order.id}`,
                 fromWarehouseId: stockChange < 0 ? targetWarehouseId : undefined,
-                toWarehouseId: stockChange > 0 ? targetWarehouseId : undefined
+                toWarehouseId: stockChange > 0 ? targetWarehouseId : undefined,
+                prevStock: currentStock,
+                nextStock: currentStock + stockChange
               });
             }
           }
+        }
         // -------------------------
 
         const currentSubtotal =

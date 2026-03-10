@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { auth, db, storage } from '@/lib/firebase';
+import { addInventoryLog } from '@/lib/inventory';
 
 
 import { useParams, useRouter } from 'next/navigation';
@@ -280,9 +281,26 @@ export default function EditProductPage() {
 
       // 5. Simpan semua riwayat ke koleksi 'stock_logs'
       if (logEntries.length > 0) {
+        // Keep legacy stock_logs for now if needed, or remove it later.
         const { addDoc, collection } = await import('firebase/firestore');
         const logPromises = logEntries.map(log => addDoc(collection(db, 'stock_logs'), log));
         await Promise.all(logPromises);
+
+        // NEW: Write to unified inventory_logs
+        const invLogPromises = logEntries.map(log => addInventoryLog({
+          productId: log.productId,
+          productName: log.productName,
+          type: log.change > 0 ? 'MASUK' : 'KELUAR',
+          amount: Math.abs(log.change),
+          adminId: log.adminEmail || 'system',
+          source: 'MANUAL',
+          note: `Edit Product Details. Prev: ${log.previousStock}, New: ${log.newStock}`,
+          prevStock: log.previousStock,
+          nextStock: log.newStock,
+          fromWarehouseId: log.change < 0 ? log.warehouseId : undefined,
+          toWarehouseId: log.change > 0 ? log.warehouseId : undefined,
+        }));
+        await Promise.all(invLogPromises);
       }
 
       toast.success('Database & Riwayat Berhasil Disinkronkan!', { id: loadingToast });

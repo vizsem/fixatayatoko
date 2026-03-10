@@ -175,6 +175,23 @@ export default function AdminPurchases() {
                 hargaBeli: nextAvgCost,
                 updatedAt: serverTimestamp()
               });
+
+              // --- ADD INVENTORY LOG INSIDE TRANSACTION ---
+              const logRef = doc(collection(db, 'inventory_logs'));
+              tx.set(logRef, {
+                productId: item.id,
+                productName: item.name,
+                type: 'MASUK',
+                amount: incomingQtyPcs,
+                adminId: auth.currentUser?.uid || 'system',
+                source: 'PURCHASE',
+                referenceId: id, // Purchase ID
+                supplierId: p.supplierId,
+                note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
+                toWarehouseId: whKey,
+                date: serverTimestamp()
+              });
+              // -------------------------------------------
             });
           }
         }

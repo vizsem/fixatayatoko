@@ -43,6 +43,8 @@ type InventoryLog = {
   source?: 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER';
   note?: string;
   referenceId?: string;
+  prevStock?: number;
+  nextStock?: number;
 };
 
 export default function InventoryHistoryPage() {
@@ -254,6 +256,11 @@ export default function InventoryHistoryPage() {
                         }`}>
                         {log.type === 'MASUK' ? '+' : log.type === 'KELUAR' ? '-' : ''} {log.amount.toLocaleString()}
                       </p>
+                      {(log.prevStock !== undefined && log.nextStock !== undefined) && (
+                        <p className="text-[9px] font-bold text-gray-400 mt-1">
+                          {log.prevStock} → {log.nextStock}
+                        </p>
+                      )}
                     </div>
                   </div>
 

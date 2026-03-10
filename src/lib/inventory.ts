@@ -17,6 +17,8 @@ export interface InventoryLogData {
   note?: string;
   source: InventorySource;
   referenceId?: string; // Generic reference ID (Order ID, Purchase ID, etc.)
+  prevStock?: number;
+  nextStock?: number;
 }
 
 /**

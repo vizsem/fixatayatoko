@@ -70,9 +70,11 @@ export default function StockOpnamePage() {
         amount: Math.abs(diff),
         adminId: auth.currentUser?.uid || 'system',
         source: 'OPNAME',
-        note: `Opname: ${note || (diff >= 0 ? 'Kelebihan barang' : 'Barang kurang/hilang')}. Prev: ${selectedProduct.stock}, New: ${physicalStock}`,
+        note: `Opname: ${note || (diff >= 0 ? 'Kelebihan barang' : 'Barang kurang/hilang')}`,
         toWarehouseId: diff >= 0 ? 'gudang-utama' : undefined,
-        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined
+        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined,
+        prevStock: selectedProduct.stock,
+        nextStock: physicalStock
       });
 
       setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });
