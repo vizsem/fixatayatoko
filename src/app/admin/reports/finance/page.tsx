@@ -318,255 +318,318 @@ export default function FinanceReport() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-      <div className="md:hidden mb-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F8F9FC] text-slate-800 font-sans pb-20">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white px-6 py-4 sticky top-0 z-20 border-b border-slate-100 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-emerald-200 shadow-lg">
+            <LayoutDashboard size={20} />
+          </div>
+          <span className="font-bold text-slate-800 text-lg tracking-tight">Keuangan</span>
+        </div>
         <button
           onClick={() => setMobileOpen(true)}
-          aria-label="Buka menu laporan"
-          className="p-2.5 bg-white rounded-xl shadow-sm border border-gray-100"
+          className="p-2 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
         >
-          <LayoutDashboard size={18} />
+          <LayoutDashboard size={20} />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-green-600 rounded-lg flex items-center justify-center text-white font-black text-[10px]">AT</div>
-          <span className="text-[10px] font-black text-green-600">Admin</span>
-        </div>
-        <div className="w-8" />
-      </div>
-      <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-3xl shadow-lg">
-            <CreditCard size={28} />
-          </div>
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Laporan Keuangan</h1>
-            <p className="text-xs font-semibold text-gray-500 mt-1">Analisis profitabilitas & arus kas bisnis</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleExport}
-            className="bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3.5 rounded-2xl text-sm font-bold hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-          >
-            <Download size={18} /> Export Excel
-          </button>
-        </div>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl shadow-lg mb-8 border border-gray-100">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Filter Periode</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8">
+        
+        {/* Desktop Header & Filters */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Mulai</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-            />
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-2">Laporan Keuangan</h1>
+            <p className="text-slate-500 font-medium text-sm">Monitor performa bisnis, arus kas, dan profitabilitas real-time.</p>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Akhir</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-            />
-          </div>
-          <div className="flex items-end">
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-2 w-full sm:w-auto px-2">
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                className="bg-slate-50 border-none text-xs font-bold text-slate-700 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+              <span className="text-slate-300 font-bold">-</span>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                className="bg-slate-50 border-none text-xs font-bold text-slate-700 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+            <div className="h-8 w-[1px] bg-slate-100 hidden sm:block"></div>
             <button
               onClick={handleExport}
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-3.5 rounded-xl text-sm font-bold hover:shadow-lg transition-all duration-200"
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
             >
-              <Download size={18} className="mr-2" />
-              Ekspor Laporan
+              <Download size={16} /> Export
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-500">Pendapatan</p>
-              <span
-                className="h-7 w-7 rounded-xl bg-green-100 text-green-600 flex items-center justify-center ring-1 ring-current/10"
-                title="Ringkasan pendapatan bulanan & mingguan"
-              >
-                <TrendingUp className="h-4 w-4" />
-              </span>
-            </div>
-              <p className="text-2xl md:text-3xl font-black text-green-600 mt-1">
-                Rp{totalIncome.toLocaleString('id-ID')}
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                    +12% vs bulan lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Bulan ini
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                    +3% vs minggu lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Minggu ini
-                  </span>
-                </div>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          {/* Pendapatan */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl">
+                <TrendingUp size={18} />
               </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pendapatan</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              Rp{totalIncome.toLocaleString('id-ID')}
+            </h3>
+            <p className="text-xs font-medium text-slate-400 mt-1">Total Pemasukan</p>
+          </div>
+
+          {/* HPP */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2.5 bg-rose-50 text-rose-600 rounded-2xl">
+                <Package size={18} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">HPP</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              Rp{totalCost.toLocaleString('id-ID')}
+            </h3>
+            <p className="text-xs font-medium text-slate-400 mt-1">Modal Produk Terjual</p>
+          </div>
+
+          {/* Laba Kotor */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-shadow relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-5">
+              <Package size={80} />
+            </div>
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+                <TrendingUp size={18} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Laba Kotor</span>
+            </div>
+            <h3 className="text-2xl font-black text-blue-600 tracking-tight relative z-10">
+              Rp{totalProfit.toLocaleString('id-ID')}
+            </h3>
+            <p className="text-xs font-medium text-slate-400 mt-1 relative z-10">Pendapatan - HPP</p>
+          </div>
+
+          {/* Pengeluaran */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2.5 bg-orange-50 text-orange-600 rounded-2xl">
+                <CreditCard size={18} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pengeluaran</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              Rp{totalExpense.toLocaleString('id-ID')}
+            </h3>
+            <p className="text-xs font-medium text-slate-400 mt-1">Operasional & Stok</p>
+          </div>
+
+          {/* Laba Bersih */}
+          <div className={`p-5 rounded-3xl border shadow-[0_4px_20px_-4px_rgba(16,185,129,0.15)] hover:shadow-lg transition-shadow relative overflow-hidden ${netProfit >= 0 ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-500' : 'bg-gradient-to-br from-red-600 to-rose-700 border-red-500'}`}>
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <TrendingUp size={100} className="text-white" />
+            </div>
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="p-2.5 bg-white/20 text-white rounded-2xl backdrop-blur-sm">
+                <TrendingUp size={18} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Net Profit</span>
+            </div>
+            <h3 className="text-2xl font-black text-white tracking-tight relative z-10">
+              Rp{netProfit.toLocaleString('id-ID')}
+            </h3>
+            <p className="text-xs font-medium text-white/80 mt-1 relative z-10">Laba Kotor - Pengeluaran</p>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-500">Biaya Pokok</p>
-              <span
-                className="h-7 w-7 rounded-xl bg-red-100 text-red-600 flex items-center justify-center ring-1 ring-current/10"
-                title="Ringkasan biaya pokok bulanan & mingguan"
-              >
-                <TrendingDown className="h-4 w-4" />
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+           {/* Channel Summary */}
+           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm lg:col-span-1 h-full">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                 <Package size={18} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Performa Channel</h3>
             </div>
-              <p className="text-2xl md:text-3xl font-black text-red-600 mt-1">
-                Rp{totalCost.toLocaleString('id-ID')}
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                    +5% vs bulan lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Bulan ini
-                  </span>
+            
+            <div className="space-y-4">
+              {channelSummary.map((summary) => (
+                <div key={summary.channel} className="group p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-100 transition-all">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-600 transition-colors">{summary.channel}</span>
+                    <span className={`text-xs font-black ${summary.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {summary.profit >= 0 ? '+' : ''}Rp{summary.profit.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-emerald-500 rounded-full" 
+                          style={{ width: `${Math.min((summary.revenue / (totalIncome || 1)) * 100, 100)}%` }}
+                        />
+                     </div>
+                     <span className="text-[10px] font-bold text-slate-400 min-w-[3rem] text-right">
+                       {((summary.revenue / (totalIncome || 1)) * 100).toFixed(0)}%
+                     </span>
+                  </div>
+                  <div className="flex justify-between mt-2 text-[10px] text-slate-400">
+                    <span>Rev: {summary.revenue.toLocaleString('id-ID')}</span>
+                    <span>HPP: {summary.cost.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">
-                    +1% vs minggu lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Minggu ini
-                  </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Table */}
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm lg:col-span-2 flex flex-col h-full overflow-hidden">
+            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
+                    <LayoutDashboard size={18} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800">Riwayat Transaksi</h3>
+               </div>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Keterangan</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
+                    <th className="hidden md:table-cell px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Tipe</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {records.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                             <CreditCard size={24} className="text-slate-300" />
+                          </div>
+                          <p className="text-slate-500 font-bold text-sm">Belum ada data transaksi</p>
+                          <p className="text-slate-400 text-xs mt-1">Coba sesuaikan filter tanggal</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRecords.map((record) => (
+                      <tr key={record.id} className="group hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-700">
+                              {new Date(record.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(record.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-emerald-600 transition-colors">
+                              {record.description}
+                            </span>
+                            <div className="flex items-center gap-2">
+                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wide">
+                                 {record.paymentMethod}
+                               </span>
+                               {record.channel && (
+                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-500 uppercase tracking-wide">
+                                   {record.channel}
+                                 </span>
+                               )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                           <div className="flex flex-col items-end gap-1">
+                              <span className={`text-xs font-black ${record.type === 'profit' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {record.type === 'profit' ? '+' : '-'} Rp{record.amount.toLocaleString('id-ID')}
+                              </span>
+                              {record.profit !== undefined && (
+                                <span className={`text-[10px] font-bold ${record.profit >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                                  Laba: Rp{record.profit.toLocaleString('id-ID')}
+                                </span>
+                              )}
+                           </div>
+                        </td>
+                        <td className="hidden md:table-cell px-6 py-4 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
+                             record.type === 'profit' 
+                               ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                               : 'bg-rose-50 text-rose-600 border border-rose-100'
+                          }`}>
+                            {record.type === 'profit' ? 'Pemasukan' : 'Pengeluaran'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-slate-50 bg-white flex items-center justify-between">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Hal {currentPage} dari {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
               </div>
+            )}
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-500">Laba Kotor</p>
-              <span
-                className={`h-7 w-7 rounded-xl flex items-center justify-center ring-1 ring-current/10 ${totalProfit >= 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}
-                title="Ikon ringkasan laba kotor"
-              >
-                <Package className="h-4 w-4" />
-              </span>
+        {/* Footer Notes */}
+        <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 mb-20">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+               <Package size={18} />
             </div>
-              <p className={`text-2xl md:text-3xl font-black mt-1 ${totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'
-                }`}>
-                Rp{totalProfit.toLocaleString('id-ID')}
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                    +8% vs bulan lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Bulan ini
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">
-                    +2% vs minggu lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Minggu ini
-                  </span>
-                </div>
-              </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-500">Pengeluaran</p>
-              <span
-                className="h-7 w-7 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center ring-1 ring-current/10"
-                title="Ringkasan pengeluaran bulanan & mingguan"
-              >
-                <CreditCard className="h-4 w-4" />
-              </span>
+            <div>
+               <h4 className="text-sm font-bold text-slate-800 mb-2">Catatan Sistem Keuangan</h4>
+               <ul className="space-y-2 text-xs text-slate-500 font-medium">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                    HPP (Harga Pokok Penjualan) dihitung otomatis berdasarkan data Modal produk saat transaksi.
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                    Jika Modal kosong, sistem menggunakan estimasi margin 15% (HPP = 85% Harga Jual).
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                    Laba Bersih = (Total Pendapatan - Total HPP) - Total Pengeluaran Operasional.
+                  </li>
+               </ul>
             </div>
-              <p className="text-2xl md:text-3xl font-black text-orange-600 mt-1">
-                Rp{totalExpense.toLocaleString('id-ID')}
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                    +20% vs bulan lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Bulan ini
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                    +6% vs minggu lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Minggu ini
-                  </span>
-                </div>
-              </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-500">Laba Bersih</p>
-              <span
-                className={`h-7 w-7 rounded-xl flex items-center justify-center ring-1 ring-current/10 ${netProfit >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}
-                title="Ringkasan laba bersih"
-              >
-                {netProfit >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-              </span>
-            </div>
-              <p className={`text-2xl md:text-3xl font-black mt-1 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                Rp{netProfit.toLocaleString('id-ID')}
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                    -15% vs bulan lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Bulan ini
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">
-                    -4% vs minggu lalu
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Minggu ini
-                  </span>
-                </div>
-              </div>
           </div>
         </div>
       </div>
@@ -580,250 +643,6 @@ export default function FinanceReport() {
         onChangeEnd={(v) => setDateRange({ ...dateRange, endDate: v })}
         onExport={handleExport}
       />
-
-      <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Ringkasan Laba per Channel</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Menggunakan Harga Modal/HPP dari produk dan harga jual per channel.
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {channelSummary.map(summary => (
-            <div
-              key={summary.channel}
-              className="p-4 rounded-2xl border border-gray-100 bg-gray-50 flex flex-col gap-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
-                  {summary.channel}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Pendapatan</p>
-                <p className="text-sm font-bold text-green-600">
-                  Rp{summary.revenue.toLocaleString('id-ID')}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">HPP (Modal)</p>
-                <p className="text-sm font-bold text-red-600">
-                  Rp{summary.cost.toLocaleString('id-ID')}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[11px] text-gray-500">Laba Kotor</p>
-                <p
-                  className={`text-sm font-extrabold ${
-                    summary.profit >= 0 ? 'text-blue-600' : 'text-red-600'
-                  }`}
-                >
-                  Rp{summary.profit.toLocaleString('id-ID')}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Detail Transaksi Keuangan</h2>
-        </div>
-
-        <div className="md:hidden space-y-4 px-4 pb-4">
-          {paginatedRecords.map((record) => (
-            <div key={record.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    {new Date(record.date).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </p>
-                  <h3 className="text-sm font-bold text-gray-900 line-clamp-2">{record.description}</h3>
-                </div>
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                  record.type === 'profit' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                }`}>
-                  {record.type === 'profit' ? 'Penjualan' : 'Pengeluaran'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="bg-gray-50 p-3 rounded-xl">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Jumlah</p>
-                  <p className={`text-sm font-black ${record.type === 'profit' ? 'text-green-600' : 'text-orange-600'}`}>
-                    Rp {record.amount.toLocaleString('id-ID')}
-                  </p>
-                </div>
-                {record.type === 'profit' && (
-                  <div className="bg-gray-50 p-3 rounded-xl">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Laba</p>
-                    <p className={`text-sm font-black ${record.profit && record.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {record.profit ? `Rp ${record.profit.toLocaleString('id-ID')}` : '-'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700">
-                  {record.paymentMethod}
-                </span>
-                {record.cost && record.cost > 0 && (
-                   <span className="text-xs text-gray-400">
-                     Modal: Rp {record.cost.toLocaleString('id-ID')}
-                   </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 text-xs md:text-sm">
-              <tr>
-                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Tanggal
-                </th>
-                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Deskripsi
-                </th>
-                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Pendapatan
-                </th>
-                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Biaya Pokok
-                </th>
-                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Laba
-                </th>
-                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Pengeluaran
-                </th>
-                <th className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Metode Bayar
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 md:px-6 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <CreditCard className="h-16 w-16 text-gray-300 mb-4" />
-                      <p className="text-gray-500 font-medium">Tidak ada data keuangan dalam periode ini</p>
-                      <p className="text-sm text-gray-400 mt-1">Coba ubah filter tanggal untuk melihat data</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {new Date(record.date).toLocaleDateString('id-ID')}
-                    </td>
-                    <td className="px-3 py-3 md:px-6 md:py-4 text-sm text-gray-900 max-w-xs truncate">{record.description}</td>
-                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                      {record.type === 'profit' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-red-600">
-                      {record.cost ? `Rp${record.cost.toLocaleString('id-ID')}` : '–'}
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                      {record.profit ? (
-                        <span className={`text-sm font-bold ${record.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                          Rp{record.profit.toLocaleString('id-ID')}
-                        </span>
-                      ) : '–'}
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-semibold text-orange-600">
-                      {record.type === 'expense' ? `Rp${record.amount.toLocaleString('id-ID')}` : '–'}
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {record.paymentMethod}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-gray-700">
-                Menampilkan <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> -{' '}
-                <span className="font-medium">
-                  {Math.min(currentPage * itemsPerPage, records.length)}
-                </span>{' '}
-                dari <span className="font-medium">{records.length}</span> transaksi
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const page = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
-                        currentPage === page
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="flex items-start gap-2">
-          <Package size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-black">
-            <p className="font-medium">Catatan Perhitungan:</p>
-            <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-              <li><strong>Biaya Pokok (HPP)</strong> menggunakan data Harga Modal dari database produk.</li>
-              <li>Jika Harga Modal bernilai 0, sistem mengestimasi HPP sebesar 85% dari harga jual.</li>
-              <li><strong>Laba Kotor</strong> = Pendapatan Penjualan dikurangi Biaya Pokok (HPP).</li>
-              <li><strong>Laba Bersih</strong> = Laba Kotor dikurangi Pengeluaran Operasional (Pembelian Stok, dll).</li>
-              <li>Data hanya mencakup transaksi dengan status <strong>SELESAI</strong>.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      </div>
     </div>
   );
 }
@@ -846,46 +665,52 @@ function MobileSheet({
   onExport: () => void;
 }) {
   return (
-    <div className={`${open ? 'pointer-events-auto' : 'pointer-events-none'} md:hidden`}>
+    <div className={`fixed inset-0 z-50 ${open ? 'pointer-events-auto' : 'pointer-events-none'} md:hidden`}>
       <div
-        className={`${open ? 'opacity-100' : 'opacity-0'} fixed inset-0 bg-black/40 transition-opacity`}
+        className={`${open ? 'opacity-100' : 'opacity-0'} absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300`}
         onClick={onClose}
-        aria-hidden="true"
       />
       <div
-        className={`${open ? 'translate-y-0' : 'translate-y-full'} fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl border-t border-gray-200 p-4 space-y-4 transition-transform`}
-        role="dialog"
-        aria-modal="true"
+        className={`${open ? 'translate-y-0' : 'translate-y-full'} absolute inset-x-0 bottom-0 bg-white rounded-t-[2rem] shadow-2xl p-6 space-y-6 transition-transform duration-300 ease-out`}
       >
-        <div className="h-1 w-12 bg-gray-300 rounded-full mx-auto" />
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Mulai</label>
+        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto" />
+        
+        <div>
+           <h3 className="text-lg font-black text-slate-800 mb-1">Filter Laporan</h3>
+           <p className="text-xs text-slate-500 font-medium">Atur periode waktu laporan keuangan.</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Dari Tanggal</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => onChangeStart(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Akhir</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sampai Tanggal</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => onChangeEnd(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-3 pt-4">
           <button
-            onClick={onExport}
-            className="w-full bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3.5 rounded-xl text-sm font-bold"
+            onClick={() => { onExport(); onClose(); }}
+            className="w-full bg-emerald-600 text-white px-6 py-4 rounded-2xl text-sm font-bold shadow-lg shadow-emerald-200 active:scale-95 transition-transform"
           >
-            Ekspor Laporan
+            Download Excel
           </button>
           <button
             onClick={onClose}
-            className="w-full bg-gray-100 text-gray-700 px-6 py-3.5 rounded-xl text-sm font-bold"
+            className="w-full bg-slate-100 text-slate-600 px-6 py-4 rounded-2xl text-sm font-bold hover:bg-slate-200 active:scale-95 transition-transform"
           >
             Tutup
           </button>
