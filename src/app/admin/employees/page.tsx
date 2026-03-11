@@ -174,127 +174,204 @@ export default function EmployeesPage() {
   };
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase())
+    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
+    <div className="min-h-screen bg-[#F8F9FC] text-slate-800 font-sans pb-20">
       <Toaster position="top-center" />
 
-      <div className="px-4 md:px-8 pt-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-3xl shadow-lg">
-              <UserCog size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Team Ataya</h1>
-              <p className="text-xs font-semibold text-gray-500 mt-1">Manajemen staf & kehadiran</p>
-            </div>
-          </div>
-          <button
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3.5 rounded-2xl text-sm font-bold hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-          >
-            <Plus size={18} /> Tambah Staff
-          </button>
+      {/* Header */}
+      <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
+           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+             <div className="flex items-center gap-3">
+               <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200">
+                 <UserCog size={20} />
+               </div>
+               <div>
+                 <h1 className="text-xl font-black text-slate-900 tracking-tight">Team Ataya</h1>
+                 <p className="text-xs font-medium text-slate-500">Manajemen staf & kehadiran</p>
+               </div>
+             </div>
+             
+             <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Cari nama, jabatan..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={() => { resetForm(); setIsModalOpen(true); }}
+                  className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg shadow-slate-200"
+                >
+                  <Plus size={16} /> <span className="hidden sm:inline">Tambah Staff</span>
+                </button>
+             </div>
+           </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-        <div className="relative mb-8 group">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors" size={20} />
-          <input
-            type="text"
-            placeholder="Cari berdasarkan nama staff..."
-            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8">
         {loading ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-green-600" size={40} /></div>
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-emerald-600" size={32} /></div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEmployees.map((emp) => (
-              <div key={emp.id} className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
-                <div className="absolute top-0 right-0 px-4 py-2 bg-gray-50 text-gray-600 rounded-bl-2xl flex items-center gap-2 border-l border-b border-gray-200">
-                  <Clock size={12} />
-                  <span className="text-xs font-medium">{emp.workSchedule}</span>
-                </div>
-
-                <div className="flex justify-between items-start mb-6 pt-2">
-                  <div className="w-14 h-14 bg-green-100 text-green-700 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
-                    <UserCog size={28} />
-                  </div>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${emp.status === 'AKTIF' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {emp.status}
-                  </span>
-                </div>
-
-                <div className="mb-6">
-                  <h3 className="font-bold text-gray-900 text-lg leading-tight mb-2">{emp.name}</h3>
-                  <div className="flex items-center gap-2 text-green-600">
-                    <ShieldCheck size={14} />
-                    <span className="text-xs font-medium">{emp.role}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 group-hover:border-green-200 transition-all">
-                    <span className="text-xs font-medium text-gray-500 block mb-1">Gaji Bulanan</span>
-                    <p className="text-xl font-bold text-gray-900">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 px-1 text-gray-500">
-                    <CheckCircle2 size={16} className="text-green-500" />
-                    <span className="text-sm font-medium">Total absensi: {emp.totalAttendance || 0} Hari</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <button onClick={() => handlePresent(emp)} className="bg-gray-900 hover:bg-black text-white py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-md">Absen hadir</button>
-                  <button onClick={() => handleAlpha(emp)} className="bg-white border-2 border-red-100 text-red-600 hover:bg-red-50 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95">Alpha</button>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <button onClick={() => handleEdit(emp)} className="flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
-                    <Edit size={14} /> Edit data
-                  </button>
-
-                  <button onClick={() => handleDelete(emp.id)} className="text-gray-400 hover:text-red-600 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+             <div className="overflow-x-auto">
+               <table className="w-full text-left border-collapse">
+                 <thead className="bg-slate-50/50 border-b border-slate-100">
+                   <tr>
+                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Nama Staff</th>
+                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Jabatan</th>
+                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Jadwal & Status</th>
+                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Gaji & Absensi</th>
+                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Aksi</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-50">
+                   {filteredEmployees.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm font-medium">
+                          Tidak ada data karyawan ditemukan.
+                        </td>
+                      </tr>
+                   ) : (
+                     filteredEmployees.map((emp) => (
+                       <tr key={emp.id} className="group hover:bg-slate-50/80 transition-colors">
+                         <td className="px-6 py-4">
+                           <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center font-bold text-xs border border-emerald-100">
+                               {emp.name.charAt(0).toUpperCase()}
+                             </div>
+                             <div>
+                               <p className="text-sm font-bold text-slate-800">{emp.name}</p>
+                               <p className="text-[10px] text-slate-400 font-medium">{emp.phone || '-'}</p>
+                             </div>
+                           </div>
+                         </td>
+                         <td className="px-6 py-4">
+                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wide border border-indigo-100">
+                             <ShieldCheck size={12} /> {emp.role}
+                           </span>
+                         </td>
+                         <td className="px-6 py-4">
+                           <div className="flex flex-col gap-1.5">
+                             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                               <Clock size={14} className="text-slate-400" />
+                               {emp.workSchedule}
+                             </div>
+                             <span className={`inline-flex self-start px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+                               emp.status === 'AKTIF' 
+                                 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                                 : 'bg-rose-50 text-rose-600 border border-rose-100'
+                             }`}>
+                               {emp.status}
+                             </span>
+                           </div>
+                         </td>
+                         <td className="px-6 py-4">
+                           <div className="space-y-1">
+                             <p className="text-xs font-bold text-slate-700">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                             <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                               <CheckCircle2 size={12} className="text-emerald-500" />
+                               Hadir: {emp.totalAttendance || 0} hari
+                             </div>
+                           </div>
+                         </td>
+                         <td className="px-6 py-4">
+                           <div className="flex items-center justify-end gap-2">
+                             <button 
+                               onClick={() => handlePresent(emp)}
+                               title="Absen Hadir"
+                               className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 hover:text-emerald-700 transition-colors border border-emerald-100"
+                             >
+                               <CheckCircle2 size={16} />
+                             </button>
+                             <button 
+                               onClick={() => handleAlpha(emp)}
+                               title="Alpha (Denda)"
+                               className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 hover:text-rose-700 transition-colors border border-rose-100"
+                             >
+                               <X size={16} />
+                             </button>
+                             <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
+                             <button 
+                               onClick={() => handleEdit(emp)}
+                               className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                             >
+                               <Edit size={16} />
+                             </button>
+                             <button 
+                               onClick={() => handleDelete(emp.id)}
+                               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                             >
+                               <Trash2 size={16} />
+                             </button>
+                           </div>
+                         </td>
+                       </tr>
+                     ))
+                   )}
+                 </tbody>
+               </table>
+             </div>
           </div>
         )}
       </main>
 
       {/* MODAL TAMBAH/EDIT */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-lg font-black tracking-tighter italic">{editingId ? 'Edit profile staff' : 'Registrasi staff baru'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] p-8 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-8 border-b border-slate-50 pb-6">
+              <div>
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">{editingId ? 'Edit Data Staff' : 'Registrasi Staff Baru'}</h2>
+                <p className="text-xs text-slate-400 font-medium mt-1">Lengkapi informasi karyawan di bawah ini.</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Nama lengkap</label>
-                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-green-500/20" placeholder="Contoh: Budi Santoso" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
+                  <input 
+                    required 
+                    value={formData.name} 
+                    onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                    placeholder="Nama staff" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kontak (WA)</label>
+                  <input 
+                    value={formData.phone} 
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })} 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                    placeholder="08xxx" 
+                  />
+                </div>
               </div>
 
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Jabatan</label>
-                  <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full px-4 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none">
-
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jabatan</label>
+                  <select 
+                    value={formData.role} 
+                    onChange={e => setFormData({ ...formData, role: e.target.value })} 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                  >
                     <option>Karyawan Toko</option>
                     <option>Kasir</option>
                     <option>Kurir</option>
@@ -302,38 +379,51 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Gaji bulanan</label>
-                  <input type="number" required value={formData.manualSalary} onChange={e => setFormData({ ...formData, manualSalary: Number(e.target.value) })} className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none" />
-                </div>
-
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Jadwal shift</label>
-                <input required value={formData.workSchedule} onChange={e => setFormData({ ...formData, workSchedule: e.target.value })} className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none" placeholder="07:00 - 14:00" />
-              </div>
-
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Kontak WA</label>
-                  <input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none" placeholder="08xxx" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 ml-2 tracking-widest">Status</label>
-                  <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as 'AKTIF' | 'NON-AKTIF' })} className="w-full px-4 py-4 bg-gray-50 rounded-2xl text-xs font-bold outline-none">
-
-
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                  <select 
+                    value={formData.status} 
+                    onChange={e => setFormData({ ...formData, status: e.target.value as 'AKTIF' | 'NON-AKTIF' })} 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                  >
                     <option value="AKTIF">AKTIF</option>
-                    <option value="NON-AKTIF">OFF</option>
+                    <option value="NON-AKTIF">NON-AKTIF</option>
                   </select>
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-green-600 text-white py-5 rounded-[24px] font-black text-[11px] tracking-[0.2em] shadow-xl shadow-green-100 hover:bg-green-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                <Save size={18} /> {editingId ? 'Simpan perubahan' : 'Daftarkan staff'}
-              </button>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gaji Bulanan (Rp)</label>
+                 <div className="relative">
+                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                   <input 
+                     type="number" 
+                     required 
+                     value={formData.manualSalary} 
+                     onChange={e => setFormData({ ...formData, manualSalary: Number(e.target.value) })} 
+                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                   />
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jadwal Shift</label>
+                <div className="relative">
+                   <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                   <input 
+                     required 
+                     value={formData.workSchedule} 
+                     onChange={e => setFormData({ ...formData, workSchedule: e.target.value })} 
+                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                     placeholder="Contoh: 08:00 - 16:00" 
+                   />
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                  <Save size={18} /> {editingId ? 'Simpan Perubahan' : 'Simpan Data Staff'}
+                </button>
+              </div>
 
             </form>
           </div>

@@ -333,6 +333,11 @@ export default function AdminOrders() {
               }`}
             >
               {tab}
+              {tab === 'MENUNGGU' && orders.filter(o => o.status === 'MENUNGGU').length > 0 && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === tab ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-600'}`}>
+                  {orders.filter(o => o.status === 'MENUNGGU').length}
+                </span>
+              )}
             </button>
           ))}
         </div>

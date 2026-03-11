@@ -34,6 +34,7 @@ import {
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 import { addInventoryLog } from '@/lib/inventory';
+import AdminChatInterface from '@/components/AdminChatInterface';
 
 // Types
 type UnitOption = {
@@ -157,6 +158,9 @@ export default function CashierPOS() {
   const [shiftInput, setShiftInput] = useState({ initialCash: '', actualCash: '', notes: '' });
   const [shiftSummary, setShiftSummary] = useState<{ totalCash: number, totalNonCash: number, expected: number } | null>(null);
 
+  // Chat State
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   // No redundant state for calculated values
 
@@ -536,6 +540,17 @@ export default function CashierPOS() {
     
     return () => clearInterval(interval);
   }, [loading]);
+
+  // Listen for Unread Chats (Admin)
+  useEffect(() => {
+    const q = query(collection(db, 'chats'), where('isReadByAdmin', '==', false));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setChatUnreadCount(snapshot.size);
+    }, (error) => {
+      console.log("Chat listener error (probably index missing):", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (activeTab !== 'orders') return;
@@ -1029,6 +1044,10 @@ export default function CashierPOS() {
           )}
         </div>
         <div className="flex items-center gap-4">
+          <button onClick={() => setShowChatModal(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
+            <MessageSquare size={20} className="group-hover:text-green-600" />
+            {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
+          </button>
           <button onClick={() => setIsDrawerOpen(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
             <Bell size={20} className="group-hover:text-blue-600" />
             {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
@@ -1565,6 +1584,15 @@ export default function CashierPOS() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN CHAT MODAL */}
+      {showChatModal && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+             <AdminChatInterface onClose={() => setShowChatModal(false)} isModal={true} />
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import './globals.css';
 import MobileNav from '@/components/MobileNav';
 import { Toaster } from 'react-hot-toast';
 import FCMManager from '@/components/FCMManager';
+import CustomerChatWidget from '@/components/CustomerChatWidget';
 
 declare global {
   interface Window {
@@ -57,6 +58,7 @@ export default function RootLayout({
       <body className="antialiased overflow-x-hidden">
         <Toaster position="top-center" />
         <FCMManager />
+        <CustomerChatWidget />
         {children}
         <MobileNav />
         <Script src="/xlsx.full.min.js" strategy="afterInteractive" />

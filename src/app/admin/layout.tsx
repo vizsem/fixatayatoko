@@ -10,7 +10,7 @@ import {
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
-  Banknote, Bell
+  Banknote, Bell, Landmark
 } from 'lucide-react';
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
@@ -96,6 +96,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       group: "Keuangan & Operasional", items: [
         { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
+        { name: 'Modal & Aset', href: '/admin/capital', icon: Landmark },
       ]
     },
     {
