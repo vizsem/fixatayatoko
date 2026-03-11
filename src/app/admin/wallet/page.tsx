@@ -5,7 +5,8 @@ import { db } from '@/lib/firebase';
 
 import {
   collection, query, orderBy, limit, onSnapshot,
-  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp
+  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp,
+  runTransaction
 } from 'firebase/firestore';
 
 import {
@@ -70,20 +71,42 @@ export default function AdminWalletDashboard() {
       const amountToChange = adjustData.type === 'TOPUP_ADMIN' ? adjustData.amount : -adjustData.amount;
       const userRef = doc(db, 'users', adjustData.userId);
 
-      await updateDoc(userRef, { walletBalance: increment(amountToChange) });
-      await addDoc(collection(db, 'wallet_logs'), {
-        userId: adjustData.userId,
-        amountChanged: amountToChange,
-        type: adjustData.type,
-        description: adjustData.reason || (adjustData.type === 'TOPUP_ADMIN' ? 'Top-up oleh Admin' : 'Penarikan oleh Admin'),
-        createdAt: serverTimestamp()
+      // Gunakan Transaction untuk Safety Net (Cegah Saldo Negatif)
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error("User tidak ditemukan!");
+        }
+
+        const userData = userDoc.data();
+        const currentBalance = userData?.walletBalance || 0;
+        const newBalance = currentBalance + amountToChange;
+
+        // Safety Net Check
+        if (newBalance < 0) {
+          throw new Error(`Saldo tidak mencukupi! Sisa saldo: Rp${currentBalance.toLocaleString()}`);
+        }
+
+        // Update Saldo
+        transaction.update(userRef, { walletBalance: newBalance });
+
+        // Catat Log dalam transaksi yang sama (atomic)
+        const logRef = doc(collection(db, 'wallet_logs'));
+        transaction.set(logRef, {
+          userId: adjustData.userId,
+          amountChanged: amountToChange,
+          type: adjustData.type,
+          description: adjustData.reason || (adjustData.type === 'TOPUP_ADMIN' ? 'Top-up oleh Admin' : 'Penarikan oleh Admin'),
+          createdAt: serverTimestamp()
+        });
       });
 
       toast.success("Berhasil memperbarui saldo dompet");
       setShowModal(false);
       setAdjustData({ userId: '', amount: 0, reason: '', type: 'TOPUP_ADMIN' });
-    } catch {
-      toast.error("Gagal memproses data");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Gagal memproses data");
     }
   };
 

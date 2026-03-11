@@ -310,6 +310,17 @@ export async function POST(req: Request) {
       // 3. Update User & Logs
       if (userId && userRef) {
         if (finalPointsUsed > 0 || finalWalletUsed > 0) {
+          // Safety Net: Ensure balance/points are sufficient before updating
+          // Note: We already calculated finalWalletUsed = Math.min(currentWallet, ...), so technically safe.
+          // But explicitly checking here adds a layer of protection.
+          
+          if (finalWalletUsed > 0) {
+             const userData = userSnap?.data() as UserData;
+             if ((userData.walletBalance || 0) < finalWalletUsed) {
+                throw new Error("Safety Net Triggered: Saldo wallet tidak mencukupi saat finalisasi transaksi.");
+             }
+          }
+
           t.update(userRef, {
             points: FieldValue.increment(-finalPointsUsed),
             walletBalance: FieldValue.increment(-finalWalletUsed)

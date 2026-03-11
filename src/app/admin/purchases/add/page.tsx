@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -126,6 +126,23 @@ export default function AddPurchase() {
 
     setLoading(true);
     try {
+      // VALIDASI: Cek Saldo Modal jika Pembayaran Tunai (LUNAS & CASH)
+      if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
+        const capitalQ = query(collection(db, 'capital_transactions'), orderBy('date', 'desc'));
+        const capitalSnap = await getDocs(capitalQ);
+        
+        let currentCapital = 0;
+        capitalSnap.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.type === 'INJECTION') currentCapital += (data.amount || 0);
+          else if (data.type === 'WITHDRAWAL') currentCapital -= (data.amount || 0);
+        });
+
+        if (total > currentCapital) {
+          throw new Error(`Saldo Modal Tidak Cukup! Saldo: Rp${currentCapital.toLocaleString()}, Butuh: Rp${total.toLocaleString()}`);
+        }
+      }
+
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
@@ -236,26 +253,28 @@ export default function AddPurchase() {
             nextStock: currentStock + newQty,
             date: serverTimestamp()
           });
-
-          // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai
-          // Agar sinkron dengan "Modal & Aset"
-          if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
-             await addDoc(collection(db, 'capital_transactions'), {
-               date: serverTimestamp(),
-               type: 'WITHDRAWAL', // Pengurangan modal tunai
-               amount: newCostTotal,
-               description: `Pembelian Stok: ${item.name} (${newQty} pcs)`,
-               recordedBy: 'system',
-               referenceId: purchaseRef.id
-             });
-          }
         }
       }
 
+
+
+      // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai
+      // Agar sinkron dengan "Modal & Aset"
+      if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
+         await addDoc(collection(db, 'capital_transactions'), {
+           date: serverTimestamp(),
+           type: 'WITHDRAWAL', // Pengurangan modal tunai
+           amount: total, // Total Pembelian (bukan per item)
+           description: `Pembelian Stok (Total): ${supplierName || 'Supplier'} (${cart.length} items)`,
+           recordedBy: 'system',
+           referenceId: purchaseRef.id
+         });
+      }
+
       router.push('/admin/purchases');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      notify.admin.error("Gagal menyimpan transaksi.");
+      notify.admin.error(err.message || "Gagal menyimpan transaksi.");
     } finally {
       setLoading(false);
     }

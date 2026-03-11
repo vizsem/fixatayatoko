@@ -13,7 +13,7 @@ import {
   Banknote, Bell, Landmark, MessageCircle, Mail
 } from 'lucide-react';
 
-import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, limit, query, Timestamp, where } from 'firebase/firestore';
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     createdAt?: Timestamp;
   }>>([]);
   const initialLoaded = useRef(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // Listen to unread messages count
+  useEffect(() => {
+    const q = query(
+      collection(db, 'messages'),
+      where('status', '==', 'unread')
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUnreadMessages(snap.size);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const q = query(
@@ -102,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       group: "Pelanggan & SDM", items: [
         { name: 'Live Chat', href: '/admin/chat', icon: MessageCircle },
-        { name: 'Kotak Masuk', href: '/admin/messages', icon: Mail },
+        { name: 'Kotak Masuk', href: '/admin/messages', icon: Mail, badge: unreadMessages },
         { name: 'Pelanggan', href: '/admin/customers', icon: Users },
         { name: 'Karyawan', href: '/admin/employees', icon: UsersRound },
         { name: 'Sistem Poin', href: '/admin/points', icon: Star },
@@ -169,15 +182,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {group.items.map((item) => {
                   const isActive = pathname === item.href;
                   const Icon = item.icon;
+                  // @ts-ignore - badge property might not exist on all items
+                  const badge = item.badge;
+                  
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       onClick={() => setIsOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isActive ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'text-gray-500 hover:bg-gray-50 hover:text-green-600'}`}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all relative ${isActive ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'text-gray-500 hover:bg-gray-50 hover:text-green-600'}`}
                     >
                       <Icon size={16} strokeWidth={isActive ? 3 : 2} />
-                      {item.name}
+                      <span className="flex-1">{item.name}</span>
+                      {badge > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                          {badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

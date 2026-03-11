@@ -175,17 +175,22 @@ export default function AdminProducts() {
   };
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Hapus ${selectedIds.length} produk? Tindakan ini tidak bisa dikembalikan.`)) return;
-    const t = notify.admin.loading(`Menghapus ${selectedIds.length} produk...`);
+    if (!confirm(`Arsipkan ${selectedIds.length} produk? Produk akan dinonaktifkan (Soft Delete).`)) return;
+    const t = notify.admin.loading(`Mengarsipkan ${selectedIds.length} produk...`);
     try {
       const batch = writeBatch(db);
       selectedIds.forEach(id => {
-        batch.delete(doc(db, 'products', id));
+        // Soft Delete: Set isActive = false instead of deleting document
+        batch.update(doc(db, 'products', id), { 
+          isActive: false, 
+          status: 'ARCHIVED',
+          updatedAt: serverTimestamp() 
+        });
       });
       await batch.commit();
       setSelectedIds([]);
-      notify.admin.success("Produk berhasil dihapus", { id: t });
-    } catch { notify.admin.error("Gagal menghapus produk", { id: t }); }
+      notify.admin.success("Produk berhasil diarsipkan", { id: t });
+    } catch { notify.admin.error("Gagal mengarsipkan produk", { id: t }); }
   };
   // States
   const [loading, setLoading] = useState(true);
