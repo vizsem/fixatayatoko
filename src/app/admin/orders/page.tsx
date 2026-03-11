@@ -53,19 +53,25 @@ export default function AdminOrders() {
   }, [router]);
 
   // 2. Real-time Data Fetching (Fetch ALL relevant orders for client-side pagination)
-  // We remove the limit(10) to allow client-side pagination to work correctly
-  useEffect(() => {
-    const q = query(
-      collection(db, 'orders'), 
-      orderBy('createdAt', 'desc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-      setOrders(list);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    // We remove the limit(10) to allow client-side pagination to work correctly
+    // Also removing orderBy from query to ensure we get docs even if createdAt is missing, then sort client-side
+    useEffect(() => {
+      const q = query(collection(db, 'orders'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        
+        // Client-side sorting
+        list.sort((a, b) => {
+            const dateA = a.createdAt ? a.createdAt.toMillis() : 0;
+            const dateB = b.createdAt ? b.createdAt.toMillis() : 0;
+            return dateB - dateA;
+        });
+
+        setOrders(list);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }, []);
 
   // 6. Fungsi Auto-Update Status (Simulasi Cron Job)
   // Menjalankan logika update status otomatis setiap kali halaman ini dimuat oleh admin
@@ -247,7 +253,20 @@ export default function AdminOrders() {
   const filteredOrders = orders.filter(order => {
     const matchesSearch = (order.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.customerName || "").toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'SEMUA' || order.status === activeTab;
+    
+    // Normalize status for flexible matching
+    const s = (order.status || '').toUpperCase();
+    
+    let matchesTab = false;
+    if (activeTab === 'SEMUA') {
+      matchesTab = true;
+    } else if (activeTab === 'MENUNGGU') {
+      // Include 'PENDING' and 'BELUM_LUNAS' (Tempo) in 'MENUNGGU' tab
+      matchesTab = s === 'MENUNGGU' || s === 'PENDING' || s === 'BELUM_LUNAS';
+    } else {
+      matchesTab = s === activeTab;
+    }
+
     return matchesSearch && matchesTab;
   });
 
@@ -255,11 +274,17 @@ export default function AdminOrders() {
   const currentItems = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'MENUNGGU': return 'bg-rose-100 text-rose-600 border-rose-200';
+    const s = (status || '').toUpperCase();
+    switch (s) {
+      case 'MENUNGGU': 
+      case 'PENDING':
+      case 'BELUM_LUNAS':
+        return 'bg-rose-100 text-rose-600 border-rose-200';
       case 'DIPROSES': return 'bg-amber-100 text-amber-600 border-amber-200';
       case 'DIKIRIM': return 'bg-blue-100 text-blue-600 border-blue-200';
-      case 'SELESAI': return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case 'SELESAI': 
+      case 'LUNAS':
+        return 'bg-emerald-100 text-emerald-600 border-emerald-200';
       case 'DIBATALKAN': return 'bg-slate-100 text-slate-500 border-slate-200';
       default: return 'bg-gray-100 text-gray-500 border-gray-200';
     }

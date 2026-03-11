@@ -117,7 +117,9 @@ export default function CapitalPage() {
     // 2. Calculate Stock Assets (Real-time is expensive, maybe fetch once or slow interval)
     const fetchStockAssets = async () => {
       try {
-        const pSnapshot = await getDocs(collection(db, 'products'));
+        // Only count assets from ACTIVE products
+        const q = query(collection(db, 'products'), where('isActive', '==', true));
+        const pSnapshot = await getDocs(q);
         let totalStockValue = 0;
         pSnapshot.forEach(doc => {
           const data = doc.data();
