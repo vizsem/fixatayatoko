@@ -209,10 +209,55 @@ export default function MarketplaceOrdersPage() {
 
       for (const item of cart) {
         const pRef = doc(db, 'products', item.id);
+        const pSnap = await getDoc(pRef);
+        const productData = pSnap.data();
+        const currentStock = productData?.stock != null ? productData.stock : 0;
+        const newStock = currentStock - item.quantity;
+
+        // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
+        const MAIN_WAREHOUSE_ID = 'gudang-utama';
+        const stockByWarehouse = productData?.stockByWarehouse || {};
+        const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+        
+        let remainingToDeduct = item.quantity;
+        
+        // 1. Prioritas Gudang Utama
+        if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
+          const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
+          newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
+          remainingToDeduct -= deduct;
+        }
+        
+        // 2. Gudang Lainnya (Jika masih ada sisa yang harus dikurangi)
+        if (remainingToDeduct > 0) {
+          for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
+            if (whId === MAIN_WAREHOUSE_ID) continue;
+            if (remainingToDeduct <= 0) break;
+            
+            const deduct = Math.min(qty as number, remainingToDeduct);
+            newStockByWarehouse[whId] = (qty as number) - deduct;
+            remainingToDeduct -= deduct;
+          }
+        }
+
         await updateDoc(pRef, {
-          stock: (await getDoc(pRef)).data()?.stock != null
-            ? (await getDoc(pRef)).data()!.stock - item.quantity
-            : 0
+          stock: newStock,
+          stockByWarehouse: newStockByWarehouse
+        });
+
+        // Catat log inventory agar muncul di Audit
+        await (await import('firebase/firestore')).addDoc(collection(db, 'inventory_logs'), {
+          productId: item.id,
+          productName: item.name,
+          type: 'KELUAR',
+          amount: item.quantity,
+          adminId: auth.currentUser?.uid || 'admin',
+          date: serverTimestamp(),
+          note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
+          source: 'marketplace',
+          prevStock: currentStock,
+          nextStock: newStock,
+          fromWarehouseId: 'gudang-utama' // Asumsi utama diambil dari gudang utama, tapi log ini general
         });
       }
 

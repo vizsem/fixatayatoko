@@ -170,14 +170,28 @@ export default function AddPurchase() {
           // Bulatkan
           newAverageCost = Math.round(newAverageCost);
 
+          // Update Stok per Gudang (Jika ada)
+          const stockByWarehouse = productData.stockByWarehouse || {};
+          const newStockByWarehouse = { ...stockByWarehouse };
+          if (selectedWarehouse) {
+            newStockByWarehouse[selectedWarehouse] = (newStockByWarehouse[selectedWarehouse] || 0) + newQty;
+          }
+
+          const updateData: any = {
+            stock: currentStock + newQty,
+            stockByWarehouse: newStockByWarehouse
+          };
+
           // Update HPP di Produk jika berbeda
           if (newAverageCost !== currentCost) {
-            await updateDoc(productRef, {
-              cost: newAverageCost,
-              Modal: newAverageCost // Update field legacy juga
-            });
+            updateData.cost = newAverageCost;
+            updateData.Modal = newAverageCost; // Update field legacy juga
+          }
 
-            // Catat Log Perubahan Harga
+          await updateDoc(productRef, updateData);
+
+          // Catat Log Perubahan Harga (Jika berubah)
+          if (newAverageCost !== currentCost) {
             await addDoc(collection(db, 'product_cost_logs'), {
               productId: item.id,
               productName: item.name,
@@ -187,10 +201,27 @@ export default function AddPurchase() {
               purchasePrice: unitCostNew,
               quantity: newQty,
               changeDate: serverTimestamp(),
-              adminId: 'system', // Atau ambil current user ID
+              adminId: 'system',
               reason: 'PURCHASE_AVG_CALCULATION'
             });
           }
+
+          // Catat Log Inventory (Masuk)
+          await addDoc(collection(db, 'inventory_logs'), {
+            productId: item.id,
+            productName: item.name,
+            type: 'MASUK',
+            amount: newQty,
+            adminId: 'system',
+            source: 'PURCHASE',
+            referenceId: purchaseRef.id,
+            purchaseId: purchaseRef.id,
+            note: `Pembelian dari ${supplierName || 'Supplier'}`,
+            toWarehouseId: selectedWarehouse,
+            prevStock: currentStock,
+            nextStock: currentStock + newQty,
+            date: serverTimestamp()
+          });
         }
       }
 

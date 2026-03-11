@@ -64,6 +64,7 @@ export default function AdminPurchases() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<string>('all'); // State untuk filter pembayaran
   const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -86,8 +87,11 @@ export default function AdminPurchases() {
     if (statusFilter !== 'all') {
       result = result.filter(p => p.status === statusFilter);
     }
+    if (paymentFilter !== 'all') {
+      result = result.filter(p => p.paymentStatus === paymentFilter);
+    }
     return result;
-  }, [purchases, searchTerm, statusFilter]);
+  }, [purchases, searchTerm, statusFilter, paymentFilter]);
 
 
   useEffect(() => {
@@ -279,6 +283,16 @@ export default function AdminPurchases() {
           <option value="MENUNGGU">Menunggu</option>
           <option value="DITERIMA">Diterima</option>
           <option value="DIBATALKAN">Dibatalkan</option>
+        </select>
+        <select
+          className="bg-gray-50 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
+          value={paymentFilter}
+          onChange={(e) => setPaymentFilter(e.target.value)}
+        >
+          <option value="all">Semua Pembayaran</option>
+          <option value="LUNAS">Lunas</option>
+          <option value="HUTANG">Hutang</option>
+          <option value="DP">DP</option>
         </select>
       </div>
 

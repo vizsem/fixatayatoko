@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { auth, db, storage } from '@/lib/firebase';
 import { addInventoryLog } from '@/lib/inventory';
 import { useParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp, addDoc, query, where, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Tag, Truck, Save, Layers, Trash2,
-  Barcode, Image as ImageIcon, AlertCircle, ChevronLeft
+  Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
+  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -17,12 +18,20 @@ import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
 import { deleteDoc } from 'firebase/firestore';
 
+type ChannelPrices = {
+  offline?: number;
+  website?: number;
+  shopee?: number;
+  tiktok?: number;
+};
+
 type UnitOption = {
   code: string;
   contains?: number;
   price?: number;
   minQty?: number;
   label?: string;
+  prices?: ChannelPrices;
 };
 
 interface Warehouse {
@@ -74,6 +83,26 @@ export default function EditProductPage() {
     stockByWarehouse: {} as Record<string, number>
   });
 
+  // Cost History State
+  const [costHistory, setCostHistory] = useState<any[]>([]);
+
+  const formDataRef = useRef(formData); // Ref to keep track of latest formData for logs if needed
+  
+  const fetchCostHistory = useCallback(async () => {
+    try {
+      const q = query(
+        collection(db, 'product_cost_logs'), 
+        where('productId', '==', id),
+        orderBy('changeDate', 'desc')
+      );
+      const snap = await getDocs(q);
+      const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCostHistory(logs);
+    } catch (e) {
+      console.error("Gagal load history modal:", e);
+    }
+  }, [id]);
+
   const fetchProductData = useCallback(async () => {
     try {
       const docSnap = await getDoc(doc(db, 'products', id));
@@ -83,6 +112,8 @@ export default function EditProductPage() {
       }
       const data = docSnap.data();
       const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
+      const basePrice = Number(data.Ecer || 0);
+      const cp = data.channelPricing || {};
 
       setFormData(prev => ({
         ...prev,
@@ -131,13 +162,24 @@ export default function EditProductPage() {
       });
       
       // Clean up units
-      mergedUnits = mergedUnits.map(u => ({
-          ...u,
-          code: u.code.toUpperCase(),
-          contains: Number(u.contains || 0),
-          price: Number(u.price || 0),
-          minQty: Number(u.minQty || 0)
-      }));
+      mergedUnits = mergedUnits.map(u => {
+          const code = u.code.toUpperCase();
+          const prices: ChannelPrices = {
+            offline: cp.offline?.[code]?.price,
+            website: cp.website?.[code]?.price,
+            shopee: cp.shopee?.[code]?.price,
+            tiktok: cp.tiktok?.[code]?.price,
+          };
+
+          return {
+            ...u,
+            code,
+            contains: Number(u.contains || 0),
+            price: Number(u.price || 0),
+            minQty: Number(u.minQty || 0),
+            prices
+          };
+      });
 
       setUnits(mergedUnits);
 
@@ -159,7 +201,7 @@ export default function EditProductPage() {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') return router.push('/profil');
-      await Promise.all([fetchProductData(), fetchWarehouses()]);
+      await Promise.all([fetchProductData(), fetchWarehouses(), fetchCostHistory()]);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -184,6 +226,24 @@ export default function EditProductPage() {
       setImageFile(compressedFile);
       setImagePreview(URL.createObjectURL(compressedFile));
     } catch { toast.error("Gagal proses gambar"); }
+  };
+
+  const calculateProfit = (sellingPrice: number, costPrice: number) => {
+    const profit = sellingPrice - costPrice;
+    const percentage = costPrice > 0 ? (profit / costPrice) * 100 : 0;
+    return { profit, percentage };
+  };
+
+  const ProfitBadge = ({ profit, percentage }: { profit: number, percentage: number }) => {
+    const isProfitable = profit >= 0;
+    return (
+      <div className={`flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+        {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+        <span>
+          {isProfitable ? '+' : ''}Rp{profit.toLocaleString('id-ID')} ({percentage.toFixed(1)}%)
+        </span>
+      </div>
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,7 +273,7 @@ export default function EditProductPage() {
           if (!code) return null;
           const contains = Number(u.contains || 0);
           const price = Number(u.price || 0);
-          const unitEntry: UnitOption = { code, contains, price };
+          const unitEntry: UnitOption = { code, contains, price, prices: u.prices };
           if (u.minQty !== undefined) unitEntry.minQty = Number(u.minQty);
           if (u.label) unitEntry.label = String(u.label);
           return unitEntry;
@@ -226,9 +286,20 @@ export default function EditProductPage() {
         : Number(formData.Ecer || 0);
 
       const ensuredBase = [
-        { code: baseUnit, contains: 1, price: nextEcer, label: '' },
+        { code: baseUnit, contains: 1, price: nextEcer, label: '', prices: cleanedUnits.find(u => u.code === baseUnit)?.prices },
         ...cleanedUnits.filter((u) => u.code !== baseUnit),
       ];
+
+      // Construct Channel Pricing
+      const channelPricing: any = { offline: {}, website: {}, shopee: {}, tiktok: {} };
+      ensuredBase.forEach(u => {
+        if (u.prices) {
+          if (u.prices.offline) channelPricing.offline[u.code] = { price: Number(u.prices.offline) };
+          if (u.prices.website) channelPricing.website[u.code] = { price: Number(u.prices.website) };
+          if (u.prices.shopee) channelPricing.shopee[u.code] = { price: Number(u.prices.shopee) };
+          if (u.prices.tiktok) channelPricing.tiktok[u.code] = { price: Number(u.prices.tiktok) };
+        }
+      });
 
       // Prepare Stock Data
       const totalStock = Number(formData.Stok || 0);
@@ -317,6 +388,7 @@ export default function EditProductPage() {
         expiredDate: formData.expired_date || formData.Expired_Default || '',
         Lokasi: formData.Lokasi || '',
         units: ensuredBase,
+        channelPricing,
         updatedAt: serverTimestamp(),
       };
 
@@ -503,6 +575,22 @@ export default function EditProductPage() {
                 <p className="text-[9px] text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
               </div>
             </div>
+
+            {/* DETAIL STOK PER GUDANG */}
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h4 className="text-[10px] font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {warehouses.map(w => {
+                  const qty = formData.stockByWarehouse?.[w.id] || 0;
+                  return (
+                    <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">{w.name}</span>
+                      <span className={`text-xs font-black ${qty > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{qty}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* BAGIAN 3: HARGA & GROSIR */}
@@ -517,7 +605,12 @@ export default function EditProductPage() {
                 <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                  {formData.Ecer > 0 && formData.Modal > 0 && (
+                    <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
+                  )}
+                </div>
                 <input required type="number" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
@@ -527,7 +620,12 @@ export default function EditProductPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                  {formData.Grosir > 0 && formData.Modal > 0 && (
+                    <ProfitBadge {...calculateProfit(formData.Grosir, formData.Modal)} />
+                  )}
+                </div>
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
@@ -543,6 +641,39 @@ export default function EditProductPage() {
               </select>
             </div>
           </div>
+
+          {/* Riwayat Perubahan Modal */}
+          {costHistory.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
+                <HistoryIcon size={14} /> Riwayat Perubahan Modal (Average Cost)
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[10px] text-gray-400 uppercase border-b">
+                      <th className="py-2">Tanggal</th>
+                      <th className="py-2">Admin</th>
+                      <th className="py-2 text-right">Lama</th>
+                      <th className="py-2 text-right">Baru</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs font-bold text-gray-700">
+                    {costHistory.map((log: any) => (
+                      <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="py-3">
+                          {log.changeDate?.seconds ? new Date(log.changeDate.seconds * 1000).toLocaleDateString('id-ID') : '-'}
+                        </td>
+                        <td className="py-3">{log.adminEmail || 'System'}</td>
+                        <td className="py-3 text-right text-gray-400">Rp{Number(log.oldCost || 0).toLocaleString('id-ID')}</td>
+                        <td className="py-3 text-right text-gray-800">Rp{Number(log.newCost || 0).toLocaleString('id-ID')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -593,23 +724,46 @@ export default function EditProductPage() {
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                       </button>
                     )}
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
-                      <input
-                        type="text"
-                        className="w-32 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
-                        placeholder="Nama satuan"
-                        value={current.label || ''}
-                        onChange={(e) => {
-                          const next = [...units];
-                          next[idx] = { ...current, label: e.target.value };
-                          setUnits(next);
-                        }}
-                      />
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">Kode Satuan</label>
+                        <input 
+                           type="text" 
+                           className="w-full bg-white p-2 rounded-xl text-xs font-black text-gray-800 outline-none border focus:ring-2 focus:ring-blue-500 uppercase"
+                           value={code}
+                           disabled={code === 'PCS'}
+                           onChange={(e) => {
+                             const val = e.target.value.toUpperCase();
+                             const next = [...units];
+                             next[idx] = { ...current, code: val };
+                             setUnits(next);
+                           }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">Label</label>
+                        <input
+                          type="text"
+                          className="w-full bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                          placeholder="Nama satuan"
+                          value={current.label || ''}
+                          onChange={(e) => {
+                            const next = [...units];
+                            next[idx] = { ...current, label: e.target.value };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga Dasar</span>
+                        {Number(current.price) > 0 && formData.Modal > 0 && (
+                           <span className={`text-[9px] font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                             {calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? '+' : ''}
+                             {((calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
+                           </span>
+                        )}
                         <input
                           type="number"
                           className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
@@ -622,8 +776,92 @@ export default function EditProductPage() {
                           }}
                         />
                       </div>
+                      
+                      {/* CHANNEL PRICING */}
+                      <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
+                        <p className="text-[9px] font-black text-blue-600 uppercase mb-2">Harga Khusus Channel</p>
+                        <div className="grid grid-cols-2 gap-2">
+                           <div>
+                              <div className="flex justify-between">
+                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
+                                {current.prices?.offline && formData.Modal > 0 && (
+                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {((calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
+                                value={current.prices?.offline || ''}
+                                onChange={e => {
+                                  const val = e.target.value ? Number(e.target.value) : undefined;
+                                  const next = [...units];
+                                  next[idx] = { ...current, prices: { ...current.prices, offline: val } };
+                                  setUnits(next);
+                                }}
+                              />
+                           </div>
+                           <div>
+                              <div className="flex justify-between">
+                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
+                                {current.prices?.website && formData.Modal > 0 && (
+                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {((calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
+                                value={current.prices?.website || ''}
+                                onChange={e => {
+                                  const val = e.target.value ? Number(e.target.value) : undefined;
+                                  const next = [...units];
+                                  next[idx] = { ...current, prices: { ...current.prices, website: val } };
+                                  setUnits(next);
+                                }}
+                              />
+                           </div>
+                           <div>
+                              <div className="flex justify-between">
+                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
+                                {current.prices?.shopee && formData.Modal > 0 && (
+                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {((calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
+                                value={current.prices?.shopee || ''}
+                                onChange={e => {
+                                  const val = e.target.value ? Number(e.target.value) : undefined;
+                                  const next = [...units];
+                                  next[idx] = { ...current, prices: { ...current.prices, shopee: val } };
+                                  setUnits(next);
+                                }}
+                              />
+                           </div>
+                           <div>
+                              <div className="flex justify-between">
+                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
+                                {current.prices?.tiktok && formData.Modal > 0 && (
+                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {((calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
+                                value={current.prices?.tiktok || ''}
+                                onChange={e => {
+                                  const val = e.target.value ? Number(e.target.value) : undefined;
+                                  const next = [...units];
+                                  next[idx] = { ...current, prices: { ...current.prices, tiktok: val } };
+                                  setUnits(next);
+                                }}
+                              />
+                           </div>
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi (Konversi)</span>
                         <input
                           type="number"
                           disabled={code === 'PCS'}

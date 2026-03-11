@@ -107,6 +107,10 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Filter Date State
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01')); // Awal bulan ini
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd')); // Hari ini
+
   // Data States
   const [stockLogs, setStockLogs] = useState<InventoryLog[]>([]);
   const [transactions, setTransactions] = useState<TransactionLog[]>([]);
@@ -125,30 +129,68 @@ export default function AuditPage() {
   // Fetch Data based on active tab
   useEffect(() => {
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, startDate, endDate]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const startTimestamp = Timestamp.fromDate(start);
+      const endTimestamp = Timestamp.fromDate(end);
+
       if (activeTab === 'stock') {
-        const q = query(collection(db, 'inventory_logs'), orderBy('date', 'desc'), limit(100));
+        const q = query(
+          collection(db, 'inventory_logs'), 
+          where('date', '>=', startTimestamp),
+          where('date', '<=', endTimestamp),
+          orderBy('date', 'desc'), 
+          limit(200)
+        );
         const snap = await getDocs(q);
         setStockLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryLog)));
       } 
       else if (activeTab === 'transaction') {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
+        const q = query(
+          collection(db, 'orders'), 
+          where('createdAt', '>=', startTimestamp),
+          where('createdAt', '<=', endTimestamp),
+          orderBy('createdAt', 'desc'), 
+          limit(200)
+        );
         const snap = await getDocs(q);
         setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionLog)));
       } 
       else if (activeTab === 'finance') {
-        const q = query(collection(db, 'cashier_shifts'), orderBy('openedAt', 'desc'), limit(50));
+        const q = query(
+          collection(db, 'cashier_shifts'), 
+          where('openedAt', '>=', startTimestamp),
+          where('openedAt', '<=', endTimestamp),
+          orderBy('openedAt', 'desc'), 
+          limit(100)
+        );
         const snap = await getDocs(q);
         setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashierShift)));
       }
       else if (activeTab === 'profit') {
-        // Fetch orders and calculate profit
-        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']), orderBy('createdAt', 'desc'), limit(100));
-        const qExpenses = query(collection(db, 'operational_expenses'), orderBy('date', 'desc'), limit(100)); // Should ideally filter by date range same as orders
+        // Fetch orders and calculate profit based on DATE RANGE
+        const qOrders = query(
+          collection(db, 'orders'), 
+          where('status', 'in', ['SELESAI', 'SUCCESS']), 
+          where('createdAt', '>=', startTimestamp),
+          where('createdAt', '<=', endTimestamp),
+          orderBy('createdAt', 'desc')
+        );
+        
+        const qExpenses = query(
+          collection(db, 'operational_expenses'), 
+          where('date', '>=', startTimestamp),
+          where('date', '<=', endTimestamp),
+          orderBy('date', 'desc')
+        );
 
         const [snapOrders, snapExpenses] = await Promise.all([
           getDocs(qOrders),
@@ -239,7 +281,13 @@ export default function AuditPage() {
           netProfit: netProfitTotal
         });
       } else if (activeTab === 'cost') {
-        const q = query(collection(db, 'product_cost_logs'), orderBy('changeDate', 'desc'), limit(100));
+        const q = query(
+          collection(db, 'product_cost_logs'), 
+          where('changeDate', '>=', startTimestamp),
+          where('changeDate', '<=', endTimestamp),
+          orderBy('changeDate', 'desc'), 
+          limit(100)
+        );
         const snap = await getDocs(q);
         setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as CostLog)));
       }
@@ -385,6 +433,28 @@ export default function AuditPage() {
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+          {/* FILTER TANGGAL */}
+          <div className="flex items-center gap-2">
+            <div className="bg-gray-50 border px-3 py-2 rounded-xl flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 uppercase">Dari</span>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none"
+              />
+            </div>
+            <div className="bg-gray-50 border px-3 py-2 rounded-xl flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 uppercase">Sampai</span>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none"
+              />
+            </div>
+          </div>
+
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 

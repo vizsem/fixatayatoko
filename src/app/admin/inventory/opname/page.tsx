@@ -11,7 +11,8 @@ import {
   collection,
   doc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDoc
 } from 'firebase/firestore';
 import {
   ArrowLeft,
@@ -58,8 +59,30 @@ export default function StockOpnamePage() {
       const productRef = doc(db, 'products', selectedProduct.id);
 
       // A. Update stok di tabel produk sesuai fisik
+      const pSnap = await getDoc(productRef);
+      const productData = pSnap.data();
+      
+      // Update Stok per Gudang (Prioritas Gudang Utama)
+      // Asumsi Opname dilakukan di Gudang Utama untuk saat ini, atau perlu selector Gudang di UI Opname
+      // Default ke gudang-utama jika belum ada selector
+      const MAIN_WAREHOUSE_ID = 'gudang-utama';
+      const stockByWarehouse = productData?.stockByWarehouse || {};
+      const newStockByWarehouse = { ...stockByWarehouse };
+      
+      // Jika opname, kita set stok gudang utama agar total match, atau idealnya user pilih gudang
+      // Simplified logic: adjust main warehouse to match the difference
+      // If diff > 0 (excess), add to main warehouse
+      // If diff < 0 (missing), deduct from main warehouse
+      
+      const currentMainStock = newStockByWarehouse[MAIN_WAREHOUSE_ID] || 0;
+      newStockByWarehouse[MAIN_WAREHOUSE_ID] = currentMainStock + diff;
+      
+      // Safety check: ensure no negative stock if possible, but opname is truth
+      if (newStockByWarehouse[MAIN_WAREHOUSE_ID] < 0) newStockByWarehouse[MAIN_WAREHOUSE_ID] = 0;
+
       await updateDoc(productRef, {
-        stock: physicalStock
+        stock: physicalStock,
+        stockByWarehouse: newStockByWarehouse
       });
 
       // B. Catat Riwayat Mutasi sebagai OPNAME

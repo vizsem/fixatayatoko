@@ -231,7 +231,13 @@ export async function POST(req: Request) {
         }
         
         const finalTotalStock = currentStock - item.quantity;
-        productUpdates.push({ ref, newStock: finalTotalStock, newStockByWarehouse });
+        productUpdates.push({ 
+          ref, 
+          newStock: finalTotalStock, 
+          newStockByWarehouse,
+          name: pData.name || pData.Nama || 'Produk',
+          currentStock
+        });
       }
 
       // B. Validasi Voucher
@@ -280,6 +286,24 @@ export async function POST(req: Request) {
         t.update(p.ref, { 
           stock: p.newStock,
           stockByWarehouse: p.newStockByWarehouse
+        });
+
+        // 2b. Catat Log Inventory (Agar muncul di Audit Stok)
+        const logRef = adminDb.collection('inventory_logs').doc();
+        t.set(logRef, {
+          productId: p.ref.id,
+          productName: p.name,
+          type: 'KELUAR',
+          amount: p.currentStock - p.newStock, // Selisih stok
+          adminId: userId || 'system',
+          source: 'ORDER', // Menandakan order online
+          referenceId: orderId, // ID Order yang dapat dilihat user (e.g. ATY-XXXXX)
+          orderId: orderRef.id, // ID Dokumen Order
+          note: `Order Online #${orderId}`,
+          fromWarehouseId: 'gudang-utama',
+          prevStock: p.currentStock,
+          nextStock: p.newStock,
+          date: FieldValue.serverTimestamp()
         });
       }
 

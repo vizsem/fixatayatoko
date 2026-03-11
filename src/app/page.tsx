@@ -291,7 +291,21 @@ export default function Home() {
 
         const now = new Date();
         const active = promoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Promotion))
-          .filter(p => p.isActive && now >= new Date(p.startDate) && now <= new Date(p.endDate));
+          .filter(p => {
+            if (!p.isActive) return false;
+            try {
+              // Safe date parsing for Safari/iOS
+              const start = p.startDate ? new Date(p.startDate.replace(/-/g, '/')) : new Date(0); 
+              const end = p.endDate ? new Date(p.endDate.replace(/-/g, '/')) : new Date(0);
+              // Fallback to standard ISO if replacement fails or just try standard new Date if string is ISO
+              const safeStart = isNaN(start.getTime()) ? new Date(p.startDate) : start;
+              const safeEnd = isNaN(end.getTime()) ? new Date(p.endDate) : end;
+              
+              return !isNaN(safeStart.getTime()) && !isNaN(safeEnd.getTime()) && now >= safeStart && now <= safeEnd;
+            } catch {
+              return false;
+            }
+          });
 
         setActivePromos(active);
 

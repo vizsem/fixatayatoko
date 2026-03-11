@@ -795,9 +795,42 @@ export default function CashierPOS() {
         const pRef = doc(db, 'products', item.id);
         const pSnap = await getDoc(pRef);
         if (pSnap.exists()) {
+          const productData = pSnap.data();
+          const currentStock = productData.stock || 0;
           const contains = Number(item.contains || 1);
           const pcsToDeduct = item.quantity * contains;
-          batch.update(pRef, { stock: (pSnap.data().stock || 0) - pcsToDeduct });
+          const newStock = currentStock - pcsToDeduct;
+
+          // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
+          const MAIN_WAREHOUSE_ID = 'gudang-utama';
+          const stockByWarehouse = productData.stockByWarehouse || {};
+          const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+          
+          let remainingToDeduct = pcsToDeduct;
+          
+          // 1. Prioritas Gudang Utama
+          if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
+            const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
+            newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
+            remainingToDeduct -= deduct;
+          }
+          
+          // 2. Gudang Lainnya (Jika masih ada sisa yang harus dikurangi)
+          if (remainingToDeduct > 0) {
+            for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
+              if (whId === MAIN_WAREHOUSE_ID) continue;
+              if (remainingToDeduct <= 0) break;
+              
+              const deduct = Math.min(qty as number, remainingToDeduct);
+              newStockByWarehouse[whId] = (qty as number) - deduct;
+              remainingToDeduct -= deduct;
+            }
+          }
+
+          batch.update(pRef, { 
+            stock: newStock,
+            stockByWarehouse: newStockByWarehouse
+          });
 
           // Log Inventory
           await addInventoryLog({
@@ -810,7 +843,9 @@ export default function CashierPOS() {
             referenceId: newOrderRef.id,
             orderId: newOrderRef.id,
             note: `Transaksi Kasir via ${paymentMethod}`,
-            fromWarehouseId: 'gudang-utama'
+            fromWarehouseId: 'gudang-utama',
+            prevStock: currentStock,
+            nextStock: newStock
           }, batch);
         }
       }
