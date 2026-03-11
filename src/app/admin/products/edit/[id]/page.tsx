@@ -3,21 +3,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { auth, db, storage } from '@/lib/firebase';
 import { addInventoryLog } from '@/lib/inventory';
-
-
 import { useParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
-
+import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
-  Tag, DollarSign, Warehouse, Save,
-  Loader2, Calendar, Image as ImageIcon
+  Tag, Truck, Save, Layers, Trash2,
+  Barcode, Image as ImageIcon, AlertCircle, ChevronLeft
 } from 'lucide-react';
 import Image from 'next/image';
-
+import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
+import { deleteDoc } from 'firebase/firestore';
 
 type UnitOption = {
   code: string;
@@ -26,29 +24,6 @@ type UnitOption = {
   minQty?: number;
   label?: string;
 };
-
-interface ProductData {
-  id: string;
-  ID: string;
-  Nama: string;
-  Kategori: string;
-  Satuan: string;
-  Barcode: string;
-  Brand: string;
-  Supplier: string;
-  Min_Stok: number;
-  Ecer: number;
-  Modal: number;
-  Grosir: number;
-  Stok: number;
-  Status: number;
-  expired_date: string;
-  URL_Produk?: string;
-  Link_Foto?: string;
-  image?: string;
-  stockByWarehouse: Record<string, number>;
-  units?: UnitOption[];
-}
 
 interface Warehouse {
   id: string;
@@ -62,20 +37,42 @@ export default function EditProductPage() {
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [product, setProduct] = useState<ProductData>({
-    id: '', ID: '', Nama: '', Kategori: 'UMUM', Satuan: 'PCS', Barcode: '',
-    Brand: '', Supplier: '', Min_Stok: 5, Ecer: 0, Modal: 0, Grosir: 0,
-    Stok: 0, Status: 1, expired_date: '', stockByWarehouse: {}
-  });
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  
+  // State from Add Page structure
+  const [units, setUnits] = useState<UnitOption[]>([]);
+  const [newUnitCode, setNewUnitCode] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [units, setUnits] = useState<UnitOption[]>([]);
-  const [distUnit, setDistUnit] = useState<string>('PCS'); // Satuan untuk distribusi stok
+  const [isDeleting, setIsDeleting] = useState(false);
 
-
-
-
+  const [formData, setFormData] = useState({
+    ID: '',
+    Barcode: '',
+    Parent_ID: '',
+    Nama: '',
+    Kategori: '',
+    Brand: '',
+    Expired_Default: '',
+    expired_date: '',
+    tgl_masuk: '',
+    Satuan: 'Pcs',
+    Stok: 0,
+    Min_Stok: 5,
+    Modal: 0,
+    Ecer: 0,
+    Harga_Coret: 0,
+    Grosir: 0,
+    Min_Grosir: 1,
+    Link_Foto: '',
+    Deskripsi: '',
+    Status: 1,
+    Supplier: '',
+    No_WA_Supplier: '',
+    Lokasi: '',
+    warehouseId: '',
+    stockByWarehouse: {} as Record<string, number>
+  });
 
   const fetchProductData = useCallback(async () => {
     try {
@@ -86,44 +83,68 @@ export default function EditProductPage() {
       }
       const data = docSnap.data();
       const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
-      setDistUnit(baseUnit); // Set default dist unit
-      const loadedProduct: ProductData = {
-        ...data,
-        id: docSnap.id,
-        ID: data.ID || '',
-        Nama: data.Nama || data.name || '',
-        Ecer: Number(data.Ecer || 0),
-        Modal: Number(data.Modal || 0),
-        Grosir: Number(data.Grosir || 0),
-        Stok: Number(data.Stok ?? 0),
-        Kategori: data.Kategori || 'UMUM',
-        Satuan: baseUnit,
-        Barcode: data.Barcode || '',
-        Brand: data.Brand || '',
-        Supplier: data.Supplier || '',
-        Min_Stok: Number(data.Min_Stok || 5), // Default peringatan jika stok < 5
-        expired_date: data.expired_date || '', // Sinkron dengan tabel admin
-        Status: data.Status ?? 1,
-        stockByWarehouse: data.stockByWarehouse || {},
-        units: Array.isArray(data.units) ? data.units : undefined,
-      };
-      setProduct(loadedProduct);
 
+      setFormData(prev => ({
+        ...prev,
+        ID: data.ID || '',
+        Barcode: data.Barcode || '',
+        Parent_ID: data.Parent_ID || '',
+        Nama: data.Nama || data.name || '',
+        Kategori: data.Kategori || 'UMUM',
+        Brand: data.Brand || '',
+        Expired_Default: data.expired_date || '', // Map expired_date to Expired_Default for UI
+        expired_date: data.expired_date || '',
+        tgl_masuk: data.tgl_masuk || '',
+        Satuan: baseUnit,
+        Stok: Number(data.Stok ?? 0),
+        Min_Stok: Number(data.Min_Stok || 5),
+        Modal: Number(data.Modal || 0),
+        Ecer: Number(data.Ecer || 0),
+        Harga_Coret: Number(data.Harga_Coret || 0),
+        Grosir: Number(data.Grosir || 0),
+        Min_Grosir: Number(data.Min_Grosir || 1),
+        Link_Foto: data.Link_Foto || data.URL_Produk || '',
+        Deskripsi: data.Deskripsi || data.description || '',
+        Status: data.Status ?? 1,
+        Supplier: data.Supplier || '',
+        No_WA_Supplier: data.No_WA_Supplier || '',
+        Lokasi: data.Lokasi || '',
+        warehouseId: data.warehouseId || '',
+        stockByWarehouse: data.stockByWarehouse || {}
+      }));
+
+      // Handle Units
       const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
-      const byCode: Record<string, UnitOption> = {};
-      existingUnits.forEach(u => { if (u?.code) byCode[String(u.code).toUpperCase()] = { ...u, code: String(u.code).toUpperCase() }; });
-      const basePrice = Number(loadedProduct.Ecer || 0);
-      const defaultUnits: UnitOption[] = [
-        { code: baseUnit, contains: 1, price: basePrice },
-        { code: 'BOX', contains: byCode['BOX']?.contains ?? 0, price: byCode['BOX']?.price ?? 0 },
-        { code: 'CTN', contains: byCode['CTN']?.contains ?? 0, price: byCode['CTN']?.price ?? 0 },
-      ];
-      const merged = defaultUnits.map(u => byCode[u.code] ? { ...u, ...byCode[u.code] } : u);
-      setUnits(merged);
+      
+      // Ensure base unit exists
+      let mergedUnits = [...existingUnits];
+      if (!mergedUnits.find(u => u.code === baseUnit)) {
+          mergedUnits.unshift({ code: baseUnit, contains: 1, price: basePrice });
+      }
+
+      // Add default units if missing (to match Add Product)
+      const defaultOptions = ['BOX', 'CTN'];
+      defaultOptions.forEach(defCode => {
+        if (!mergedUnits.some(u => u.code === defCode)) {
+          mergedUnits.push({ code: defCode, contains: 0, price: 0, label: '' });
+        }
+      });
+      
+      // Clean up units
+      mergedUnits = mergedUnits.map(u => ({
+          ...u,
+          code: u.code.toUpperCase(),
+          contains: Number(u.contains || 0),
+          price: Number(u.price || 0),
+          minQty: Number(u.minQty || 0)
+      }));
+
+      setUnits(mergedUnits);
 
       const currentPhoto = data.URL_Produk || data.Link_Foto || data.image;
       setImagePreview(currentPhoto || null);
-    } catch {
+    } catch (e) {
+      console.error(e);
       toast.error("Gagal sinkron data");
     }
   }, [id, router]);
@@ -144,149 +165,168 @@ export default function EditProductPage() {
     return () => unsubscribe();
   }, [id, router, fetchProductData, fetchWarehouses]);
 
-
-
+  const handleAddUnit = () => {
+    if (!newUnitCode) return;
+    const code = newUnitCode.toUpperCase();
+    if (units.some(u => u.code === code)) {
+      toast.error('Satuan sudah ada');
+      return;
+    }
+    setUnits([...units, { code, contains: 0, price: 0, label: '' }]);
+    setNewUnitCode('');
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compressedFile = await imageCompression(file, { maxSizeMB: 0.2, maxWidthOrHeight: 1024 });
+      const compressedFile = await imageCompression(file, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
       setImageFile(compressedFile);
       setImagePreview(URL.createObjectURL(compressedFile));
     } catch { toast.error("Gagal proses gambar"); }
-
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const loadingToast = toast.loading("Sinkronisasi data & mencatat riwayat...");
+    const loadingToast = toast.loading("Menyimpan perubahan...");
 
     try {
-      // 1. Ambil data stok lama untuk dibandingkan
+      // 1. Ambil data stok lama untuk dibandingkan (Logika Audit)
       const oldDoc = await getDoc(doc(db, 'products', id));
       const oldData = oldDoc.data();
       const oldStocks = oldData?.stockByWarehouse || {};
 
       // 2. Proses Gambar
-      let finalImageUrl = product.URL_Produk || product.Link_Foto || '';
+      let finalImageUrl = formData.Link_Foto || '';
       if (imageFile) {
-        const imageRef = ref(storage, `products/${id}/main.jpg`);
+        const imageRef = ref(storage, `products/${id}/main_${Date.now()}.jpg`);
         await uploadBytes(imageRef, imageFile);
         finalImageUrl = await getDownloadURL(imageRef);
       }
 
-      const newStocks = product.stockByWarehouse || {};
-      const totalStock = Object.values(newStocks).reduce((a, b) => a + (Number(b) || 0), 0);
-
-      // 3. LOGIKA RIWAYAT STOK: Cek gudang mana yang angkanya berubah
-      interface StockLog {
-        productId: string;
-        productName: string;
-        warehouseId: string;
-        warehouseName: string;
-        previousStock: number;
-        newStock: number;
-        change: number;
-        type: string;
-        adminEmail?: string | null;
-        createdAt: Timestamp | { toDate: () => Date } | null | unknown; // serverTimestamp returns FieldValue
-
-      }
-      const logEntries: StockLog[] = [];
-
-
-
-      warehouses.forEach(wh => {
-        const oldVal = Number(oldStocks[wh.id] || 0);
-        const newVal = Number(newStocks[wh.id] || 0);
-
-        if (oldVal !== newVal) {
-          logEntries.push({
-            productId: id,
-            productName: product.Nama.toUpperCase(),
-            warehouseId: wh.id,
-            warehouseName: wh.name,
-            previousStock: oldVal,
-            newStock: newVal,
-            change: newVal - oldVal,
-            type: 'EDIT_ADMIN', // Penanda bahwa diubah manual lewat menu edit
-            adminEmail: auth.currentUser?.email,
-            createdAt: serverTimestamp(),
-          });
-        }
-      });
-
-      // 4. Update Dokumen Produk
-      const baseUnit = String(product.Satuan || 'PCS').toUpperCase();
+      // 3. Update Logic
+      const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
       const cleanedUnits = (units || [])
         .map((u) => {
-          const code = String(u.code || '').toUpperCase();
-          const contains = typeof u.contains === 'number' ? u.contains : Number(u.contains || 0);
-          const price = typeof u.price === 'number' ? u.price : Number(u.price || 0);
-
+          const code = String(u.code || '').trim().toUpperCase();
+          if (!code) return null;
+          const contains = Number(u.contains || 0);
+          const price = Number(u.price || 0);
           const unitEntry: UnitOption = { code, contains, price };
-
-          if (u.minQty !== undefined && u.minQty !== null) {
-            unitEntry.minQty = typeof u.minQty === 'number' ? u.minQty : Number(u.minQty);
-          }
-
+          if (u.minQty !== undefined) unitEntry.minQty = Number(u.minQty);
           if (u.label) unitEntry.label = String(u.label);
-
           return unitEntry;
         })
-        .filter(u => u.code);
+        .filter(Boolean) as UnitOption[];
 
-      const baseUnitEntry = cleanedUnits.find(u => u.code === baseUnit) || { code: baseUnit, contains: 1, price: Number(product.Ecer || 0) };
-      const nextEcer = Number(baseUnitEntry.price || product.Ecer || 0);
+      const basePriceFromUnits = cleanedUnits.find((u) => u.code === baseUnit)?.price;
+      const nextEcer = (typeof basePriceFromUnits === 'number' && !Number.isNaN(basePriceFromUnits))
+        ? basePriceFromUnits
+        : Number(formData.Ecer || 0);
+
+      const ensuredBase = [
+        { code: baseUnit, contains: 1, price: nextEcer, label: '' },
+        ...cleanedUnits.filter((u) => u.code !== baseUnit),
+      ];
+
+      // Prepare Stock Data
+      const totalStock = Number(formData.Stok || 0);
+      // Jika warehouseId dipilih, update stock spesifik gudang itu
+      // Jika tidak, biarkan stockByWarehouse apa adanya (atau update jika logic lain)
+      // Disini kita ikuti logic Add Page: jika ada warehouseId, set stockByWarehouse[id] = totalStock
+      // TAPI ini Edit Page, kita harus hati-hati menimpa stockByWarehouse.
+      // Kita update stockByWarehouse hanya jika warehouseId dipilih.
+      
+      const newStocks = { ...formData.stockByWarehouse };
+      if (formData.warehouseId) {
+          newStocks[formData.warehouseId] = totalStock;
+      }
+      
+      // Recalculate total stock from all warehouses if using warehouse system
+      // Or just trust the input if simple system.
+      // Let's trust the input 'Stok' as the primary source of truth for the edited context,
+      // but update the breakdown if warehouse is selected.
+      
+      // LOG STOCK CHANGES
+      const logEntries: any[] = [];
+      
+      // Check specific warehouse change if selected
+      if (formData.warehouseId) {
+          const whId = formData.warehouseId;
+          const oldVal = Number(oldStocks[whId] || 0);
+          const newVal = totalStock; // Asumsi input Stok adalah stok untuk gudang yang dipilih
+          
+          if (oldVal !== newVal) {
+             const whName = warehouses.find(w => w.id === whId)?.name || whId;
+             logEntries.push({
+                productId: id,
+                productName: formData.Nama.toUpperCase(),
+                warehouseId: whId,
+                warehouseName: whName,
+                previousStock: oldVal,
+                newStock: newVal,
+                change: newVal - oldVal,
+                type: 'EDIT_ADMIN',
+                adminEmail: auth.currentUser?.email,
+                createdAt: serverTimestamp(),
+             });
+          }
+      } else {
+          // If no warehouse selected, we assume 'Stok' is global stock update? 
+          // Or we iterate all warehouses if user edited them individually?
+          // Current UI only allows selecting one warehouse to set stock.
+          // Let's check if global stock changed significantly without warehouse context
+          // For now, let's stick to the Add Page logic which assigns stock to a warehouse.
+      }
 
       const updatePayload = {
-        ID: product.ID || '',
-        Nama: String(product.Nama || '').toUpperCase(),
-        Kategori: product.Kategori || 'UMUM',
+        ...formData,
+        ID: formData.ID,
+        Nama: String(formData.Nama || '').toUpperCase(),
         Satuan: baseUnit,
-        Barcode: product.Barcode || '',
-        Brand: product.Brand || '',
-        Supplier: product.Supplier || '',
-        Min_Stok: Number(product.Min_Stok || 0),
-        Ecer: nextEcer,
-        Modal: Number(product.Modal || 0),
-        Grosir: Number(product.Grosir || 0),
-        Stok: totalStock,
-        Status: product.Status ?? 1,
-        expired_date: product.expired_date || '',
-        stockByWarehouse: newStocks,
-        units: cleanedUnits,
-        URL_Produk: finalImageUrl,
-        sku: product.ID || product.Barcode || id,
-        name: String(product.Nama || '').toUpperCase(),
-        category: product.Kategori || 'UMUM',
+        sku: formData.ID,
+        name: String(formData.Nama || '').toUpperCase(),
+        category: formData.Kategori,
         unit: baseUnit,
+        description: formData.Deskripsi || '',
         stock: totalStock,
-        minStock: Number(product.Min_Stok || 0),
-        purchasePrice: Number(product.Modal || 0),
+        Stok: totalStock,
+        stockByWarehouse: newStocks,
+        minStock: Number(formData.Min_Stok || 0),
+        Min_Stok: Number(formData.Min_Stok || 0),
+        purchasePrice: Number(formData.Modal || 0),
+        Modal: Number(formData.Modal || 0),
         priceEcer: nextEcer,
+        Ecer: nextEcer,
         price: nextEcer,
-        priceGrosir: Number(product.Grosir || 0),
-        wholesalePrice: Number(product.Grosir || 0),
-        isActive: (product.Status ?? 1) === 1,
+        priceGrosir: Number(formData.Grosir || 0),
+        wholesalePrice: Number(formData.Grosir || 0),
+        Min_Grosir: Number(formData.Min_Grosir || 0),
+        minWholesale: Number(formData.Min_Grosir || 0),
+        barcode: formData.Barcode || '',
+        Barcode: formData.Barcode || '',
         imageUrl: finalImageUrl,
         image: finalImageUrl,
-        barcode: product.Barcode || '',
+        URL_Produk: finalImageUrl,
+        isActive: Number(formData.Status) === 1,
+        Status: Number(formData.Status) === 1 ? 1 : 0,
+        warehouseId: formData.warehouseId || oldData?.warehouseId || '',
+        tgl_masuk: formData.tgl_masuk || '',
+        expired_date: formData.expired_date || formData.Expired_Default || '',
+        expiredDate: formData.expired_date || formData.Expired_Default || '',
+        Lokasi: formData.Lokasi || '',
+        units: ensuredBase,
         updatedAt: serverTimestamp(),
       };
 
       await updateDoc(doc(db, 'products', id), updatePayload);
 
-      // 5. Simpan semua riwayat ke koleksi 'stock_logs'
+      // Write Logs
       if (logEntries.length > 0) {
-        // Keep legacy stock_logs for now if needed, or remove it later.
-        const { addDoc, collection } = await import('firebase/firestore');
         const logPromises = logEntries.map(log => addDoc(collection(db, 'stock_logs'), log));
         await Promise.all(logPromises);
-
-        // NEW: Write to unified inventory_logs
+        
         const invLogPromises = logEntries.map(log => addInventoryLog({
           productId: log.productId,
           productName: log.productName,
@@ -294,7 +334,7 @@ export default function EditProductPage() {
           amount: Math.abs(log.change),
           adminId: log.adminEmail || 'system',
           source: 'MANUAL',
-          note: `Edit Product Details. Prev: ${log.previousStock}, New: ${log.newStock}`,
+          note: `Edit Product. Prev: ${log.previousStock}, New: ${log.newStock}`,
           prevStock: log.previousStock,
           nextStock: log.newStock,
           fromWarehouseId: log.change < 0 ? log.warehouseId : undefined,
@@ -303,278 +343,381 @@ export default function EditProductPage() {
         await Promise.all(invLogPromises);
       }
 
-      toast.success('Database & Riwayat Berhasil Disinkronkan!', { id: loadingToast });
+      toast.dismiss(loadingToast);
+      toast.success('Produk berhasil diperbarui!');
       router.push('/admin/products');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error("Gagal: " + errorMessage, { id: loadingToast });
+    } catch (err: any) {
+      console.error(err);
+      toast.dismiss(loadingToast);
+      toast.error(err.message || 'Terjadi kesalahan');
     } finally {
-
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
+  const handleDelete = async () => {
+    if (!confirm('Apakah Anda yakin ingin menghapus produk ini? Data yang dihapus tidak dapat dikembalikan.')) return;
+    setIsDeleting(true);
+    const toastId = toast.loading('Menghapus produk...');
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      
+      // Catat Log Hapus
+      await addDoc(collection(db, 'stock_logs'), {
+          productId: id,
+          productName: formData.Nama.toUpperCase(),
+          warehouseId: 'SYSTEM',
+          warehouseName: 'SYSTEM',
+          previousStock: formData.Stok,
+          newStock: 0,
+          change: -formData.Stok,
+          type: 'DELETE_PRODUCT',
+          adminEmail: auth.currentUser?.email,
+          createdAt: serverTimestamp(),
+      });
+
+      toast.success('Produk berhasil dihapus');
+      router.push('/admin/products');
+    } catch (error) {
+      console.error(error);
+      toast.error('Gagal menghapus produk');
+      setIsDeleting(false);
+    } finally {
+      toast.dismiss(toastId);
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
 
   return (
-    <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-24 text-black font-sans">
+      <div className="max-w-4xl mx-auto">
 
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-              <Tag size={22} />
-            </div>
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/products" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+              <ChevronLeft size={20} />
+            </Link>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Edit Produk</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SKU: {product.Barcode || id}</p>
+              <h1 className="text-xl font-black uppercase tracking-tighter">Edit Produk</h1>
+              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Update Data Inventaris</p>
             </div>
-          </div>
-          <div className="flex bg-white p-2 rounded-2xl shadow-sm">
-            <button type="button" onClick={() => setProduct({ ...product, Status: 1 })} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 1 ? 'bg-green-600 text-white' : 'text-gray-400'}`}>Aktif</button>
-            <button type="button" onClick={() => setProduct({ ...product, Status: 0 })} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${product.Status === 0 ? 'bg-red-600 text-white' : 'text-gray-400'}`}>Arsip</button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* KIRI: MEDIA & KONTROL */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 text-center">
-              <label className="text-[10px] font-black uppercase text-gray-400 mb-4 block tracking-widest">Foto Produk</label>
-              <div className="relative group aspect-square rounded-[2rem] overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center transition-all hover:border-blue-400">
-                {imagePreview ? <Image src={imagePreview} className="w-full h-full object-cover" alt="Preview" width={400} height={400} /> : <ImageIcon size={48} className="text-gray-200" />}
-                <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
+              <Tag size={16} />
+              Identitas Barang
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                <input
+                  required
+                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  type="text"
+                  value={formData.ID}
+                  onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
+                  placeholder="Contoh: BRG-001"
+                />
               </div>
-
-            </div>
-
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-1">Batas Minimum Stok</label>
-              <input type="number" value={product.Min_Stok} onChange={e => setProduct({ ...product, Min_Stok: Number(e.target.value) })} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-orange-400 transition-all" />
-
-              <p className="text-[8px] text-gray-400 mt-2 font-bold uppercase italic">* Notifikasi akan muncul jika stok di bawah angka ini.</p>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Parent ID</label>
+                <input
+                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  type="text"
+                  value={formData.Parent_ID}
+                  onChange={(e) => setFormData({ ...formData, Parent_ID: e.target.value })}
+                  placeholder="Opsional"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
+                <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Lokasi} onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
+                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
+                <div className="relative">
+                  <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
+                <div className="relative">
+                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.Expired_Default} onChange={e => setFormData({ ...formData, Expired_Default: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
+                <div className="relative">
+                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.tgl_masuk} onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* KANAN: FORM LENGKAP */}
-          <div className="lg:col-span-8 space-y-6">
-
-            {/* SPESIFIKASI */}
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600"><Tag size={16} /> Identitas Barang</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
-                  <input required type="text" value={product.Nama} onChange={e => setProduct({ ...product, Nama: e.target.value })} className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
-                  <input type="text" value={product.Kategori} onChange={e => setProduct({ ...product, Kategori: e.target.value })} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
-                  <input type="text" value={product.Brand} onChange={e => setProduct({ ...product, Brand: e.target.value })} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
-                  <input type="text" value={product.Barcode} onChange={e => setProduct({ ...product, Barcode: e.target.value })} className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                    <input type="date" value={product.expired_date} onChange={e => setProduct({ ...product, expired_date: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" />
-                  </div>
-                </div>
+          {/* BAGIAN 2: STOK & KATEGORI */}
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-emerald-600">
+              <Layers size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Kategori & Stok</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Satuan</label>
+                <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Saat Ini</label>
+                <input required type="number" className="w-full p-4 bg-emerald-50 rounded-2xl border-none font-black text-emerald-700" value={formData.Stok} onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
+                <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Gudang</label>
+                <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.warehouseId} onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}>
+                  <option value="">Pilih Gudang (Opsional)</option>
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+                <p className="text-[9px] text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
               </div>
             </div>
+          </div>
 
-            {/* HARGA */}
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-emerald-600"><DollarSign size={16} /> Finansial</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-200 transition-all">
-                  <label className="text-[9px] font-black uppercase text-gray-400 block mb-1">Harga Modal</label>
-                  <input type="number" value={product.Modal} onChange={e => setProduct({ ...product, Modal: Number(e.target.value) })} className="w-full bg-transparent font-black text-lg outline-none" />
-                </div>
-                <div className="p-4 bg-blue-50 rounded-2xl border border-transparent hover:border-blue-200 transition-all">
-                  <label className="text-[9px] font-black uppercase text-blue-400 block mb-1">Harga Ecer</label>
-                  <input type="number" value={product.Ecer} onChange={e => setProduct({ ...product, Ecer: Number(e.target.value) })} className="w-full bg-transparent font-black text-lg text-blue-600 outline-none" />
-                </div>
-                <div className="p-4 bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-200 transition-all">
-                  <label className="text-[9px] font-black uppercase text-emerald-400 block mb-1">Harga Grosir</label>
-                  <input type="number" value={product.Grosir} onChange={e => setProduct({ ...product, Grosir: Number(e.target.value) })} className="w-full bg-transparent font-black text-lg text-emerald-600 outline-none" />
-                </div>
-
+          {/* BAGIAN 3: HARGA & GROSIR */}
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-orange-600">
+              <Tag size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Struktur Harga</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Modal</label>
+                <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                <input required type="number" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Coret</label>
+                <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
+                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase text-gray-400">Status</span>
+              <select className="p-3 bg-gray-50 rounded-xl text-xs font-bold" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
+                <option value={1}>Aktif</option>
+                <option value={0}>Arsip</option>
+              </select>
+            </div>
+          </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-gray-700">Pilih Satuan Jual</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {['PCS', 'BOX', 'CTN'].map((code) => {
-                  const idx = units.findIndex(u => String(u.code || '').toUpperCase() === code);
-                  const current = idx >= 0 ? units[idx] : { code, contains: code === 'PCS' ? 1 : 0, price: 0 };
-                  const basePrice = Number(product.Ecer || 0);
-                  const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
-                  const unitPrice = Number(current.price || 0);
-                  const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
-                  return (
-                    <div key={code} className="p-4 rounded-2xl border bg-gray-50">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2 text-gray-800">
+                <Tag size={18} />
+                <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Kode Satuan (Ex: LUSIN)"
+                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500 w-40"
+                  value={newUnitCode}
+                  onChange={(e) => setNewUnitCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddUnit}
+                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all"
+                >
+                  + Tambah
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {units.map((u, index) => {
+                const code = u.code || '';
+                const idx = index;
+                const current = u;
+                const basePrice = Number(formData.Ecer || 0);
+                const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
+                const unitPrice = Number(current.price || 0);
+                const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
+
+                return (
+                  <div key={code} className="p-4 rounded-2xl border bg-gray-50 relative group">
+                    {code !== 'PCS' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...units];
+                          next.splice(idx, 1);
+                          setUnits(next);
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    )}
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
+                      <input
+                        type="text"
+                        className="w-32 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                        placeholder="Nama satuan"
+                        value={current.label || ''}
+                        onChange={(e) => {
+                          const next = [...units];
+                          next[idx] = { ...current, label: e.target.value };
+                          setUnits(next);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
                         <input
-                          type="text"
-                          className="w-40 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
-                          placeholder="Nama satuan"
-                          value={current.label || ''}
+                          type="number"
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.price || ''}
                           onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
                             const next = [...units];
-                            const nextLabel = e.target.value;
-                            if (idx >= 0) next[idx] = { ...current, label: nextLabel };
-                            else next.push({ code, price: current.price, contains: current.contains, label: nextLabel });
+                            next[idx] = { ...current, price: val };
                             setUnits(next);
                           }}
                         />
                       </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
-                          <input
-                            type="number"
-                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
-                            value={current.price ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? undefined : Number(e.target.value);
-                              const next = [...units];
-                              if (idx >= 0) next[idx] = { ...current, price: val };
-                              else next.push({ code, price: val, contains: current.contains });
-                              setUnits(next);
-                            }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
-                          <input
-                            type="number"
-                            disabled={code === 'PCS'}
-                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
-                            value={code === 'PCS' ? 1 : (current.contains ?? '')}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? undefined : Number(e.target.value);
-                              const next = [...units];
-                              if (idx >= 0) next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
-                              else next.push({ code, price: current.price, contains: code === 'PCS' ? 1 : val });
-                              setUnits(next);
-                            }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-36 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
-                            value={current.minQty ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? undefined : Number(e.target.value);
-                              const next = [...units];
-                              if (idx >= 0) next[idx] = { ...current, minQty: val };
-                              else next.push({ code, price: current.price, contains: current.contains, minQty: val });
-                              setUnits(next);
-                            }}
-                          />
-                        </div>
-                        <div className="text-[10px] font-black text-gray-500">
-                          {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
-                          <span className="mx-1">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
-                          / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* STOK PER GUDANG */}
-            <div className="bg-black p-8 rounded-[2.5rem] text-white shadow-xl">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xs font-black uppercase flex items-center gap-2">
-                  <Warehouse size={16} className="text-yellow-400" /> Distribusi Stok
-                </h3>
-
-                <div className="flex items-center gap-3">
-                  <select
-                    value={distUnit}
-                    onChange={(e) => setDistUnit(e.target.value)}
-                    className="bg-white/10 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none border border-white/20 cursor-pointer hover:bg-white/20 transition-all"
-                  >
-                    {units.filter(u => u.code && (Number(u.contains) || 0) > 0).map(u => (
-                      <option key={u.code} value={u.code} className="text-black bg-white">
-                        {u.code} (Isi {u.contains})
-                      </option>
-                    ))}
-                  </select>
-
-                  <div className="bg-yellow-400 text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                    Total: {(() => {
-                      const values = Object.values(product.stockByWarehouse || {});
-                      const total = values.reduce((acc: number, curr: unknown) => acc + (Number(curr) || 0), 0);
-
-                      // Calculate total in selected unit
-                      const currentUnit = units.find(u => u.code === distUnit);
-                      const multiplier = Number(currentUnit?.contains || 1);
-                      const displayTotal = total / multiplier;
-
-                      return `${displayTotal.toLocaleString('id-ID')} ${distUnit}`;
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {warehouses.map(wh => {
-                  const currentUnit = units.find(u => u.code === distUnit);
-                  const multiplier = Number(currentUnit?.contains || 1);
-                  const stockVal = Number(product.stockByWarehouse?.[wh.id] || 0);
-                  const displayVal = stockVal / multiplier;
-
-                  return (
-                    <div key={wh.id} className="bg-white/10 p-4 rounded-2xl border border-white/5 hover:bg-white/20 transition-all cursor-pointer group">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[9px] font-black uppercase opacity-60 group-hover:opacity-100 transition-opacity">{wh.name}</span>
-                        <span className="text-[9px] font-bold opacity-40 group-hover:opacity-80 transition-opacity">
-                          {stockVal.toLocaleString('id-ID')} {product.Satuan}
-                        </span>
-                      </div>
-                      <div className="relative">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
                         <input
                           type="number"
-                          value={displayVal === 0 ? '' : displayVal}
-                          onChange={e => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            const realVal = Math.round(val * multiplier);
-                            setProduct({ ...product, stockByWarehouse: { ...product.stockByWarehouse, [wh.id]: realVal } });
+                          disabled={code === 'PCS'}
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
+                          value={code === 'PCS' ? 1 : (current.contains || '')}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
+                            setUnits(next);
                           }}
-                          className="bg-transparent w-full font-black text-xl outline-none text-white placeholder-white/20"
-                          placeholder="0"
                         />
-                        <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-40 pointer-events-none">
-                          {distUnit}
-                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          value={current.minQty || ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            next[idx] = { ...current, minQty: val };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+                      <div className="text-[10px] font-black text-gray-500 pt-2 border-t border-gray-200">
+                        {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
+                        <span className="mx-1 font-bold text-gray-800">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
+                        / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* BAGIAN 4: MEDIA & SUPPLIER */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
+              <h3 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><ImageIcon size={14} /> Media</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
+                    {imagePreview ? (
+                      <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                    ) : (
+                      <ImageIcon size={20} className="text-gray-300" />
+                    )}
+                  </div>
+                  <label className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer text-xs font-bold text-gray-700">
+                    Ganti Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                </div>
+                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => setFormData({ ...formData, Link_Foto: e.target.value })} />
+                <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}></textarea>
               </div>
             </div>
+            <div className="bg-blue-600 p-6 rounded-[2.5rem] shadow-xl text-white">
+              <h3 className="text-xs font-black uppercase text-blue-200 mb-4 flex items-center gap-2"><Truck size={14} /> Supplier</h3>
+              <div className="space-y-4">
+                <input type="text" placeholder="Nama Supplier" className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.Supplier} onChange={e => setFormData({ ...formData, Supplier: e.target.value })} />
+                <input type="text" placeholder="WA: 628..." className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.No_WA_Supplier} onChange={e => setFormData({ ...formData, No_WA_Supplier: e.target.value })} />
+              </div>
+            </div>
+          </div>
 
-            <button type="submit" disabled={isSubmitting} className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-[10px] shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-gray-300">
-              {isSubmitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}
-              {isSubmitting ? 'Sync Database...' : 'Update Master Data'}
+          {/* Action Buttons */}
+          <div className="flex flex-col-reverse md:flex-row gap-4 pt-6">
+            <button 
+                type="button" 
+                onClick={handleDelete}
+                disabled={isSubmitting || isDeleting}
+                className="p-5 bg-red-50 text-red-600 font-black uppercase text-xs rounded-[2rem] shadow-sm border border-red-100 hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+            >
+               <Trash2 size={18} /> Hapus Produk
             </button>
+            <div className="flex-1 flex gap-4">
+                <button type="button" onClick={() => router.back()} className="flex-1 p-5 bg-white text-gray-400 font-black uppercase text-xs rounded-[2rem] shadow-sm border hover:bg-gray-100 transition-all">
+                Batal
+                </button>
+                <button type="submit" disabled={isSubmitting || isDeleting} className="flex-[2] p-5 bg-black text-white font-black uppercase text-xs rounded-[2rem] shadow-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-widest">
+                {isSubmitting ? 'MENYIMPAN...' : <><Save size={18} /> Simpan Perubahan</>}
+                </button>
+            </div>
           </div>
         </form>
       </div>
