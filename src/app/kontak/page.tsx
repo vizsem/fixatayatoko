@@ -1,11 +1,11 @@
 // src/app/kontak/page.tsx
 'use client';
 
-import { useState } from 'react';
-import { Store, Phone, Mail, MapPin, MessageCircle, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Store, Phone, Mail, MapPin, MessageCircle, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import notify from '@/lib/notify';
 
@@ -19,6 +19,46 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [activeChip, setActiveChip] = useState<ChipKey>('SEMUA');
+  const [storeSettings, setStoreSettings] = useState({
+    name: 'Atayatoko',
+    address: 'Jl. Pandan 98, Semen, Kediri',
+    phone: '0858-5316-1174',
+    email: 'info@atayatoko.com',
+    whatsapp: '6285853161174'
+  });
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // Load Settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'system'));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const store = data.store || {};
+          
+          // Format phone for WhatsApp (remove non-digits, replace 0 with 62)
+          let waNumber = store.phone ? store.phone.replace(/\D/g, '') : '';
+          if (waNumber.startsWith('0')) {
+            waNumber = '62' + waNumber.slice(1);
+          }
+
+          setStoreSettings({
+            name: store.name || 'Atayatoko',
+            address: store.address || 'Jl. Pandan 98, Semen, Kediri',
+            phone: store.phone || '0858-5316-1174',
+            email: store.email || 'info@atayatoko.com',
+            whatsapp: waNumber || '6285853161174'
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Kategori untuk ChipFilter
   const HELP_CHIPS: { key: ChipKey; label: string }[] = [
@@ -66,7 +106,7 @@ export default function ContactPage() {
           <div className="flex items-center space-x-2">
             <Store className="text-green-600" size={28} />
             <div>
-              <h1 className="text-xl font-bold text-green-600">ATAYATOKO</h1>
+              <h1 className="text-xl font-bold text-green-600 uppercase">{storeSettings.name}</h1>
               <p className="text-xs text-gray-600">Ecer & Grosir</p>
             </div>
           </div>
@@ -93,7 +133,7 @@ export default function ContactPage() {
             
             {submitSuccess && (
               <div className="mb-6 p-3 bg-green-50 text-green-700 rounded-lg">
-                ✅ Pesan Anda berhasil terkirim! Tim ATAYATOKO akan segera menghubungi Anda.
+                ✅ Pesan Anda berhasil terkirim! Tim {storeSettings.name} akan segera menghubungi Anda.
               </div>
             )}
 
@@ -193,7 +233,11 @@ export default function ContactPage() {
                 <MapPin className="text-green-600 mt-1 mr-3" size={20} />
                 <div>
                   <h3 className="font-semibold text-gray-900">Alamat</h3>
-                  <p className="text-gray-600">Jl. Pandan 98, Semen, Kediri</p>
+                  {loadingSettings ? (
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-48 mt-1"></div>
+                  ) : (
+                    <p className="text-gray-600">{storeSettings.address}</p>
+                  )}
                 </div>
               </div>
 
@@ -201,7 +245,11 @@ export default function ContactPage() {
                 <Phone className="text-green-600 mt-1 mr-3" size={20} />
                 <div>
                   <h3 className="font-semibold text-gray-900">Telepon</h3>
-                  <p className="text-gray-600">0858-5316-1174</p>
+                  {loadingSettings ? (
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-32 mt-1"></div>
+                  ) : (
+                    <p className="text-gray-600">{storeSettings.phone}</p>
+                  )}
                 </div>
               </div>
 
@@ -209,7 +257,11 @@ export default function ContactPage() {
                 <Mail className="text-green-600 mt-1 mr-3" size={20} />
                 <div>
                   <h3 className="font-semibold text-gray-900">Email</h3>
-                  <p className="text-gray-600">info@atayatoko.com</p>
+                  {loadingSettings ? (
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-40 mt-1"></div>
+                  ) : (
+                    <p className="text-gray-600">{storeSettings.email}</p>
+                  )}
                 </div>
               </div>
 
@@ -220,7 +272,7 @@ export default function ContactPage() {
 
               <div className="pt-4">
                 <a
-                  href="https://wa.me/6285853161174"
+                  href={`https://wa.me/${storeSettings.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors"

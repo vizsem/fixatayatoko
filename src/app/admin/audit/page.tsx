@@ -8,7 +8,8 @@ import {
   limit, 
   getDocs, 
   where,
-  Timestamp 
+  Timestamp,
+  onSnapshot 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { 
@@ -25,14 +26,26 @@ import {
   Package,
   ArrowUpCircle,
   ArrowDownCircle,
-  FileText
+  FileText,
+  Landmark,
+  ChevronDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 // --- TYPES ---
-type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost';
+type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital';
+
+interface CapitalLog {
+  id: string;
+  date: Timestamp;
+  type: 'INJECTION' | 'WITHDRAWAL';
+  amount: number;
+  description: string;
+  recordedBy?: string;
+  referenceId?: string;
+}
 
 interface CostLog {
   id: string;
@@ -106,6 +119,7 @@ export default function AuditPage() {
   const [activeTab, setActiveTab] = useState<AuditTab>('stock');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [limitCount, setLimitCount] = useState(50);
   
   // Filter Date State
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01')); // Awal bulan ini
@@ -117,6 +131,7 @@ export default function AuditPage() {
   const [shifts, setShifts] = useState<CashierShift[]>([]);
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
   const [costLogs, setCostLogs] = useState<CostLog[]>([]);
+  const [capitalLogs, setCapitalLogs] = useState<CapitalLog[]>([]);
   const [profitSummary, setProfitSummary] = useState({ 
     sales: 0, 
     cost: 0, 
@@ -128,78 +143,124 @@ export default function AuditPage() {
 
   // Fetch Data based on active tab
   useEffect(() => {
-    fetchData();
-  }, [activeTab, startDate, endDate]);
+    let unsubscribe: () => void = () => {};
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
 
-      const startTimestamp = Timestamp.fromDate(start);
-      const endTimestamp = Timestamp.fromDate(end);
+        const startTimestamp = Timestamp.fromDate(start);
+        const endTimestamp = Timestamp.fromDate(end);
 
-      if (activeTab === 'stock') {
-        const q = query(
-          collection(db, 'inventory_logs'), 
-          where('date', '>=', startTimestamp),
-          where('date', '<=', endTimestamp),
-          orderBy('date', 'desc'), 
-          limit(200)
-        );
-        const snap = await getDocs(q);
-        setStockLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryLog)));
-      } 
-      else if (activeTab === 'transaction') {
-        const q = query(
-          collection(db, 'orders'), 
-          where('createdAt', '>=', startTimestamp),
-          where('createdAt', '<=', endTimestamp),
-          orderBy('createdAt', 'desc'), 
-          limit(200)
-        );
-        const snap = await getDocs(q);
-        setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionLog)));
-      } 
-      else if (activeTab === 'finance') {
-        const q = query(
-          collection(db, 'cashier_shifts'), 
-          where('openedAt', '>=', startTimestamp),
-          where('openedAt', '<=', endTimestamp),
-          orderBy('openedAt', 'desc'), 
-          limit(100)
-        );
-        const snap = await getDocs(q);
-        setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashierShift)));
+        if (activeTab === 'stock') {
+          const q = query(
+            collection(db, 'inventory_logs'), 
+            where('date', '>=', startTimestamp),
+            where('date', '<=', endTimestamp),
+            orderBy('date', 'desc'), 
+            limit(limitCount)
+          );
+          unsubscribe = onSnapshot(q, (snap) => {
+            setStockLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryLog)));
+            setLoading(false);
+          });
+        } 
+        else if (activeTab === 'transaction') {
+          const q = query(
+            collection(db, 'orders'), 
+            where('createdAt', '>=', startTimestamp),
+            where('createdAt', '<=', endTimestamp),
+            orderBy('createdAt', 'desc'), 
+            limit(limitCount)
+          );
+          unsubscribe = onSnapshot(q, (snap) => {
+            setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionLog)));
+            setLoading(false);
+          });
+        } 
+        else if (activeTab === 'finance') {
+          const q = query(
+            collection(db, 'cashier_shifts'), 
+            where('openedAt', '>=', startTimestamp),
+            where('openedAt', '<=', endTimestamp),
+            orderBy('openedAt', 'desc'), 
+            limit(limitCount)
+          );
+          unsubscribe = onSnapshot(q, (snap) => {
+            setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashierShift)));
+            setLoading(false);
+          });
+        }
+        else if (activeTab === 'profit') {
+          // Profit calculation remains getDocs for now as it involves multiple collections and heavy processing
+          
+          const qOrders = query(
+            collection(db, 'orders'), 
+            where('status', 'in', ['SELESAI', 'SUCCESS']), 
+            where('createdAt', '>=', startTimestamp),
+            where('createdAt', '<=', endTimestamp),
+            orderBy('createdAt', 'desc')
+          );
+          
+          const qExpenses = query(
+            collection(db, 'operational_expenses'), 
+            where('date', '>=', startTimestamp),
+            where('date', '<=', endTimestamp),
+            orderBy('date', 'desc')
+          );
+
+          const [snapOrders, snapExpenses] = await Promise.all([
+            getDocs(qOrders),
+            getDocs(qExpenses)
+          ]);
+          calculateProfit(snapOrders.docs, snapExpenses.docs);
+          setLoading(false);
+        } 
+        else if (activeTab === 'cost') {
+          const q = query(
+            collection(db, 'product_cost_logs'), 
+            where('changeDate', '>=', startTimestamp),
+            where('changeDate', '<=', endTimestamp),
+            orderBy('changeDate', 'desc'), 
+            limit(limitCount)
+          );
+          unsubscribe = onSnapshot(q, (snap) => {
+            setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as CostLog)));
+            setLoading(false);
+          });
+        }
+        else if (activeTab === 'capital') {
+          const q = query(
+            collection(db, 'capital_transactions'), 
+            where('date', '>=', startTimestamp),
+            where('date', '<=', endTimestamp),
+            orderBy('date', 'desc'), 
+            limit(limitCount)
+          );
+          unsubscribe = onSnapshot(q, (snap) => {
+            setCapitalLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as CapitalLog)));
+            setLoading(false);
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching audit data:", error);
+        setLoading(false);
       }
-      else if (activeTab === 'profit') {
-        // Fetch orders and calculate profit based on DATE RANGE
-        const qOrders = query(
-          collection(db, 'orders'), 
-          where('status', 'in', ['SELESAI', 'SUCCESS']), 
-          where('createdAt', '>=', startTimestamp),
-          where('createdAt', '<=', endTimestamp),
-          orderBy('createdAt', 'desc')
-        );
-        
-        const qExpenses = query(
-          collection(db, 'operational_expenses'), 
-          where('date', '>=', startTimestamp),
-          where('date', '<=', endTimestamp),
-          orderBy('date', 'desc')
-        );
+    };
 
-        const [snapOrders, snapExpenses] = await Promise.all([
-          getDocs(qOrders),
-          getDocs(qExpenses)
-        ]);
-        
+    fetchData();
+
+    return () => unsubscribe();
+  }, [activeTab, startDate, endDate, limitCount]);
+
+  const calculateProfit = (orderDocs: any[], expenseDocs: any[]) => {
         // Calculate Expenses
         let totalExpenses = 0;
-        snapExpenses.docs.forEach(doc => {
+        expenseDocs.forEach(doc => {
           const data = doc.data();
           totalExpenses += (data.amount || 0);
         });
@@ -209,7 +270,7 @@ export default function AuditPage() {
         let totalCost = 0;
         let totalDiscount = 0;
         
-        const logs: ProfitLog[] = snapOrders.docs.map(d => {
+        const logs: ProfitLog[] = orderDocs.map(d => {
           const data = d.data();
           const items = data.items || [];
           let orderCost = 0;
@@ -281,22 +342,6 @@ export default function AuditPage() {
           expenses: totalExpenses,
           netProfit: netProfitTotal
         });
-      } else if (activeTab === 'cost') {
-        const q = query(
-          collection(db, 'product_cost_logs'), 
-          where('changeDate', '>=', startTimestamp),
-          where('changeDate', '<=', endTimestamp),
-          orderBy('changeDate', 'desc'), 
-          limit(100)
-        );
-        const snap = await getDocs(q);
-        setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as CostLog)));
-      }
-    } catch (error) {
-      console.error("Error fetching audit data:", error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const exportToExcel = () => {
@@ -359,6 +404,15 @@ export default function AuditPage() {
         'Sumber': c.purchaseId ? `Pembelian #${c.purchaseId.slice(-4)}` : 'Manual Edit',
         Admin: c.adminId || '-'
       }));
+    } else if (activeTab === 'capital') {
+      data = capitalLogs.map(c => ({
+        Tanggal: c.date?.toDate ? format(c.date.toDate(), 'dd/MM/yyyy HH:mm') : '-',
+        Tipe: c.type === 'INJECTION' ? 'Modal Masuk' : 'Modal Keluar',
+        Jumlah: c.amount,
+        Keterangan: c.description,
+        'Dicatat Oleh': c.recordedBy || '-',
+        Reference: c.referenceId || '-'
+      }));
     }
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -393,6 +447,11 @@ export default function AuditPage() {
         c.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.adminId || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
+    } else if (activeTab === 'capital') {
+      return capitalLogs.filter(c => 
+        (c.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (c.recordedBy?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      );
     }
     return [];
   };
@@ -413,6 +472,7 @@ export default function AuditPage() {
             { id: 'stock', label: 'Stok Produk', icon: Package },
             { id: 'transaction', label: 'Transaksi', icon: ArrowLeftRight },
             { id: 'finance', label: 'Keuangan Shift', icon: Wallet },
+            { id: 'capital', label: 'Modal Operasional', icon: Landmark },
             { id: 'profit', label: 'Laba Rugi', icon: ArrowUpCircle },
             { id: 'cost', label: 'Harga Beli (HPP)', icon: ArrowDownCircle },
           ].map((tab) => (
@@ -758,9 +818,61 @@ export default function AuditPage() {
               </table>
             )}
             
+            {activeTab === 'capital' && (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
+                    <th className="p-4">Waktu</th>
+                    <th className="p-4 text-center">Tipe</th>
+                    <th className="p-4 text-right">Jumlah</th>
+                    <th className="p-4">Keterangan</th>
+                    <th className="p-4">Dicatat Oleh</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredData().map((c: any) => (
+                    <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4 text-xs font-bold text-gray-600">
+                        {c.date?.toDate ? format(c.date.toDate(), 'dd/MM/yyyy HH:mm', { locale: id }) : '-'}
+                      </td>
+                      <td className="p-4 text-center">
+                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
+                          c.type === 'INJECTION' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {c.type === 'INJECTION' ? 'MASUK' : 'KELUAR'}
+                        </span>
+                      </td>
+                      <td className={`p-4 text-right text-xs font-black ${c.type === 'INJECTION' ? 'text-green-600' : 'text-red-600'}`}>
+                        {c.type === 'INJECTION' ? '+' : '-'}Rp{c.amount.toLocaleString()}
+                      </td>
+                      <td className="p-4 text-sm text-gray-800">
+                        {c.description}
+                        {c.referenceId && <div className="text-[10px] text-gray-400 mt-1 font-mono">REF: {c.referenceId.slice(-6).toUpperCase()}</div>}
+                      </td>
+                      <td className="p-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-1"><User size={12}/> {c.recordedBy || 'System'}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
             {filteredData().length === 0 && (
               <div className="text-center py-10 text-gray-400 text-sm italic">
                 Tidak ada data ditemukan.
+              </div>
+            )}
+            
+            {!loading && filteredData().length > 0 && activeTab !== 'profit' && (
+              <div className="p-4 text-center border-t border-gray-100">
+                <button 
+                  onClick={() => setLimitCount(prev => prev + 50)}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center justify-center gap-1 mx-auto px-4 py-2 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  <ChevronDown size={14} />
+                  Muat Lebih Banyak ({limitCount})
+                </button>
               </div>
             )}
           </div>

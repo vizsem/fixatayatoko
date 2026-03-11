@@ -236,6 +236,19 @@ export default function AddPurchase() {
             nextStock: currentStock + newQty,
             date: serverTimestamp()
           });
+
+          // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai
+          // Agar sinkron dengan "Modal & Aset"
+          if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
+             await addDoc(collection(db, 'capital_transactions'), {
+               date: serverTimestamp(),
+               type: 'WITHDRAWAL', // Pengurangan modal tunai
+               amount: newCostTotal,
+               description: `Pembelian Stok: ${item.name} (${newQty} pcs)`,
+               recordedBy: 'system',
+               referenceId: purchaseRef.id
+             });
+          }
         }
       }
 
@@ -262,7 +275,7 @@ export default function AddPurchase() {
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">New Purchase Order</h1>
+          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Pembelian Baru</h1>
           <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">Input stok masuk dari supplier</p>
         </div>
       </div>

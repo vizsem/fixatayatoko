@@ -10,7 +10,7 @@ import {
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
-  Banknote, Bell, Landmark, MessageCircle
+  Banknote, Bell, Landmark, MessageCircle, Mail
 } from 'lucide-react';
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp } from 'firebase/firestore';
@@ -102,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       group: "Pelanggan & SDM", items: [
         { name: 'Live Chat', href: '/admin/chat', icon: MessageCircle },
+        { name: 'Kotak Masuk', href: '/admin/messages', icon: Mail },
         { name: 'Pelanggan', href: '/admin/customers', icon: Users },
         { name: 'Karyawan', href: '/admin/employees', icon: UsersRound },
         { name: 'Sistem Poin', href: '/admin/points', icon: Star },
