@@ -204,6 +204,20 @@ export default function AddPurchase() {
               adminId: 'system',
               reason: 'PURCHASE_AVG_CALCULATION'
             });
+          } else {
+             // JIKA TIDAK BERUBAH, TETAP CATAT AGAR MUNCUL DI AUDIT COST
+             await addDoc(collection(db, 'product_cost_logs'), {
+              productId: item.id,
+              productName: item.name,
+              oldCost: currentCost,
+              newCost: newAverageCost,
+              purchaseId: purchaseRef.id,
+              purchasePrice: unitCostNew,
+              quantity: newQty,
+              changeDate: serverTimestamp(),
+              adminId: 'system',
+              reason: 'PURCHASE_RESTOCK' // Different reason
+            });
           }
 
           // Catat Log Inventory (Masuk)

@@ -217,23 +217,24 @@ export default function AuditPage() {
           const orderSales = data.total || 0;
           
           const profitItems = items.map((i: any) => {
-            // Prioritize 'cost' field from order item, then try to estimate or fallback
-            // Note: Ideally 'cost' should be saved in order items during checkout
-            let itemCost = (i.cost || 0) * (i.quantity || 1);
-            
-            // Fallback if cost is 0 (maybe old data or not saved)
-            if (itemCost === 0 && i.price) {
-               // Estimate cost as 80% of price if not available (Standard retail margin estimation)
-               // Better approach: fetch product current cost, but that might have changed. 
-               // For audit, using saved cost is best. If 0, we can flag it or estimate.
-               // Let's try to be safe and set it to 0 if not found, or maybe estimate.
-               // Based on user request "hpp modal tidak muncul", likely it is 0.
-               // We will try to use 'modal' field if 'cost' is missing, some systems use that.
-               const unitCost = i.cost || i.modal || i.purchasePrice || 0;
-               itemCost = unitCost * (i.quantity || 1);
-            }
+                // Prioritize 'cost' field from order item, then try to estimate or fallback
+                // Note: Ideally 'cost' should be saved in order items during checkout
+                let itemCost = (i.cost || 0) * (i.quantity || 1);
+                
+                // Fallback if cost is 0 (maybe old data or not saved)
+                if (itemCost === 0) {
+                   // Estimate cost as 80% of price if not available (Standard retail margin estimation)
+                   // Better approach: fetch product current cost, but that might have changed. 
+                   // For audit, using saved cost is best. If 0, we can flag it or estimate.
+                   // Let's try to be safe and set it to 0 if not found, or maybe estimate.
+                   // Based on user request "hpp modal tidak muncul", likely it is 0.
+                   // We will try to use 'modal' field if 'cost' is missing, some systems use that.
+                   // Also check 'purchasePrice' as fallback
+                   const unitCost = i.cost || i.modal || i.purchasePrice || 0;
+                   itemCost = unitCost * (i.quantity || 1);
+                }
 
-            const itemSales = (i.price || 0) * (i.quantity || 1);
+                const itemSales = (i.price || 0) * (i.quantity || 1);
             // Assuming i.originalPrice exists, otherwise fallback to price
             const itemOriginalSales = (i.originalPrice || i.price || 0) * (i.quantity || 1);
             const itemDiscount = Math.max(0, itemOriginalSales - itemSales);
