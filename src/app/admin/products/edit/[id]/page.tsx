@@ -273,7 +273,17 @@ export default function EditProductPage() {
           if (!code) return null;
           const contains = Number(u.contains || 0);
           const price = Number(u.price || 0);
-          const unitEntry: UnitOption = { code, contains, price, prices: u.prices };
+          const unitEntry: UnitOption = { code, contains, price };
+          if (u.prices) {
+             const cleanedPrices: any = {};
+             if (u.prices.offline !== undefined && u.prices.offline !== null) cleanedPrices.offline = Number(u.prices.offline);
+             if (u.prices.website !== undefined && u.prices.website !== null) cleanedPrices.website = Number(u.prices.website);
+             if (u.prices.shopee !== undefined && u.prices.shopee !== null) cleanedPrices.shopee = Number(u.prices.shopee);
+             if (u.prices.tiktok !== undefined && u.prices.tiktok !== null) cleanedPrices.tiktok = Number(u.prices.tiktok);
+             if (Object.keys(cleanedPrices).length > 0) {
+                 unitEntry.prices = cleanedPrices;
+             }
+          }
           if (u.minQty !== undefined) unitEntry.minQty = Number(u.minQty);
           if (u.label) unitEntry.label = String(u.label);
           return unitEntry;
@@ -285,8 +295,20 @@ export default function EditProductPage() {
         ? basePriceFromUnits
         : Number(formData.Ecer || 0);
 
+      const baseUnitEntry: UnitOption = { 
+        code: baseUnit, 
+        contains: 1, 
+        price: nextEcer, 
+        label: '' 
+      };
+      
+      const foundBaseUnit = cleanedUnits.find(u => u.code === baseUnit);
+      if (foundBaseUnit?.prices) {
+        baseUnitEntry.prices = foundBaseUnit.prices;
+      }
+
       const ensuredBase = [
-        { code: baseUnit, contains: 1, price: nextEcer, label: '', prices: cleanedUnits.find(u => u.code === baseUnit)?.prices },
+        baseUnitEntry,
         ...cleanedUnits.filter((u) => u.code !== baseUnit),
       ];
 
@@ -294,10 +316,10 @@ export default function EditProductPage() {
       const channelPricing: any = { offline: {}, website: {}, shopee: {}, tiktok: {} };
       ensuredBase.forEach(u => {
         if (u.prices) {
-          if (u.prices.offline) channelPricing.offline[u.code] = { price: Number(u.prices.offline) };
-          if (u.prices.website) channelPricing.website[u.code] = { price: Number(u.prices.website) };
-          if (u.prices.shopee) channelPricing.shopee[u.code] = { price: Number(u.prices.shopee) };
-          if (u.prices.tiktok) channelPricing.tiktok[u.code] = { price: Number(u.prices.tiktok) };
+          if (u.prices.offline !== undefined) channelPricing.offline[u.code] = { price: Number(u.prices.offline) };
+          if (u.prices.website !== undefined) channelPricing.website[u.code] = { price: Number(u.prices.website) };
+          if (u.prices.shopee !== undefined) channelPricing.shopee[u.code] = { price: Number(u.prices.shopee) };
+          if (u.prices.tiktok !== undefined) channelPricing.tiktok[u.code] = { price: Number(u.prices.tiktok) };
         }
       });
 
@@ -339,7 +361,7 @@ export default function EditProductPage() {
                 newStock: newVal,
                 change: newVal - oldVal,
                 type: 'EDIT_ADMIN',
-                adminEmail: auth.currentUser?.email,
+                adminEmail: auth.currentUser?.email || 'system',
                 createdAt: serverTimestamp(),
              });
           }
