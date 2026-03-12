@@ -42,6 +42,7 @@ import { CapitalTransaction, LoanRecord } from '@/types/finance';
 type MarketplaceAccount = {
   id: string;
   name: string;
+  storeName?: string;
   activeBalance: number;
   pendingBalance: number;
   lastUpdated: any;
@@ -66,6 +67,10 @@ export default function CapitalPage() {
   const [selectedAccount, setSelectedAccount] = useState<MarketplaceAccount | null>(null);
   const [activeBalance, setActiveBalance] = useState('');
   const [pendingBalance, setPendingBalance] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [isAddMarketplaceModalOpen, setIsAddMarketplaceModalOpen] = useState(false);
+  const [newPlatform, setNewPlatform] = useState('Shopee');
+  const [newStoreName, setNewStoreName] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -223,22 +228,48 @@ export default function CapitalPage() {
       const active = Number(activeBalance.replace(/\D/g, ''));
       const pending = Number(pendingBalance.replace(/\D/g, ''));
       
-      // Calculate difference for logging if needed
-      // const diffActive = active - selectedAccount.activeBalance;
-      
       await setDoc(doc(db, 'marketplace_accounts', selectedAccount.id), {
         activeBalance: active,
         pendingBalance: pending,
+        storeName: storeName,
         lastUpdated: serverTimestamp()
       }, { merge: true });
 
-      toast.success('Saldo marketplace diperbarui');
+      toast.success('Saldo & Nama Toko diperbarui');
       setIsMarketplaceModalOpen(false);
       setSelectedAccount(null);
       setActiveBalance('');
       setPendingBalance('');
+      setStoreName('');
     } catch (error) {
-      toast.error('Gagal update saldo');
+      toast.error('Gagal update data');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddMarketplaceAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPlatform || !newStoreName) {
+      toast.error('Pilih platform dan isi nama toko');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'marketplace_accounts'), {
+        name: newPlatform,
+        storeName: newStoreName,
+        activeBalance: 0,
+        pendingBalance: 0,
+        lastUpdated: serverTimestamp()
+      });
+      toast.success('Akun Marketplace ditambahkan');
+      setIsAddMarketplaceModalOpen(false);
+      setNewStoreName('');
+      setNewPlatform('Shopee');
+    } catch (error) {
+      toast.error('Gagal menambahkan akun');
     } finally {
       setIsSubmitting(false);
     }
@@ -548,26 +579,40 @@ export default function CapitalPage() {
                <p className="text-xs text-slate-500 font-medium">Monitoring saldo aktif dan tertahan di e-commerce.</p>
              </div>
            </div>
-           <div className="text-right">
-             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Total Aset Digital</p>
-             <p className="text-xl font-black text-purple-600">Rp{totalMarketplaceAssets.toLocaleString('id-ID')}</p>
+           <div className="text-right flex flex-col items-end gap-2">
+             <div>
+               <p className="text-xs font-black uppercase tracking-widest text-slate-400">Total Aset Digital</p>
+               <p className="text-xl font-black text-purple-600">Rp{totalMarketplaceAssets.toLocaleString('id-ID')}</p>
+             </div>
+             <button
+               onClick={() => setIsAddMarketplaceModalOpen(true)}
+               className="bg-purple-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-200"
+             >
+               <Plus size={14} /> Tambah Akun
+             </button>
            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {marketplaceAccounts.map((acc) => (
-            <div key={acc.id} className="border border-slate-100 rounded-2xl p-5 hover:shadow-md transition-all group relative overflow-hidden">
+            <div key={acc.id} className="border border-slate-100 rounded-2xl p-5 hover:shadow-md transition-all group relative overflow-hidden bg-white">
                <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
                  <Store size={60} />
                </div>
                
                <div className="flex justify-between items-start mb-4 relative z-10">
-                 <h4 className="font-bold text-slate-800">{acc.name}</h4>
+                 <div>
+                    <h4 className="font-bold text-slate-800 text-sm">{acc.name}</h4>
+                    {acc.storeName && (
+                      <p className="text-[10px] font-black text-purple-600 uppercase tracking-wide mt-0.5">{acc.storeName}</p>
+                    )}
+                 </div>
                  <button 
                    onClick={() => {
                      setSelectedAccount(acc);
                      setActiveBalance(acc.activeBalance.toString());
                      setPendingBalance(acc.pendingBalance.toString());
+                     setStoreName(acc.storeName || '');
                      setIsMarketplaceModalOpen(true);
                    }}
                    className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all"
@@ -1048,6 +1093,17 @@ export default function CapitalPage() {
             
             <form onSubmit={handleUpdateMarketplace} className="space-y-4">
               <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Toko (Opsional)</label>
+                <input
+                  type="text"
+                  value={storeName}
+                  onChange={e => setStoreName(e.target.value)}
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                  placeholder="Contoh: Toko Cabang 1"
+                />
+              </div>
+
+              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Aktif (Siap Tarik)</label>
                 <input
                   type="number"
@@ -1088,6 +1144,64 @@ export default function CapitalPage() {
                   className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Menyimpan...' : 'Update Saldo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add Marketplace Modal Form */}
+      {isAddMarketplaceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+              <Plus className="text-slate-400" />
+              Tambah Akun Marketplace
+            </h2>
+            
+            <form onSubmit={handleAddMarketplaceAccount} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Platform</label>
+                <select
+                  value={newPlatform}
+                  onChange={e => setNewPlatform(e.target.value)}
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="Shopee">Shopee</option>
+                  <option value="TikTok Shop">TikTok Shop</option>
+                  <option value="Tokopedia">Tokopedia</option>
+                  <option value="Lazada">Lazada</option>
+                  <option value="Blibli">Blibli</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Toko</label>
+                <input
+                  type="text"
+                  value={newStoreName}
+                  onChange={e => setNewStoreName(e.target.value)}
+                  className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                  placeholder="Contoh: Toko Cabang 2"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsAddMarketplaceModalOpen(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !newStoreName}
+                  className="flex-1 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Menyimpan...' : 'Tambah'}
                 </button>
               </div>
             </form>
