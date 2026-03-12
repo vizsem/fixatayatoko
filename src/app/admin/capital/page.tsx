@@ -31,10 +31,21 @@ import {
   Landmark,
   CreditCard,
   DollarSign,
-  Save
+  Save,
+  Store,
+  RefreshCcw,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { CapitalTransaction, LoanRecord } from '@/types/finance';
+
+type MarketplaceAccount = {
+  id: string;
+  name: string;
+  activeBalance: number;
+  pendingBalance: number;
+  lastUpdated: any;
+};
 
 export default function CapitalPage() {
   const [loading, setLoading] = useState(true);
@@ -50,6 +61,11 @@ export default function CapitalPage() {
   const [cashBalance, setCashBalance] = useState(0);
   const [isEditingCash, setIsEditingCash] = useState(false);
   const [tempCash, setTempCash] = useState('');
+  const [marketplaceAccounts, setMarketplaceAccounts] = useState<MarketplaceAccount[]>([]);
+  const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<MarketplaceAccount | null>(null);
+  const [activeBalance, setActiveBalance] = useState('');
+  const [pendingBalance, setPendingBalance] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -173,12 +189,106 @@ export default function CapitalPage() {
       }
     });
 
+    // 5. Fetch Marketplace Accounts
+    const unsubMarketplace = onSnapshot(collection(db, 'marketplace_accounts'), (snap) => {
+      if (snap.empty) {
+        // Initialize if empty
+        const defaults = [
+          { id: 'shopee', name: 'Shopee', activeBalance: 0, pendingBalance: 0, lastUpdated: serverTimestamp() },
+          { id: 'tiktok', name: 'TikTok Shop', activeBalance: 0, pendingBalance: 0, lastUpdated: serverTimestamp() },
+          { id: 'tokopedia', name: 'Tokopedia', activeBalance: 0, pendingBalance: 0, lastUpdated: serverTimestamp() },
+          { id: 'lazada', name: 'Lazada', activeBalance: 0, pendingBalance: 0, lastUpdated: serverTimestamp() }
+        ];
+        defaults.forEach(d => setDoc(doc(db, 'marketplace_accounts', d.id), d));
+      } else {
+        const accounts = snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketplaceAccount));
+        setMarketplaceAccounts(accounts);
+      }
+    });
+
     return () => {
       unsubAuth();
       unsubTx();
       unsubLoans();
+      unsubMarketplace();
     };
   }, []);
+
+  const handleUpdateMarketplace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAccount) return;
+
+    setIsSubmitting(true);
+    try {
+      const active = Number(activeBalance.replace(/\D/g, ''));
+      const pending = Number(pendingBalance.replace(/\D/g, ''));
+      
+      // Calculate difference for logging if needed
+      // const diffActive = active - selectedAccount.activeBalance;
+      
+      await setDoc(doc(db, 'marketplace_accounts', selectedAccount.id), {
+        activeBalance: active,
+        pendingBalance: pending,
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+
+      toast.success('Saldo marketplace diperbarui');
+      setIsMarketplaceModalOpen(false);
+      setSelectedAccount(null);
+      setActiveBalance('');
+      setPendingBalance('');
+    } catch (error) {
+      toast.error('Gagal update saldo');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdrawMarketplace = async (acc: MarketplaceAccount) => {
+    const amountStr = prompt(`Masukkan jumlah penarikan dari ${acc.name}:`, acc.activeBalance.toString());
+    if (!amountStr) return;
+    
+    const amount = Number(amountStr.replace(/\D/g, ''));
+    if (amount <= 0 || amount > acc.activeBalance) {
+      toast.error('Jumlah tidak valid atau melebihi saldo');
+      return;
+    }
+
+    try {
+      // 1. Decrease Marketplace Balance
+      await setDoc(doc(db, 'marketplace_accounts', acc.id), {
+        activeBalance: acc.activeBalance - amount,
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+
+      // 2. Increase Cash Balance
+      // Re-fetch current cash balance first to be safe? Or rely on state?
+      // State is reactive from store_settings, but let's just increment
+      const currentCashRef = doc(db, 'store_settings', 'finance');
+      const currentCashSnap = await getDoc(currentCashRef);
+      const currentCash = currentCashSnap.exists() ? (currentCashSnap.data().cashBalance || 0) : 0;
+      
+      await setDoc(currentCashRef, {
+        cashBalance: currentCash + amount
+      }, { merge: true });
+
+      // 3. Log Transaction
+      await addDoc(collection(db, 'capital_transactions'), {
+        date: serverTimestamp(),
+        type: 'INJECTION', // Using INJECTION as it adds to Cash Flow (Internal Transfer)
+        amount: amount,
+        description: `Penarikan Saldo ${acc.name}`,
+        recordedBy: auth.currentUser?.uid || 'unknown',
+        source: 'MARKETPLACE_WITHDRAWAL',
+        marketplaceId: acc.id
+      });
+
+      toast.success(`Berhasil menarik Rp${amount.toLocaleString()} ke Kas`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Gagal memproses penarikan');
+    }
+  };
 
   const handleRecordLoan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,7 +422,8 @@ export default function CapitalPage() {
   };
 
   const currentCapital = assetSummary.capitalInjected - assetSummary.capitalWithdrawn;
-  const totalAssets = assetSummary.stockValue + assetSummary.receivables + cashBalance;
+  const totalMarketplaceAssets = marketplaceAccounts.reduce((sum, acc) => sum + (acc.activeBalance || 0) + (acc.pendingBalance || 0), 0);
+  const totalAssets = assetSummary.stockValue + assetSummary.receivables + cashBalance + totalMarketplaceAssets;
   const netWorth = totalAssets - (assetSummary.totalLiabilities || 0);
   const growth = netWorth - currentCapital;
 
@@ -422,6 +533,72 @@ export default function CapitalPage() {
           <p className="text-xs font-medium text-white/80 mt-1 relative z-10">
             Net Worth - Modal
           </p>
+        </div>
+      </div>
+
+      {/* Marketplace & E-Wallets Section */}
+      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+           <div className="flex items-center gap-3">
+             <div className="p-2.5 bg-purple-50 text-purple-600 rounded-2xl">
+               <Store size={20} />
+             </div>
+             <div>
+               <h3 className="text-lg font-bold text-slate-800">Dompet Marketplace</h3>
+               <p className="text-xs text-slate-500 font-medium">Monitoring saldo aktif dan tertahan di e-commerce.</p>
+             </div>
+           </div>
+           <div className="text-right">
+             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Total Aset Digital</p>
+             <p className="text-xl font-black text-purple-600">Rp{totalMarketplaceAssets.toLocaleString('id-ID')}</p>
+           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {marketplaceAccounts.map((acc) => (
+            <div key={acc.id} className="border border-slate-100 rounded-2xl p-5 hover:shadow-md transition-all group relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+                 <Store size={60} />
+               </div>
+               
+               <div className="flex justify-between items-start mb-4 relative z-10">
+                 <h4 className="font-bold text-slate-800">{acc.name}</h4>
+                 <button 
+                   onClick={() => {
+                     setSelectedAccount(acc);
+                     setActiveBalance(acc.activeBalance.toString());
+                     setPendingBalance(acc.pendingBalance.toString());
+                     setIsMarketplaceModalOpen(true);
+                   }}
+                   className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all"
+                 >
+                   <RefreshCcw size={14} />
+                 </button>
+               </div>
+
+               <div className="space-y-3 relative z-10">
+                 <div>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Saldo Aktif (Siap Tarik)</p>
+                   <div className="flex items-center justify-between">
+                     <p className="text-lg font-black text-emerald-600">Rp{acc.activeBalance.toLocaleString('id-ID')}</p>
+                     {acc.activeBalance > 0 && (
+                       <button 
+                         onClick={() => handleWithdrawMarketplace(acc)}
+                         className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                       >
+                         <ExternalLink size={10} /> Tarik
+                       </button>
+                     )}
+                   </div>
+                 </div>
+                 
+                 <div className="pt-3 border-t border-dashed border-slate-100">
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Dana Tertahan (Pending)</p>
+                   <p className="text-sm font-black text-slate-600">Rp{acc.pendingBalance.toLocaleString('id-ID')}</p>
+                 </div>
+               </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -854,6 +1031,63 @@ export default function CapitalPage() {
                   className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Memproses...' : 'Bayar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Marketplace Modal Form */}
+      {isMarketplaceModalOpen && selectedAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+              <Store className="text-slate-400" />
+              Update Saldo {selectedAccount.name}
+            </h2>
+            
+            <form onSubmit={handleUpdateMarketplace} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Aktif (Siap Tarik)</label>
+                <input
+                  type="number"
+                  value={activeBalance}
+                  onChange={e => setActiveBalance(e.target.value)}
+                  className="w-full text-2xl font-black text-emerald-600 border-b-2 border-slate-100 focus:border-emerald-600 outline-none py-2 bg-transparent placeholder:text-slate-200"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Tertahan (Pending)</label>
+                <input
+                  type="number"
+                  value={pendingBalance}
+                  onChange={e => setPendingBalance(e.target.value)}
+                  className="w-full text-xl font-black text-slate-600 border-b-2 border-slate-100 focus:border-slate-600 outline-none py-2 bg-transparent placeholder:text-slate-200"
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl text-xs text-slate-500 font-medium">
+                <p>Update saldo sesuai dengan yang tertera di aplikasi marketplace. Perubahan ini akan mempengaruhi Total Aset Digital.</p>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsMarketplaceModalOpen(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Menyimpan...' : 'Update Saldo'}
                 </button>
               </div>
             </form>

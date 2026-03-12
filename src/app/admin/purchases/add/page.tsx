@@ -258,14 +258,14 @@ export default function AddPurchase() {
 
 
 
-      // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai
+      // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai & Transfer
       // Agar sinkron dengan "Modal & Aset"
-      if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
+      if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
          await addDoc(collection(db, 'capital_transactions'), {
            date: serverTimestamp(),
-           type: 'WITHDRAWAL', // Pengurangan modal tunai
+           type: 'WITHDRAWAL', // Pengurangan modal
            amount: total, // Total Pembelian (bukan per item)
-           description: `Pembelian Stok (Total): ${supplierName || 'Supplier'} (${cart.length} items)`,
+           description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
            recordedBy: 'system',
            referenceId: purchaseRef.id
          });
