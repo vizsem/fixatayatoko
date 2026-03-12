@@ -5,12 +5,12 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs
+  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs, runTransaction, increment, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import {
   ShoppingCart, Search, Truck, Printer, XCircle,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
-  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar
+  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar, XOctagon
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -25,6 +25,9 @@ type Order = {
   status: 'MENUNGGU' | 'DIPROSES' | 'DIKIRIM' | 'SELESAI' | 'DIBATALKAN';
   deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
   userId?: string;
+  items?: any[]; // Added for cancel logic
+  walletUsed?: number; // Added for cancel logic
+  pointsUsed?: number; // Added for cancel logic
 };
 
 export default function AdminOrders() {
@@ -198,6 +201,146 @@ export default function AdminOrders() {
     } catch {
       notify.admin.error('Gagal memperbarui status.');
     }
+  };
+
+  // Fungsi Batalkan Transaksi (Dengan Refund Stok & Dana)
+  const handleBulkCancel = async () => {
+    if (selectedOrders.length === 0) return;
+    if (!confirm(`Yakin ingin membatalkan ${selectedOrders.length} pesanan? \n\n⚠️ Stok akan dikembalikan otomatis.\n⚠️ Dana/Poin akan direfund ke user.`)) return;
+
+    const t = notify.admin.loading("Memproses pembatalan...");
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const orderId of selectedOrders) {
+      try {
+        await runTransaction(db, async (transaction) => {
+          const orderRef = doc(db, 'orders', orderId);
+          const orderSnap = await transaction.get(orderRef);
+          
+          if (!orderSnap.exists()) throw new Error("Pesanan tidak ditemukan");
+          
+          const orderData = orderSnap.data();
+          if (orderData.status === 'DIBATALKAN') throw new Error("Pesanan sudah dibatalkan sebelumnya");
+
+          // 1. Restore Stock
+          if (orderData.items && Array.isArray(orderData.items)) {
+            for (const item of orderData.items) {
+              if (!item.productId) continue;
+              
+              const productRef = doc(db, 'products', item.productId);
+              const productSnap = await transaction.get(productRef);
+              
+              if (productSnap.exists()) {
+                const pData = productSnap.data();
+                const currentStock = Number(pData.stock || 0);
+                const qtyToRestore = Number(item.quantity || 0);
+                
+                // Handle Stock by Warehouse (Restore to Main Warehouse or Default)
+                const stockByWarehouse = pData.stockByWarehouse || {};
+                // Default logic: restore to 'gudang-utama' or the first warehouse found
+                // Ideally we should know which warehouse it came from, but for now we default to main
+                const targetWh = 'gudang-utama';
+                stockByWarehouse[targetWh] = (stockByWarehouse[targetWh] || 0) + qtyToRestore;
+
+                transaction.update(productRef, {
+                  stock: currentStock + qtyToRestore,
+                  stockByWarehouse: stockByWarehouse
+                });
+
+                // Log Inventory (Manual because we are inside transaction)
+                const logRef = doc(collection(db, 'inventory_logs'));
+                transaction.set(logRef, {
+                  productId: item.productId,
+                  productName: item.name || 'Unknown',
+                  type: 'MASUK',
+                  amount: qtyToRestore,
+                  adminId: auth.currentUser?.uid || 'admin',
+                  source: 'ORDER',
+                  orderId: orderId,
+                  referenceId: orderId,
+                  note: `Pembatalan Pesanan #${orderId.substring(0,8)}`,
+                  date: serverTimestamp(),
+                  prevStock: currentStock,
+                  nextStock: currentStock + qtyToRestore
+                });
+              }
+            }
+          }
+
+          // 2. Refund Wallet & Points
+          if (orderData.userId && orderData.userId !== 'guest') {
+            const userRef = doc(db, 'users', orderData.userId);
+            const userSnap = await transaction.get(userRef);
+            
+            if (userSnap.exists()) {
+              const walletToRefund = Number(orderData.walletUsed || 0);
+              const pointsToRefund = Number(orderData.pointsUsed || 0);
+
+              if (walletToRefund > 0 || pointsToRefund > 0) {
+                transaction.update(userRef, {
+                  walletBalance: increment(walletToRefund),
+                  points: increment(pointsToRefund)
+                });
+
+                if (walletToRefund > 0) {
+                  const wLogRef = doc(collection(db, 'wallet_logs'));
+                  transaction.set(wLogRef, {
+                    userId: orderData.userId,
+                    orderId: orderId,
+                    amountChanged: walletToRefund,
+                    type: 'REFUND',
+                    description: `Refund Pembatalan Order #${orderId.substring(0,8)}`,
+                    createdAt: serverTimestamp()
+                  });
+                }
+
+                if (pointsToRefund > 0) {
+                  const pLogRef = doc(collection(db, 'point_logs'));
+                  transaction.set(pLogRef, {
+                    userId: orderData.userId,
+                    pointsChanged: pointsToRefund,
+                    type: 'REFUND',
+                    description: `Refund Poin Order #${orderId.substring(0,8)}`,
+                    createdAt: serverTimestamp()
+                  });
+                }
+              }
+            }
+          }
+
+          // 3. Update Order Status
+          transaction.update(orderRef, {
+            status: 'DIBATALKAN',
+            updatedAt: serverTimestamp()
+          });
+          
+          // 4. Send Notification
+          if (orderData.userId) {
+             const notifRef = doc(collection(db, 'notifications'));
+             transaction.set(notifRef, {
+                title: 'Pesanan Dibatalkan',
+                body: `Pesanan #${orderId.substring(0,8)} telah dibatalkan. Dana/Poin telah dikembalikan (jika ada).`,
+                type: 'transaction',
+                category: 'Pesanan',
+                userId: orderData.userId,
+                createdAt: serverTimestamp(),
+                read: false,
+                orderId: orderId
+             });
+          }
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Gagal membatalkan order ${orderId}:`, err);
+        failCount++;
+      }
+    }
+
+    notify.admin.dismiss(t);
+    if (successCount > 0) notify.admin.success(`${successCount} pesanan berhasil dibatalkan`);
+    if (failCount > 0) notify.admin.error(`${failCount} pesanan gagal dibatalkan`);
+    setSelectedOrders([]);
   };
 
   // FITUR HAPUS DATA LAMA (> 90 HARI)
@@ -532,6 +675,7 @@ export default function AdminOrders() {
           <div className="h-8 w-px bg-white/10"></div>
           
           <div className="flex gap-1">
+            <button onClick={handleBulkCancel} className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Batal</button>
             <button onClick={() => handleBulkUpdate('DIPROSES')} className="bg-amber-500 hover:bg-amber-400 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Proses</button>
             <button onClick={() => handleBulkUpdate('DIKIRIM')} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Kirim</button>
             <button onClick={() => handleBulkUpdate('SELESAI')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Selesai</button>

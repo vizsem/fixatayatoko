@@ -28,6 +28,8 @@ type ProductData = {
   Link_Foto?: string;
   unit?: string;
   Satuan?: string;
+  isActive?: boolean; // Added
+  status?: string; // Added
   channelPricing?: {
     offline?: ChannelPricing;
     website?: ChannelPricing;
@@ -79,6 +81,11 @@ export async function POST(req: Request) {
       }
 
       const productData = productSnap.data() as ProductData;
+
+      // 1. Validasi Status Aktif (Safety)
+      if (productData.isActive === false || productData.status === 'ARCHIVED') {
+        return NextResponse.json({ error: `Produk ${productData.name || productData.Nama} tidak tersedia (diarsipkan).` }, { status: 400 });
+      }
 
       if (productData.stock < item.quantity) {
         return NextResponse.json({ error: `Stok ${productData.name || productData.Nama} tidak mencukupi` }, { status: 400 });
