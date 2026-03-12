@@ -337,7 +337,7 @@ export default function AdminOrders() {
       }
     }
 
-    notify.admin.dismiss(t);
+    notify.dismiss(t);
     if (successCount > 0) notify.admin.success(`${successCount} pesanan berhasil dibatalkan`);
     if (failCount > 0) notify.admin.error(`${failCount} pesanan gagal dibatalkan`);
     setSelectedOrders([]);
