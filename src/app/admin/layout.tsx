@@ -182,8 +182,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {group.items.map((item) => {
                   const isActive = pathname === item.href;
                   const Icon = item.icon;
-                  // @ts-ignore - badge property might not exist on all items
-                  const badge = item.badge;
+                  const badge = (item as any).badge;
                   
                   return (
                     <Link
@@ -194,7 +193,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     >
                       <Icon size={16} strokeWidth={isActive ? 3 : 2} />
                       <span className="flex-1">{item.name}</span>
-                      {badge > 0 && (
+                      {(badge ?? 0) > 0 && (
                         <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                           {badge}
                         </span>
