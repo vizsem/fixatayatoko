@@ -58,6 +58,8 @@ type CartItem = {
   price: number;
   quantity: number;
   unit: string;
+  conversion?: number;
+  availableUnits?: { code: string; contains: number }[];
 };
 
 export default function MarketplaceOrdersPage() {
@@ -119,6 +121,8 @@ export default function MarketplaceOrdersPage() {
     const existing = cart.find(c => c.id === product.id);
     const baseName = product.name || product.Nama || 'Produk';
     const baseUnit = product.unit || product.Satuan || 'pcs';
+    const availableUnits = (product as any).units || [];
+    const defaultUnit = Array.isArray(availableUnits) && availableUnits.length > 0 ? availableUnits[0] : { code: baseUnit, contains: 1 };
 
     let basePrice = Number(product.Ecer || product.price || 0);
     if (product.channelPricing) {
@@ -144,7 +148,9 @@ export default function MarketplaceOrdersPage() {
           name: baseName,
           price: basePrice,
           quantity: 1,
-          unit: baseUnit
+          unit: defaultUnit.code || baseUnit,
+          conversion: defaultUnit.contains || 1,
+          availableUnits: availableUnits
         }
       ]);
     }
@@ -157,7 +163,7 @@ export default function MarketplaceOrdersPage() {
 
   const updateCartItem = (id: string, field: keyof CartItem, value: string | number) => {
     setCart(cart.map(item =>
-      item.id === id ? { ...item, [field]: field === 'quantity' || field === 'price' ? Number(value) : value } : item
+      item.id === id ? { ...item, [field]: field === 'quantity' || field === 'price' || field === 'conversion' ? Number(value) : value } : item
     ));
   };
 
@@ -212,14 +218,15 @@ export default function MarketplaceOrdersPage() {
         const pSnap = await getDoc(pRef);
         const productData = pSnap.data();
         const currentStock = productData?.stock != null ? productData.stock : 0;
-        const newStock = currentStock - item.quantity;
+        const deductionQty = (item.quantity || 0) * (item.conversion || 1);
+        const newStock = currentStock - deductionQty;
 
         // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
         const MAIN_WAREHOUSE_ID = 'gudang-utama';
         const stockByWarehouse = productData?.stockByWarehouse || {};
         const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
         
-        let remainingToDeduct = item.quantity;
+        let remainingToDeduct = deductionQty;
         
         // 1. Prioritas Gudang Utama
         if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
@@ -250,7 +257,7 @@ export default function MarketplaceOrdersPage() {
           productId: item.id,
           productName: item.name,
           type: 'KELUAR',
-          amount: item.quantity,
+          amount: deductionQty,
           adminId: auth.currentUser?.uid || 'admin',
           date: serverTimestamp(),
           note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
@@ -435,6 +442,37 @@ export default function MarketplaceOrdersPage() {
                               min={0}
                            />
                         </div>
+                        <div className="bg-gray-50 p-2 rounded-2xl">
+                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Satuan</label>
+                           <select
+                             className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black uppercase"
+                             value={item.unit}
+                             onChange={(e) => {
+                               const newUnit = e.target.value;
+                               const found = item.availableUnits?.find(u => u.code === newUnit);
+                               updateCartItem(item.id, 'unit', newUnit);
+                               updateCartItem(item.id, 'conversion', found?.contains || 1);
+                             }}
+                           >
+                             {item.availableUnits && item.availableUnits.length > 0 ? (
+                               item.availableUnits.map(u => (
+                                 <option key={u.code} value={u.code}>{u.code}</option>
+                               ))
+                             ) : (
+                               <option value={item.unit}>{item.unit}</option>
+                             )}
+                           </select>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded-2xl">
+                          <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Isi (Pcs)</label>
+                          <input
+                            type="number"
+                            className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
+                            value={item.conversion || 1}
+                            onChange={(e) => updateCartItem(item.id, 'conversion', e.target.value)}
+                            min={1}
+                          />
+                        </div>
                      </div>
 
                      <div className="flex justify-between items-center border-t border-gray-50 pt-3">
@@ -451,6 +489,8 @@ export default function MarketplaceOrdersPage() {
                 <tr>
                   <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
                   <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Satuan</th>
+                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
                   <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga</th>
                   <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
                 </tr>
@@ -482,6 +522,35 @@ export default function MarketplaceOrdersPage() {
                       </div>
                     </td>
                     <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+                      <select
+                        className="bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none uppercase"
+                        value={item.unit}
+                        onChange={(e) => {
+                          const newUnit = e.target.value;
+                          const found = item.availableUnits?.find(u => u.code === newUnit);
+                          updateCartItem(item.id, 'unit', newUnit);
+                          updateCartItem(item.id, 'conversion', found?.contains || 1);
+                        }}
+                      >
+                        {item.availableUnits && item.availableUnits.length > 0 ? (
+                          item.availableUnits.map(u => (
+                            <option key={u.code} value={u.code}>{u.code}</option>
+                          ))
+                        ) : (
+                          <option value={item.unit}>{item.unit}</option>
+                        )}
+                      </select>
+                    </td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+                      <input
+                        type="number"
+                        className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
+                        value={item.conversion || 1}
+                        onChange={(e) => updateCartItem(item.id, 'conversion', e.target.value)}
+                        min={1}
+                      />
+                    </td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                       <input
                         type="number"
                         className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
@@ -497,7 +566,7 @@ export default function MarketplaceOrdersPage() {
                 ))}
                 {!cart.length && (
                   <tr>
-                    <td colSpan={4} className="px-3 md:px-8 py-10 text-center text-[11px] font-bold text-gray-400">
+                    <td colSpan={6} className="px-3 md:px-8 py-10 text-center text-[11px] font-bold text-gray-400">
                       Belum ada produk di order marketplace ini.
                     </td>
                   </tr>
