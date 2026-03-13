@@ -123,6 +123,11 @@ export default function MarketplaceOrdersPage() {
     const baseUnit = product.unit || product.Satuan || 'pcs';
     const availableUnits = (product as any).units || [];
     const defaultUnit = Array.isArray(availableUnits) && availableUnits.length > 0 ? availableUnits[0] : { code: baseUnit, contains: 1 };
+    const availableStock = product.stock ?? 0;
+    if (availableStock <= 0) {
+      notify.admin.error(`Stok kosong: ${baseName}`);
+      return;
+    }
 
     let basePrice = Number(product.Ecer || product.price || 0);
     if (product.channelPricing) {
@@ -183,6 +188,25 @@ export default function MarketplaceOrdersPage() {
     }
     setLoading(true);
     try {
+      // Preflight stock validation BEFORE creating order
+      for (const item of cart) {
+        const pRef = doc(db, 'products', item.id);
+        const pSnap = await getDoc(pRef);
+        const productData = pSnap.data();
+        const currentStock = productData?.stock != null ? Number(productData.stock) : 0;
+        const deductionQty = (item.quantity || 0) * (item.conversion || 1);
+        if (currentStock <= 0) {
+          notify.admin.error(`Stok kosong: ${item.name}`);
+          setLoading(false);
+          return;
+        }
+        if (currentStock < deductionQty) {
+          notify.admin.error(`Stok tidak cukup untuk ${item.name}. Tersedia: ${currentStock}, Dibutuhkan: ${deductionQty}`);
+          setLoading(false);
+          return;
+        }
+      }
+
       const orderRef = collection(db, 'orders');
       const items = cart.map(item => ({
         id: item.id,
