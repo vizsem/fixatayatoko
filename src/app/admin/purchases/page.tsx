@@ -10,6 +10,7 @@ import {
   collection,
   doc,
   updateDoc,
+  addDoc,
   query,
   orderBy,
   serverTimestamp,
@@ -196,6 +197,23 @@ export default function AdminPurchases() {
                 date: serverTimestamp()
               });
               // -------------------------------------------
+            });
+          }
+        }
+      } else if (newStatus === 'DIBATALKAN') {
+        const p = purchases.find(pur => pur.id === id);
+        if (p) {
+          const method = p.paymentMethod;
+          const isPaid = p.paymentStatus === 'LUNAS';
+          if (isPaid && (method === 'CASH' || method === 'TRANSFER')) {
+            await addDoc(collection(db, 'capital_transactions'), {
+              date: serverTimestamp(),
+              type: 'INJECTION',
+              amount: p.total,
+              description: `Refund Pembatalan PO #${id}`,
+              recordedBy: auth.currentUser?.uid || 'system',
+              referenceId: id,
+              source: 'PURCHASE_CANCEL'
             });
           }
         }
