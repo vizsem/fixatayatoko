@@ -48,6 +48,21 @@ type MarketplaceAccount = {
   lastUpdated: any;
 };
 
+type MarketplaceLog = {
+  id: string;
+  accountId: string;
+  name: string;
+  storeName?: string;
+  type: 'ADJUST' | 'WITHDRAWAL' | 'DEPOSIT';
+  amount?: number;
+  activeChange?: number;
+  pendingChange?: number;
+  date: any;
+  recordedBy?: string;
+  note?: string;
+  balanceAfter?: number;
+};
+
 export default function CapitalPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<CapitalTransaction[]>([]);
@@ -71,6 +86,7 @@ export default function CapitalPage() {
   const [isAddMarketplaceModalOpen, setIsAddMarketplaceModalOpen] = useState(false);
   const [newPlatform, setNewPlatform] = useState('Shopee');
   const [newStoreName, setNewStoreName] = useState('');
+  const [marketplaceLogs, setMarketplaceLogs] = useState<MarketplaceLog[]>([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -210,12 +226,17 @@ export default function CapitalPage() {
         setMarketplaceAccounts(accounts);
       }
     });
+    const unsubMarketplaceLogs = onSnapshot(query(collection(db, 'marketplace_transactions'), orderBy('date', 'desc')), (snap) => {
+      const logs = snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketplaceLog));
+      setMarketplaceLogs(logs);
+    });
 
     return () => {
       unsubAuth();
       unsubTx();
       unsubLoans();
       unsubMarketplace();
+      unsubMarketplaceLogs();
     };
   }, []);
 
@@ -227,6 +248,8 @@ export default function CapitalPage() {
     try {
       const active = Number(activeBalance.replace(/\D/g, ''));
       const pending = Number(pendingBalance.replace(/\D/g, ''));
+      const activeDiff = active - (selectedAccount.activeBalance || 0);
+      const pendingDiff = pending - (selectedAccount.pendingBalance || 0);
       
       await setDoc(doc(db, 'marketplace_accounts', selectedAccount.id), {
         activeBalance: active,
@@ -234,6 +257,20 @@ export default function CapitalPage() {
         storeName: storeName,
         lastUpdated: serverTimestamp()
       }, { merge: true });
+
+      if (activeDiff !== 0 || pendingDiff !== 0) {
+        await addDoc(collection(db, 'marketplace_transactions'), {
+          accountId: selectedAccount.id,
+          name: selectedAccount.name,
+          storeName: storeName || selectedAccount.storeName || null,
+          type: 'ADJUST',
+          activeChange: activeDiff,
+          pendingChange: pendingDiff,
+          date: serverTimestamp(),
+          recordedBy: auth.currentUser?.uid || 'unknown',
+          note: 'Update saldo'
+        });
+      }
 
       toast.success('Saldo & Nama Toko diperbarui');
       setIsMarketplaceModalOpen(false);
@@ -312,6 +349,18 @@ export default function CapitalPage() {
         recordedBy: auth.currentUser?.uid || 'unknown',
         source: 'MARKETPLACE_WITHDRAWAL',
         marketplaceId: acc.id
+      });
+
+      await addDoc(collection(db, 'marketplace_transactions'), {
+        accountId: acc.id,
+        name: acc.name,
+        storeName: acc.storeName || null,
+        type: 'WITHDRAWAL',
+        amount: amount,
+        balanceAfter: acc.activeBalance - amount,
+        date: serverTimestamp(),
+        recordedBy: auth.currentUser?.uid || 'unknown',
+        note: 'Tarik ke Kas'
       });
 
       toast.success(`Berhasil menarik Rp${amount.toLocaleString()} ke Kas`);
@@ -649,6 +698,69 @@ export default function CapitalPage() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm flex flex-col overflow-hidden h-fit">
+          <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                <Store size={18} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Riwayat Dompet Marketplace</h3>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto max-h-[500px]">
+            {marketplaceLogs.length === 0 ? (
+              <div className="p-10 text-center text-slate-400">Belum ada riwayat.</div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Akun</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Jumlah</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Ket</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {marketplaceLogs.map((lg) => {
+                    const dateObj = lg.date ? (lg.date instanceof Timestamp ? lg.date.toDate() : new Date(lg.date)) : null;
+                    const isAdjust = lg.type === 'ADJUST';
+                    const adjustText =
+                      isAdjust
+                        ? `Aktif: ${((lg.activeChange || 0) >= 0 ? '+' : '') + (lg.activeChange || 0).toLocaleString('id-ID')} | Pending: ${((lg.pendingChange || 0) >= 0 ? '+' : '') + (lg.pendingChange || 0).toLocaleString('id-ID')}`
+                        : '';
+                    const amountText = !isAdjust ? (lg.amount || 0).toLocaleString('id-ID') : '';
+                    const amountClass = lg.type === 'WITHDRAWAL' ? 'text-rose-600' : 'text-emerald-600';
+                    return (
+                      <tr key={lg.id} className="group hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-bold text-slate-700">
+                            {dateObj ? dateObj.toLocaleDateString('id-ID') : '-'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-800">{lg.name}</span>
+                            {lg.storeName && <span className="text-[10px] font-black text-purple-600 uppercase">{lg.storeName}</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">{lg.type}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`text-xs font-black ${amountClass}`}>{lg.type === 'WITHDRAWAL' ? '-' : '+'} {amountText}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] font-bold text-slate-600">{isAdjust ? adjustText : (lg.note || '')}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
         
         {/* Left: Transaction History */}
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm flex flex-col overflow-hidden h-fit">
