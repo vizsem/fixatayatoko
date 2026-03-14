@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, orderBy, runTransaction } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
@@ -207,90 +207,99 @@ export default function MarketplaceOrdersPage() {
         }
       }
 
-      const orderRef = collection(db, 'orders');
-      const items = cart.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        unit: item.unit
-      }));
-
-      await (await import('firebase/firestore')).addDoc(orderRef, {
-        orderId: externalOrderId || null,
-        name: customerName || 'Marketplace',
-        userId: 'marketplace',
-        items,
-        subtotal,
-        shippingCost,
-        total,
-        status: 'SELESAI',
-        paymentStatus: 'PAID',
-        payment: {
-          method: paymentMethod
-        },
-        delivery: {
-          method: channel === 'SHOPEE' ? 'Shopee' : 'TikTok',
-          address: 'Marketplace'
-        },
-        channel,
-        createdAt: serverTimestamp()
-      });
-
-      for (const item of cart) {
-        const pRef = doc(db, 'products', item.id);
-        const pSnap = await getDoc(pRef);
-        const productData = pSnap.data();
-        const currentStock = productData?.stock != null ? productData.stock : 0;
-        const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-        const newStock = currentStock - deductionQty;
-
-        // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
-        const MAIN_WAREHOUSE_ID = 'gudang-utama';
-        const stockByWarehouse = productData?.stockByWarehouse || {};
-        const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
-        
-        let remainingToDeduct = deductionQty;
-        
-        // 1. Prioritas Gudang Utama
-        if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
-          const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
-          newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
-          remainingToDeduct -= deduct;
+      // Atomic transaction with idempotency key
+      const idempKey = externalOrderId ? `mp:${channel}:${externalOrderId}` : null;
+      await runTransaction(db, async (tx) => {
+        // Idempotency check
+        if (idempKey) {
+          const keyRef = doc(db, 'marketplace_order_keys', idempKey);
+          const keySnap = await tx.get(keyRef);
+          if (keySnap.exists()) {
+            throw new Error('Order marketplace dengan ID ini sudah diproses.');
+          }
+          tx.set(keyRef, {
+            createdAt: serverTimestamp(),
+            channel,
+            externalOrderId,
+            by: auth.currentUser?.uid || 'admin'
+          });
         }
-        
-        // 2. Gudang Lainnya (Jika masih ada sisa yang harus dikurangi)
-        if (remainingToDeduct > 0) {
-          for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
-            if (whId === MAIN_WAREHOUSE_ID) continue;
-            if (remainingToDeduct <= 0) break;
-            
-            const deduct = Math.min(qty as number, remainingToDeduct);
-            newStockByWarehouse[whId] = (qty as number) - deduct;
+
+        // Create order doc
+        const orderDocRef = doc(collection(db, 'orders'));
+        const items = cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          unit: item.unit
+        }));
+
+        tx.set(orderDocRef, {
+          orderId: externalOrderId || null,
+          name: customerName || 'Marketplace',
+          userId: 'marketplace',
+          items,
+          subtotal,
+          shippingCost,
+          total,
+          status: 'SELESAI',
+          paymentStatus: 'PAID',
+          payment: { method: paymentMethod },
+          delivery: {
+            method: channel === 'SHOPEE' ? 'Shopee' : 'TikTok',
+            address: 'Marketplace'
+          },
+          channel,
+          createdAt: serverTimestamp()
+        });
+
+        // Deduct stocks and write inventory logs
+        for (const item of cart) {
+          const pRef = doc(db, 'products', item.id);
+          const pSnap = await tx.get(pRef);
+          const productData = pSnap.data() as any;
+          const currentStock = productData?.stock != null ? Number(productData.stock) : 0;
+          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
+          if (currentStock < deductionQty) {
+            throw new Error(`Stok tidak cukup untuk ${item.name}. Tersedia: ${currentStock}, Dibutuhkan: ${deductionQty}`);
+          }
+          const MAIN_WAREHOUSE_ID = 'gudang-utama';
+          const stockByWarehouse = productData?.stockByWarehouse || {};
+          const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+          let remainingToDeduct = deductionQty;
+          if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
+            const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
+            newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
             remainingToDeduct -= deduct;
           }
+          if (remainingToDeduct > 0) {
+            for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
+              if (whId === MAIN_WAREHOUSE_ID) continue;
+              if (remainingToDeduct <= 0) break;
+              const deduct = Math.min(qty as number, remainingToDeduct);
+              newStockByWarehouse[whId] = (qty as number) - deduct;
+              remainingToDeduct -= deduct;
+            }
+          }
+          const newStock = currentStock - deductionQty;
+          tx.update(pRef, { stock: newStock, stockByWarehouse: newStockByWarehouse });
+
+          const logRef = doc(collection(db, 'inventory_logs'));
+          tx.set(logRef, {
+            productId: item.id,
+            productName: item.name,
+            type: 'KELUAR',
+            amount: deductionQty,
+            adminId: auth.currentUser?.uid || 'admin',
+            date: serverTimestamp(),
+            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
+            source: 'marketplace',
+            prevStock: currentStock,
+            nextStock: newStock
+          });
         }
-
-        await updateDoc(pRef, {
-          stock: newStock,
-          stockByWarehouse: newStockByWarehouse
-        });
-
-        // Catat log inventory agar muncul di Audit
-        await (await import('firebase/firestore')).addDoc(collection(db, 'inventory_logs'), {
-          productId: item.id,
-          productName: item.name,
-          type: 'KELUAR',
-          amount: deductionQty,
-          adminId: auth.currentUser?.uid || 'admin',
-          date: serverTimestamp(),
-          note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
-          source: 'marketplace',
-          prevStock: currentStock,
-          nextStock: newStock,
-          fromWarehouseId: 'gudang-utama' // Asumsi utama diambil dari gudang utama, tapi log ini general
-        });
-      }
+      });
 
       notify.admin.success('Order marketplace berhasil disimpan.');
       setCart([]);

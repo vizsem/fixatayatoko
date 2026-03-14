@@ -87,6 +87,8 @@ export default function CapitalPage() {
   const [newPlatform, setNewPlatform] = useState('Shopee');
   const [newStoreName, setNewStoreName] = useState('');
   const [marketplaceLogs, setMarketplaceLogs] = useState<MarketplaceLog[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -638,6 +640,12 @@ export default function CapitalPage() {
                className="bg-purple-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-200"
              >
                <Plus size={14} /> Tambah Akun
+             </button>
+             <button
+               onClick={() => setIsImportModalOpen(true)}
+               className="bg-white text-purple-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-50 transition-all flex items-center gap-2 border border-purple-200"
+             >
+               Import Settlement
              </button>
            </div>
         </div>
@@ -1320,6 +1328,152 @@ export default function CapitalPage() {
           </div>
         </div>
       )}
+  {/* Import Settlement Modal */}
+  {isImportModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl p-6">
+        <h2 className="text-xl font-black text-slate-800 mb-4">Import Settlement Marketplace (CSV)</h2>
+        <p className="text-xs text-slate-500 mb-4">Format kolom: accountId,name,storeName,active_change,pending_change,fee,payout</p>
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+          className="w-full p-3 bg-slate-50 rounded-xl mb-4"
+        />
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => setIsImportModalOpen(false)}
+            className="py-2 px-4 bg-slate-100 text-slate-600 font-bold rounded-xl"
+          >
+            Batal
+          </button>
+          <button
+            onClick={async () => {
+              if (!importFile) { toast.error('Pilih file CSV dulu'); return; }
+              setIsSubmitting(true);
+              try {
+                const text = await importFile.text();
+                const lines = text.split(/\\r?\\n/).filter(l => l.trim().length > 0);
+                const [header, ...rows] = lines;
+                const cols = header.split(',').map(c => c.trim().toLowerCase());
+                const idx: Record<string, number> = {
+                  accountId: cols.indexOf('accountid'),
+                  name: cols.indexOf('name'),
+                  storeName: cols.indexOf('storename'),
+                  active: cols.indexOf('active_change'),
+                  pending: cols.indexOf('pending_change'),
+                  fee: cols.indexOf('fee'),
+                  payout: cols.indexOf('payout'),
+                } as any;
+                for (const row of rows) {
+                  const cells = row.split(',').map(c => c.trim());
+                  const accountId = idx.accountId >= 0 ? cells[idx.accountId] : '';
+                  const name = idx.name >= 0 ? cells[idx.name] : '';
+                  const storeName = idx.storeName >= 0 ? cells[idx.storeName] : '';
+                  const activeDelta = idx.active >= 0 ? Number(cells[idx.active] || 0) : 0;
+                  const pendingDelta = idx.pending >= 0 ? Number(cells[idx.pending] || 0) : 0;
+                  const fee = idx.fee >= 0 ? Number(cells[idx.fee] || 0) : 0;
+                  const payout = idx.payout >= 0 ? Number(cells[idx.payout] || 0) : 0;
+
+                  // Ensure account exists
+                  const accKey = accountId || name.toLowerCase();
+                  const accRef = doc(db, 'marketplace_accounts', accKey);
+                  const accSnap = await getDoc(accRef);
+                  const accData = accSnap.data() || { name: name || accKey, activeBalance: 0, pendingBalance: 0 };
+
+                  // Apply active/pending adjustments
+                  let nextActive = Number(accData.activeBalance || 0) + (activeDelta || 0);
+                  let nextPending = Number(accData.pendingBalance || 0) + (pendingDelta || 0);
+                  if (fee > 0) nextActive = Math.max(0, nextActive - fee);
+                  if (payout > 0) nextActive = Math.max(0, nextActive - payout);
+
+                  await setDoc(accRef, {
+                    name: name || accKey,
+                    storeName: storeName || null,
+                    activeBalance: nextActive,
+                    pendingBalance: nextPending,
+                    lastUpdated: serverTimestamp()
+                  }, { merge: true });
+
+                  // Log adjust
+                  if ((activeDelta || 0) !== 0 || (pendingDelta || 0) !== 0) {
+                    await addDoc(collection(db, 'marketplace_transactions'), {
+                      accountId: accKey,
+                      name: name || accKey,
+                      storeName: storeName || null,
+                      type: 'ADJUST',
+                      activeChange: activeDelta || 0,
+                      pendingChange: pendingDelta || 0,
+                      date: serverTimestamp(),
+                      recordedBy: auth.currentUser?.uid || 'import',
+                      note: 'Import Settlement'
+                    });
+                  }
+                  if (fee > 0) {
+                    await addDoc(collection(db, 'marketplace_transactions'), {
+                      accountId: accKey,
+                      name: name || accKey,
+                      storeName: storeName || null,
+                      type: 'WITHDRAWAL',
+                      amount: fee,
+                      date: serverTimestamp(),
+                      recordedBy: auth.currentUser?.uid || 'import',
+                      note: 'Biaya Platform'
+                    });
+                    await addDoc(collection(db, 'operational_expenses'), {
+                      title: `Biaya Platform ${name || accKey}`,
+                      amount: fee,
+                      type: 'expense',
+                      category: 'Marketplace Fee',
+                      createdAt: serverTimestamp()
+                    });
+                  }
+                  if (payout > 0) {
+                    // Tambah kas
+                    const cashRef = doc(db, 'store_settings', 'finance');
+                    const cashSnap = await getDoc(cashRef);
+                    const cash = cashSnap.exists() ? (cashSnap.data().cashBalance || 0) : 0;
+                    await setDoc(cashRef, { cashBalance: cash + payout }, { merge: true });
+                    // Modal injection & log
+                    await addDoc(collection(db, 'capital_transactions'), {
+                      date: serverTimestamp(),
+                      type: 'INJECTION',
+                      amount: payout,
+                      description: `Settlement ${name || accKey}`,
+                      recordedBy: auth.currentUser?.uid || 'import',
+                      source: 'MARKETPLACE_SETTLEMENT',
+                      marketplaceId: accKey
+                    });
+                    await addDoc(collection(db, 'marketplace_transactions'), {
+                      accountId: accKey,
+                      name: name || accKey,
+                      storeName: storeName || null,
+                      type: 'WITHDRAWAL',
+                      amount: payout,
+                      date: serverTimestamp(),
+                      recordedBy: auth.currentUser?.uid || 'import',
+                      note: 'Settlement Payout'
+                    });
+                  }
+                }
+                toast.success('Import selesai');
+                setIsImportModalOpen(false);
+                setImportFile(null);
+              } catch (err) {
+                console.error(err);
+                toast.error('Gagal import CSV');
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            className="py-2 px-4 bg-purple-600 text-white font-bold rounded-xl"
+          >
+            Proses CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
     </div>
   );
 }

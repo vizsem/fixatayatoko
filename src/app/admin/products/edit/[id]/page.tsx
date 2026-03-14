@@ -323,54 +323,30 @@ export default function EditProductPage() {
         }
       });
 
-      // Prepare Stock Data
-      const totalStock = Number(formData.Stok || 0);
-      // Jika warehouseId dipilih, update stock spesifik gudang itu
-      // Jika tidak, biarkan stockByWarehouse apa adanya (atau update jika logic lain)
-      // Disini kita ikuti logic Add Page: jika ada warehouseId, set stockByWarehouse[id] = totalStock
-      // TAPI ini Edit Page, kita harus hati-hati menimpa stockByWarehouse.
-      // Kita update stockByWarehouse hanya jika warehouseId dipilih.
+      // Prepare Stock Data (edit per-gudang)
+      const newStocks: Record<string, number> = { ...(formData.stockByWarehouse || {}) };
+      const totalStock = Object.values(newStocks).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
       
-      const newStocks = { ...formData.stockByWarehouse };
-      if (formData.warehouseId) {
-          newStocks[formData.warehouseId] = totalStock;
-      }
-      
-      // Recalculate total stock from all warehouses if using warehouse system
-      // Or just trust the input if simple system.
-      // Let's trust the input 'Stok' as the primary source of truth for the edited context,
-      // but update the breakdown if warehouse is selected.
-      
-      // LOG STOCK CHANGES
+      // LOG STOCK CHANGES untuk setiap gudang yang berubah
       const logEntries: any[] = [];
-      
-      // Check specific warehouse change if selected
-      if (formData.warehouseId) {
-          const whId = formData.warehouseId;
-          const oldVal = Number(oldStocks[whId] || 0);
-          const newVal = totalStock; // Asumsi input Stok adalah stok untuk gudang yang dipilih
-          
-          if (oldVal !== newVal) {
-             const whName = warehouses.find(w => w.id === whId)?.name || whId;
-             logEntries.push({
-                productId: id,
-                productName: formData.Nama.toUpperCase(),
-                warehouseId: whId,
-                warehouseName: whName,
-                previousStock: oldVal,
-                newStock: newVal,
-                change: newVal - oldVal,
-                type: 'EDIT_ADMIN',
-                adminEmail: auth.currentUser?.email || 'system',
-                createdAt: serverTimestamp(),
-             });
-          }
-      } else {
-          // If no warehouse selected, we assume 'Stok' is global stock update? 
-          // Or we iterate all warehouses if user edited them individually?
-          // Current UI only allows selecting one warehouse to set stock.
-          // Let's check if global stock changed significantly without warehouse context
-          // For now, let's stick to the Add Page logic which assigns stock to a warehouse.
+      for (const [whId, nv] of Object.entries(newStocks)) {
+        const newVal = Number(nv || 0);
+        const oldVal = Number((oldStocks as any)[whId] || 0);
+        if (oldVal !== newVal) {
+          const whName = warehouses.find((w) => w.id === whId)?.name || whId;
+          logEntries.push({
+            productId: id,
+            productName: (formData.Nama || '').toString().toUpperCase(),
+            warehouseId: whId,
+            warehouseName: whName,
+            previousStock: oldVal,
+            newStock: newVal,
+            change: newVal - oldVal,
+            type: 'EDIT_ADMIN',
+            adminEmail: auth.currentUser?.email || 'system',
+            createdAt: serverTimestamp(),
+          });
+        }
       }
 
       const updatePayload = {
@@ -602,12 +578,27 @@ export default function EditProductPage() {
             <div className="mt-6 pt-6 border-t border-gray-100">
               <h4 className="text-[10px] font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {warehouses.map(w => {
-                  const qty = formData.stockByWarehouse?.[w.id] || 0;
+                {warehouses.map((w) => {
+                  const qty = Number(formData.stockByWarehouse?.[w.id] || 0);
                   return (
-                    <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">{w.name}</span>
-                      <span className={`text-xs font-black ${qty > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{qty}</span>
+                    <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">{w.name}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        className="w-full bg-white p-2 rounded-lg text-xs font-black text-gray-800 outline-none border border-gray-200"
+                        value={qty}
+                        onChange={(e) => {
+                          const nextVal = Number(e.target.value || 0);
+                          const nextMap = { ...(formData.stockByWarehouse || {}) , [w.id]: nextVal };
+                          const nextTotal = Object.values(nextMap).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+                          setFormData({
+                            ...formData,
+                            stockByWarehouse: nextMap,
+                            Stok: nextTotal
+                          });
+                        }}
+                      />
                     </div>
                   );
                 })}
