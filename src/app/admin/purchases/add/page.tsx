@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -12,7 +12,7 @@ import {
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
-import { type NormalizedProduct, type UnitOption } from '@/lib/normalize';
+import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
 
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
@@ -45,6 +45,8 @@ export default function AddPurchase() {
   const [shippingCost, setShippingCost] = useState(0);
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
 
 
   useEffect(() => {
@@ -106,6 +108,51 @@ export default function AddPurchase() {
     setSearchProduct('');
   };
 
+  const handleScan = async (code: string) => {
+    try {
+      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
+      const s1 = await getDocs(q1);
+      let p: any | null = null;
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        p = { id: d.id, ...d.data() };
+      } else {
+        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
+        const s2 = await getDocs(q2);
+        if (!s2.empty) {
+          const d2 = s2.docs[0];
+          p = { id: d2.id, ...d2.data() };
+        }
+      }
+      if (!p) {
+        notify.admin.error('Barcode tidak ditemukan');
+        return;
+      }
+      const normalized: NormalizedProduct = normalizeProduct(p.id, p);
+      addToCart(normalized);
+      setShowScanner(false);
+    } catch {
+      notify.admin.error('Gagal membaca barcode');
+    }
+  };
+
+  useEffect(() => {
+    let scanner: any = null;
+    const init = async () => {
+      if (!showScanner || scannerReady) return;
+      const mod: any = await import('html5-qrcode');
+      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
+      scanner = new Html5QrcodeScanner('po-scanner', { fps: 10, qrbox: 200 }, false);
+      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
+      setScannerReady(true);
+    };
+    init();
+    return () => {
+      const el = document.getElementById('po-scanner');
+      if (el) el.innerHTML = '';
+      setScannerReady(false);
+    };
+  }, [showScanner, scannerReady]);
 
   const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));
 
@@ -348,6 +395,16 @@ export default function AddPurchase() {
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(!showScanner)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black text-white rounded-xl text-[10px] font-black uppercase"
+                >
+                  Scan
+                </button>
+                {showScanner && (
+                  <div id="po-scanner" className="mt-3 rounded-2xl overflow-hidden border border-gray-100" />
+                )}
                 {/* Search Results Dropdown */}
                 {searchProduct && (
                   <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">

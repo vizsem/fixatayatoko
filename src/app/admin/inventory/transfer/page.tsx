@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { addInventoryLog } from '@/lib/inventory';
+import { transferStockTx } from '@/lib/inventory';
 
 import {
   collection,
   getDocs,
   doc,
-  updateDoc,
   serverTimestamp,
   query,
-  orderBy
+  orderBy,
+  runTransaction
 } from 'firebase/firestore';
 
 import {
@@ -112,34 +112,24 @@ export default function StockTransferPage() {
 
     setLoading(true);
     try {
-      const productRef = doc(db, 'products', selectedProduct.id);
-      const newStockByWarehouse = { ...selectedProduct.stockByWarehouse };
-
-      // Update distribusi stok
-      newStockByWarehouse[fromWarehouse] = (newStockByWarehouse[fromWarehouse] || 0) - qty;
-      newStockByWarehouse[toWarehouse] = (newStockByWarehouse[toWarehouse] || 0) + qty;
-
-      await updateDoc(productRef, { stockByWarehouse: newStockByWarehouse });
-
-      // Catat Log
-      await addInventoryLog({
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        type: 'MUTASI',
-        amount: qty,
-        adminId: auth.currentUser?.uid || 'system',
-        source: 'TRANSFER',
-        fromWarehouseId: fromWarehouse,
-        toWarehouseId: toWarehouse,
-        note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
+      await runTransaction(db, async (tx) => {
+        await transferStockTx(tx, {
+          productId: selectedProduct.id,
+          amount: qty,
+          fromWarehouseId: fromWarehouse,
+          toWarehouseId: toWarehouse,
+          adminId: auth.currentUser?.uid || 'system',
+          source: 'TRANSFER',
+          note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
+        });
       });
 
       setStatus({ type: 'success', msg: 'Transfer stok berhasil!' });
       setQty(0);
       setSearchTerm('');
-    } catch {
-      setStatus({ type: 'error', msg: 'Gagal melakukan mutasi.' });
-
+    } catch (err: any) {
+      console.error(err);
+      setStatus({ type: 'error', msg: err.message || 'Gagal melakukan mutasi.' });
     } finally {
       setLoading(false);
     }

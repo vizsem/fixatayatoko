@@ -33,6 +33,10 @@ export default function StockLogsPage() {
 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [warehouseFilter, setWarehouseFilter] = useState('');
+  const [adminFilter, setAdminFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     // Ambil 100 riwayat terbaru
@@ -55,10 +59,16 @@ export default function StockLogsPage() {
     return () => unsubscribe();
   }, []);
 
-  const filteredLogs = logs.filter(log =>
-    log.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.adminEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = logs.filter(log => {
+    const matchesSearch = log.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.adminEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesWarehouse = warehouseFilter ? (log.warehouseName || '').toLowerCase() === warehouseFilter.toLowerCase() : true;
+    const matchesAdmin = adminFilter ? (log.adminEmail || '').toLowerCase().includes(adminFilter.toLowerCase()) : true;
+    const t = log.createdAt ? log.createdAt.toDate().getTime() : 0;
+    const startOk = startDate ? t >= new Date(startDate).getTime() : true;
+    const endOk = endDate ? t <= new Date(endDate).getTime() + 86400000 - 1 : true;
+    return matchesSearch && matchesWarehouse && matchesAdmin && startOk && endOk;
+  });
 
   return (
     <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
@@ -88,6 +98,34 @@ export default function StockLogsPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl font-black text-[10px] uppercase shadow-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+            />
+          </div>
+          <div className="flex gap-2 w-full md:w-auto">
+            <input
+              type="text"
+              placeholder="Filter Admin"
+              value={adminFilter}
+              onChange={(e) => setAdminFilter(e.target.value)}
+              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <input
+              type="text"
+              placeholder="Filter Gudang"
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
         </div>

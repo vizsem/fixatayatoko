@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { addInventoryLog } from '@/lib/inventory';
+import { adjustStockTx } from '@/lib/inventory';
 
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
@@ -12,7 +12,8 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
-  getDoc
+  getDoc,
+  runTransaction
 } from 'firebase/firestore';
 import {
   ArrowLeft,
@@ -58,64 +59,42 @@ export default function StockOpnamePage() {
     try {
       const productRef = doc(db, 'products', selectedProduct.id);
 
-      // A. Update stok di tabel produk sesuai fisik
-      const pSnap = await getDoc(productRef);
-      const productData = pSnap.data();
-      
-      // Update Stok per Gudang (Prioritas Gudang Utama)
-      // Asumsi Opname dilakukan di Gudang Utama untuk saat ini, atau perlu selector Gudang di UI Opname
-      // Default ke gudang-utama jika belum ada selector
-      const MAIN_WAREHOUSE_ID = 'gudang-utama';
-      const stockByWarehouse = productData?.stockByWarehouse || {};
-      const newStockByWarehouse = { ...stockByWarehouse };
-      
-      // Jika opname, kita set stok gudang utama agar total match, atau idealnya user pilih gudang
-      // Simplified logic: adjust main warehouse to match the difference
-      // If diff > 0 (excess), add to main warehouse
-      // If diff < 0 (missing), deduct from main warehouse
-      
-      const currentMainStock = newStockByWarehouse[MAIN_WAREHOUSE_ID] || 0;
-      newStockByWarehouse[MAIN_WAREHOUSE_ID] = currentMainStock + diff;
-      
-      // Safety check: ensure no negative stock if possible, but opname is truth
-      if (newStockByWarehouse[MAIN_WAREHOUSE_ID] < 0) newStockByWarehouse[MAIN_WAREHOUSE_ID] = 0;
+      await runTransaction(db, async (tx) => {
+        const pSnap = await tx.get(productRef);
+        if (!pSnap.exists()) throw new Error('Produk tidak ditemukan');
+        
+        const data = pSnap.data();
+        const currentTotal = Number(data.stock || 0);
+        const stockByWarehouse = data.stockByWarehouse || {};
+        const MAIN_WAREHOUSE_ID = 'gudang-utama';
+        const currentMain = Number(stockByWarehouse[MAIN_WAREHOUSE_ID] || 0);
 
-      await updateDoc(productRef, {
-        stock: physicalStock,
-        stockByWarehouse: newStockByWarehouse
+        // Hitung selisih dari Total Fisik vs Total DB
+        const totalDiff = physicalStock - currentTotal;
+        
+        // Bebankan selisih ke Gudang Utama
+        let newMainStock = currentMain + totalDiff;
+        if (newMainStock < 0) newMainStock = 0; // Safety clamp
+
+        await adjustStockTx(tx, {
+          productId: selectedProduct.id,
+          newStock: newMainStock,
+          warehouseId: MAIN_WAREHOUSE_ID,
+          adminId: auth.currentUser?.uid || 'system',
+          source: 'OPNAME',
+          note: note || (totalDiff >= 0 ? 'Kelebihan barang (Opname)' : 'Barang kurang/hilang (Opname)')
+        });
       });
 
-      // B. Catat Riwayat Mutasi sebagai OPNAME
-      await addInventoryLog({
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        type: diff >= 0 ? 'MASUK' : 'KELUAR',
-        amount: Math.abs(diff),
-        adminId: auth.currentUser?.uid || 'system',
-        source: 'OPNAME',
-        note: `Opname: ${note || (diff >= 0 ? 'Kelebihan barang' : 'Barang kurang/hilang')}`,
-        toWarehouseId: diff >= 0 ? 'gudang-utama' : undefined,
-        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined,
-        prevStock: selectedProduct.stock,
-        nextStock: physicalStock
-      });
-
-      setStatus({ type: 'success', msg: 'Stok fisik berhasil disinkronkan!' });
-      notify.admin.success('Stok fisik berhasil disinkronkan!');
-
-      // Reset Form
-      setTimeout(() => {
-        setSelectedProduct(null);
-        setSearchTerm('');
-        setPhysicalStock(0);
-        setNote('');
-      }, 1500);
-
-    } catch {
-      setStatus({ type: 'error', msg: 'Gagal memproses opname.' });
-      notify.admin.error('Gagal memproses opname.');
+      setStatus({ type: 'success', msg: 'Stok berhasil disesuaikan!' });
+      setPhysicalStock(0);
+      setNote('');
+      setSelectedProduct(null);
+      setSearchTerm('');
+    } catch (err: any) {
+      console.error(err);
+      setStatus({ type: 'error', msg: err.message || 'Gagal update stok.' });
     } finally {
-
       setLoading(false);
     }
   };

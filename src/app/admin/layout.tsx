@@ -10,7 +10,7 @@ import {
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
-  Banknote, Bell, Landmark, MessageCircle, Mail
+  Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw
 } from 'lucide-react';
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp, where } from 'firebase/firestore';
@@ -110,6 +110,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       group: "Keuangan & Operasional", items: [
         { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
         { name: 'Modal & Aset', href: '/admin/capital', icon: Landmark },
+        { name: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard },
+      ]
+    },
+    {
+      group: "Layanan & Purna Jual", items: [
+        { name: 'Retur Barang', href: '/admin/returns', icon: RefreshCcw },
       ]
     },
     {

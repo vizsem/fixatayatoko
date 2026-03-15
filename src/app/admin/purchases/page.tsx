@@ -22,6 +22,8 @@ import {
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
 import notify from '@/lib/notify';
+import { addStockTx } from '@/lib/inventory';
+import { postJournal } from '@/lib/ledger';
 import { Toaster } from 'react-hot-toast';
 
 import {
@@ -51,6 +53,7 @@ type Purchase = {
   total: number;
   paymentMethod: string;
   paymentStatus: 'LUNAS' | 'HUTANG' | 'DP';
+  paidAmount?: number; // Total amount paid so far
   dueDate?: string;
   notes?: string;
   status: 'MENUNGGU' | 'DITERIMA' | 'DIBATALKAN';
@@ -66,6 +69,10 @@ export default function AdminPurchases() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all'); // State untuk filter pembayaran
+  const [supplierFilter, setSupplierFilter] = useState<string>('');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -91,8 +98,30 @@ export default function AdminPurchases() {
     if (paymentFilter !== 'all') {
       result = result.filter(p => p.paymentStatus === paymentFilter);
     }
+    if (supplierFilter) {
+      const s = supplierFilter.toLowerCase();
+      result = result.filter(p => (p.supplierName || '').toLowerCase().includes(s));
+    }
+    if (warehouseFilter) {
+      const w = warehouseFilter.toLowerCase();
+      result = result.filter(p => (p.warehouseName || '').toLowerCase().includes(w));
+    }
+    if (startDate) {
+      const start = new Date(startDate).getTime();
+      result = result.filter(p => {
+        const t = p.createdAt ? new Date(p.createdAt).getTime() : 0;
+        return t >= start;
+      });
+    }
+    if (endDate) {
+      const end = new Date(endDate).getTime() + 86400000 - 1;
+      result = result.filter(p => {
+        const t = p.createdAt ? new Date(p.createdAt).getTime() : 0;
+        return t <= end;
+      });
+    }
     return result;
-  }, [purchases, searchTerm, statusFilter, paymentFilter]);
+  }, [purchases, searchTerm, statusFilter, paymentFilter, supplierFilter, warehouseFilter, startDate, endDate]);
 
 
   useEffect(() => {
@@ -128,88 +157,89 @@ export default function AdminPurchases() {
       ? 'Konfirmasi barang diterima? Stok akan bertambah otomatis.'
       : 'Batalkan transaksi ini?';
 
-
     if (!confirm(confirmMsg)) return;
 
     try {
-      if (newStatus === 'DITERIMA') {
-        const p = purchases.find(pur => pur.id === id);
-        if (p) {
-          for (const item of p.items) {
-            const productRef = doc(db, 'products', item.id);
-            await runTransaction(db, async (tx) => {
-              const snap = await tx.get(productRef);
-              if (!snap.exists()) return;
+      await runTransaction(db, async (tx) => {
+        // 1. Idempotency Check
+        const keyRef = doc(db, 'action_keys', `purchase:${id}:${newStatus}`);
+        const keySnap = await tx.get(keyRef);
+        if (keySnap.exists()) throw new Error('Aksi ini sudah diproses sebelumnya.');
 
-              const curData = snap.data() as Record<string, unknown>;
+        // 2. Lock Purchase Doc
+        const purchaseRef = doc(db, 'purchases', id);
+        const pSnap = await tx.get(purchaseRef);
+        if (!pSnap.exists()) throw new Error('Data pembelian tidak ditemukan.');
+        const pData = pSnap.data() as Purchase;
+
+        if (pData.status !== 'MENUNGGU') throw new Error('Status transaksi bukan MENUNGGU.');
+
+        // 3. Process Logic
+        if (newStatus === 'DITERIMA') {
+          for (const item of pData.items) {
+            const productRef = doc(db, 'products', item.id);
+            const prodSnap = await tx.get(productRef);
+            
+            if (prodSnap.exists()) {
+              const curData = prodSnap.data() as Record<string, any>;
               const currentStock = Number(curData.stock || curData.Stok || 0);
-              
-              // Handle conversion (Satuan Beli -> Satuan Dasar)
               const conversion = Number(item.conversion || 1);
               const qtyInUnit = Number(item.quantity || 0);
               const pricePerUnit = Number(item.purchasePrice || 0);
-
-              const incomingQtyPcs = qtyInUnit * conversion; // Total PCS
-              const incomingCostPerPcs = conversion > 0 ? (pricePerUnit / conversion) : 0;
-
-              const newStock = currentStock + incomingQtyPcs;
-
+              
+              const incomingQtyPcs = qtyInUnit * conversion;
+              const incomingCostPerPcs = conversion > 0 ? (pricePerUnit / conversion) : pricePerUnit;
+              
               const currentCostPerPcs = Number(curData.Modal || curData.purchasePrice || 0);
               const effectiveOldCost = currentCostPerPcs > 0 ? currentCostPerPcs : incomingCostPerPcs;
               
-              // Hitung Average Cost Baru
+              const newStock = currentStock + incomingQtyPcs;
               const nextAvgCost = newStock > 0
                 ? Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock)
                 : Math.round(incomingCostPerPcs);
 
-              const curByWarehouse = (curData.stockByWarehouse && typeof curData.stockByWarehouse === 'object')
-                ? (curData.stockByWarehouse as Record<string, number>)
-                : {};
-              const whKey = p.warehouseId || 'gudang-utama';
-              const whStock = Number(curByWarehouse[whKey] || 0) + incomingQtyPcs;
+              const whKey = pData.warehouseId || 'gudang-utama';
+              
+              // Atomic Stock Add
+              await addStockTx(tx, {
+                productId: item.id,
+                amount: incomingQtyPcs,
+                warehouseId: whKey,
+                adminId: auth.currentUser?.uid || 'system',
+                note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
+                source: 'PURCHASE'
+              });
 
+              // Atomic Cost Update (Merged)
               tx.update(productRef, {
-                stock: newStock,
-                Stok: newStock,
-                stockByWarehouse: {
-                  ...curByWarehouse,
-                  [whKey]: whStock
-                },
                 purchasePrice: nextAvgCost,
                 Modal: nextAvgCost,
                 hargaBeli: nextAvgCost,
                 updatedAt: serverTimestamp()
               });
-
-              // --- ADD INVENTORY LOG INSIDE TRANSACTION ---
-              const logRef = doc(collection(db, 'inventory_logs'));
-              tx.set(logRef, {
-                productId: item.id,
-                productName: item.name,
-                type: 'MASUK',
-                amount: incomingQtyPcs,
-                adminId: auth.currentUser?.uid || 'system',
-                source: 'PURCHASE',
-                referenceId: id, // Purchase ID
-                supplierId: p.supplierId,
-                note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
-                toWarehouseId: whKey,
-                date: serverTimestamp()
-              });
-              // -------------------------------------------
-            });
+            }
           }
-        }
-      } else if (newStatus === 'DIBATALKAN') {
-        const p = purchases.find(pur => pur.id === id);
-        if (p) {
-          const method = p.paymentMethod;
-          const isPaid = p.paymentStatus === 'LUNAS';
+
+          // DOUBLE ENTRY: Terima Barang (Inventory bertambah, tapi Hutang/Kas berkurang)
+          // Asumsi: Saat barang diterima, kita catat nilai barang tersebut.
+          await postJournal({
+            debitAccount: 'Inventory',
+            creditAccount: pData.paymentStatus === 'LUNAS' ? 'Cash' : 'AccountsPayable',
+            amount: pData.total,
+            memo: `Penerimaan Barang PO #${id}`,
+            refType: 'PURCHASE',
+            refId: id
+          }, tx);
+
+        } else if (newStatus === 'DIBATALKAN') {
+          const method = pData.paymentMethod;
+          const isPaid = pData.paymentStatus === 'LUNAS';
           if (isPaid && (method === 'CASH' || method === 'TRANSFER')) {
-            await addDoc(collection(db, 'capital_transactions'), {
+            const refundRef = doc(collection(db, 'capital_transactions'));
+            tx.set(refundRef, {
               date: serverTimestamp(),
               type: 'INJECTION',
-              amount: p.total,
+              amount: pData.total,
               description: `Refund Pembatalan PO #${id}`,
               recordedBy: auth.currentUser?.uid || 'system',
               referenceId: id,
@@ -217,39 +247,72 @@ export default function AdminPurchases() {
             });
           }
         }
-      }
-      await updateDoc(doc(db, 'purchases', id), { status: newStatus, updatedAt: serverTimestamp() });
-      notify.admin.success(newStatus === 'DITERIMA' ? 'Pembelian dikonfirmasi, stok bertambah' : 'Pembelian dibatalkan');
-    } catch {
-      notify.admin.error('Gagal update status');
-    }
 
+        // 4. Update Status & Write Idempotency Key
+        tx.update(purchaseRef, { status: newStatus, updatedAt: serverTimestamp() });
+        tx.set(keyRef, { createdAt: serverTimestamp(), by: auth.currentUser?.uid || 'admin' });
+      });
+
+      notify.admin.success(newStatus === 'DITERIMA' ? 'Pembelian dikonfirmasi, stok bertambah' : 'Pembelian dibatalkan');
+    } catch (err: any) {
+      console.error(err);
+      notify.admin.error(err.message || 'Gagal update status');
+    }
   };
 
   const handlePayment = async (purchaseId: string, amountPaid: number) => {
     if (!purchaseId) return;
+    const p = purchases.find(pur => pur.id === purchaseId);
+    if (!p) return;
 
     try {
-      const purchaseRef = doc(db, 'purchases', purchaseId);
-      await updateDoc(purchaseRef, {
-        paymentStatus: 'LUNAS',
-        paidAmount: amountPaid,
-        paymentDate: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      await runTransaction(db, async (tx) => {
+        const purchaseRef = doc(db, 'purchases', purchaseId);
+        const pSnap = await tx.get(purchaseRef);
+        if (!pSnap.exists()) throw new Error('Data pembelian tidak ditemukan.');
+        
+        const pData = pSnap.data() as Purchase;
+        const currentPaid = pData.paidAmount || 0;
+        const newPaid = currentPaid + amountPaid;
+        const isFullyPaid = newPaid >= pData.total;
+
+        tx.update(purchaseRef, {
+          paymentStatus: isFullyPaid ? 'LUNAS' : 'HUTANG',
+          paidAmount: newPaid,
+          paymentDate: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // DOUBLE ENTRY: Payment of Accounts Payable
+        await postJournal({
+          debitAccount: 'AccountsPayable',
+          creditAccount: 'Cash',
+          amount: amountPaid,
+          memo: `Pembayaran ${isFullyPaid ? 'Lunas' : 'Cicilan'} PO #${purchaseId}`,
+          refType: 'PURCHASE_PAYMENT',
+          refId: purchaseId
+        }, tx);
       });
 
-      // Update local state
-      setPurchases(prevPurchases =>
-        prevPurchases.map(p =>
-          p.id === purchaseId ? { ...p, paymentStatus: 'LUNAS' } : p
-        )
-      );
+      // Refresh local state to reflect partial payment
+      const pData = purchases.find(p => p.id === purchaseId);
+      if (pData) {
+        const currentPaid = pData.paidAmount || 0;
+        const newPaid = currentPaid + amountPaid;
+        const isFullyPaid = newPaid >= pData.total;
+        
+        setPurchases(prevPurchases =>
+          prevPurchases.map(p =>
+            p.id === purchaseId ? { ...p, paymentStatus: isFullyPaid ? 'LUNAS' : 'HUTANG', paidAmount: newPaid } : p
+          )
+        );
+      }
 
-      notify.admin.success('Pembayaran berhasil. Status telah lunas.');
+      notify.admin.success('Pembayaran berhasil dicatat.');
       setPaymentModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing payment: ", error);
-      notify.admin.error('Gagal memproses pembayaran.');
+      notify.admin.error(error.message || 'Gagal memproses pembayaran.');
     }
   };
 
@@ -312,6 +375,30 @@ export default function AdminPurchases() {
           <option value="HUTANG">Hutang</option>
           <option value="DP">DP</option>
         </select>
+        <input
+          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
+          placeholder="Filter Supplier"
+          value={supplierFilter}
+          onChange={(e) => setSupplierFilter(e.target.value)}
+        />
+        <input
+          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
+          placeholder="Filter Gudang"
+          value={warehouseFilter}
+          onChange={(e) => setWarehouseFilter(e.target.value)}
+        />
+        <input
+          type="date"
+          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+        <input
+          type="date"
+          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
       </div>
 
       {/* Purchases Table */}
@@ -553,7 +640,15 @@ interface PaymentModalProps {
   onConfirm: (amount: number) => void;
 }
 function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProps) {
-  const [amount, setAmount] = useState(() => (purchase ? purchase.total : 0));
+  const remaining = purchase ? purchase.total - (purchase.paidAmount || 0) : 0;
+  const [amount, setAmount] = useState(() => remaining);
+
+  // Update amount if purchase changes
+  useEffect(() => {
+    if (purchase) {
+      setAmount(purchase.total - (purchase.paidAmount || 0));
+    }
+  }, [purchase]);
 
   if (!isOpen || !purchase) return null;
 
@@ -561,7 +656,7 @@ function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProp
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 m-4 transform transition-all">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3"><CreditCard size={24} className="text-blue-600"/>Konfirmasi Pembayaran</h2>
+          <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3"><CreditCard size={24} className="text-blue-600"/>Bayar Tagihan</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-800"><XCircle size={24} /></button>
         </div>
         
@@ -570,13 +665,15 @@ function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProp
             <p className="text-[10px] font-bold text-gray-400 uppercase">Supplier</p>
             <p className="text-sm font-black text-gray-800 uppercase">{purchase.supplierName}</p>
           </div>
-          <div className="bg-gray-50 p-4 rounded-xl">
-            <p className="text-[10px] font-bold text-gray-400 uppercase">ID Pembelian</p>
-            <p className="text-sm font-bold text-gray-600 italic">#{purchase.id.slice(-6)}</p>
-          </div>
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-center">
-            <p className="text-[10px] font-bold text-blue-500 uppercase">Total Hutang</p>
-            <p className="text-3xl font-black text-blue-600">Rp {purchase.total.toLocaleString('id-ID')}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-center">
+              <p className="text-[10px] font-bold text-blue-500 uppercase">Total Hutang</p>
+              <p className="text-lg font-black text-blue-600">Rp {purchase.total.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl text-center">
+              <p className="text-[10px] font-bold text-orange-500 uppercase">Sisa Tagihan</p>
+              <p className="text-lg font-black text-orange-600">Rp {remaining.toLocaleString('id-ID')}</p>
+            </div>
           </div>
         </div>
 
@@ -592,8 +689,9 @@ function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProp
            </div>
           <button 
             onClick={() => onConfirm(amount)}
-            className="w-full bg-black text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2">
-            LUNASI SEKARANG
+            disabled={amount <= 0 || amount > remaining}
+            className="w-full bg-black text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
+            KONFIRMASI PEMBAYARAN
           </button>
         </div>
       </div>

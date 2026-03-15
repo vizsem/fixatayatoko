@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { CapitalTransaction, LoanRecord } from '@/types/finance';
+import { postJournal } from '@/lib/ledger';
 
 type MarketplaceAccount = {
   id: string;
@@ -363,6 +364,15 @@ export default function CapitalPage() {
         date: serverTimestamp(),
         recordedBy: auth.currentUser?.uid || 'unknown',
         note: 'Tarik ke Kas'
+      });
+      // Double-entry: Debit Cash, Credit MarketplaceBalance
+      await postJournal({
+        debitAccount: 'Cash',
+        creditAccount: 'MarketplaceBalance',
+        amount,
+        memo: `Withdrawal ${acc.name}`,
+        refType: 'MARKETPLACE_WITHDRAWAL',
+        refId: acc.id
       });
 
       toast.success(`Berhasil menarik Rp${amount.toLocaleString()} ke Kas`);
@@ -1427,6 +1437,15 @@ export default function CapitalPage() {
                       category: 'Marketplace Fee',
                       createdAt: serverTimestamp()
                     });
+                    // Double-entry: Debit MarketplaceFeeExpense, Credit MarketplaceBalance
+                    await postJournal({
+                      debitAccount: 'MarketplaceFeeExpense',
+                      creditAccount: 'MarketplaceBalance',
+                      amount: fee,
+                      memo: `Biaya platform ${name || accKey}`,
+                      refType: 'MARKETPLACE_FEE',
+                      refId: accKey
+                    });
                   }
                   if (payout > 0) {
                     // Tambah kas
@@ -1453,6 +1472,15 @@ export default function CapitalPage() {
                       date: serverTimestamp(),
                       recordedBy: auth.currentUser?.uid || 'import',
                       note: 'Settlement Payout'
+                    });
+                    // Double-entry: Debit Cash, Credit MarketplaceBalance
+                    await postJournal({
+                      debitAccount: 'Cash',
+                      creditAccount: 'MarketplaceBalance',
+                      amount: payout,
+                      memo: `Settlement ${name || accKey}`,
+                      refType: 'MARKETPLACE_SETTLEMENT',
+                      refId: accKey
                     });
                   }
                 }

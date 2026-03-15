@@ -85,6 +85,7 @@ export default function EditProductPage() {
 
   // Cost History State
   const [costHistory, setCostHistory] = useState<any[]>([]);
+  const [stockReason, setStockReason] = useState<'MANUAL' | 'OPNAME' | 'TRANSFER'>('MANUAL');
 
   const formDataRef = useRef(formData); // Ref to keep track of latest formData for logs if needed
   
@@ -342,7 +343,7 @@ export default function EditProductPage() {
             previousStock: oldVal,
             newStock: newVal,
             change: newVal - oldVal,
-            type: 'EDIT_ADMIN',
+            type: stockReason,
             adminEmail: auth.currentUser?.email || 'system',
             createdAt: serverTimestamp(),
           });
@@ -403,8 +404,8 @@ export default function EditProductPage() {
           type: log.change > 0 ? 'MASUK' : 'KELUAR',
           amount: Math.abs(log.change),
           adminId: log.adminEmail || 'system',
-          source: 'MANUAL',
-          note: `Edit Product. Prev: ${log.previousStock}, New: ${log.newStock}`,
+          source: stockReason as any,
+          note: `Edit ${stockReason}. Prev: ${log.previousStock}, New: ${log.newStock}`,
           prevStock: log.previousStock,
           nextStock: log.newStock,
           fromWarehouseId: log.change < 0 ? log.warehouseId : undefined,
@@ -577,6 +578,18 @@ export default function EditProductPage() {
             {/* DETAIL STOK PER GUDANG */}
             <div className="mt-6 pt-6 border-t border-gray-100">
               <h4 className="text-[10px] font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
+              <div className="mb-3">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Alasan Perubahan</label>
+                <select
+                  className="w-full p-3 bg-gray-50 rounded-xl text-xs font-bold outline-none"
+                  value={stockReason}
+                  onChange={(e) => setStockReason(e.target.value as any)}
+                >
+                  <option value="MANUAL">Adjust (Manual)</option>
+                  <option value="OPNAME">Opname</option>
+                  <option value="TRANSFER">Transfer</option>
+                </select>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {warehouses.map((w) => {
                   const qty = Number(formData.stockByWarehouse?.[w.id] || 0);

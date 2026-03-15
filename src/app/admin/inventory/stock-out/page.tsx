@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { addInventoryLog } from '@/lib/inventory';
+import { deductStockTx } from '@/lib/inventory';
 
 import {
   collection,
   getDocs,
   doc,
-  updateDoc,
   serverTimestamp,
-  increment
+  runTransaction
 } from 'firebase/firestore';
 import {
   ArrowLeft,
@@ -23,7 +22,6 @@ import {
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
-import { stockSyncService } from '@/lib/stockSyncService';
 
 type Product = {
   id: string;
@@ -77,35 +75,16 @@ export default function StockOutPage() {
 
     try {
       const user = auth.currentUser;
-      const productRef = doc(db, 'products', selectedProduct.id);
-
-      // A. Update Stok di Produk (Kurangi)
-      await updateDoc(productRef, {
-        stock: increment(-qty)
+      await runTransaction(db, async (tx) => {
+        await deductStockTx(tx, {
+          productId: selectedProduct.id,
+          amount: qty,
+          adminId: user?.uid || 'system',
+          source: 'MANUAL',
+          note: `Manual Stock Out: ${reason}`,
+          mainWarehouseId: 'gudang-utama'
+        });
       });
-
-      // B. Catat ke Inventory Logs (Agar muncul di halaman History)
-      await addInventoryLog({
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        type: 'KELUAR',
-        amount: qty,
-        adminId: user?.uid || 'system',
-        source: 'MANUAL',
-        note: `Manual Stock Out: ${reason}`,
-        fromWarehouseId: 'gudang-utama',
-        prevStock: selectedProduct.stock,
-        nextStock: selectedProduct.stock - qty
-      });
-
-      // C. Trigger sinkronisasi otomatis
-      try {
-        await stockSyncService.syncWarehouseToProduct(selectedProduct.id, 'gudang-utama');
-        console.log('Sinkronisasi stok otomatis berhasil');
-      } catch (syncError) {
-        console.error('Gagal sinkronisasi otomatis:', syncError);
-        // Tidak menghentikan proses utama, hanya log error
-      }
 
       setStatus({ type: 'success', msg: 'Stok berhasil dikurangi!' });
       notify.admin.success('Stok berhasil dikurangi!');

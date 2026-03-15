@@ -29,11 +29,13 @@ import { auth, db, storage } from '@/lib/firebase';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
-  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag
+  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 import { addInventoryLog } from '@/lib/inventory';
+import { postJournal } from '@/lib/ledger';
+import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 
 // Types
@@ -146,6 +148,7 @@ export default function CashierPOS() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [tempoDueDate, setTempoDueDate] = useState('');
+  const [useBluetoothPrinter, setUseBluetoothPrinter] = useState(false);
 
   // State untuk Wallet
   const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number} | null>(null);
@@ -164,6 +167,106 @@ export default function CashierPOS() {
 
   // No redundant state for calculated values
 
+  // Scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+
+  const handleScan = useCallback(async (code: string) => {
+    try {
+      if (!code) return;
+      // Cari produk by barcode (dua variasi field)
+      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
+      const s1 = await getDocs(q1);
+      let prod: any | null = null;
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        prod = { id: d.id, ...d.data() };
+      } else {
+        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
+        const s2 = await getDocs(q2);
+        if (!s2.empty) {
+          const d2 = s2.docs[0];
+          prod = { id: d2.id, ...d2.data() };
+        }
+      }
+      if (!prod) {
+        toast.error('Barcode tidak ditemukan');
+        return;
+      }
+      const mapped: Product = {
+        id: prod.id,
+        name: prod.name || prod.Nama || 'Produk',
+        price: Number(prod.price || prod.Ecer || 0),
+        cost: Number(prod.cost || prod.Modal || 0),
+        unit: (prod.unit || prod.Satuan || 'PCS').toUpperCase(),
+        stock: Number(prod.stock || 0),
+        barcode: prod.Barcode || prod.barcode || '',
+        image: prod.image || prod.URL_Produk || '',
+        units: prod.units || [],
+        channelPricing: prod.channelPricing || {}
+      };
+      setScannedProduct(mapped);
+      setShowScanner(false);
+    } catch {
+      toast.error('Gagal membaca barcode');
+    }
+  }, []);
+
+  useEffect(() => {
+    const checkAuthAndShift = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        router.push('/profil/login');
+        return;
+      }
+      
+      // Load Active Shift
+      try {
+        const q = query(
+          collection(db, 'cashier_shifts'), 
+          where('cashierId', '==', user.uid),
+          where('status', '==', 'OPEN'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const shiftDoc = snap.docs[0];
+          setCurrentShift({ id: shiftDoc.id, ...shiftDoc.data() } as CashierShift);
+        }
+      } catch (err) {
+        console.error("Error loading shift:", err);
+      }
+    };
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        checkAuthAndShift();
+      } else {
+        router.push('/profil/login');
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
+    let scanner: any = null;
+    const init = async () => {
+      if (!showScanner || scannerReady) return;
+      const mod: any = await import('html5-qrcode');
+      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
+      scanner = new Html5QrcodeScanner('pos-scanner', { fps: 10, qrbox: 200 }, false);
+      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
+      setScannerReady(true);
+    };
+    init();
+    return () => {
+      const el = document.getElementById('pos-scanner');
+      if (el) el.innerHTML = '';
+      setScannerReady(false);
+    };
+  }, [showScanner, scannerReady, handleScan]);
 
   // --- TAMBAHAN: LOGIKA KOMPRESI PHOTO ---
   const compressImage = useCallback(async (file: File) => {
@@ -291,6 +394,14 @@ export default function CashierPOS() {
       }];
     });
   }, [transactionType, getChannelKey]);
+
+  // Tambahkan item hasil scan ke keranjang setelah addToCart tersedia
+  useEffect(() => {
+    if (scannedProduct) {
+      addToCart(scannedProduct);
+      setScannedProduct(null);
+    }
+  }, [scannedProduct, addToCart]);
 
   const updateQuantity = useCallback((id: string, q: number) => {
     if (q <= 0) {
@@ -745,7 +856,7 @@ export default function CashierPOS() {
       </html>
     `);
     w.document.close();
-  }, []);
+  }, [useBluetoothPrinter]);
 
 
   // --- HANDLE TRANSACTION (DIUBAH UNTUK KOMPRESI) ---
@@ -881,6 +992,39 @@ export default function CashierPOS() {
         });
       }
       // --- AKHIR LOGIKA DOMPET ---
+
+      // --- DOUBLE-ENTRY ACCOUNTING ---
+      let debitAcc: any = 'Cash';
+      if (paymentMethod === 'TEMPO') debitAcc = 'AccountsReceivable';
+      else if (paymentMethod === 'DOMPET') debitAcc = 'CustomerWallet';
+
+      await postJournal({
+        debitAccount: debitAcc,
+        creditAccount: 'Sales',
+        amount: total,
+        memo: `Penjualan Kasir #${newOrderRef.id}`,
+        refType: 'ORDER',
+        refId: newOrderRef.id
+      }, batch);
+
+      let totalCogs = 0;
+      for (const item of cart) {
+        const itemCost = item.cost || 0;
+        const contains = Number(item.contains || 1);
+        totalCogs += (itemCost * item.quantity * contains);
+      }
+      
+      if (totalCogs > 0) {
+        await postJournal({
+          debitAccount: 'COGS',
+          creditAccount: 'Inventory',
+          amount: totalCogs,
+          memo: `HPP Penjualan #${newOrderRef.id}`,
+          refType: 'ORDER',
+          refId: newOrderRef.id
+        }, batch);
+      }
+      // --- AKHIR DOUBLE-ENTRY ---
   
       await batch.commit();
       
@@ -907,7 +1051,19 @@ export default function CashierPOS() {
     } finally { setIsProcessing(false); }
   };
 
-  const printReceipt = useCallback((order: Partial<Order>) => {
+  const printReceipt = useCallback(async (order: Partial<Order>) => {
+    if (useBluetoothPrinter) {
+      try {
+        const escReceipt = generateESCReceipt(order);
+        await printToThermal(escReceipt);
+        toast.success('Struk berhasil dicetak via Bluetooth');
+        return;
+      } catch (err: any) {
+        toast.error('Gagal cetak Bluetooth: ' + err.message);
+        // Fallback to normal print if user wants? Just continue to normal print.
+      }
+    }
+
     const w = window.open('', '_blank');
     if (!w) return;
 
@@ -1018,7 +1174,30 @@ export default function CashierPOS() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Memuat Kasir...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100 flex flex-col relative">
+      {!currentShift && (
+        <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-gray-100">
+            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShoppingBag size={40} />
+            </div>
+            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter mb-2">Shift Belum Dibuka</h2>
+            <p className="text-gray-500 text-sm mb-8">Anda harus membuka shift kasir dan memasukkan modal awal sebelum dapat melakukan transaksi.</p>
+            <button 
+              onClick={() => setShowShiftModal('open')} 
+              className="w-full py-4 bg-green-600 text-white font-black rounded-2xl hover:bg-green-700 uppercase tracking-widest shadow-lg shadow-green-200 transition-all hover:scale-105"
+            >
+              Buka Shift Sekarang
+            </button>
+            <button 
+              onClick={() => router.push('/profil')}
+              className="w-full py-4 mt-3 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 uppercase text-xs"
+            >
+              Kembali ke Dashboard
+            </button>
+          </div>
+        </div>
+      )}
       <nav className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
         <div className="flex items-center gap-6">
           <h1 className="text-xl font-black italic text-green-600">ATAYATOKO <span className="text-gray-400 not-italic font-medium text-sm">POS</span></h1>
@@ -1067,11 +1246,19 @@ export default function CashierPOS() {
                 placeholder="Cari Produk atau Scan Barcode [F1]..."
                 className="flex-1 outline-none font-medium text-gray-700"
               />
+              <button
+                type="button"
+                onClick={() => setShowScanner(!showScanner)}
+                className="px-3 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1"
+              >
+                <Camera size={14} /> Scan
+              </button>
               <div className="flex bg-gray-100 p-1 rounded-lg">
                 <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={18} /></button>
                 <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={18} /></button>
               </div>
             </div>
+            {showScanner && <div id="pos-scanner" className="p-2 bg-white rounded-2xl border border-gray-100" />}
 
             <div 
               className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} 
@@ -1405,6 +1592,19 @@ export default function CashierPOS() {
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs font-black text-gray-400 uppercase">Total</span>
                   <span className={`text-xl font-black ${transactionType === 'online' ? 'text-blue-600' : 'text-green-600'}`}>Rp{total.toLocaleString()}</span>
+                </div>
+
+                <div className="flex items-center gap-2 mb-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <input 
+                    type="checkbox" 
+                    id="useBluetooth"
+                    checked={useBluetoothPrinter}
+                    onChange={(e) => setUseBluetoothPrinter(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <label htmlFor="useBluetooth" className="text-xs font-bold text-gray-700 cursor-pointer flex-1">
+                    Cetak dengan Printer Bluetooth
+                  </label>
                 </div>
 
                 <button

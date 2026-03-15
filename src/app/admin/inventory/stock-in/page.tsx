@@ -13,15 +13,16 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   serverTimestamp,
   query,
   where,
-  orderBy
+  orderBy,
+  runTransaction
 } from 'firebase/firestore';
 import { ArrowDown, Plus, Calendar } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { addStockTx } from '@/lib/inventory';
 import { stockSyncService } from '@/lib/stockSyncService';
 
 
@@ -171,28 +172,34 @@ function StockInContent() {
 
       await addDoc(collection(db, 'inventory_transactions'), transactionData);
 
+      // 2. Update stok produk (atomik + log via util)
+      await runTransaction(db, async (tx) => {
+        const productRef = doc(db, 'products', formData.productId);
+        const snap = await tx.get(productRef);
+        if (!snap.exists()) throw new Error('Produk tidak ditemukan');
+        const cur = snap.data() as any;
+        const currentStock = Number(cur.stock || 0);
+        const newStock = currentStock + pcsToAdd;
+        const currentCost = Number(cur.Modal || cur.purchasePrice || 0);
+        const effectiveOldCost = currentCost > 0 ? currentCost : incomingCostPerPcs;
+        const nextAvgCost = newStock > 0
+          ? Math.round(((currentStock * effectiveOldCost) + (pcsToAdd * incomingCostPerPcs)) / newStock)
+          : Math.round(incomingCostPerPcs);
 
-      // 2. Update stok produk
-      const productRef = doc(db, 'products', formData.productId);
-      const currentStock = selectedProduct?.stock || 0;
-      const newStock = currentStock + pcsToAdd;
-      const currentCost = Number(selectedProduct?.Modal || selectedProduct?.purchasePrice || 0);
-      const effectiveOldCost = currentCost > 0 ? currentCost : incomingCostPerPcs;
-      const nextAvgCost = newStock > 0
-        ? Math.round(((currentStock * effectiveOldCost) + (pcsToAdd * incomingCostPerPcs)) / newStock)
-        : Math.round(incomingCostPerPcs);
-
-      await updateDoc(productRef, {
-        stock: newStock,
-        Stok: newStock,
-        purchasePrice: nextAvgCost,
-        Modal: nextAvgCost,
-        hargaBeli: nextAvgCost,
-        updatedAt: serverTimestamp(),
-        stockByWarehouse: {
-          ...(selectedProduct?.stockByWarehouse || {}),
-          'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + pcsToAdd
-        },
+        await addStockTx(tx, {
+          productId: formData.productId,
+          amount: pcsToAdd,
+          warehouseId: 'gudang-utama',
+          adminId: auth.currentUser?.uid || 'system',
+          note: `Stock-In manual (${formData.unitCode} x ${formData.quantity})`,
+          source: 'MANUAL'
+        });
+        tx.update(productRef, {
+          purchasePrice: nextAvgCost,
+          Modal: nextAvgCost,
+          hargaBeli: nextAvgCost,
+          updatedAt: serverTimestamp()
+        });
       });
 
       // 3. Trigger sinkronisasi otomatis

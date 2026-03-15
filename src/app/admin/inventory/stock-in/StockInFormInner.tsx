@@ -13,12 +13,13 @@ import {
   getDocs,
   addDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  runTransaction
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
 import notify from '@/lib/notify';
-import { addInventoryLog } from '@/lib/inventory';
+import { addStockTx } from '@/lib/inventory';
 
 
 
@@ -117,47 +118,31 @@ export default function StockInFormInner({ productId }: { productId: string }) {
     }
 
     try {
-      // 1. Simpan transaksi stok masuk
-      const transactionData = {
-        type: 'STOCK_IN',
-        productId: formData.productId,
-        productName: selectedProduct?.name,
-        supplierId: formData.supplierId,
-        supplierName: suppliers.find(s => s.id === formData.supplierId)?.name,
-        quantity: formData.quantity,
-        purchasePrice: formData.purchasePrice,
-        expiredDate: formData.expiredDate,
-        createdAt: serverTimestamp()
-      };
+      await runTransaction(db, async (tx) => {
+        // 1. Simpan transaksi stok masuk (Purchase Record)
+        const transactionRef = doc(collection(db, 'inventory_transactions'));
+        const transactionData = {
+          type: 'STOCK_IN',
+          productId: formData.productId,
+          productName: selectedProduct?.name,
+          supplierId: formData.supplierId,
+          supplierName: suppliers.find(s => s.id === formData.supplierId)?.name,
+          quantity: formData.quantity,
+          purchasePrice: formData.purchasePrice,
+          expiredDate: formData.expiredDate,
+          createdAt: serverTimestamp()
+        };
+        tx.set(transactionRef, transactionData);
 
-      await addDoc(collection(db, 'inventory_transactions'), transactionData);
-
-
-      // 2. Update stok produk
-      const productRef = doc(db, 'products', formData.productId);
-      const currentStock = selectedProduct?.stock || 0;
-      const newStock = currentStock + formData.quantity;
-
-      await updateDoc(productRef, {
-        stock: newStock,
-        stockByWarehouse: {
-          'gudang-utama': (selectedProduct?.stockByWarehouse?.['gudang-utama'] || 0) + formData.quantity
-        }
-      });
-
-      // 3. Tambah log inventaris
-      await addInventoryLog({
-        productId: formData.productId,
-        productName: selectedProduct?.name || 'Unknown Product',
-        type: 'MASUK',
-        amount: formData.quantity,
-        adminId: auth.currentUser?.uid || 'system',
-        source: 'PURCHASE',
-        supplierId: formData.supplierId,
-        note: `Pembelian dari ${transactionData.supplierName}`,
-        toWarehouseId: 'gudang-utama',
-        prevStock: currentStock,
-        nextStock: newStock
+        // 2. Update stok produk & Log Inventory secara atomik
+        await addStockTx(tx, {
+          productId: formData.productId,
+          amount: formData.quantity,
+          warehouseId: 'gudang-utama',
+          adminId: auth.currentUser?.uid || 'system',
+          note: `Pembelian dari ${transactionData.supplierName}`,
+          source: 'PURCHASE'
+        });
       });
 
       notify.admin.success('Stok berhasil ditambahkan!');

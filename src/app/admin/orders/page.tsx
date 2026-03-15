@@ -392,7 +392,11 @@ export default function AdminOrders() {
     }
   };
 
-  // 5. Logika Filter & Pagination
+  // 5. Filter tambahan
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  // 6. Logika Filter & Pagination
   const filteredOrders = orders.filter(order => {
     const matchesSearch = (order.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.customerName || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -410,7 +414,11 @@ export default function AdminOrders() {
       matchesTab = s === activeTab;
     }
 
-    return matchesSearch && matchesTab;
+    const tMs = order.createdAt?.toDate ? order.createdAt.toDate().getTime() : 0;
+    const startOk = startDate ? tMs >= new Date(startDate).getTime() : true;
+    const endOk = endDate ? tMs <= new Date(endDate).getTime() + 86400000 - 1 : true;
+
+    return matchesSearch && matchesTab && startOk && endOk;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -508,6 +516,23 @@ export default function AdminOrders() {
               )}
             </button>
           ))}
+        </div>
+
+        <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            className="px-3 py-2 rounded-xl bg-slate-50 text-xs font-bold outline-none"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+          />
+          <span className="text-slate-400 text-xs">s/d</span>
+          <input
+            type="date"
+            className="px-3 py-2 rounded-xl bg-slate-50 text-xs font-bold outline-none"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+          />
         </div>
         
         <button

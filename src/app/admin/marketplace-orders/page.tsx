@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, serverTimestamp, updateDoc, query, orderBy, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, query, orderBy, runTransaction, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
+import { deductStockTx } from '@/lib/inventory';
 import { Toaster } from 'react-hot-toast';
 import {
   ChevronLeft,
   ShoppingBag,
   Search,
+  Camera,
   Plus,
   Trash2,
   Save,
@@ -74,6 +76,8 @@ export default function MarketplaceOrdersPage() {
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER');
   const [shippingCost, setShippingCost] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -162,6 +166,51 @@ export default function MarketplaceOrdersPage() {
     setSearch('');
   };
 
+  const handleScan = async (code: string) => {
+    try {
+      // Cari berdasar Barcode (variasi field)
+      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
+      const s1 = await getDocs(q1);
+      let prod: any | null = null;
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        prod = { id: d.id, ...d.data() };
+      } else {
+        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
+        const s2 = await getDocs(q2);
+        if (!s2.empty) {
+          const d2 = s2.docs[0];
+          prod = { id: d2.id, ...d2.data() };
+        }
+      }
+      if (!prod) {
+        notify.admin.error('Barcode tidak ditemukan');
+        return;
+      }
+      addToCart(prod as Product);
+      setShowScanner(false);
+    } catch {
+      notify.admin.error('Gagal membaca barcode');
+    }
+  };
+
+  useEffect(() => {
+    let scanner: any = null;
+    const init = async () => {
+      if (!showScanner || scannerReady) return;
+      const mod: any = await import('html5-qrcode');
+      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
+      scanner = new Html5QrcodeScanner('mp-scanner', { fps: 10, qrbox: 200 }, false);
+      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
+      setScannerReady(true);
+    };
+    init();
+    return () => {
+      const el = document.getElementById('mp-scanner');
+      if (el) el.innerHTML = '';
+      setScannerReady(false);
+    };
+  }, [showScanner, scannerReady]);
   const removeFromCart = (id: string) => {
     setCart(cart.filter(item => item.id !== id));
   };
@@ -254,49 +303,15 @@ export default function MarketplaceOrdersPage() {
           createdAt: serverTimestamp()
         });
 
-        // Deduct stocks and write inventory logs
+        // Deduct stocks (util) and write inventory logs via util
         for (const item of cart) {
-          const pRef = doc(db, 'products', item.id);
-          const pSnap = await tx.get(pRef);
-          const productData = pSnap.data() as any;
-          const currentStock = productData?.stock != null ? Number(productData.stock) : 0;
           const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-          if (currentStock < deductionQty) {
-            throw new Error(`Stok tidak cukup untuk ${item.name}. Tersedia: ${currentStock}, Dibutuhkan: ${deductionQty}`);
-          }
-          const MAIN_WAREHOUSE_ID = 'gudang-utama';
-          const stockByWarehouse = productData?.stockByWarehouse || {};
-          const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
-          let remainingToDeduct = deductionQty;
-          if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
-            const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
-            newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
-            remainingToDeduct -= deduct;
-          }
-          if (remainingToDeduct > 0) {
-            for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
-              if (whId === MAIN_WAREHOUSE_ID) continue;
-              if (remainingToDeduct <= 0) break;
-              const deduct = Math.min(qty as number, remainingToDeduct);
-              newStockByWarehouse[whId] = (qty as number) - deduct;
-              remainingToDeduct -= deduct;
-            }
-          }
-          const newStock = currentStock - deductionQty;
-          tx.update(pRef, { stock: newStock, stockByWarehouse: newStockByWarehouse });
-
-          const logRef = doc(collection(db, 'inventory_logs'));
-          tx.set(logRef, {
+          await deductStockTx(tx, {
             productId: item.id,
-            productName: item.name,
-            type: 'KELUAR',
             amount: deductionQty,
             adminId: auth.currentUser?.uid || 'admin',
-            date: serverTimestamp(),
-            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
-            source: 'marketplace',
-            prevStock: currentStock,
-            nextStock: newStock
+            source: 'MARKETPLACE',
+            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`
           });
         }
       });
@@ -409,6 +424,16 @@ export default function MarketplaceOrdersPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(!showScanner)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1"
+                >
+                  <Camera size={12} /> Scan
+                </button>
+                {showScanner && (
+                  <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100" id="mp-scanner" />
+                )}
                 {search && (
                   <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
                     {filteredProducts.map(p => {
