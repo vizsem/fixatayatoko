@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { adjustStockTx } from '@/lib/inventory';
+import { postJournal } from '@/lib/ledger';
 
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
@@ -84,6 +85,36 @@ export default function StockOpnamePage() {
           source: 'OPNAME',
           note: note || (totalDiff >= 0 ? 'Kelebihan barang (Opname)' : 'Barang kurang/hilang (Opname)')
         });
+
+        // Catat kerugian/keuntungan ke Ledger
+        if (totalDiff !== 0) {
+          const costPrice = Number(data.Modal || data.purchasePrice || 0);
+          const diffValue = Math.abs(totalDiff) * costPrice;
+
+          if (diffValue > 0) {
+            if (totalDiff < 0) {
+              // Barang Hilang -> Kerugian
+              await postJournal({
+                debitAccount: 'LossOnInventory',
+                creditAccount: 'Inventory',
+                amount: diffValue,
+                memo: `Penyesuaian Opname (Kurang ${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${note}`,
+                refType: 'OPNAME_LOSS',
+                refId: selectedProduct.id
+              }, tx);
+            } else {
+              // Kelebihan Barang -> Keuntungan (atau pemulihan HPP)
+              await postJournal({
+                debitAccount: 'Inventory',
+                creditAccount: 'GainOnInventory',
+                amount: diffValue,
+                memo: `Penyesuaian Opname (Lebih ${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${note}`,
+                refType: 'OPNAME_GAIN',
+                refId: selectedProduct.id
+              }, tx);
+            }
+          }
+        }
       });
 
       setStatus({ type: 'success', msg: 'Stok berhasil disesuaikan!' });

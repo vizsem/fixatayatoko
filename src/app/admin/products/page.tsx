@@ -35,6 +35,9 @@ import * as XLSX from 'xlsx';
 type ProductRow = NormalizedProduct & {
   tgl_masuk?: string;
   expired_date?: string;
+  expiredDate?: string;
+  Expired_Default?: string;
+  createdAt?: any;
   URL_Produk?: string;
   url_produk?: string;
   image?: string;
@@ -735,11 +738,11 @@ export default function AdminProducts() {
                     <td className="hidden md:table-cell p-4 md:p-6">
                       <div className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-gray-500">
-                          Masuk: {p.tgl_masuk || '-'}
+                          Masuk: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                         </p>
                         <p className={`text-xs font-medium flex items-center gap-1 ${isExpired ? 'text-red-600 animate-pulse' : 'text-orange-500'}`}>
                           {isExpired && <AlertTriangle size={12} />} 
-                          Exp: {p.expired_date || '-'}
+                          Exp: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
                         </p>
                       </div>
                     </td>

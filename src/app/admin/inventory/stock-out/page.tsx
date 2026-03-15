@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { deductStockTx } from '@/lib/inventory';
+import { postJournal } from '@/lib/ledger';
 
 import {
   collection,
@@ -76,6 +77,13 @@ export default function StockOutPage() {
     try {
       const user = auth.currentUser;
       await runTransaction(db, async (tx) => {
+        // Get product to calculate loss value
+        const pRef = doc(db, 'products', selectedProduct.id);
+        const pSnap = await tx.get(pRef);
+        const pData = pSnap.exists() ? pSnap.data() : {};
+        const costPrice = Number(pData.Modal || pData.purchasePrice || 0);
+        const lossValue = costPrice * qty;
+
         await deductStockTx(tx, {
           productId: selectedProduct.id,
           amount: qty,
@@ -84,6 +92,18 @@ export default function StockOutPage() {
           note: `Manual Stock Out: ${reason}`,
           mainWarehouseId: 'gudang-utama'
         });
+
+        // Catat kerugian ke Ledger jika ada nilai
+        if (lossValue > 0) {
+          await postJournal({
+            debitAccount: 'LossOnInventory', // Beban Kerugian
+            creditAccount: 'Inventory',      // Mengurangi Nilai Persediaan
+            amount: lossValue,
+            memo: `Barang Keluar (Rusak/Hilang): ${reason} (${qty} ${selectedProduct.unit})`,
+            refType: 'STOCK_OUT',
+            refId: selectedProduct.id
+          }, tx);
+        }
       });
 
       setStatus({ type: 'success', msg: 'Stok berhasil dikurangi!' });

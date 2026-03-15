@@ -11,7 +11,9 @@ type Account =
   | 'Capital'
   | 'AccountsPayable'
   | 'AccountsReceivable'
-  | 'CustomerWallet';
+  | 'CustomerWallet'
+  | 'LossOnInventory'   // Beban kerugian barang hilang/rusak
+  | 'GainOnInventory';  // Pendapatan dari kelebihan stok (opname)
 
 export interface LedgerEntry {
   date?: any;
