@@ -259,8 +259,15 @@ export default function MarketplaceOrdersPage() {
         // 1b. Read All Product Stocks
         // We cannot use deductStockTx here because it mixes read/write.
         // We must implement the deduction logic manually in batch.
+        // NOTE: Promise.all works for concurrent reads, but we need to ensure the refs are unique if duplicate items?
+        // Cart should have unique items by ID ideally.
         const productRefs = cart.map(item => doc(db, 'products', item.id));
-        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
+        const productSnaps = [];
+        
+        // Sequential read to be absolutely safe with Firestore transaction requirements
+        for (const ref of productRefs) {
+          productSnaps.push(await tx.get(ref));
+        }
         
         // --- PHASE 2: VALIDATION & LOGIC ---
         
