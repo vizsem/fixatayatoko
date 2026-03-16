@@ -242,64 +242,17 @@ export default function AddPurchase() {
           }
 
           const updateData: any = {
-            stock: currentStock + newQty,
-            stockByWarehouse: newStockByWarehouse
+            // REMOVED: Do not update stock here! Stock should only update when status changes to 'DITERIMA'
+            // stock: currentStock + newQty,
+            // stockByWarehouse: newStockByWarehouse
           };
 
-          // Update HPP di Produk jika berbeda
-          if (newAverageCost !== currentCost) {
-            updateData.cost = newAverageCost;
-            updateData.Modal = newAverageCost; // Update field legacy juga
-          }
-
-          await updateDoc(productRef, updateData);
-
-          // Catat Log Perubahan Harga (Jika berubah)
-          if (newAverageCost !== currentCost) {
-            await addDoc(collection(db, 'product_cost_logs'), {
-              productId: item.id,
-              productName: item.name,
-              oldCost: currentCost,
-              newCost: newAverageCost,
-              purchaseId: purchaseRef.id,
-              purchasePrice: unitCostNew,
-              quantity: newQty,
-              changeDate: serverTimestamp(),
-              adminId: 'system',
-              reason: 'PURCHASE_AVG_CALCULATION'
-            });
-          } else {
-             // JIKA TIDAK BERUBAH, TETAP CATAT AGAR MUNCUL DI AUDIT COST
-             await addDoc(collection(db, 'product_cost_logs'), {
-              productId: item.id,
-              productName: item.name,
-              oldCost: currentCost,
-              newCost: newAverageCost,
-              purchaseId: purchaseRef.id,
-              purchasePrice: unitCostNew,
-              quantity: newQty,
-              changeDate: serverTimestamp(),
-              adminId: 'system',
-              reason: 'PURCHASE_RESTOCK' // Different reason
-            });
-          }
-
-          // Catat Log Inventory (Masuk)
-          await addDoc(collection(db, 'inventory_logs'), {
-            productId: item.id,
-            productName: item.name,
-            type: 'MASUK',
-            amount: newQty,
-            adminId: 'system',
-            source: 'PURCHASE',
-            referenceId: purchaseRef.id,
-            purchaseId: purchaseRef.id,
-            note: `Pembelian dari ${supplierName || 'Supplier'}`,
-            toWarehouseId: selectedWarehouse,
-            prevStock: currentStock,
-            nextStock: currentStock + newQty,
-            date: serverTimestamp()
-          });
+          // We only want to log the intent or keep it minimal here.
+          // The actual cost and stock update logic is already handled in /admin/purchases/page.tsx 
+          // when the user clicks 'Terima' (handleReceive -> updatePurchaseStatus).
+          
+          // Therefore, we shouldn't update product cost OR stock right now when status is just 'MENUNGGU'.
+          // Let's remove the updateDoc and inventory logging from here completely to prevent early stock additions.
         }
       }
 
