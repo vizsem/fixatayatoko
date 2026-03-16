@@ -238,30 +238,17 @@ export default function MarketplaceOrdersPage() {
     setLoading(true);
     try {
       // Preflight stock validation BEFORE creating order
-      for (const item of cart) {
-        const pRef = doc(db, 'products', item.id);
-        const pSnap = await getDoc(pRef);
-        const productData = pSnap.data();
-        const currentStock = productData?.stock != null ? Number(productData.stock) : 0;
-        const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-        if (currentStock <= 0) {
-          notify.admin.error(`Stok kosong: ${item.name}`);
-          setLoading(false);
-          return;
-        }
-        if (currentStock < deductionQty) {
-          notify.admin.error(`Stok tidak cukup untuk ${item.name}. Tersedia: ${currentStock}, Dibutuhkan: ${deductionQty}`);
-          setLoading(false);
-          return;
-        }
-      }
+      // REMOVED: This validation is redundant and potentially buggy if not atomic.
+      // We rely on deductStockTx to throw if stock is insufficient during transaction.
 
       // Atomic transaction with idempotency key
-      const idempKey = externalOrderId ? `mp:${channel}:${externalOrderId}` : null;
       await runTransaction(db, async (tx) => {
         // Idempotency check
-        if (idempKey) {
-          const keyRef = doc(db, 'marketplace_order_keys', idempKey);
+        if (externalOrderId) {
+          const idempKey = `mp:${channel}:${externalOrderId}`;
+          // Use a dedicated collection for idempotency keys or just query orderId
+          // Using 'action_keys' as per convention in other modules
+          const keyRef = doc(db, 'action_keys', idempKey);
           const keySnap = await tx.get(keyRef);
           if (keySnap.exists()) {
             throw new Error('Order marketplace dengan ID ini sudah diproses.');
@@ -274,26 +261,43 @@ export default function MarketplaceOrdersPage() {
           });
         }
 
+        // Deduct stocks (util) and write inventory logs via util
+        for (const item of cart) {
+          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
+          
+          // deductStockTx checks stock sufficiency inside transaction
+          await deductStockTx(tx, {
+            productId: item.id,
+            amount: deductionQty,
+            adminId: auth.currentUser?.uid || 'admin',
+            source: 'MARKETPLACE',
+            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
+            mainWarehouseId: 'gudang-utama' // Explicitly set main warehouse
+          });
+        }
+
         // Create order doc
         const orderDocRef = doc(collection(db, 'orders'));
-        const items = cart.map(item => ({
+        const itemsData = cart.map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
-          unit: item.unit
+          unit: item.unit,
+          productId: item.id // Ensure productId is saved
         }));
 
         tx.set(orderDocRef, {
           orderId: externalOrderId || null,
-          name: customerName || 'Marketplace',
+          customerName: customerName || 'Marketplace', // Standardized field name
           userId: 'marketplace',
-          items,
+          items: itemsData,
           subtotal,
           shippingCost,
           total,
           status: 'SELESAI',
-          paymentStatus: 'PAID',
+          paymentStatus: 'LUNAS', // Standardized 'LUNAS' vs 'PAID'
+          paymentMethod: paymentMethod, // Top level field for easier querying
           payment: { method: paymentMethod },
           delivery: {
             method: channel === 'SHOPEE' ? 'Shopee' : 'TikTok',
@@ -302,18 +306,6 @@ export default function MarketplaceOrdersPage() {
           channel,
           createdAt: serverTimestamp()
         });
-
-        // Deduct stocks (util) and write inventory logs via util
-        for (const item of cart) {
-          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-          await deductStockTx(tx, {
-            productId: item.id,
-            amount: deductionQty,
-            adminId: auth.currentUser?.uid || 'admin',
-            source: 'MARKETPLACE',
-            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`
-          });
-        }
       });
 
       notify.admin.success('Order marketplace berhasil disimpan.');
@@ -322,9 +314,9 @@ export default function MarketplaceOrdersPage() {
       setCustomerName('');
       setShippingCost(0);
       router.push('/admin/reports/sales');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      notify.admin.error('Gagal menyimpan order marketplace.');
+      notify.admin.error(err.message || 'Gagal menyimpan order marketplace.');
     } finally {
       setLoading(false);
     }
