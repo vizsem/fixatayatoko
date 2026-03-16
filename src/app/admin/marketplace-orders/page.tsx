@@ -243,17 +243,103 @@ export default function MarketplaceOrdersPage() {
 
       // Atomic transaction with idempotency key
       await runTransaction(db, async (tx) => {
-        // Idempotency check
+        // --- PHASE 1: READS ---
+        
+        // 1a. Check Idempotency Key
+        let idempKeyRef = null;
         if (externalOrderId) {
           const idempKey = `mp:${channel}:${externalOrderId}`;
-          // Use a dedicated collection for idempotency keys or just query orderId
-          // Using 'action_keys' as per convention in other modules
-          const keyRef = doc(db, 'action_keys', idempKey);
-          const keySnap = await tx.get(keyRef);
+          idempKeyRef = doc(db, 'action_keys', idempKey);
+          const keySnap = await tx.get(idempKeyRef);
           if (keySnap.exists()) {
             throw new Error('Order marketplace dengan ID ini sudah diproses.');
           }
-          tx.set(keyRef, {
+        }
+
+        // 1b. Read All Product Stocks
+        // We cannot use deductStockTx here because it mixes read/write.
+        // We must implement the deduction logic manually in batch.
+        const productRefs = cart.map(item => doc(db, 'products', item.id));
+        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
+        
+        // --- PHASE 2: VALIDATION & LOGIC ---
+        
+        const updates: { ref: any, data: any }[] = [];
+        const logs: { ref: any, data: any }[] = [];
+
+        productSnaps.forEach((pSnap, idx) => {
+          if (!pSnap.exists()) throw new Error(`Produk tidak ditemukan (ID: ${cart[idx].id})`);
+          
+          const item = cart[idx];
+          const pData: any = pSnap.data();
+          const currentStock = Number(pData.stock || 0);
+          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
+
+          if (currentStock < deductionQty) {
+            throw new Error(`Stok tidak cukup: ${item.name}. Sisa: ${currentStock}, Butuh: ${deductionQty}`);
+          }
+
+          // Calculate new stock distribution
+          const stockByWarehouse: Record<string, number> = pData.stockByWarehouse || {};
+          const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
+          let remaining = deductionQty;
+          const mainWarehouseId = 'gudang-utama';
+
+          // Prioritize Main Warehouse
+          if (nextByWarehouse[mainWarehouseId] && nextByWarehouse[mainWarehouseId] > 0) {
+            const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
+            nextByWarehouse[mainWarehouseId] -= cut;
+            remaining -= cut;
+          }
+
+          // Then others
+          if (remaining > 0) {
+            for (const [whId, qty] of Object.entries(nextByWarehouse)) {
+              if (whId === mainWarehouseId) continue;
+              if (remaining <= 0) break;
+              const cut = Math.min(qty as number, remaining);
+              nextByWarehouse[whId] = (qty as number) - cut;
+              remaining -= cut;
+            }
+          }
+
+          if (remaining > 0) {
+             // Force deduct from main if somehow still remaining (negative stock allowed? No, usually error)
+             // But we already checked total stock. So this case implies stockByWarehouse inconsistency.
+             // We'll force deduct from main to keep total consistent even if it goes negative per warehouse
+             nextByWarehouse[mainWarehouseId] = (nextByWarehouse[mainWarehouseId] || 0) - remaining;
+          }
+
+          const nextStock = currentStock - deductionQty;
+
+          updates.push({
+            ref: pSnap.ref,
+            data: { stock: nextStock, stockByWarehouse: nextByWarehouse }
+          });
+
+          // Prepare Log
+          logs.push({
+            ref: doc(collection(db, 'inventory_logs')),
+            data: {
+              productId: item.id,
+              productName: pData.name || pData.Nama || 'Produk',
+              type: 'KELUAR',
+              amount: deductionQty,
+              adminId: auth.currentUser?.uid || 'admin',
+              source: 'MARKETPLACE',
+              note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
+              date: serverTimestamp(),
+              prevStock: currentStock,
+              nextStock
+            }
+          });
+        });
+
+        // --- PHASE 3: WRITES ---
+
+        // 3a. Write Idempotency Key
+        if (idempKeyRef) {
+          tx.set(idempKeyRef, {
             createdAt: serverTimestamp(),
             channel,
             externalOrderId,
@@ -261,22 +347,13 @@ export default function MarketplaceOrdersPage() {
           });
         }
 
-        // Deduct stocks (util) and write inventory logs via util
-        for (const item of cart) {
-          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-          
-          // deductStockTx checks stock sufficiency inside transaction
-          await deductStockTx(tx, {
-            productId: item.id,
-            amount: deductionQty,
-            adminId: auth.currentUser?.uid || 'admin',
-            source: 'MARKETPLACE',
-            note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
-            mainWarehouseId: 'gudang-utama' // Explicitly set main warehouse
-          });
-        }
+        // 3b. Update Products
+        updates.forEach(u => tx.update(u.ref, u.data));
 
-        // Create order doc
+        // 3c. Write Logs
+        logs.forEach(l => tx.set(l.ref, l.data));
+
+        // 3d. Create Order
         const orderDocRef = doc(collection(db, 'orders'));
         const itemsData = cart.map(item => ({
           id: item.id,
@@ -284,20 +361,20 @@ export default function MarketplaceOrdersPage() {
           price: item.price,
           quantity: item.quantity,
           unit: item.unit,
-          productId: item.id // Ensure productId is saved
+          productId: item.id
         }));
 
         tx.set(orderDocRef, {
           orderId: externalOrderId || null,
-          customerName: customerName || 'Marketplace', // Standardized field name
+          customerName: customerName || 'Marketplace',
           userId: 'marketplace',
           items: itemsData,
           subtotal,
           shippingCost,
           total,
           status: 'SELESAI',
-          paymentStatus: 'LUNAS', // Standardized 'LUNAS' vs 'PAID'
-          paymentMethod: paymentMethod, // Top level field for easier querying
+          paymentStatus: 'LUNAS',
+          paymentMethod: paymentMethod,
           payment: { method: paymentMethod },
           delivery: {
             method: channel === 'SHOPEE' ? 'Shopee' : 'TikTok',
