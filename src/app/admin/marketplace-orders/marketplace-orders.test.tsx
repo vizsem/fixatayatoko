@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import MarketplaceOrdersPage from './page';
+import notify from '@/lib/notify';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -14,21 +15,11 @@ vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('lucide-react', () => ({
-  ChevronLeft: () => <div />,
-  ShoppingBag: () => <div />,
-  Search: () => <div />,
-  Plus: () => <div />,
-  Trash2: () => <div />,
-  Save: () => <div />,
-  Store: () => <div />,
-  CreditCard: () => <div />,
-}));
-
 const mockGetDoc = vi.fn();
 const mockGetDocs = vi.fn();
 const mockUpdateDoc = vi.fn();
 const mockAddDoc = vi.fn();
+const mockRunTransaction = vi.fn();
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db: unknown, _path: string) => ({ path: _path })),
@@ -40,6 +31,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   addDoc: (...args: unknown[]) => mockAddDoc(...args),
+  runTransaction: (...args: unknown[]) => mockRunTransaction(...args),
 }));
 
 vi.mock('@/lib/firebase', () => ({
@@ -93,6 +85,18 @@ describe('MarketplaceOrdersPage', () => {
       ],
     });
 
+    mockRunTransaction.mockImplementation(async (_db: unknown, fn: (tx: any) => unknown) => {
+      const tx = {
+        get: vi.fn(async () => ({
+          exists: () => true,
+          data: () => ({ stock: 100, stockByWarehouse: {} }),
+        })),
+        update: vi.fn(async () => {}),
+        set: vi.fn(async () => {}),
+      };
+      return await fn(tx);
+    });
+
     mockUpdateDoc.mockResolvedValue(undefined);
   });
 
@@ -128,15 +132,15 @@ describe('MarketplaceOrdersPage', () => {
     fireEvent.click(screen.getByText('Produk Marketplace'));
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('12000')).toBeInTheDocument();
+      expect(screen.getAllByDisplayValue('12000').length).toBeGreaterThan(0);
     });
 
     const submitButton = screen.getByText('Simpan Order');
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockAddDoc).toHaveBeenCalled();
-      expect(mockUpdateDoc).toHaveBeenCalled();
+      expect(mockRunTransaction).toHaveBeenCalled();
+      expect(notify.admin.success).toHaveBeenCalled();
     });
   });
 });

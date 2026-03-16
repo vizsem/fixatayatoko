@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { auth, db, storage } from '@/lib/firebase';
 import { addInventoryLog } from '@/lib/inventory';
 import { useParams, useRouter } from 'next/navigation';
@@ -17,6 +17,7 @@ import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
 import { deleteDoc } from 'firebase/firestore';
+import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 
 type ChannelPrices = {
   offline?: number;
@@ -83,11 +84,50 @@ export default function EditProductPage() {
     stockByWarehouse: {} as Record<string, number>
   });
 
+  const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
+  const [pricingRuleKey, setPricingRuleKey] = useState<string>('AUTO');
+  const [pricingMarginPercent, setPricingMarginPercent] = useState<number>(0);
+  const [pricingRoundingStep, setPricingRoundingStep] = useState<number>(100);
+
   // Cost History State
   const [costHistory, setCostHistory] = useState<any[]>([]);
   const [stockReason, setStockReason] = useState<'MANUAL' | 'OPNAME' | 'TRANSFER'>('MANUAL');
 
   const formDataRef = useRef(formData); // Ref to keep track of latest formData for logs if needed
+  
+  const pricingRec = useMemo(() => {
+    if (pricingMode !== 'RECOMMENDED') return null;
+    return recommendSellingPrice({
+      cost: Number(formData.Modal || 0),
+      name: formData.Nama,
+      category: formData.Kategori,
+      ruleKey: pricingRuleKey,
+      marginPercent: pricingMarginPercent,
+      roundingStep: pricingRoundingStep,
+    });
+  }, [pricingMode, formData.Modal, formData.Nama, formData.Kategori, pricingRuleKey, pricingMarginPercent, pricingRoundingStep]);
+
+  const applyRecommendedEcer = (price: number) => {
+    const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
+    setFormData((prev) => ({ ...prev, Ecer: price }));
+    setUnits((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex((u) => String(u.code || '').toUpperCase() === baseUnit);
+      if (idx >= 0) {
+        next[idx] = { ...next[idx], code: baseUnit, contains: next[idx].contains ?? 1, price };
+        return next;
+      }
+      next.unshift({ code: baseUnit, contains: 1, price, label: '' });
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (pricingMode !== 'RECOMMENDED') return;
+    if (!pricingRec) return;
+    if (Number(formData.Ecer || 0) === pricingRec.recommendedPrice) return;
+    applyRecommendedEcer(pricingRec.recommendedPrice);
+  }, [pricingMode, pricingRec, formData.Ecer, formData.Satuan]);
   
   const fetchCostHistory = useCallback(async () => {
     try {
@@ -144,6 +184,19 @@ export default function EditProductPage() {
         warehouseId: data.warehouseId || '',
         stockByWarehouse: data.stockByWarehouse || {}
       }));
+
+      const ps = (data as any).pricingStrategy as PricingStrategy | undefined;
+      if (ps?.mode === 'margin') {
+        setPricingMode('RECOMMENDED');
+        setPricingRuleKey(String(ps.ruleKey || 'AUTO'));
+        setPricingMarginPercent(Number(ps.marginPercent || 0));
+        setPricingRoundingStep(Number(ps.roundingStep || 100));
+      } else {
+        setPricingMode('MANUAL');
+        setPricingRuleKey('AUTO');
+        setPricingMarginPercent(0);
+        setPricingRoundingStep(100);
+      }
 
       // Handle Units
       const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
@@ -388,6 +441,15 @@ export default function EditProductPage() {
         Lokasi: formData.Lokasi || '',
         units: ensuredBase,
         channelPricing,
+        pricingStrategy:
+          pricingMode === 'RECOMMENDED' && pricingRec
+            ? {
+                mode: 'margin',
+                ruleKey: pricingRec.rule.key,
+                marginPercent: pricingRec.marginPercent,
+                roundingStep: pricingRec.roundingStep,
+              }
+            : { mode: 'manual' },
         updatedAt: serverTimestamp(),
       };
 
@@ -637,12 +699,78 @@ export default function EditProductPage() {
                     <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
                   )}
                 </div>
-                <input required type="number" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
+                <input required type="number" disabled={pricingMode === 'RECOMMENDED'} className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600 disabled:opacity-70" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Coret</label>
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
+            </div>
+            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Mode Harga</label>
+                  <select
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm"
+                    value={pricingMode}
+                    onChange={(e) => setPricingMode(e.target.value === 'RECOMMENDED' ? 'RECOMMENDED' : 'MANUAL')}
+                  >
+                    <option value="MANUAL">Manual</option>
+                    <option value="RECOMMENDED">Ikuti rekomendasi</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Profil Margin</label>
+                  <select
+                    disabled={pricingMode !== 'RECOMMENDED'}
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    value={pricingRuleKey}
+                    onChange={(e) => setPricingRuleKey(e.target.value)}
+                  >
+                    {MARGIN_RULES.map((r) => (
+                      <option key={r.key} value={r.key}>
+                        {r.label} ({r.min}-{r.max}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Margin (%)</label>
+                  <input
+                    type="number"
+                    disabled={pricingMode !== 'RECOMMENDED'}
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    value={pricingMarginPercent || ''}
+                    onChange={(e) => setPricingMarginPercent(Number(e.target.value || 0))}
+                    placeholder={pricingRec ? String(pricingRec.marginPercent.toFixed(1)) : ''}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Pembulatan</label>
+                  <select
+                    disabled={pricingMode !== 'RECOMMENDED'}
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    value={pricingRoundingStep}
+                    onChange={(e) => setPricingRoundingStep(Number(e.target.value || 100))}
+                  >
+                    <option value={1}>Tanpa pembulatan</option>
+                    <option value={50}>Kelipatan 50</option>
+                    <option value={100}>Kelipatan 100</option>
+                    <option value={500}>Kelipatan 500</option>
+                    <option value={1000}>Kelipatan 1000</option>
+                  </select>
+                </div>
+              </div>
+              {pricingMode === 'RECOMMENDED' && pricingRec && (
+                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="text-xs font-black text-slate-700">
+                    Rekomendasi: Rp{pricingRec.recommendedPrice.toLocaleString('id-ID')} ({pricingRec.rule.label}, {pricingRec.rule.min}-{pricingRec.rule.max}%)
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Efektif: {pricingRec.effectiveMarginPercent.toFixed(2)}%
+                  </div>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
               <div className="space-y-1">

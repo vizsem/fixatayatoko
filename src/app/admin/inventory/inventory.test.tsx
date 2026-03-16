@@ -80,32 +80,24 @@ vi.mock('@/lib/notify', () => ({
   },
 }));
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Box: () => <div data-testid="box-icon">Box</div>,
-  Search: () => <div data-testid="search-icon">Search</div>,
-  Plus: () => <div data-testid="plus-icon">Plus</div>,
-  ArrowUpRight: () => <div data-testid="arrow-up-right-icon">ArrowUpRight</div>,
-  ArrowDownLeft: () => <div data-testid="arrow-down-left-icon">ArrowDownLeft</div>,
-  RefreshCw: () => <div data-testid="refresh-icon">Refresh</div>,
-  ClipboardCheck: () => <div data-testid="clipboard-icon">Clipboard</div>,
-  Package: () => <div data-testid="package-icon">Package</div>,
-  Warehouse: () => <div data-testid="warehouse-icon">Warehouse</div>,
-  ChevronRight: () => <div data-testid="chevron-right-icon">ChevronRight</div>,
-  ChevronLeft: () => <div data-testid="chevron-left-icon">ChevronLeft</div>,
-  Download: () => <div data-testid="download-icon">Download</div>,
-  Activity: () => <div data-testid="activity-icon">Activity</div>,
-  ListFilter: () => <div data-testid="filter-icon">Filter</div>,
-  CheckSquare: () => <div data-testid="check-square-icon">CheckSquare</div>,
-  Square: () => <div data-testid="square-icon">Square</div>,
-  X: () => <div data-testid="x-icon">X</div>,
-  MapPinned: () => <div data-testid="map-pinned-icon">MapPinned</div>,
-  FolderInput: () => <div data-testid="folder-input-icon">FolderInput</div>,
-  EyeOff: () => <div data-testid="eye-off-icon">EyeOff</div>,
-  Check: () => <div data-testid="check-icon">Check</div>,
-  ScanBarcode: () => <div data-testid="barcode-icon">ScanBarcode</div>,
-  ImageIcon: () => <div data-testid="image-icon">Image</div>,
-}));
+vi.mock('lucide-react', () => {
+  const toKebab = (s: string) =>
+    s
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/_/g, '-')
+      .toLowerCase();
+
+  return new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        if (prop === '__esModule') return true;
+        const name = String(prop);
+        return () => <div data-testid={`${toKebab(name)}-icon`}>{name}</div>;
+      },
+    },
+  );
+});
 
 // Mock next/link
 vi.mock('next/link', () => ({

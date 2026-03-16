@@ -84,30 +84,24 @@ vi.mock('@/components/ErrorBoundary', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Plus: () => <div data-testid="plus-icon">Plus</div>,
-  Edit: () => <div data-testid="edit-icon">Edit</div>,
-  Trash2: () => <div data-testid="trash-icon">Trash</div>,
-  Download: () => <div data-testid="download-icon">Download</div>,
-  Upload: () => <div data-testid="upload-icon">Upload</div>,
-  Search: () => <div data-testid="search-icon">Search</div>,
-  X: () => <div data-testid="x-icon">X</div>,
-  Camera: () => <div data-testid="camera-icon">Camera</div>,
-  Warehouse: () => <div data-testid="warehouse-icon">Warehouse</div>,
-  Calculator: () => <div data-testid="calculator-icon">Calculator</div>,
-  Eye: () => <div data-testid="eye-icon">Eye</div>,
-  EyeOff: () => <div data-testid="eye-off-icon">EyeOff</div>,
-  ChevronLeft: () => <div data-testid="chevron-left-icon">ChevronLeft</div>,
-  ChevronRight: () => <div data-testid="chevron-right-icon">ChevronRight</div>,
-  FileSpreadsheet: () => <div data-testid="spreadsheet-icon">Spreadsheet</div>,
-  AlertTriangle: () => <div data-testid="alert-icon">Alert</div>,
-  Package: () => <div data-testid="package-icon">Package</div>,
-  Banknote: () => <div data-testid="banknote-icon">Banknote</div>,
-  RefreshCw: () => <div data-testid="refresh-icon">Refresh</div>,
-  CheckSquare: () => <div data-testid="check-square-icon">CheckSquare</div>,
-  Square: () => <div data-testid="square-icon">Square</div>,
-}));
+vi.mock('lucide-react', () => {
+  const toKebab = (s: string) =>
+    s
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/_/g, '-')
+      .toLowerCase();
+
+  return new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        if (prop === '__esModule') return true;
+        const name = String(prop);
+        return () => <div data-testid={`${toKebab(name)}-icon`}>{name}</div>;
+      },
+    },
+  );
+});
 
 // Mock next/link
 vi.mock('next/link', () => ({

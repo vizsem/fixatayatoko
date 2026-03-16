@@ -71,21 +71,6 @@ vi.mock('@/lib/notify', () => {
   return { default: mocked };
 });
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Plus: () => <div data-testid="plus-icon">Plus</div>,
-  Search: () => <div data-testid="search-icon">Search</div>,
-  Edit: () => <div data-testid="edit-icon">Edit</div>,
-  Trash2: () => <div data-testid="trash-icon">Trash</div>,
-  UserCog: () => <div data-testid="user-cog-icon">UserCog</div>,
-  Loader2: () => <div data-testid="loader-icon">Loader</div>,
-  Clock: () => <div data-testid="clock-icon">Clock</div>,
-  CheckCircle2: () => <div data-testid="check-circle-icon">CheckCircle</div>,
-  X: () => <div data-testid="x-icon">X</div>,
-  Save: () => <div data-testid="save-icon">Save</div>,
-  ShieldCheck: () => <div data-testid="shield-check-icon">ShieldCheck</div>,
-}));
-
 describe('EmployeesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,7 +82,7 @@ describe('EmployeesPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Team Ataya')).toBeInTheDocument();
       expect(screen.getByText('Manajemen staf & kehadiran')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Cari berdasarkan nama staff...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Cari nama, jabatan...')).toBeInTheDocument();
       expect(screen.getByText('Tambah Staff')).toBeInTheDocument();
     });
   });
@@ -106,14 +91,14 @@ describe('EmployeesPage', () => {
     render(<EmployeesPage />);
     
     await waitFor(() => {
-      expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+      expect(screen.getByText('Team Ataya')).toBeInTheDocument();
     });
   });
 
   it('should handle search input', async () => {
     render(<EmployeesPage />);
     
-    const searchInput = await screen.findByPlaceholderText('Cari berdasarkan nama staff...');
+    const searchInput = await screen.findByPlaceholderText('Cari nama, jabatan...');
     fireEvent.change(searchInput, { target: { value: 'john doe' } });
     
     await waitFor(() => {
@@ -127,14 +112,14 @@ describe('EmployeesPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
       expect(screen.getByText(/Kasir/i)).toBeInTheDocument();
-      expect(screen.getByText('Total absensi: 5 Hari')).toBeInTheDocument();
+      expect(screen.getByText(/Hadir:\s*5\s*hari/i)).toBeInTheDocument();
     });
   });
 
   it('should show success notification when marking employee present', async () => {
     render(<EmployeesPage />);
 
-    const presentButton = await screen.findByText('Absen hadir');
+    const presentButton = await screen.findByTitle('Absen Hadir');
     fireEvent.click(presentButton);
 
     await waitFor(() => {

@@ -113,18 +113,6 @@ vi.mock('react-hot-toast', () => ({
   },
 }));
 
-vi.mock('lucide-react', () => ({
-  Download: () => <div data-testid="download-icon">Download</div>,
-  Users: () => <div data-testid="users-icon">Users</div>,
-  Warehouse: () => <div data-testid="warehouse-icon">Warehouse</div>,
-  Package: () => <div data-testid="package-icon">Package</div>,
-  Activity: () => <div data-testid="activity-icon">Activity</div>,
-  Clock: () => <div data-testid="clock-icon">Clock</div>,
-  AlertTriangle: () => <div data-testid="alert-icon">Alert</div>,
-  ShoppingCart: () => <div data-testid="shopping-cart-icon">ShoppingCart</div>,
-  Database: () => <div data-testid="database-icon">Database</div>,
-}));
-
 vi.mock('xlsx', () => ({
   utils: {
     json_to_sheet: vi.fn(),

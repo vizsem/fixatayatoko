@@ -8,13 +8,6 @@ vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('lucide-react', () => ({
-  ChevronLeft: () => <div />,
-  Search: () => <div />,
-  Save: () => <div />,
-  Tag: () => <div />,
-}));
-
 vi.mock('firebase/firestore', () => {
   const products = [
     {
@@ -75,7 +68,7 @@ describe('ChannelPricingPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Harga per Channel')).toBeInTheDocument();
-      expect(screen.getByText('Produk Satu')).toBeInTheDocument();
+      expect(screen.getAllByText('Produk Satu').length).toBeGreaterThan(0);
       expect(screen.getByText(/Harga dasar: Rp 10.000/)).toBeInTheDocument();
     });
   });
@@ -87,7 +80,7 @@ describe('ChannelPricingPage', () => {
     render(<ChannelPricingPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Produk Satu')).toBeInTheDocument();
+      expect(screen.getAllByText('Produk Satu').length).toBeGreaterThan(0);
     });
 
     const inputs = screen.getAllByRole('spinbutton');
