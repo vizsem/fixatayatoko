@@ -2,52 +2,55 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import EmployeesPage from './page';
-import notify from '@/lib/notify';
 
 // Mock Firebase dependencies
+const mockGetDocs = vi.fn();
+const mockGetDoc = vi.fn();
+const mockRunTransaction = vi.fn();
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),
   doc: vi.fn(),
   updateDoc: vi.fn(),
   query: vi.fn(),
   orderBy: vi.fn(),
-  getDocs: vi.fn(() =>
-    Promise.resolve({
-      docs: [
-        {
-          id: 'emp1',
-          data: () => ({
-            name: 'Budi Santoso',
-            role: 'Kasir',
-            email: 'budi@example.com',
-            phone: '08123456789',
-            status: 'AKTIF',
-            manualSalary: 3000000,
-            workSchedule: '07:00 - 14:00',
-            totalAttendance: 5,
-          }),
-        },
-      ],
-    }),
-  ),
+  where: vi.fn(),
+  getDocs: (...args: unknown[]) => mockGetDocs(...args),
+  getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  runTransaction: (...args: unknown[]) => mockRunTransaction(...args),
   increment: vi.fn(),
   addDoc: vi.fn(),
   deleteDoc: vi.fn(),
   serverTimestamp: vi.fn(),
-  writeBatch: vi.fn(() => ({
-    update: vi.fn(),
-    set: vi.fn(),
-    commit: vi.fn(),
-  })),
   arrayUnion: vi.fn(),
   setDoc: vi.fn(),
-  Timestamp: {
-    now: vi.fn(),
-  },
 }));
 
 vi.mock('@/lib/firebase', () => ({
+  auth: {},
   db: {},
+}));
+
+vi.mock('firebase/auth', () => ({
+  onAuthStateChanged: (_auth: unknown, cb: (user: { uid: string } | null) => void) => {
+    cb({ uid: 'admin-user' });
+    return () => {};
+  },
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock('jspdf', () => ({
+  default: function () {
+    return {
+      setFontSize: vi.fn(),
+      text: vi.fn(),
+      line: vi.fn(),
+      save: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -74,6 +77,44 @@ vi.mock('@/lib/notify', () => {
 describe('EmployeesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ role: 'admin' }),
+    });
+
+    mockGetDocs.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 'emp1',
+          data: () => ({
+            name: 'Budi Santoso',
+            role: 'Kasir',
+            email: 'budi@example.com',
+            phone: '08123456789',
+            status: 'AKTIF',
+            manualSalary: 3000000,
+            workSchedule: '07:00 - 14:00',
+            totalAttendance: 5,
+          }),
+        },
+      ],
+    });
+    mockGetDocs.mockResolvedValue({
+      docs: [],
+    });
+
+    mockRunTransaction.mockImplementation(async (_db: unknown, fn: (tx: any) => unknown) => {
+      const tx = {
+        get: vi.fn(async () => ({
+          exists: () => true,
+          data: () => ({}),
+        })),
+        set: vi.fn(),
+        update: vi.fn(),
+      };
+      return await fn(tx);
+    });
   });
 
   it('should render employees page with main sections', async () => {
@@ -123,7 +164,7 @@ describe('EmployeesPage', () => {
     fireEvent.click(presentButton);
 
     await waitFor(() => {
-      expect(notify.admin.success).toHaveBeenCalled();
+      expect(mockRunTransaction).toHaveBeenCalled();
     });
   });
 });

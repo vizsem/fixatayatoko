@@ -34,7 +34,7 @@ type UserDoc = {
   email: string;
   name: string;
   phone?: string;
-  role: 'admin' | 'cashier' | 'user';
+  role: 'admin' | 'hr' | 'supervisor' | 'cashier' | 'user';
   createdAt: string;
 };
 
@@ -94,13 +94,13 @@ export default function AdminUsers() {
   }, [router, fetchUsers]);
 
 
-  const handleUpdateRole = async (userId: string, newRole: 'admin' | 'cashier' | 'user') => {
+  const handleUpdateRole = async (userId: string, newRole: UserDoc['role']) => {
     if (userId === currentUser) {
       notify.admin.error('Anda tidak bisa mengubah role diri sendiri.');
       return;
     }
 
-    if (newRole === 'admin' && !confirm('Yakin memberikan akses admin?')) {
+    if ((newRole === 'admin' || newRole === 'hr') && !confirm('Yakin memberikan akses role ini?')) {
       return;
     }
 
@@ -138,6 +138,8 @@ export default function AdminUsers() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-red-100 text-red-800';
+      case 'hr': return 'bg-emerald-100 text-emerald-800';
+      case 'supervisor': return 'bg-indigo-100 text-indigo-800';
       case 'cashier': return 'bg-blue-100 text-blue-800';
       case 'user': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -147,6 +149,8 @@ export default function AdminUsers() {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <Shield className="text-red-600" size={16} />;
+      case 'hr': return <UserCheck className="text-emerald-600" size={16} />;
+      case 'supervisor': return <Shield className="text-indigo-600" size={16} />;
       case 'cashier': return <UserCheck className="text-blue-600" size={16} />;
       case 'user': return <User className="text-gray-600" size={16} />;
       default: return <User className="text-gray-600" size={16} />;
@@ -188,7 +192,7 @@ export default function AdminUsers() {
       )}
 
       {/* Ringkasan Role */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
           <div className="flex items-center">
             <Shield className="text-red-600 mr-2" size={24} />
@@ -196,6 +200,28 @@ export default function AdminUsers() {
               <p className="text-sm text-black">Admin</p>
               <p className="font-bold text-black">
                 {users.filter(u => u.role === 'admin').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <UserCheck className="text-emerald-600 mr-2" size={24} />
+            <div>
+              <p className="text-sm text-black">HR</p>
+              <p className="font-bold text-black">
+                {users.filter(u => u.role === 'hr').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <Shield className="text-indigo-600 mr-2" size={24} />
+            <div>
+              <p className="text-sm text-black">Supervisor</p>
+              <p className="font-bold text-black">
+                {users.filter(u => u.role === 'supervisor').length}
               </p>
             </div>
           </div>
@@ -288,6 +314,8 @@ export default function AdminUsers() {
                           >
 
                             <option value="admin">Admin</option>
+                            <option value="hr">HR</option>
+                            <option value="supervisor">Supervisor</option>
                             <option value="cashier">Kasir</option>
                             <option value="user">Pelanggan</option>
                           </select>
@@ -356,6 +384,8 @@ export default function AdminUsers() {
                           className="text-xs font-bold border-none bg-white rounded-lg px-2 py-1 shadow-sm focus:ring-0"
                         >
                           <option value="admin">Admin</option>
+                          <option value="hr">HR</option>
+                          <option value="supervisor">Supervisor</option>
                           <option value="cashier">Kasir</option>
                           <option value="user">Pelanggan</option>
                         </select>
