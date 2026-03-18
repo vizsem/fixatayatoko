@@ -26,7 +26,7 @@ export default function LoginPage() {
   // Proteksi: Jika sudah login, jangan boleh ke halaman ini, lempar ke profil
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+      if (user && !user.isAnonymous) {
         router.push('/profil');
       }
     });

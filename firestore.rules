@@ -41,9 +41,19 @@ service cloud.firestore {
 
     // 2. ORDERS
     match /orders/{orderId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if isStaff();
+      function isOrderOwner() {
+        return isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      function isCustomerCompletingOrder() {
+        return isOrderOwner()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.status == 'SELESAI';
+      }
+
+      allow get, list: if isOrderOwner() || isStaff();
+      allow create: if isStaff();
+      allow update: if isStaff() || isCustomerCompletingOrder();
       allow delete: if isAdmin();
     }
 

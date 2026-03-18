@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { doc, getDoc, collection, getDocs, query, orderBy, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export type Review = {
   id: string;
@@ -121,12 +122,14 @@ export default function ProductDetailClient({
   };
 
   useEffect(() => {
-    let tempId = localStorage.getItem('temp_user_id');
-    if (!tempId) {
-      tempId = 'user_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('temp_user_id', tempId);
-    }
-    setUserId(tempId);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      const id = u?.uid || localStorage.getItem('temp_user_id') || '';
+      if (!id) return;
+      try {
+        localStorage.setItem('temp_user_id', id);
+      } catch {}
+      setUserId(id);
+    });
 
     if (product) {
         const wishlist = getWishlist();
@@ -134,6 +137,7 @@ export default function ProductDetailClient({
     }
     
     setLoading(false);
+    return () => unsub();
   }, [product]);
 
   const syncToFirebaseCart = async (p: Product, q: number) => {

@@ -124,6 +124,16 @@ npm run build
 npm start
 ```
 
+### Firestore Rules
+Project ini menggunakan `firestore.rules` untuk membatasi akses:
+- User hanya bisa membaca pesanan miliknya sendiri.
+- User tidak bisa mengubah status pembayaran (diupdate oleh server/webhook).
+
+Jika kamu memakai Firebase CLI:
+```bash
+firebase deploy --only firestore:rules
+```
+
 ### Environment Variables Production
 Pastikan semua environment variables sudah diset untuk production:
 - `NEXT_PUBLIC_*` variables untuk frontend

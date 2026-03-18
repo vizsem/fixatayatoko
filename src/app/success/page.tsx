@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Order, OrderItem } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
+import { onAuthStateChanged } from 'firebase/auth';
 
 
 function SuccessContent() {
@@ -31,18 +32,10 @@ function SuccessContent() {
       try {
         // PERBAIKAN: Menggunakan Query where('orderId') 
         // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
-        const q = query(
-          collection(db, 'orders'),
-          where('orderId', '==', orderId),
-          limit(1)
-        );
-
+        const q = query(collection(db, 'orders'), where('orderId', '==', orderId), limit(1));
         const querySnapshot = await getDocs(q);
-
         if (!querySnapshot.empty) {
           setOrderData({ id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Order);
-        } else {
-          console.warn("Pesanan tidak ditemukan di database.");
         }
       } catch (error) {
         console.error("Gagal mengambil data pesanan:", error);
@@ -50,7 +43,10 @@ function SuccessContent() {
         setLoading(false);
       }
     };
-    fetchOrder();
+    const unsub = onAuthStateChanged(auth, () => {
+      fetchOrder();
+    });
+    return () => unsub();
   }, [orderId]);
 
   useEffect(() => {

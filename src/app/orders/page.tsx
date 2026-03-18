@@ -11,6 +11,8 @@ import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { EmptyState, SkeletonList } from '@/components/UIState';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 type FirebaseOrder = {
   status?: string;
@@ -50,8 +52,7 @@ export default function UserOrdersPage() {
 
   useEffect(() => {
     const fetchUserOrders = async () => {
-      // Ambil ID User dari localStorage
-      const userId = localStorage.getItem('temp_user_id');
+      const userId = auth.currentUser?.uid || localStorage.getItem('temp_user_id');
       
       if (!userId) {
         setLoading(false);
@@ -105,8 +106,10 @@ export default function UserOrdersPage() {
         setLoading(false);
       }
     };
-
-    fetchUserOrders();
+    const unsub = onAuthStateChanged(auth, () => {
+      fetchUserOrders();
+    });
+    return () => unsub();
   }, []);
 
   const getStatusInfo = (status: string) => {
@@ -244,7 +247,7 @@ export default function UserOrdersPage() {
                 disabled={loadingMore}
                 onClick={async () => {
                   if (loadingMore) return;
-                  const userId = localStorage.getItem('temp_user_id');
+                  const userId = auth.currentUser?.uid || localStorage.getItem('temp_user_id');
                   if (!userId || !lastDoc) return;
                   setLoadingMore(true);
                   try {

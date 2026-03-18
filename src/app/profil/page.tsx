@@ -101,6 +101,10 @@ export default function ProfilePage() {
         router.push('/profil/login');
         return;
       }
+      if (firebaseUser.isAnonymous) {
+        router.push('/profil/login');
+        return;
+      }
       setUser(firebaseUser);
 
       // Real-time Listener Data User

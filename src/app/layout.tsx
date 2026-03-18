@@ -5,6 +5,7 @@ import MobileNav from '@/components/MobileNav';
 import { Toaster } from 'react-hot-toast';
 import FCMManager from '@/components/FCMManager';
 import CustomerChatWidget from '@/components/CustomerChatWidget';
+import AuthBootstrap from '@/components/AuthBootstrap';
 
 declare global {
   interface Window {
@@ -57,6 +58,7 @@ export default function RootLayout({
 
       <body className="antialiased overflow-x-hidden">
         <Toaster position="top-center" />
+        <AuthBootstrap />
         <FCMManager />
         <CustomerChatWidget />
         {children}
