@@ -52,14 +52,18 @@ export const removeItem = (id: string): void => {
 // ✅ Fungsi Cerdas: Menghitung total harga dengan logika Grosir
 // Jika jumlah barang >= Min_Grosir, gunakan harga Grosir, jika tidak gunakan harga Ecer
 export const getItemPrice = (item: CartItem): number => {
-  // Gunakan optional chaining dan fallback ke 0
-  const grosirPrice = item.wholesalePrice ?? item.Grosir ?? 0;
-  const minGrosirQty = item.minWholesale ?? item.Min_Grosir ?? 0;
-  
-  if (grosirPrice > 0 && minGrosirQty > 0 && item.quantity >= minGrosirQty) {
-    return grosirPrice;
-  }
-  return item.price ?? item.Ecer ?? 0;
+  if (item.promoType === 'TEBUS_MURAH') return 10000;
+
+  const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
+  const baseQty = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
+
+  const baseEcer = Number(item.price ?? item.Ecer ?? 0);
+  const grosirPrice = Number(item.wholesalePrice ?? item.Grosir ?? 0);
+  const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? 0);
+
+  const baseUnitPrice = grosirPrice > 0 && minGrosirQty > 0 && baseQty >= minGrosirQty ? grosirPrice : baseEcer;
+  const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : baseUnitPrice * contains;
+  return unitPrice;
 };
 
 export const getTotalPrice = (cart: CartItem[]): number => {

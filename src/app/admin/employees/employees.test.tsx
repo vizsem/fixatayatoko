@@ -83,7 +83,7 @@ describe('EmployeesPage', () => {
       data: () => ({ role: 'admin' }),
     });
 
-    mockGetDocs.mockResolvedValueOnce({
+    mockGetDocs.mockResolvedValue({
       docs: [
         {
           id: 'emp1',
@@ -99,9 +99,6 @@ describe('EmployeesPage', () => {
           }),
         },
       ],
-    });
-    mockGetDocs.mockResolvedValue({
-      docs: [],
     });
 
     mockRunTransaction.mockImplementation(async (_db: unknown, fn: (tx: any) => unknown) => {

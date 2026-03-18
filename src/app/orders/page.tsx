@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react';
 import {
   ShoppingBag, Clock, ChevronRight, Package,
   Truck, CheckCircle2, AlertCircle,
-  HomeIcon, LayoutGrid, ReceiptText, User,
   Coins, Ticket
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { EmptyState, SkeletonList } from '@/components/UIState';
 
 type FirebaseOrder = {
@@ -48,7 +47,6 @@ export default function UserOrdersPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<import('firebase/firestore').QueryDocumentSnapshot | null>(null);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const fetchUserOrders = async () => {
@@ -300,25 +298,6 @@ export default function UserOrdersPage() {
         )}
       </div>
 
-      {/* BOTTOM NAVIGATION */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-4 pb-6 pt-2 bg-gradient-to-t from-gray-50 via-gray-50/80 to-transparent">
-        <div className="bg-gray-900 rounded-[2.5rem] shadow-2xl border border-white/10 p-2 flex items-center justify-between backdrop-blur-xl">
-          {[
-            { name: 'Home', icon: HomeIcon, path: '/' },
-            { name: 'Kategori', icon: LayoutGrid, path: '/semua-kategori' },
-            { name: 'Pesanan', icon: ReceiptText, path: '/orders' },
-            { name: 'Profil', icon: User, path: '/profil' },
-          ].map((item) => {
-            const isActive = pathname === item.path;
-            return (
-              <Link key={item.name} href={item.path} className={`flex flex-col items-center justify-center py-2 px-5 rounded-full transition-all duration-300 ${isActive ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-                <item.icon size={20} strokeWidth={isActive ? 3 : 2} />
-                <span className={`text-[8px] font-black uppercase mt-1 tracking-widest ${isActive ? 'block' : 'hidden'}`}>{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 }

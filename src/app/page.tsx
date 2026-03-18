@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { UnitOption } from '@/lib/types';
 
 // --- TYPES ---
 type Product = {
   minWholesale: number; id: string; name: string; price: number;
   wholesalePrice: number; stock: number; category: string;
   unit: string; barcode?: string; image: string; variant?: string;
+  units?: Array<UnitOption & { minQty?: number }>;
 };
 
 type Category = { id: string; name: string; slug: string; };
@@ -64,7 +66,7 @@ type NotificationItem = {
 };
 
 const SkeletonCard = () => (
-  <div className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+  <div className="min-w-[165px] md:min-w-[210px] bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
     <div className="aspect-square bg-gray-200" />
     <div className="p-3 space-y-2">
       <div className="h-3 bg-gray-200 rounded w-3/4" />
@@ -128,7 +130,10 @@ export default function Home() {
     const cart = cartString ? JSON.parse(cartString) : [];
     const idx = cart.findIndex((item: { id: string }) => item.id === product.id);
     if (idx >= 0) cart[idx].quantity += 1;
-    else cart.push({ ...product, price, quantity: 1 });
+    else {
+      const baseUnit = (product.unit || 'PCS').toString().toUpperCase();
+      cart.push({ ...product, price, quantity: 1, baseUnit, unit: baseUnit, unitContains: 1, basePrice: price, unitPrice: price, units: product.units || [] });
+    }
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-updated'));
   }, [getDiscountedPrice]);
@@ -353,10 +358,17 @@ export default function Home() {
         wholesalePrice: Number(p.priceGrosir || p.priceEcer || 0),
         minWholesale: Number(minQtyUnit?.minQty || 1),
         stock: finalStock,
-        unit: p.unit || 'pcs',
+        unit: (p.unit || 'PCS').toString().toUpperCase(),
         category: p.category || 'Umum',
         image: p.imageUrl || '/logo-atayatoko.png',
-        variant: ''
+        variant: '',
+        units: (p.units || []).map((u) => ({
+          code: (u.code || '').toString().toUpperCase(),
+          contains: Number(u.contains || 0),
+          price: typeof u.price === 'number' ? Number(u.price) : undefined,
+          label: u.label ? String(u.label) : undefined,
+          minQty: typeof u.minQty === 'number' ? Number(u.minQty) : undefined,
+        })).filter((u) => u.code && Number(u.contains || 0) > 0)
       } as Product;
     });
     setProducts(mapped);
@@ -376,9 +388,37 @@ export default function Home() {
     const promoInfo = getDiscountedPrice(product);
     const isOut = product.stock <= 0;
     const isWish = wishlist.includes(product.id);
+    const baseUnit = (product.unit || 'PCS').toString().toUpperCase();
+    const baseDiscount = Math.max(0, Number(product.price || 0) - Number(promoInfo.price || 0));
+
+    const unitList = (() => {
+      const src = (product.units || []).map((u) => ({
+        code: (u.code || '').toString().toUpperCase(),
+        contains: Math.max(1, Math.floor(Number(u.contains || 1))),
+        price: typeof u.price === 'number' ? Number(u.price) : undefined,
+      })).filter((u) => u.code);
+      const list = src.some((u) => u.code === baseUnit) ? src : [{ code: baseUnit, contains: 1 }, ...src];
+      const uniq = new Map<string, { code: string; contains: number; price?: number }>();
+      list.forEach((u) => {
+        if (!uniq.has(u.code)) uniq.set(u.code, u);
+      });
+      const deduped = Array.from(uniq.values());
+      deduped.sort((a, b) => {
+        if (a.code === baseUnit && b.code !== baseUnit) return -1;
+        if (b.code === baseUnit && a.code !== baseUnit) return 1;
+        return a.contains - b.contains;
+      });
+      return deduped;
+    })();
+
+    const unitPrice = (u: { code: string; contains: number; price?: number }) => {
+      const baseUnitPrice = Number(u.price ?? (Number(product.price || 0) * Number(u.contains || 1)));
+      const discounted = promoInfo.hasPromo ? Math.max(0, baseUnitPrice - (baseDiscount * Number(u.contains || 1))) : baseUnitPrice;
+      return Math.round(discounted);
+    };
 
     return (
-      <div className="min-w-[155px] md:min-w-[190px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm flex flex-col relative group">
+      <div className="min-w-[165px] md:min-w-[210px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm hover:shadow-md transition-shadow flex flex-col relative group">
         <button onClick={() => {
           const newWish = wishlist.includes(product.id) ? wishlist.filter(i => i !== product.id) : [...wishlist, product.id];
           setWishlist(newWish);
@@ -407,23 +447,49 @@ export default function Home() {
         </Link>
 
         <div className="p-3 flex flex-col flex-1">
-          <h3 className="text-[10px] md:text-xs font-bold text-gray-700 line-clamp-1 uppercase leading-tight">{product.name}</h3>
-          <p className="text-[8px] font-bold text-gray-400 mb-2 uppercase">{product.variant || 'Standar'}</p>
+          <h3 className="text-[10px] md:text-xs font-black text-gray-800 line-clamp-2 uppercase leading-tight">{product.name}</h3>
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-[8px] font-bold text-gray-400 uppercase">{product.category}</p>
+            <p className={`text-[8px] font-black uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {isOut ? 'Habis' : `Stok ${product.stock}`}
+            </p>
+          </div>
 
           <div className="flex flex-col mb-3">
-            {promoInfo.hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{product.price.toLocaleString()}</span>}
+            {promoInfo.hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{Number(product.price || 0).toLocaleString('id-ID')}</span>}
             <div className="flex items-baseline gap-1">
-              <span className={`text-[15px] font-black ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>Rp{promoInfo.price.toLocaleString('id-ID')}</span>
-              <span className="text-[9px] font-bold text-gray-400">/{product.unit}</span>
+              <span className={`text-[15px] font-black ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
+              <span className="text-[9px] font-black text-gray-400">/{baseUnit}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {unitList.slice(0, 4).map((u) => (
+                <span
+                  key={u.code}
+                  className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-700"
+                  title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
+                >
+                  <span className="text-gray-900">{u.code}</span>
+                  {u.contains > 1 && <span className="text-gray-400">×{u.contains}</span>}
+                  <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
+                </span>
+              ))}
+              {unitList.length > 4 && (
+                <span
+                  className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-500"
+                  title={unitList.slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
+                >
+                  +{unitList.length - 4}
+                </span>
+              )}
             </div>
 
             <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
               <div className="flex justify-between items-center text-[8px] font-black uppercase italic text-blue-500">
                 <span>Grosir</span>
-                <span className="text-slate-900 not-italic">Rp{product.wholesalePrice.toLocaleString()}</span>
+                <span className="text-slate-900 not-italic">Rp{Number(product.wholesalePrice || 0).toLocaleString('id-ID')}</span>
               </div>
               <span className="text-[7px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter">
-                Min. {product.minWholesale} {product.unit}
+                Min. {product.minWholesale} {baseUnit}
               </span>
             </div>
           </div>
@@ -820,6 +886,7 @@ export default function Home() {
                 <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
                   {repurchaseProducts.map(p => {
                     const { price, hasPromo } = getDiscountedPrice(p);
+                    const baseUnit = (p.unit || 'PCS').toString().toUpperCase();
                     return (
                       <div key={`rep-${p.id}`} className="min-w-[155px] md:min-w-[190px] snap-center bg-white rounded-2xl border border-gray-100 overflow-hidden relative group">
                         <Link href={`/produk/${p.id}`} className="block aspect-square bg-gray-50 relative">
@@ -836,8 +903,8 @@ export default function Home() {
                         <div className="p-3">
                           <h3 className="text-[10px] font-bold text-gray-800 line-clamp-2 min-h-[30px] uppercase tracking-tight mb-2 leading-tight">{p.name}</h3>
                           <div className="flex flex-col gap-0.5 mb-3">
-                             {hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{p.price.toLocaleString()}</span>}
-                             <span className="text-xs font-black text-green-600">Rp{price.toLocaleString()}</span>
+                             {hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{Number(p.price || 0).toLocaleString('id-ID')}</span>}
+                             <span className="text-xs font-black text-green-600">Rp{Number(price || 0).toLocaleString('id-ID')} <span className="text-[9px] font-black text-gray-400">/{baseUnit}</span></span>
                           </div>
                           <button 
                             onClick={() => addToCart(p)}

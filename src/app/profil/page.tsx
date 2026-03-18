@@ -232,9 +232,17 @@ export default function ProfilePage() {
             <h1 className="text-sm font-bold text-slate-800 uppercase tracking-tight underline decoration-emerald-500 underline-offset-4">Akun Saya</h1>
           </div>
           
-          <button onClick={() => setShowNotif(!showNotif)} className="relative p-3 bg-slate-100 rounded-2xl text-slate-500 group">
-            <Bell size={20} className={activeOrdersCount > 0 ? 'animate-bounce' : ''} />
-            {activeOrdersCount > 0 && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>}
+          <button
+            onClick={() => setShowNotif(!showNotif)}
+            className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
+            title="Notifikasi"
+          >
+            <Bell size={22} strokeWidth={1.8} className={activeOrdersCount > 0 ? 'animate-bounce' : ''} />
+            {activeOrdersCount > 0 && (
+              <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
+              </span>
+            )}
           </button>
         </div>
 

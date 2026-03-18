@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Order, OrderItem } from '@/lib/types';
 import toast from 'react-hot-toast';
+import { QRCodeSVG } from 'qrcode.react';
 
 
 function SuccessContent() {
@@ -15,6 +16,7 @@ function SuccessContent() {
   const orderId = searchParams.get('id');
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState<Order | null>(null);
+  const [qrisLoading, setQrisLoading] = useState(false);
 
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -51,12 +53,57 @@ function SuccessContent() {
     fetchOrder();
   }, [orderId]);
 
+  useEffect(() => {
+    const ensureQris = async () => {
+      if (!orderId || !orderData) return;
+      const method = String(orderData.payment?.method || '').toLowerCase();
+      const paymentStatus = String((orderData as any).paymentStatus || '').toUpperCase();
+      const qrContent = String((orderData as any).payment?.bri?.qrContent || '');
+      if (paymentStatus === 'PAID') return;
+      if (method !== 'qris_bri' && method !== 'qris-bri' && method !== 'qris_bri_auto' && method !== 'qris_bri_otomatis') return;
+      if (qrContent) return;
+
+      setQrisLoading(true);
+      try {
+        const resp = await fetch('/api/payments/bri/qris', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data?.qrContent) {
+          setOrderData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              payment: {
+                ...(prev.payment || { method: 'qris_bri' }),
+                bri: {
+                  ...(prev as any)?.payment?.bri,
+                  qrContent: String(data.qrContent),
+                  referenceNo: String(data.referenceNo || ''),
+                },
+              } as any,
+            };
+          });
+        }
+      } finally {
+        setQrisLoading(false);
+      }
+    };
+    ensureQris();
+  }, [orderId, orderData]);
+
   // Logic mapping data agar fleksibel
   const displayTotal = orderData?.total || 0;
   const displayItems = orderData?.items || [];
   const displayMethod = orderData?.delivery?.method || 'Ambil di Toko';
-  const displayPayment = orderData?.payment?.method || 'CASH';
+  const paymentMethodRaw = orderData?.payment?.method || 'CASH';
+  const displayPayment = String(paymentMethodRaw).toLowerCase() === 'qris_bri' ? 'QRIS (BRI)' : paymentMethodRaw;
   const displayCustomer = orderData?.name || orderData?.customerName || 'Pelanggan';
+  const qrisContent = String((orderData as any)?.payment?.bri?.qrContent || '');
+  const isQrisBri = String(paymentMethodRaw).toLowerCase() === 'qris_bri';
+  const isPaid = String((orderData as any)?.paymentStatus || '').toUpperCase() === 'PAID';
 
 
   const printThermal = () => {
@@ -211,6 +258,43 @@ function SuccessContent() {
               </div>
             </div>
           </div>
+
+          {isQrisBri && !isPaid && (
+            <div className="bg-white rounded-2xl border border-emerald-100 p-6 mb-8 text-left">
+              <h3 className="font-black text-emerald-700 text-[10px] uppercase tracking-widest mb-2">Pembayaran QRIS</h3>
+              {qrisLoading && !qrisContent ? (
+                <div className="flex items-center gap-3 text-slate-500">
+                  <Loader2 className="animate-spin" size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Menyiapkan QR...</span>
+                </div>
+              ) : qrisContent ? (
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  <div className="bg-white p-3 rounded-2xl border border-slate-100">
+                    <QRCodeSVG value={qrisContent} size={180} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-slate-600">Scan QR untuk bayar. Setelah berhasil, status akan otomatis berubah.</p>
+                    <div className="mt-4 flex gap-3">
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 active:scale-95 transition-all"
+                      >
+                        Refresh
+                      </button>
+                      <Link
+                        href={`/orders`}
+                        className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black active:scale-95 transition-all inline-flex items-center justify-center"
+                      >
+                        Lihat Pesanan
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs font-bold text-rose-600">QR belum tersedia. Coba refresh.</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button

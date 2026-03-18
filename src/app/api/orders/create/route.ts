@@ -4,6 +4,8 @@ import { adminDb, FieldValue } from '@/lib/firebaseAdmin';
 type IncomingItem = {
   id: string;
   quantity: number;
+  unit?: string;
+  contains?: number;
   promoType?: 'TEBUS_MURAH' | string;
 };
 type ChannelKey = 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
@@ -28,6 +30,7 @@ type ProductData = {
   Link_Foto?: string;
   unit?: string;
   Satuan?: string;
+  units?: { code: string; contains: number; price?: number }[];
   isActive?: boolean; // Added
   status?: string; // Added
   channelPricing?: {
@@ -65,7 +68,7 @@ export async function POST(req: Request) {
     items.sort((a: IncomingItem, b: IncomingItem) => Number(!!a.promoType) - Number(!!b.promoType));
 
     let calculatedSubtotal = 0;
-    const validatedItems: { id: string; name: string; price: number; quantity: number; image?: string; unit: string; total: number }[] = [];
+    const validatedItems: { id: string; name: string; price: number; quantity: number; baseQuantity: number; contains: number; image?: string; unit: string; total: number }[] = [];
 
     const channelKey: ChannelKey =
       ['OFFLINE', 'SHOPEE', 'TIKTOK', 'WEBSITE'].includes(channel)
@@ -87,11 +90,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Produk ${productData.name || productData.Nama} tidak tersedia (diarsipkan).` }, { status: 400 });
       }
 
-      if (productData.stock < item.quantity) {
+      const contains = Math.max(1, Math.floor(Number(item.contains || 1)));
+      const baseQuantity = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
+
+      if (productData.stock < baseQuantity) {
         return NextResponse.json({ error: `Stok ${productData.name || productData.Nama} tidak mencukupi` }, { status: 400 });
       }
 
-      let price = Number(productData.price || productData.Ecer || 0);
+      let baseUnitPrice = Number(productData.price || productData.Ecer || 0);
       const wholesalePrice = Number(productData.wholesalePrice || productData.Grosir || 0);
       const minWholesale = Number(productData.minWholesale || productData.Min_Grosir || 10);
 
@@ -101,22 +107,31 @@ export async function POST(req: Request) {
         };
         const key = mapping[channelKey];
         const channelConfig = productData.channelPricing[key];
-        if (channelConfig?.price != null) price = Number(channelConfig.price);
+        if (channelConfig?.price != null) baseUnitPrice = Number(channelConfig.price);
       }
 
-      if (wholesalePrice > 0 && item.quantity >= minWholesale) price = wholesalePrice;
-      if (item.promoType === 'TEBUS_MURAH' && calculatedSubtotal >= 50000 && item.quantity === 1) price = 10000;
+      if (wholesalePrice > 0 && baseQuantity >= minWholesale) baseUnitPrice = wholesalePrice;
+      if (item.promoType === 'TEBUS_MURAH' && calculatedSubtotal >= 50000 && baseQuantity === 1) baseUnitPrice = 10000;
 
-      const lineTotal = price * item.quantity;
+      const unit = String(item.unit || productData.unit || productData.Satuan || 'pcs');
+      let unitPrice = baseUnitPrice * contains;
+      const unitConfig = Array.isArray(productData.units) ? productData.units.find((u) => String(u.code || '').toUpperCase() === unit.toUpperCase()) : undefined;
+      if (unitConfig?.price != null) {
+        unitPrice = Number(unitConfig.price);
+      }
+
+      const lineTotal = unitPrice * Math.max(1, Math.floor(Number(item.quantity || 0)));
       calculatedSubtotal += lineTotal;
 
       validatedItems.push({
         id: item.id,
         name: productData.name || productData.Nama || 'Produk Tanpa Nama',
-        price: price,
-        quantity: item.quantity,
+        price: unitPrice,
+        quantity: Math.max(1, Math.floor(Number(item.quantity || 0))),
+        baseQuantity,
+        contains,
         image: productData.image || productData.Link_Foto || '',
-        unit: productData.unit || productData.Satuan || 'pcs',
+        unit,
         total: lineTotal
       });
     }
@@ -208,7 +223,7 @@ export async function POST(req: Request) {
         const pData = snap.data() as ProductData;
         
         const currentStock = pData.stock || 0;
-        if (currentStock < item.quantity) {
+        if (currentStock < item.baseQuantity) {
           throw new Error(`Stok ${pData.name || pData.Nama} tidak mencukupi`);
         }
 
@@ -216,7 +231,7 @@ export async function POST(req: Request) {
         const stockByWarehouse = pData.stockByWarehouse || {};
         const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
         
-        let remainingToDeduct = item.quantity;
+        let remainingToDeduct = item.baseQuantity;
         
         // 1. Prioritas Gudang Utama
         if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
@@ -237,7 +252,7 @@ export async function POST(req: Request) {
           }
         }
         
-        const finalTotalStock = currentStock - item.quantity;
+        const finalTotalStock = currentStock - item.baseQuantity;
         productUpdates.push({ 
           ref, 
           newStock: finalTotalStock, 

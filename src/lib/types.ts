@@ -7,6 +7,13 @@ export interface ChannelPriceConfig {
     wholesalePrice?: number;
 }
 
+export interface UnitOption {
+    code: string;
+    contains: number;
+    label?: string;
+    price?: number;
+}
+
 export interface Product {
     id: string;         // ID dokumen Firestore
     name: string;       // Nama Produk (Primary)
@@ -14,6 +21,7 @@ export interface Product {
     stock: number;      // Stok (Primary)
     category: string;   // Kategori (Primary)
     unit: string;       // Satuan (Primary)
+    units?: UnitOption[];
     
     // Optional / Legacy Fields (Mapping from Excel)
     ID?: string;        // Internal ID
@@ -66,6 +74,10 @@ export interface CartItem extends Product {
     quantity: number;
     promoType?: string;
     originalPrice?: number;
+    unitContains?: number;
+    baseUnit?: string;
+    basePrice?: number;
+    unitPrice?: number;
 }
 
 export interface OrderItem {
