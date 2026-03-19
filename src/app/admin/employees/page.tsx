@@ -249,7 +249,7 @@ export default function EmployeesPage() {
   const [monthAttendance, setMonthAttendance] = useState<AttendanceRecord[]>([]);
   const [monthLeave, setMonthLeave] = useState<LeaveRequest[]>([]);
   const [slipBusyId, setSlipBusyId] = useState<string | null>(null);
-  const [payrollAdjustments, setPayrollAdjustments] = useState<Record<string, { allowances: number; deductions: number; overtimeMinutes: number }>>({});
+  const [payrollAdjustments, setPayrollAdjustments] = useState<Record<string, { allowances: number; deductions: number; overtimeMinutes: number; bpjsEmployee?: number; pph21?: number; }>>({});
   const [alphaDeductionPercent, setAlphaDeductionPercent] = useState<number>(50);
 
   const [leaveLoading, setLeaveLoading] = useState(false);
@@ -431,7 +431,7 @@ export default function EmployeesPage() {
       setMonthLeave(leaveSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as LeaveRequest[]);
 
       const adjSnap = await getDocs(query(collection(db, 'payroll_adjustments'), where('month', '==', month)));
-      const nextAdj: Record<string, { allowances: number; deductions: number; overtimeMinutes: number }> = {};
+      const nextAdj: Record<string, { allowances: number; deductions: number; overtimeMinutes: number; bpjsEmployee?: number; pph21?: number; }> = {};
       adjSnap.docs.forEach((d) => {
         const data = d.data() as any;
         const employeeId = String(data.employeeId || '');
@@ -440,6 +440,8 @@ export default function EmployeesPage() {
           allowances: Number(data.allowances || 0),
           deductions: Number(data.deductions || 0),
           overtimeMinutes: Number(data.overtimeMinutes || 0),
+          bpjsEmployee: data.bpjsEmployee !== undefined && data.bpjsEmployee !== null ? Number(data.bpjsEmployee) : undefined,
+          pph21: data.pph21 !== undefined && data.pph21 !== null ? Number(data.pph21) : undefined,
         };
       });
       setPayrollAdjustments(nextAdj);
@@ -1170,13 +1172,15 @@ export default function EmployeesPage() {
         const kpiBonus = Math.round(Number((kpiRow as any).bonusAmount || 0));
 
         const wageKesehatan = Math.min(baseSalary, Number(payrollSettings.bpjs.maxWageKesehatan || 0) || baseSalary);
-        const bpjsEmployee = Math.round((wageKesehatan * Number(payrollSettings.bpjs.kesehatanEmployeePct || 0)) / 100) + Math.round((baseSalary * Number(payrollSettings.bpjs.tkEmployeePct || 0)) / 100);
+        const defaultBpjsEmployee = Math.round((wageKesehatan * Number(payrollSettings.bpjs.kesehatanEmployeePct || 0)) / 100) + Math.round((baseSalary * Number(payrollSettings.bpjs.tkEmployeePct || 0)) / 100);
+        const bpjsEmployee = adj.bpjsEmployee !== undefined ? Number(adj.bpjsEmployee) : defaultBpjsEmployee;
 
         const allowances = Math.round(Number(adj.allowances || 0)) + Math.round(reimbursements) + thr + kpiBonus;
         const baseDeductions = Math.round(Number(adj.deductions || 0)) + alphaDeduction + unpaidLeaveDeduction + lateDeduction;
 
         const taxable = Math.max(0, baseSalary + overtimePay + allowances - (baseDeductions + bpjsEmployee + loanDeduction));
-        const pph21 = payrollSettings.pph21.mode === 'flat' ? Math.round((taxable * Number(payrollSettings.pph21.flatPct || 0)) / 100) : 0;
+        const defaultPph21 = payrollSettings.pph21.mode === 'flat' ? Math.round((taxable * Number(payrollSettings.pph21.flatPct || 0)) / 100) : 0;
+        const pph21 = adj.pph21 !== undefined ? Number(adj.pph21) : defaultPph21;
 
         const deductions = baseDeductions + bpjsEmployee + loanDeduction + pph21;
         const takeHomePay = Math.max(0, Math.round(baseSalary + overtimePay + allowances - deductions));
@@ -1260,7 +1264,7 @@ export default function EmployeesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const savePayrollAdjustment = async (employeeId: string, patch: Partial<{ allowances: number; deductions: number; overtimeMinutes: number }>) => {
+  const savePayrollAdjustment = async (employeeId: string, patch: Partial<{ allowances: number; deductions: number; overtimeMinutes: number; bpjsEmployee?: number; pph21?: number; }>) => {
     const current = payrollAdjustments[employeeId] || { allowances: 0, deductions: 0, overtimeMinutes: 0 };
     const next = { ...current, ...patch };
     setPayrollAdjustments((prev) => ({ ...prev, [employeeId]: next }));
@@ -1271,6 +1275,8 @@ export default function EmployeesPage() {
         allowances: Number(next.allowances || 0),
         deductions: Number(next.deductions || 0),
         overtimeMinutes: Number(next.overtimeMinutes || 0),
+        bpjsEmployee: next.bpjsEmployee !== undefined ? Number(next.bpjsEmployee) : null,
+        pph21: next.pph21 !== undefined ? Number(next.pph21) : null,
         updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch {
@@ -1958,8 +1964,22 @@ export default function EmployeesPage() {
                                 />
                               </td>
                               <td className="px-6 py-4 text-right text-xs font-black text-slate-900">Rp {Number(r.overtimePay).toLocaleString('id-ID')}</td>
-                              <td className="px-6 py-4 text-right text-xs font-black text-slate-700">Rp {Number(r.bpjsEmployee).toLocaleString('id-ID')}</td>
-                              <td className="px-6 py-4 text-right text-xs font-black text-slate-700">Rp {Number(r.pph21).toLocaleString('id-ID')}</td>
+                              <td className="px-6 py-4 text-right">
+                                <input
+                                  type="number"
+                                  className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-right outline-none"
+                                  value={payrollAdjustments[r.employeeId]?.bpjsEmployee ?? r.bpjsEmployee}
+                                  onChange={(e) => savePayrollAdjustment(r.employeeId, { bpjsEmployee: Number(e.target.value || 0) })}
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <input
+                                  type="number"
+                                  className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-right outline-none"
+                                  value={payrollAdjustments[r.employeeId]?.pph21 ?? r.pph21}
+                                  onChange={(e) => savePayrollAdjustment(r.employeeId, { pph21: Number(e.target.value || 0) })}
+                                />
+                              </td>
                               <td className="px-6 py-4 text-right text-xs font-black text-slate-700">Rp {Number(r.loanDeduction).toLocaleString('id-ID')}</td>
                               <td className="px-6 py-4 text-right text-xs font-black text-slate-700">Rp {Number(r.reimbursements).toLocaleString('id-ID')}</td>
                               <td className="px-6 py-4 text-right text-xs font-black text-slate-700">Rp {Number(r.thr).toLocaleString('id-ID')}</td>

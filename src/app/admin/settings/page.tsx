@@ -36,6 +36,8 @@ type StoreSettings = {
   tiktok?: string;
   maintenanceMode?: boolean;
   runningText?: string;
+  aiPromptShopee?: string;
+  aiPromptTiktok?: string;
 };
 type PointSettings = { earningRate: number; redemptionValue: number; minRedeem: number; isActive: boolean; };
 
@@ -62,7 +64,9 @@ const defaultSettings: SystemSettings = {
     email: 'atayatoko2@gmail.com', 
     footerMsg: 'Terima kasih telah berbelanja!',
     maintenanceMode: false,
-    runningText: 'Selamat datang di Ataya Toko! Dapatkan promo menarik setiap hari.'
+    runningText: 'Selamat datang di Ataya Toko! Dapatkan promo menarik setiap hari.',
+    aiPromptShopee: "🔥 INSIGHT BULAN INI (Shopee): Kampanye 'Big Ramadan Sale 2026' sedang berlangsung (11 Feb - 22 Mar). Traffic puncak terjadi pukul 04.00 (Sahur), 12.00, dan 20.00 WIB.\n💡 Strategi: Shopee membagi-bagikan diskon besar-besaran di Shopee Live & Shopee Video. Sangat disarankan untuk mengaktifkan Shopee Live XTRA dan menjadwalkan Live streaming pada jam sahur atau jam 8 malam untuk menangkap traffic Ramadan.",
+    aiPromptTiktok: "🔥 INSIGHT BULAN INI (Tokopedia/TikTok): Siap-siap kampanye 'Ramadan Ekstra Seru 3.3' dan 'WIB (Waktu Indonesia Belanja) 25-Akhir Bulan'!\n💡 Strategi: Karena platform akan push Flash Sale & Diskon 90%, naikkan sedikit harga eceranmu sekarang, lalu berikan 'Coret Harga' besar-besaran saat promo 3.3 nanti."
   },
   paymentMethods: [
     { id: 'CASH', name: 'Tunai', enabled: true, description: 'Bayar di kasir' },
@@ -374,19 +378,27 @@ export default function AdminSettings() {
                 </div>
 
                 <div className="md:col-span-2 pt-4 border-t border-slate-100">
-                    <h3 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-3">Media Sosial</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            <Instagram size={16} className="text-pink-600" />
-                            <input type="text" placeholder="Username IG" value={settings.store.instagram || ''} onChange={e => setSettings({ ...settings, store: { ...settings.store, instagram: e.target.value } })} className="bg-transparent text-xs font-bold w-full outline-none" />
+                    <h3 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-3">AI Promosi Marketplace</h3>
+                    <div className="space-y-4">
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500">Insight AI Shopee Calculator</label>
+                            <textarea 
+                              rows={3}
+                              placeholder="Masukkan info promo Shopee bulan ini..." 
+                              value={settings.store.aiPromptShopee || ''} 
+                              onChange={e => setSettings({ ...settings, store: { ...settings.store, aiPromptShopee: e.target.value } })} 
+                              className="w-full p-3 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 text-xs font-medium outline-none resize-none" 
+                            />
                          </div>
-                         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            <Facebook size={16} className="text-blue-600" />
-                            <input type="text" placeholder="Page FB" value={settings.store.facebook || ''} onChange={e => setSettings({ ...settings, store: { ...settings.store, facebook: e.target.value } })} className="bg-transparent text-xs font-bold w-full outline-none" />
-                         </div>
-                         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            <Video size={16} className="text-black" />
-                            <input type="text" placeholder="TikTok" value={settings.store.tiktok || ''} onChange={e => setSettings({ ...settings, store: { ...settings.store, tiktok: e.target.value } })} className="bg-transparent text-xs font-bold w-full outline-none" />
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500">Insight AI TikTok/Tokopedia Calculator</label>
+                            <textarea 
+                              rows={3}
+                              placeholder="Masukkan info promo TikTok/Tokopedia bulan ini..." 
+                              value={settings.store.aiPromptTiktok || ''} 
+                              onChange={e => setSettings({ ...settings, store: { ...settings.store, aiPromptTiktok: e.target.value } })} 
+                              className="w-full p-3 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 text-xs font-medium outline-none resize-none" 
+                            />
                          </div>
                     </div>
                 </div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // ── KATEGORI & BIAYA ADMIN SHOPEE 2026 ───────────────────────
 const KATEGORI = [
@@ -269,6 +271,53 @@ export default function App() {
   const activeStr = STRATEGI.find(s=>s.id===strTab);
   const strIdx    = STRATEGI.findIndex(s=>s.id===strTab);
 
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+
+  useEffect(() => {
+    const fetchAiPrompt = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "system"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.store?.aiPromptShopee) {
+            setAiPrompt(data.store.aiPromptShopee);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load AI Prompt", err);
+      }
+    };
+    fetchAiPrompt();
+  }, []);
+  
+  // Fungsi AI Mock
+  const getAiStrategy = () => {
+    let marginPct = (cuan / hargaJual) * 100;
+    let saran = [];
+    
+    if (marginPct < 10) {
+      saran.push("🔴 Margin Tipis (<10%). Jangan paksakan ikut Promo XTRA atau Flash Sale Shopee dulu. Fokus pada optimasi judul & foto produk.");
+    } else if (marginPct >= 10 && marginPct <= 25) {
+      saran.push("🟡 Margin Sehat (10-25%). Waktunya scale-up! Wajib ikut Gratis Ongkir XTRA karena buyer Shopee sangat filter by Gratis Ongkir.");
+    } else {
+      saran.push("🟢 Margin Tebal (>25%). Bakar margin untuk Live XTRA atau Affiliasi Shopee tinggi (10-15%) agar produkmu di-spam oleh kreator.");
+    }
+
+    // Insight Promosi Bulan Ini dari Firebase Settings
+    if (aiPrompt) {
+      const prompts = aiPrompt.split("\n");
+      prompts.forEach(p => saran.push(p));
+    } else {
+      saran.push("🔥 INSIGHT BULAN INI (Shopee): Kampanye 'Big Ramadan Sale 2026' sedang berlangsung (11 Feb - 22 Mar). Traffic puncak terjadi pukul 04.00 (Sahur), 12.00, dan 20.00 WIB.");
+      saran.push("💡 Strategi: Shopee membagi-bagikan diskon besar-besaran di Shopee Live & Shopee Video. Sangat disarankan untuk mengaktifkan Shopee Live XTRA dan menjadwalkan Live streaming pada jam sahur atau jam 8 malam untuk menangkap traffic Ramadan.");
+    }
+    
+    saran.push("🔔 Info: Sistem AI ini diperbarui secara berkala oleh admin. Jika Anda butuh insight terbaru minggu ini, hubungi Admin atau pastikan aplikasi sudah di-pull/update versi terbarunya.");
+
+    return saran;
+  };
+
   const PROG_BG = {
     gray:"bg-gray-50 border-gray-200", green:"bg-green-50 border-green-200",
     blue:"bg-blue-50 border-blue-200", purple:"bg-purple-50 border-purple-200",
@@ -297,10 +346,28 @@ export default function App() {
             <p className="text-orange-100 text-base font-medium opacity-90">
               10 Program biaya akurat · Panduan dari Shopee Seller Education Hub
             </p>
-            <div className="flex items-center gap-2 mt-3">
-              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold border border-white/30">Update Januari 2026</span>
-              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold border border-white/30">10+ Program Shopee</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-3">
+              <div className="flex items-center gap-2">
+                <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold border border-white/30">Update Februari 2026</span>
+                <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold border border-white/30">10+ Program Shopee</span>
+              </div>
+              <button onClick={() => setShowAi(!showAi)} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 px-4 py-1.5 rounded-full text-xs font-bold text-white transition-all flex items-center gap-2 w-fit">
+                ✨ Analisis Strategi AI
+              </button>
             </div>
+
+            {showAi && (
+              <div className="mt-4 bg-black/20 backdrop-blur-md border border-white/30 rounded-2xl p-4 animate-in fade-in zoom-in duration-300">
+                <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                  🤖 Rekomendasi AI berdasarkan margin ({((cuan/hargaJual)*100).toFixed(1)}%)
+                </h3>
+                <div className="space-y-2">
+                  {getAiStrategy().map((saran, i) => (
+                    <p key={i} className="text-xs text-orange-50 leading-relaxed">{saran}</p>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

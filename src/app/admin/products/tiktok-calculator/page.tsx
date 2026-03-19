@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // ── KATEGORI & KOMISI (Feb 2026) ─────────────────────────────
 const KATEGORI = [
@@ -287,6 +289,62 @@ export default function App() {
     {label:"Biaya Cashback Bonus (~2%)",nom:cashNom,show:active.cashback_bonus},
   ].filter(d=>d.show);
 
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+
+  useEffect(() => {
+    const fetchAiPrompt = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "system"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.store?.aiPromptTiktok) {
+            setAiPrompt(data.store.aiPromptTiktok);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load AI Prompt", err);
+      }
+    };
+    fetchAiPrompt();
+  }, []);
+  
+  // Fungsi AI Mock
+  const getAiStrategy = () => {
+    let marginPct = (cuan / hargaJual) * 100;
+    let saran = [];
+    
+    // Analisis Margin Basic
+    if (marginPct < 10) {
+      saran.push("🔴 Margin Tipis (<10%). Hindari ikut program diskon besar seperti Voucher XTRA dulu. Fokus organik.");
+    } else if (marginPct >= 10 && marginPct <= 25) {
+      saran.push("🟡 Margin Sehat (10-25%). Waktunya scale-up! Aktifkan Afiliasi (5-8%) atau Gratis Ongkir.");
+    } else {
+      saran.push("🟢 Margin Tebal (>25%). Bakar margin sebagian untuk agresif di TopAds/LIVE Ads & Afiliasi tinggi (15%).");
+    }
+
+    // Insight Promosi Bulan Ini (Berdasarkan Data Tokopedia/TikTok Terbaru - Feb/Mar 2026)
+    if (aiPrompt) {
+      const prompts = aiPrompt.split("\n");
+      prompts.forEach(p => saran.push(p));
+    } else {
+      if (platform === "tokopedia") {
+        saran.push("🔥 INSIGHT BULAN INI (Tokopedia): Siap-siap kampanye 'Ramadan Ekstra Seru 3.3' dan 'WIB (Waktu Indonesia Belanja) 25-Akhir Bulan'!");
+        saran.push("💡 Strategi: Karena Tokopedia akan push Flash Sale & Diskon 90%, naikkan sedikit harga eceranmu sekarang, lalu berikan 'Coret Harga' besar-besaran saat promo 3.3 nanti.");
+        if (!active.cashback_bonus) {
+          saran.push("🛒 Tokopedia Trick: Buyer Tokopedia sangat suka Cashback. Sangat disarankan ikut Cashback Bonus (~2%) untuk memancing konversi.");
+        }
+      } else if (platform === "tiktok") {
+        saran.push("🔥 INSIGHT BULAN INI (TikTok Shop): Trafik live streaming naik drastis menjelang Payday & persiapan Ramadan.");
+        saran.push("💡 Strategi: Alokasikan budget ke kreator afiliasi (bikin sampel gratis) atau push LIVE Ads. User TikTok lebih impulsif kalau melihat barang dipakai langsung di Live.");
+      }
+    }
+
+    saran.push("🔔 Info: Sistem AI ini diperbarui secara berkala oleh admin. Jika Anda butuh insight terbaru minggu ini, hubungi Admin atau pastikan aplikasi sudah di-pull/update versi terbarunya.");
+
+    return saran;
+  };
+
   const activeStr=STRATEGI.find(s=>s.id===strTab);
   const strIdx=STRATEGI.findIndex(s=>s.id===strTab);
 
@@ -317,10 +375,28 @@ export default function App() {
               <p className="text-gray-300 text-base font-medium opacity-90">
                 Komisi akurat · Semua program biaya · Panduan dari Tokopedia & TikTok Shop Academy
               </p>
-              <div className="flex items-center gap-3 mt-4">
-                <span className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold text-purple-300 border border-purple-500/30">Update Februari 2026</span>
-                <span className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold text-green-300 border border-green-500/30">Komisi 1.05% - 6.97%</span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-4">
+                <div className="flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold text-purple-300 border border-purple-500/30">Update Februari 2026</span>
+                  <span className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold text-green-300 border border-green-500/30">Komisi 1.05% - 6.97%</span>
+                </div>
+                <button onClick={() => setShowAi(!showAi)} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 px-4 py-2 rounded-full text-xs font-bold text-white transition-all flex items-center gap-2 w-fit">
+                  ✨ Analisis Strategi AI
+                </button>
               </div>
+
+              {showAi && (
+                <div className="mt-4 bg-black/60 backdrop-blur-md border border-purple-500/30 rounded-2xl p-4 animate-in fade-in zoom-in duration-300">
+                  <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    🤖 Rekomendasi AI berdasarkan margin ({((cuan/hargaJual)*100).toFixed(1)}%)
+                  </h3>
+                  <div className="space-y-2">
+                    {getAiStrategy().map((saran, i) => (
+                      <p key={i} className="text-xs text-gray-200 leading-relaxed">{saran}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {/* Platform Switch */}

@@ -402,6 +402,12 @@ export default function ChannelPricingPage() {
                   const units = unitList.length ? unitList : [baseUnit];
                   const currentUnit = selectedUnit[p.id] || baseUnit;
                   const stateByUnit = prices[p.id]?.[currentUnit] || {};
+                  
+                  // Get unit conversion
+                  const unitConfig = (p.units || []).find(u => u.code.toUpperCase() === currentUnit);
+                  const conversion = unitConfig?.contains || 1;
+                  const currentModal = (p.purchasePrice || 0) * conversion;
+                  const currentDasar = (p.priceEcer || 0) * conversion;
 
                   return (
                       <div key={p.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
@@ -409,8 +415,8 @@ export default function ChannelPricingPage() {
                               <div>
                                   <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
                                   <div className="flex flex-col gap-0.5 mt-1">
-                                    <p className="text-[10px] font-bold text-gray-400">Dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}</p>
-                                    <p className="text-[10px] font-bold text-blue-500">Modal: Rp {Number(p.purchasePrice || 0).toLocaleString()}</p>
+                                    <p className="text-[10px] font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
+                                    <p className="text-[10px] font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
                                   </div>
                               </div>
                               <select
@@ -427,7 +433,7 @@ export default function ChannelPricingPage() {
                           <div className="space-y-3 pt-2 border-t border-gray-50">
                               {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => {
                                   const price = stateByUnit[key];
-                                  const modal = p.purchasePrice || 0;
+                                  const modal = currentModal;
                                   let profit = 0;
                                   let fee = 0;
 
@@ -521,6 +527,13 @@ export default function ChannelPricingPage() {
                   const units = unitList.length ? unitList : [baseUnit];
                   const currentUnit = selectedUnit[p.id] || baseUnit;
                   const stateByUnit = prices[p.id]?.[currentUnit] || {};
+                  
+                  // Get unit conversion
+                  const unitConfig = (p.units || []).find(u => u.code.toUpperCase() === currentUnit);
+                  const conversion = unitConfig?.contains || 1;
+                  const currentModal = (p.purchasePrice || 0) * conversion;
+                  const currentDasar = (p.priceEcer || 0) * conversion;
+                  
                   return (
                     <tr key={p.id}>
                       <td className="px-6 py-4">
@@ -530,10 +543,10 @@ export default function ChannelPricingPage() {
                           </span>
                           <div className="flex flex-col">
                             <span className="text-[9px] font-bold text-gray-400">
-                              Harga dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}
+                              Harga dasar: Rp {Number(currentDasar).toLocaleString()}
                             </span>
                             <span className="text-[9px] font-bold text-blue-500">
-                              Modal: Rp {Number(p.purchasePrice || 0).toLocaleString()}
+                              Modal: Rp {Number(currentModal).toLocaleString()}
                             </span>
                           </div>
                           <div className="mt-1">
@@ -551,7 +564,7 @@ export default function ChannelPricingPage() {
                       </td>
                       {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((key) => {
                         const price = stateByUnit[key];
-                        const modal = p.purchasePrice || 0;
+                        const modal = currentModal;
                         let profit = 0;
                         let fee = 0;
 

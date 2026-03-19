@@ -28,6 +28,7 @@ type Order = {
   items?: any[]; // Added for cancel logic
   walletUsed?: number; // Added for cancel logic
   pointsUsed?: number; // Added for cancel logic
+  paymentStatus?: string;
 };
 
 export default function AdminOrders() {
@@ -37,6 +38,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'SEMUA' | 'MENUNGGU' | 'DIPROSES' | 'SELESAI'>('SEMUA');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -414,11 +416,19 @@ export default function AdminOrders() {
       matchesTab = s === activeTab;
     }
 
+    let matchesPaymentStatus = true;
+    const ps = (order.paymentStatus || '').toUpperCase();
+    if (paymentStatusFilter === 'PAID') {
+      matchesPaymentStatus = ps === 'PAID' || ps === 'LUNAS' || ps === 'SUCCESS' || ps === 'SETTLED';
+    } else if (paymentStatusFilter === 'UNPAID') {
+      matchesPaymentStatus = ps === 'UNPAID' || ps === 'BELUM_LUNAS' || ps === 'PENDING' || !ps;
+    }
+
     const tMs = order.createdAt?.toDate ? order.createdAt.toDate().getTime() : 0;
     const startOk = startDate ? tMs >= new Date(startDate).getTime() : true;
     const endOk = endDate ? tMs <= new Date(endDate).getTime() + 86400000 - 1 : true;
 
-    return matchesSearch && matchesTab && startOk && endOk;
+    return matchesSearch && matchesTab && matchesPaymentStatus && startOk && endOk;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -516,6 +526,18 @@ export default function AdminOrders() {
               )}
             </button>
           ))}
+          
+          <div className="h-6 w-px bg-slate-200 mx-2 self-center shrink-0"></div>
+          
+          <select 
+            value={paymentStatusFilter}
+            onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-50 border-none text-slate-600 outline-none shrink-0 cursor-pointer hover:bg-slate-100 transition-colors"
+          >
+            <option value="ALL">Semua Pembayaran</option>
+            <option value="PAID">Lunas</option>
+            <option value="UNPAID">Belum Lunas</option>
+          </select>
         </div>
 
         <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
