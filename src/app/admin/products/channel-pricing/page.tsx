@@ -268,20 +268,40 @@ export default function ChannelPricingPage() {
     <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
       <Toaster />
 
-      <div className="flex items-center gap-4 mb-10">
-        <Link
-          href="/admin/products"
-          className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all"
-        >
-          <ChevronLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
-            Harga per Channel
-          </h1>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
-            Atur harga offline, website, Shopee & TikTok
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/products"
+            className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all"
+          >
+            <ChevronLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
+              Harga per Channel
+            </h1>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
+              Atur harga offline, website, Shopee & TikTok
+            </p>
+          </div>
+        </div>
+
+        {/* Calculator Links */}
+        <div className="flex items-center gap-3">
+          <Link 
+            href="/admin/products/shopee-calculator"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl shadow-sm hover:shadow-md transition-all text-xs font-bold"
+          >
+            <svg width="16" height="16" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="white"/><text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text></svg>
+            Kalkulator Shopee
+          </Link>
+          <Link 
+            href="/admin/products/tiktok-calculator"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-900 to-black text-white rounded-xl shadow-sm hover:shadow-md transition-all text-xs font-bold"
+          >
+            <svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="white"/><text x="16" y="22" textAnchor="middle" fontSize="18" fill="black">♪</text></svg>
+            Kalkulator TikTok
+          </Link>
         </div>
       </div>
 
@@ -388,7 +408,10 @@ export default function ChannelPricingPage() {
                           <div className="flex justify-between items-start">
                               <div>
                                   <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
-                                  <p className="text-[10px] font-bold text-gray-400 mt-1">Dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}</p>
+                                  <div className="flex flex-col gap-0.5 mt-1">
+                                    <p className="text-[10px] font-bold text-gray-400">Dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}</p>
+                                    <p className="text-[10px] font-bold text-blue-500">Modal: Rp {Number(p.purchasePrice || 0).toLocaleString()}</p>
+                                  </div>
                               </div>
                               <select
                                   value={currentUnit}
@@ -501,15 +524,19 @@ export default function ChannelPricingPage() {
                   return (
                     <tr key={p.id}>
                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
+                        <div className="flex flex-col gap-1">
                           <span className="text-xs font-black text-gray-800 uppercase">
                             {displayName}
                           </span>
-                          <span className="text-[9px] font-bold text-gray-400">
-                            Harga dasar: Rp{' '}
-                            {Number(p.priceEcer || 0).toLocaleString()}
-                          </span>
-                          <div className="mt-2">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-bold text-gray-400">
+                              Harga dasar: Rp {Number(p.priceEcer || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[9px] font-bold text-blue-500">
+                              Modal: Rp {Number(p.purchasePrice || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-1">
                             <select
                               value={currentUnit}
                               onChange={(e) => setSelectedUnit(su => ({ ...su, [p.id]: e.target.value }))}

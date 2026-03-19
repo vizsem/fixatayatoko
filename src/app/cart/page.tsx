@@ -238,7 +238,7 @@ export default function CartPage() {
       if (!customerAddress) {
         // Cek array addresses
         if (userData.addresses && userData.addresses.length > 0) {
-          setCustomerAddress(userData.addresses[0]);
+          setCustomerAddress(userData.addresses[0]?.address || '');
         } 
         // Cek properti legacy 'address' (jika ada)
         else {
@@ -250,20 +250,35 @@ export default function CartPage() {
   }, [userData, customerName, customerPhone, customerAddress]);
 
   const profileAddresses = useMemo(() => {
-    if (!userData) return [] as string[];
-    const list = Array.isArray(userData.addresses) ? userData.addresses.filter(Boolean) : [];
-    if (list.length > 0) return list;
+    if (!userData) return [] as Array<{ id: string; label: string; receiverName: string; receiverPhone: string; address: string }>;
+    const list = Array.isArray(userData.addresses) ? userData.addresses.filter((a) => a && typeof a === 'object' && 'address' in a) : [];
+    if (list.length > 0) return list as Array<{ id: string; label: string; receiverName: string; receiverPhone: string; address: string }>;
     const legacy = (userData as Partial<{ address: string }>).address;
-    return legacy ? [legacy] : [];
+    if (!legacy) return [];
+    return [
+      {
+        id: 'legacy',
+        label: 'Alamat',
+        receiverName: userData.name || 'Penerima',
+        receiverPhone: userData.phone || '',
+        address: legacy,
+      },
+    ];
   }, [userData]);
 
-  const profileAddress = profileAddresses[selectedProfileAddressIndex] || '';
+  const selectedProfileAddress = profileAddresses[selectedProfileAddressIndex] || null;
 
-  const effectiveCustomerName = useProfileShipping && userData?.name ? userData.name : customerName;
-  const effectiveCustomerPhone = useProfileShipping && userData?.phone ? userData.phone : customerPhone;
+  const effectiveCustomerName =
+    useProfileShipping && deliveryMethod === 'delivery'
+      ? (selectedProfileAddress?.receiverName || userData?.name || customerName)
+      : (useProfileShipping && userData?.name ? userData.name : customerName);
+  const effectiveCustomerPhone =
+    useProfileShipping && deliveryMethod === 'delivery'
+      ? (selectedProfileAddress?.receiverPhone || userData?.phone || customerPhone)
+      : (useProfileShipping && userData?.phone ? userData.phone : customerPhone);
   const effectiveCustomerAddress =
     deliveryMethod === 'delivery'
-      ? (useProfileShipping && profileAddress ? profileAddress : customerAddress)
+      ? (useProfileShipping && selectedProfileAddress?.address ? selectedProfileAddress.address : customerAddress)
       : '';
 
   useEffect(() => {
@@ -478,6 +493,10 @@ export default function CartPage() {
         notify.user.error("Gagal memvalidasi stok. Coba lagi.");
         return;
       }
+    }
+
+    if (!userId) {
+      return notify.user.error("Akun sedang disiapkan. Coba lagi sebentar.");
     }
 
     if (paymentMethod === 'transfer' && !paymentProof) {
@@ -849,11 +868,11 @@ export default function CartPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <p className="text-[9px] font-black uppercase text-slate-400">Nama</p>
-                    <p className="text-xs font-black text-slate-800">{userData.name || '-'}</p>
+                    <p className="text-xs font-black text-slate-800">{effectiveCustomerName || '-'}</p>
                   </div>
                   <div>
                     <p className="text-[9px] font-black uppercase text-slate-400">WhatsApp</p>
-                    <p className="text-xs font-black text-slate-800">{userData.phone || '-'}</p>
+                    <p className="text-xs font-black text-slate-800">{effectiveCustomerPhone || '-'}</p>
                   </div>
                 </div>
 
@@ -868,13 +887,13 @@ export default function CartPage() {
                       >
                         {profileAddresses.map((a, idx) => (
                           <option key={idx} value={idx}>
-                            {a}
+                            {`${a.label || 'Alamat'} - ${a.receiverName || 'Penerima'}`}
                           </option>
                         ))}
                       </select>
                     ) : (
                       <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs font-black text-slate-700">
-                        {profileAddress || 'Alamat profil belum ada'}
+                        {selectedProfileAddress?.address || 'Alamat profil belum ada'}
                       </div>
                     )}
                   </div>

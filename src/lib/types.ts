@@ -70,6 +70,14 @@ export interface FirestoreTimestamp {
     nanoseconds: number;
 }
 
+export type UserAddress = {
+    id: string;
+    label: string;
+    receiverName: string;
+    receiverPhone: string;
+    address: string;
+};
+
 export interface CartItem extends Product {
     quantity: number;
     promoType?: string;
@@ -156,7 +164,7 @@ export interface UserProfile {
     isPointsFrozen: boolean;
     role: 'customer' | 'admin' | 'cashier';
     walletBalance?: number;
-    addresses?: string[];
+    addresses?: UserAddress[];
     createdAt: FirestoreTimestamp | Date | null;
 }
 
