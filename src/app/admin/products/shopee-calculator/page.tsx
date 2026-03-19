@@ -467,7 +467,7 @@ export default function App() {
                         <div className="mt-3 pl-7">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-600 font-medium">Set komisi:</span>
-                            {[5,8,10,12,15].map(v=>(
+                            {[1,5,8,10,12,15].map(v=>(
                               <button key={v} onClick={()=>setAffiliatePct(v)}
                                 className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all transform hover:scale-105 ${
                                   affiliatePct===v ? 

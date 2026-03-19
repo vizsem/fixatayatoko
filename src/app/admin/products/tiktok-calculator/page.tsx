@@ -508,7 +508,7 @@ export default function App() {
                     <div><p className="text-xs text-gray-300 font-medium">Komisi Afiliasi Kreator</p><p className="text-xs text-gray-500">2–15% per transaksi via kreator</p></div>
                   </div>
                   {active.afiliasi&&<div className="flex items-center gap-1.5 mt-1 pl-5">
-                    {[3,5,8,10,15].map(v=>(
+                    {[1,3,5,8,10,15].map(v=>(
                       <button key={v} onClick={()=>setAfiliasiPct(v)}
                         className={`text-xs px-1.5 py-0.5 rounded-lg font-bold border transition-all ${afiliasiPct===v?"bg-pink-500 text-white border-pink-500":"bg-gray-700 text-pink-400 border-gray-600"}`}>{v}%</button>
                     ))}
