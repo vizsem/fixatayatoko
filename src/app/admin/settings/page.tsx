@@ -38,6 +38,7 @@ type StoreSettings = {
   runningText?: string;
   aiPromptShopee?: string;
   aiPromptTiktok?: string;
+  isCashDrawerEnabled?: boolean; // TAMBAHAN: Laci Kasir Aktif/Tidak
 };
 type PointSettings = { earningRate: number; redemptionValue: number; minRedeem: number; isActive: boolean; };
 
@@ -66,7 +67,8 @@ const defaultSettings: SystemSettings = {
     maintenanceMode: false,
     runningText: 'Selamat datang di Ataya Toko! Dapatkan promo menarik setiap hari.',
     aiPromptShopee: "🔥 INSIGHT BULAN INI (Shopee): Kampanye 'Big Ramadan Sale 2026' sedang berlangsung (11 Feb - 22 Mar). Traffic puncak terjadi pukul 04.00 (Sahur), 12.00, dan 20.00 WIB.\n💡 Strategi: Shopee membagi-bagikan diskon besar-besaran di Shopee Live & Shopee Video. Sangat disarankan untuk mengaktifkan Shopee Live XTRA dan menjadwalkan Live streaming pada jam sahur atau jam 8 malam untuk menangkap traffic Ramadan.",
-    aiPromptTiktok: "🔥 INSIGHT BULAN INI (Tokopedia/TikTok): Siap-siap kampanye 'Ramadan Ekstra Seru 3.3' dan 'WIB (Waktu Indonesia Belanja) 25-Akhir Bulan'!\n💡 Strategi: Karena platform akan push Flash Sale & Diskon 90%, naikkan sedikit harga eceranmu sekarang, lalu berikan 'Coret Harga' besar-besaran saat promo 3.3 nanti."
+    aiPromptTiktok: "🔥 INSIGHT BULAN INI (Tokopedia/TikTok): Siap-siap kampanye 'Ramadan Ekstra Seru 3.3' dan 'WIB (Waktu Indonesia Belanja) 25-Akhir Bulan'!\n💡 Strategi: Karena platform akan push Flash Sale & Diskon 90%, naikkan sedikit harga eceranmu sekarang, lalu berikan 'Coret Harga' besar-besaran saat promo 3.3 nanti.",
+    isCashDrawerEnabled: true
   },
   paymentMethods: [
     { id: 'CASH', name: 'Tunai', enabled: true, description: 'Bayar di kasir' },
@@ -455,7 +457,7 @@ export default function AdminSettings() {
 
             {/* PRINTER SETTINGS */}
             <section className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl">
-              <h2 className="font-black text-xs tracking-widest text-slate-500 uppercase mb-6 flex items-center gap-2"><Printer size={16} /> Printer Kasir</h2>
+              <h2 className="font-black text-xs tracking-widest text-slate-500 uppercase mb-6 flex items-center gap-2"><Printer size={16} /> Printer & Kasir</h2>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -467,12 +469,26 @@ export default function AdminSettings() {
                       </select>
                   </div>
                   <div className="space-y-1">
-                      <label className="text-[9px] text-slate-400 font-bold uppercase">Fitur</label>
+                      <label className="text-[9px] text-slate-400 font-bold uppercase">Fitur Printer</label>
                       <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl h-[42px]">
                         <input type="checkbox" checked={settings.printer.autoCut} onChange={e => setSettings({ ...settings, printer: { ...settings.printer, autoCut: e.target.checked } })} className="w-4 h-4 rounded accent-emerald-500" />
                         <span className="text-[10px] font-bold">Auto Cut</span>
                       </div>
                   </div>
+                </div>
+
+                <div className="pt-3 border-t border-white/10 space-y-2">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase">Laci Kasir (Cash Drawer)</label>
+                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                        <div>
+                            <p className="text-xs font-bold text-white">Buka Otomatis</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">Laci menendang saat cetak struk via Bluetooth (Hanya Tunai)</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" className="sr-only peer" checked={settings.store.isCashDrawerEnabled ?? true} onChange={e => setSettings({ ...settings, store: { ...settings.store, isCashDrawerEnabled: e.target.checked } })} />
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
                 </div>
               </div>
             </section>

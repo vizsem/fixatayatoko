@@ -59,6 +59,7 @@ type Product = {
   barcode?: string;
   image?: string;
   units?: UnitOption[];
+  stockByWarehouse?: Record<string, number>;
   channelPricing?: ChannelPricing | {
     offline?: { price?: number };
     website?: { price?: number };
@@ -212,6 +213,8 @@ export default function CashierPOS() {
       toast.error('Gagal membaca barcode');
     }
   }, []);
+
+  // === GLOBAL BARCODE SCANNER LISTENER ===
 
   useEffect(() => {
     const checkAuthAndShift = async () => {
@@ -538,6 +541,60 @@ export default function CashierPOS() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // === GLOBAL BARCODE SCANNER LISTENER ===
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.key !== 'Enter') {
+        if (e.key.length === 1) {
+          setBarcodeBuffer((prev) => prev + e.key);
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          setBarcodeBuffer('');
+        }, 50); 
+      } else {
+        if (barcodeBuffer) {
+          e.preventDefault();
+          
+          const scannedProduct = products.find(p => 
+            p.barcode === barcodeBuffer || 
+            (p.units && p.units.some((u: any) => u.barcode === barcodeBuffer))
+          );
+
+          if (scannedProduct) {
+            const unitMatch = scannedProduct.units?.find((u: any) => u.barcode === barcodeBuffer);
+            if (unitMatch) {
+              addToCartWithUnit(scannedProduct, unitMatch);
+              toast.success(`Scan berhasil: ${scannedProduct.name} (${unitMatch.code})`);
+            } else {
+              addToCart(scannedProduct);
+              toast.success(`Scan berhasil: ${scannedProduct.name}`);
+            }
+          } else {
+            toast.error(`Barcode ${barcodeBuffer} tidak ditemukan!`);
+          }
+
+          setBarcodeBuffer('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      clearTimeout(timeout);
+    };
+  }, [barcodeBuffer, products, addToCart, addToCartWithUnit]);
+  // ========================================
+
   useEffect(() => {
     if (loading) return;
     
@@ -582,6 +639,7 @@ export default function CashierPOS() {
             barcode: data.barcode || '',
             image: data.image || data.imageUrl || data.photo || null,
             units,
+            stockByWarehouse: data.stockByWarehouse || {},
             channelPricing: data.channelPricing
           } as Product;
         }); // REMOVE FILTER HERE TO SHOW EMPTY STOCK
@@ -919,9 +977,21 @@ export default function CashierPOS() {
 
       for (const item of cart) {
         const pRef = doc(db, 'products', item.id);
-        const pSnap = await getDoc(pRef);
-        if (pSnap.exists()) {
-          const productData = pSnap.data();
+        
+        let productData: any = null;
+        if (isOffline) {
+          // OFFLINE MODE: Gunakan data stok dari state lokal agar tidak hang menunggu server
+          const localProduct = products.find(p => p.id === item.id);
+          if (localProduct) {
+            productData = { stock: localProduct.stock, stockByWarehouse: localProduct.stockByWarehouse || {} };
+          }
+        } else {
+          // ONLINE MODE: Fetch stok realtime dari server
+          const pSnap = await getDoc(pRef);
+          if (pSnap.exists()) productData = pSnap.data();
+        }
+
+        if (productData) {
           const currentStock = productData.stock || 0;
           const contains = Number(item.contains || 1);
           const pcsToDeduct = item.quantity * contains;
@@ -1026,7 +1096,16 @@ export default function CashierPOS() {
       }
       // --- AKHIR DOUBLE-ENTRY ---
   
-      await batch.commit();
+      // EKSEKUSI BATCH BERDASARKAN STATUS JARINGAN
+      if (isOffline) {
+        // Jangan await batch.commit() jika offline, agar UI tidak hang
+        // Firebase akan menyimpannya di antrean IndexedDB dan sinkron saat online
+        batch.commit().catch(err => console.log('Offline commit queued:', err));
+        toast.success('Disimpan Offline (Akan sinkron saat koneksi kembali)');
+      } else {
+        await batch.commit();
+        toast.success('Transaksi Berhasil!');
+      }
       
       printReceipt({ 
         ...orderData, 
@@ -1044,7 +1123,6 @@ export default function CashierPOS() {
       setTempoDueDate('');
       setSelectedCustomer(null);
       setCustomerSearch('');
-      toast.success('Transaksi Berhasil!');
     } catch (e) {
       console.error(e);
       toast.error('Gagal Transaksi');
@@ -1052,9 +1130,58 @@ export default function CashierPOS() {
   };
 
   const printReceipt = useCallback(async (order: Partial<Order>) => {
+    // Ambil settingan dari state atau local storage jika memungkinkan
+    // Untuk keamanan, default buka (true) jika tidak ada setting
+    let isDrawerEnabled = true;
+    try {
+      // Jika offline, baca dari localStorage saja agar cepat dan tidak error
+      if (!navigator.onLine) {
+         const cachedSettings = localStorage.getItem('pos-settings');
+         if (cachedSettings) {
+           const parsed = JSON.parse(cachedSettings);
+           if (parsed.store?.isCashDrawerEnabled !== undefined) {
+             isDrawerEnabled = parsed.store.isCashDrawerEnabled;
+           }
+         }
+      } else {
+        const snap = await getDoc(doc(db, 'settings', 'system'));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.store?.isCashDrawerEnabled !== undefined) {
+            isDrawerEnabled = data.store.isCashDrawerEnabled;
+          }
+          // Simpan ke localstorage untuk cadangan saat offline
+          localStorage.setItem('pos-settings', JSON.stringify(data));
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal cek setting laci", e);
+    }
+
+    // FUNGSI UNTUK MEMBUKA LACI KASIR (CASH DRAWER) via ESC/POS
+    // Kode standar untuk membuka laci kasir (Drawer Kick-out):
+    // ESC p m t1 t2 -> Hex: 1B 70 00 19 FA
+    const openCashDrawer = async () => {
+      try {
+        if (!isDrawerEnabled) return; // Cegah buka laci jika setting dimatikan
+        const nav = navigator as any;
+        if (!nav.bluetooth) return;
+        const escOpenDrawer = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+        await printToThermal(escOpenDrawer);
+      } catch (err) {
+        console.log('Gagal membuka laci kasir otomatis:', err);
+      }
+    };
+
     if (useBluetoothPrinter) {
       try {
         const escReceipt = generateESCReceipt(order);
+        
+        // Buka laci kasir jika pembayarannya TUNAI (CASH)
+        if (order.paymentMethod === 'CASH') {
+          await openCashDrawer();
+        }
+        
         await printToThermal(escReceipt);
         toast.success('Struk berhasil dicetak via Bluetooth');
         return;

@@ -1,4 +1,4 @@
-export const printToThermal = async (text: string) => {
+export const printToThermal = async (dataInput: string | Uint8Array) => {
   const nav = navigator as any;
   if (!nav.bluetooth) {
     throw new Error('Web Bluetooth API tidak didukung di browser ini.');
@@ -18,8 +18,13 @@ export const printToThermal = async (text: string) => {
     // Assuming characteristic for writing is 00002af1-0000-1000-8000-00805f9b34fb
     const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
+    let data: Uint8Array;
+    if (typeof dataInput === 'string') {
+      const encoder = new TextEncoder();
+      data = encoder.encode(dataInput);
+    } else {
+      data = dataInput;
+    }
     
     // Write in chunks of 512 bytes (common limit for BLE)
     const CHUNK_SIZE = 512;
