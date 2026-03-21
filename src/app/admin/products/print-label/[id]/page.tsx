@@ -133,24 +133,24 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Kanan: QR Code di Tengah Samping */}
-            <div className="flex flex-col justify-center items-center shrink-0">
-               <div className="bg-white p-0.5">
-                 <QRCodeSVG value={barcodeValue} size={24} />
+            <div className="flex flex-col justify-center items-center shrink-0 w-[24px]">
+               <div className="bg-white p-0.5 w-full flex justify-center">
+                 <QRCodeSVG value={barcodeValue} size={24} level="M" />
                </div>
-               <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">SKU: {product.sku || product.id.slice(0,6)}</span>
+               <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center leading-tight">SKU: <br/> {product.sku || product.id.slice(0,6)}</span>
             </div>
           </div>
 
           {/* Barcode Garis 1D & Keterangan Bawah */}
           <div className="flex items-end justify-center mt-0.5 border-t border-black pt-0.5 w-full">
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full items-center">
               {/* Barcode Garis (1D) */}
-              <div className="flex justify-center bg-white -ml-2 overflow-hidden w-full">
+              <div className="bg-white overflow-hidden flex justify-center" style={{ transform: 'scale(0.8)', transformOrigin: 'top center' }}>
                 <Barcode 
                   value={barcodeValue} 
                   width={1} 
-                  height={12} 
-                  fontSize={6} 
+                  height={15} 
+                  fontSize={10} 
                   margin={0} 
                   displayValue={true} 
                   background="transparent"
@@ -207,6 +207,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               height: 30mm !important;
               background: white !important;
               z-index: 9999 !important;
+              overflow: hidden !important;
             }
             .print-exact-size {
               width: 50mm !important;
@@ -216,6 +217,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               page-break-inside: avoid;
               page-break-after: avoid;
               page-break-before: avoid;
+              overflow: hidden !important;
             }
           }
         `
