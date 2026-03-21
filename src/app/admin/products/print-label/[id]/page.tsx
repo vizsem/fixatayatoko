@@ -74,7 +74,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
 
       {/* --- AREA CETAK (HANYA INI YANG MUNCUL SAAT DI-PRINT) --- */}
       {/* Kita buat ukuran fixed 50mm x 30mm untuk disimulasikan di layar */}
-      <div className="print-area flex justify-center no-print">
+      <div className="flex justify-center print-only-container">
         <div 
           className="bg-white border border-gray-300 overflow-hidden relative print-exact-size"
           style={{ 
@@ -175,6 +175,9 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               padding: 0 !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+              height: 30mm !important;
+              width: 50mm !important;
+              overflow: hidden !important;
             }
             /* Menyembunyikan Header dan Footer default browser (URL, Tanggal, Page Number) */
             @page :first {
@@ -193,13 +196,17 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             header, nav, aside, footer {
               display: none !important;
             }
-            .print-area {
+            .print-only-container {
               display: block !important;
               margin: 0 !important;
               padding: 0 !important;
-              position: absolute;
-              top: 0;
-              left: 0;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 50mm !important;
+              height: 30mm !important;
+              background: white !important;
+              z-index: 9999 !important;
             }
             .print-exact-size {
               border: none !important;
