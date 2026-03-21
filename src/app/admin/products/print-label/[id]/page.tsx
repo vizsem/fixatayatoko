@@ -145,12 +145,12 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
           <div className="flex items-end justify-center mt-0.5 border-t border-black pt-0.5 w-full">
             <div className="flex flex-col w-full items-center">
               {/* Barcode Garis (1D) */}
-              <div className="bg-white overflow-hidden flex justify-center" style={{ transform: 'scale(0.8)', transformOrigin: 'top center' }}>
+              <div className="bg-white overflow-hidden flex justify-center w-full max-h-[12px]">
                 <Barcode 
                   value={barcodeValue} 
                   width={1} 
-                  height={15} 
-                  fontSize={10} 
+                  height={10} 
+                  fontSize={8} 
                   margin={0} 
                   displayValue={true} 
                   background="transparent"
@@ -212,11 +212,12 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             .print-exact-size {
               width: 50mm !important;
               height: 30mm !important;
+              max-height: 30mm !important;
               border: none !important;
               box-shadow: none !important;
-              page-break-inside: avoid;
-              page-break-after: avoid;
-              page-break-before: avoid;
+              page-break-inside: avoid !important;
+              page-break-after: avoid !important;
+              page-break-before: avoid !important;
               overflow: hidden !important;
             }
           }
