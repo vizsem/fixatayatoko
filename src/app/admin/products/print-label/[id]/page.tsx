@@ -104,7 +104,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
           <div className="flex-1 mt-1 flex flex-col justify-center border-t border-dashed border-gray-300 pt-0.5">
             {/* Harga Satuan Dasar (PCS) */}
             <div className="flex justify-between items-center leading-none mb-0.5">
-              <span className="text-[6px] font-bold text-gray-600 uppercase">1 {product.unit || product.Satuan || 'PCS'}</span>
+              <span className="text-[6px] font-bold text-gray-600 uppercase">{product.unit || product.Satuan || 'PCS'}</span>
               <span className="text-[10px] font-black tracking-tighter">{formatRp(product.price || product.Ecer)}</span>
             </div>
 
