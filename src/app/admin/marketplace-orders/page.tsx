@@ -79,6 +79,42 @@ export default function MarketplaceOrdersPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
 
+  // === GLOBAL BARCODE SCANNER LISTENER ===
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.key !== 'Enter') {
+        if (e.key.length === 1) {
+          setBarcodeBuffer((prev) => prev + e.key);
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          setBarcodeBuffer('');
+        }, 50); 
+      } else {
+        if (barcodeBuffer) {
+          e.preventDefault();
+          handleScan(barcodeBuffer);
+          setBarcodeBuffer('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      clearTimeout(timeout);
+    };
+  }, [barcodeBuffer, products]); // products is implicitly used inside handleScan via state or we can just call handleScan
+  // ========================================
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -168,7 +204,23 @@ export default function MarketplaceOrdersPage() {
 
   const handleScan = async (code: string) => {
     try {
-      // Cari berdasar Barcode (variasi field)
+      // Offline/Local first: Cari di state `products` yang sudah dimuat di awal
+      const localProduct = products.find(p => 
+        (p as any).Barcode === code || 
+        (p as any).barcode === code || 
+        ((p as any).units && (p as any).units.some((u: any) => u.barcode === code))
+      );
+
+      if (localProduct) {
+        // Jika barcode yang dipindai adalah barcode unit tertentu, gunakan logika addToCart yang lebih spesifik jika diperlukan
+        // Untuk sekarang kita panggil addToCart biasa (seperti di handleScan lama)
+        addToCart(localProduct);
+        setShowScanner(false);
+        notify.admin.success(`Berhasil memindai: ${localProduct.name || (localProduct as any).Nama}`);
+        return;
+      }
+
+      // Jika tidak ketemu di lokal, fallback ke database (berjaga-jaga)
       const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
       const s1 = await getDocs(q1);
       let prod: any | null = null;
@@ -189,6 +241,7 @@ export default function MarketplaceOrdersPage() {
       }
       addToCart(prod as Product);
       setShowScanner(false);
+      notify.admin.success(`Berhasil memindai: ${prod.name || prod.Nama}`);
     } catch {
       notify.admin.error('Gagal membaca barcode');
     }

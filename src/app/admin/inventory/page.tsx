@@ -79,6 +79,44 @@ export default function InventoryDashboard() {
   const [batchAction, setBatchAction] = useState<'category' | 'warehouse' | 'status' | null>(null);
   const [batchValue, setBatchValue] = useState('');
 
+  // === GLOBAL BARCODE SCANNER LISTENER ===
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.key !== 'Enter') {
+        if (e.key.length === 1) {
+          setBarcodeBuffer((prev) => prev + e.key);
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          setBarcodeBuffer('');
+        }, 50); 
+      } else {
+        if (barcodeBuffer) {
+          e.preventDefault();
+          // Set searchTerm ke barcodeBuffer agar langsung memfilter list inventory
+          setSearchTerm(barcodeBuffer);
+          setBarcodeBuffer('');
+          notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      clearTimeout(timeout);
+    };
+  }, [barcodeBuffer]);
+  // ========================================
+
   useEffect(() => {
     if (liveProducts) {
       const sorted = [...(liveProducts as Product[])].sort((a, b) => {

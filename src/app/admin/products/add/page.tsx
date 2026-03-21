@@ -7,7 +7,7 @@ import { db, storage } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
-  Barcode, Image as ImageIcon, AlertCircle, Layers
+  Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
@@ -62,6 +62,44 @@ export default function AddProductPage() {
   const [pricingRuleKey, setPricingRuleKey] = useState<string>('AUTO');
   const [pricingMarginPercent, setPricingMarginPercent] = useState<number>(0);
   const [pricingRoundingStep, setPricingRoundingStep] = useState<number>(100);
+
+  const [scannerReady, setScannerReady] = useState(false);
+
+  // === GLOBAL BARCODE SCANNER LISTENER ===
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.key !== 'Enter') {
+        if (e.key.length === 1) {
+          setBarcodeBuffer((prev) => prev + e.key);
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          setBarcodeBuffer('');
+        }, 50); 
+      } else {
+        if (barcodeBuffer) {
+          e.preventDefault();
+          setFormData(prev => ({ ...prev, Barcode: barcodeBuffer }));
+          setBarcodeBuffer('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      clearTimeout(timeout);
+    };
+  }, [barcodeBuffer]);
+  // ========================================
 
   const pricingRec = useMemo(() => {
     if (pricingMode !== 'RECOMMENDED') return null;
@@ -231,6 +269,30 @@ export default function AddProductPage() {
     }
   };
 
+  useEffect(() => {
+    let scanner: any = null;
+    const init = async () => {
+      if (!scannerReady) return;
+      const mod: any = await import('html5-qrcode');
+      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
+      scanner = new Html5QrcodeScanner('barcode-scanner-camera', { fps: 10, qrbox: 250 }, false);
+      scanner.render(
+        (decodedText: string) => {
+          setFormData(prev => ({ ...prev, Barcode: decodedText }));
+          setScannerReady(false);
+          notify.admin.success(`Barcode berhasil dipindai: ${decodedText}`);
+        },
+        (err: any) => { /* ignore errors */ }
+      );
+    };
+    init();
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(console.error);
+      }
+    };
+  }, [scannerReady]);
+
   // Load warehouses
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'warehouses'), (s) => {
@@ -314,11 +376,24 @@ export default function AddProductPage() {
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Barcode / SKU</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1 flex justify-between">
+                  <span>Barcode / SKU</span>
+                  <button type="button" onClick={() => setScannerReady(true)} className="text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                    <Camera size={12} /> Scan Kamera
+                  </button>
+                </label>
                 <div className="relative">
                   <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
                 </div>
+                {scannerReady && (
+                  <div className="mt-2 p-2 bg-black rounded-2xl relative">
+                    <button type="button" onClick={() => setScannerReady(false)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 z-10">
+                      <X size={14} />
+                    </button>
+                    <div id="barcode-scanner-camera" className="rounded-xl overflow-hidden"></div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>

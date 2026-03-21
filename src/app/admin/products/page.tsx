@@ -21,7 +21,7 @@ import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare,
+  CheckSquare, Printer,
   Square
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -237,6 +237,44 @@ export default function AdminProducts() {
   }, [warehouses, rows]);
 
   // Logic Filter & Pagination (Harus di atas handleExport)
+  // === GLOBAL BARCODE SCANNER LISTENER ===
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.key !== 'Enter') {
+        if (e.key.length === 1) {
+          setBarcodeBuffer((prev) => prev + e.key);
+        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          setBarcodeBuffer('');
+        }, 50); 
+      } else {
+        if (barcodeBuffer) {
+          e.preventDefault();
+          // Set searchQuery ke barcodeBuffer agar langsung memfilter list
+          setSearchTerm(barcodeBuffer);
+          setBarcodeBuffer('');
+          notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      clearTimeout(timeout);
+    };
+  }, [barcodeBuffer]);
+  // ========================================
+
   const filteredAndSorted = useMemo(() => {
     return rows.filter(p => {
       const name = (p.name || '').toLowerCase();
@@ -756,6 +794,13 @@ export default function AdminProducts() {
                         >
                           <Calculator size={16} />
                         </button>
+                        <Link 
+                          href={`/admin/products/print-label/${p.id}`} 
+                          className="p-2.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm hover:shadow-md"
+                          title="Cetak Label Rak"
+                        >
+                          <Printer size={16} />
+                        </Link>
                         <Link 
                           href={`/admin/products/edit/${p.id}`} 
                           className="p-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-800 hover:text-white transition-all shadow-sm hover:shadow-md"
