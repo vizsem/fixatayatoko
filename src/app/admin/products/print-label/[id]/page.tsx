@@ -117,7 +117,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                   .filter((u: any) => u.code?.toUpperCase() !== (product.unit || product.Satuan || 'PCS').toUpperCase())
                   .map((u: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
-                    <span className="text-[5px] font-bold text-gray-600 uppercase">{u.code}</span>
+                    <span className="text-[5px] font-bold text-gray-600 uppercase">1 {u.code} <span className="text-[4px] font-normal">({u.contains} {product.unit || 'PCS'})</span></span>
                     <span className="text-[6px] font-black tracking-tighter">{formatRp(u.price)}</span>
                   </div>
                 ))}
@@ -197,14 +197,16 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               display: none !important;
             }
             .print-only-container {
-              display: block !important;
+              display: flex !important;
+              justify-content: center;
+              align-items: center;
               margin: 0 !important;
               padding: 0 !important;
-              position: absolute !important;
+              position: fixed !important;
               top: 0 !important;
               left: 0 !important;
-              width: 50mm !important;
-              height: 30mm !important;
+              width: 100% !important;
+              height: 100% !important;
               background: white !important;
               z-index: 9999 !important;
             }
