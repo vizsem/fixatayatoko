@@ -165,6 +165,10 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
       <style dangerouslySetInnerHTML={{
         __html: `
           @media print {
+            @page {
+              size: 50mm 30mm; /* Sesuaikan dengan ukuran stiker barcode Anda */
+              margin: 0 !important; /* Menghilangkan margin bawaan browser */
+            }
             body {
               background: white !important;
               margin: 0 !important;
@@ -172,22 +176,35 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
+            /* Menyembunyikan Header dan Footer default browser (URL, Tanggal, Page Number) */
+            @page :first {
+              margin: 0 !important;
+            }
+            @page :left {
+              margin: 0 !important;
+            }
+            @page :right {
+              margin: 0 !important;
+            }
             .no-print {
+              display: none !important;
+            }
+            /* Memaksa elemen Sidebar / Navbar utama (jika ada di layout) untuk sembunyi */
+            header, nav, aside, footer {
               display: none !important;
             }
             .print-area {
               display: block !important;
               margin: 0 !important;
               padding: 0 !important;
+              position: absolute;
+              top: 0;
+              left: 0;
             }
             .print-exact-size {
               border: none !important;
               box-shadow: none !important;
               page-break-inside: avoid;
-            }
-            @page {
-              size: 50mm 30mm; /* Sesuaikan dengan ukuran stiker barcode Anda */
-              margin: 0;
             }
           }
         `
