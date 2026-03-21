@@ -166,7 +166,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
         __html: `
           @media print {
             @page {
-              size: 50mm 30mm; /* Sesuaikan dengan ukuran stiker barcode Anda */
+              size: 50mm 30mm landscape; /* Paksa orientasi landscape (lebar 50, tinggi 30) */
               margin: 0 !important; /* Menghilangkan margin bawaan browser */
             }
             body {
