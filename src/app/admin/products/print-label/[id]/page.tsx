@@ -76,7 +76,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
       {/* Kita buat ukuran fixed 50mm x 30mm untuk disimulasikan di layar */}
       <div className="flex justify-center print-only-container">
         <div 
-          className="bg-white border border-gray-300 overflow-hidden relative print-exact-size"
+          className="bg-white border border-gray-300 overflow-hidden print-exact-size"
           style={{ 
             width: '50mm', 
             height: '30mm',
@@ -197,23 +197,25 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               display: none !important;
             }
             .print-only-container {
-              display: flex !important;
-              justify-content: center;
-              align-items: center;
+              display: block !important;
               margin: 0 !important;
               padding: 0 !important;
-              position: fixed !important;
+              position: absolute !important;
               top: 0 !important;
               left: 0 !important;
-              width: 100% !important;
-              height: 100% !important;
+              width: 50mm !important;
+              height: 30mm !important;
               background: white !important;
               z-index: 9999 !important;
             }
             .print-exact-size {
+              width: 50mm !important;
+              height: 30mm !important;
               border: none !important;
               box-shadow: none !important;
               page-break-inside: avoid;
+              page-break-after: avoid;
+              page-break-before: avoid;
             }
           }
         `
