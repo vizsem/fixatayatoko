@@ -100,27 +100,30 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             </h2>
           </div>
 
-          {/* List Harga Satuan & Grosir */}
-          <div className="flex-1 mt-1 flex flex-col justify-center border-t border-dashed border-gray-300 pt-0.5">
-            {/* Harga Satuan Dasar (PCS) */}
-            <div className="flex justify-between items-center leading-none mb-0.5">
-              <span className="text-[6px] font-bold text-gray-600 uppercase">{product.unit || product.Satuan || 'PCS'}</span>
-              <span className="text-[10px] font-black tracking-tighter">{formatRp(product.price || product.Ecer)}</span>
-            </div>
+          {/* Harga Utama (Sangat Besar) */}
+          <div className="mt-1 flex flex-col">
+            <span className="text-[5px] font-bold text-gray-500 uppercase">Harga {product.unit || product.Satuan || 'PCS'}</span>
+            <span className="text-[14px] font-black tracking-tighter leading-none">
+              {formatRp(product.price || product.Ecer)}
+            </span>
+          </div>
 
-            {/* Harga Satuan Turunan (BOX / CTN) */}
-            {product.units && Array.isArray(product.units) && product.units.map((u: any, idx: number) => (
+          {/* List Harga Turunan & Grosir - Filter satuan utama agar tidak dobel */}
+          <div className="flex-1 mt-1 flex flex-col justify-start border-t border-dashed border-gray-300 pt-0.5">
+            {product.units && Array.isArray(product.units) && product.units
+              .filter((u: any) => u.code?.toUpperCase() !== (product.unit || product.Satuan || 'PCS').toUpperCase())
+              .map((u: any, idx: number) => (
               <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
-                <span className="text-[6px] font-bold text-gray-600 uppercase">1 {u.code} <span className="text-[4px] font-normal">({u.contains} {product.unit || 'PCS'})</span></span>
-                <span className="text-[8px] font-black tracking-tighter">{formatRp(u.price)}</span>
+                <span className="text-[5px] font-bold text-gray-600 uppercase">1 {u.code} <span className="text-[4px] font-normal">({u.contains} {product.unit || 'PCS'})</span></span>
+                <span className="text-[6px] font-black tracking-tighter">{formatRp(u.price)}</span>
               </div>
             ))}
 
             {/* Harga Grosir (Jika ada) */}
             {(product.wholesalePrice || product.Grosir) > 0 && (
               <div className="flex justify-between items-center leading-none bg-gray-100 px-0.5 rounded-sm mt-0.5">
-                <span className="text-[5px] font-black text-gray-800 uppercase">GROSIR (Min {product.minWholesaleQty || product.Min_Grosir || 2})</span>
-                <span className="text-[7px] font-black tracking-tighter">{formatRp(product.wholesalePrice || product.Grosir)}</span>
+                <span className="text-[4px] font-black text-gray-800 uppercase">Grosir (Min {product.minWholesaleQty || product.Min_Grosir || 2})</span>
+                <span className="text-[6px] font-black tracking-tighter">{formatRp(product.wholesalePrice || product.Grosir)}</span>
               </div>
             )}
           </div>
