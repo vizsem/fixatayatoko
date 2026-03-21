@@ -93,64 +93,69 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             <span className="text-[5px] font-bold uppercase">{product.category || product.Kategori || 'UMUM'}</span>
           </div>
 
-          {/* Nama Produk */}
-          <div className="mt-0.5">
-            <h2 className="text-[9px] font-black leading-tight uppercase line-clamp-2">
-              {product.name || product.Nama}
-            </h2>
-          </div>
-
-          {/* Harga Utama (Sangat Besar) */}
-          <div className="mt-1 flex flex-col">
-            <span className="text-[5px] font-bold text-gray-500 uppercase">Harga {product.unit || product.Satuan || 'PCS'}</span>
-            <span className="text-[14px] font-black tracking-tighter leading-none">
-              {formatRp(product.price || product.Ecer)}
-            </span>
-          </div>
-
-          {/* List Harga Turunan & Grosir - Filter satuan utama agar tidak dobel */}
-          <div className="flex-1 mt-1 flex flex-col justify-start border-t border-dashed border-gray-300 pt-0.5">
-            {product.units && Array.isArray(product.units) && product.units
-              .filter((u: any) => u.code?.toUpperCase() !== (product.unit || product.Satuan || 'PCS').toUpperCase())
-              .map((u: any, idx: number) => (
-              <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
-                <span className="text-[5px] font-bold text-gray-600 uppercase">1 {u.code} <span className="text-[4px] font-normal">({u.contains} {product.unit || 'PCS'})</span></span>
-                <span className="text-[6px] font-black tracking-tighter">{formatRp(u.price)}</span>
+          <div className="flex flex-row gap-2 mt-0.5 flex-1">
+            {/* Kiri: Detail Produk & Harga */}
+            <div className="flex flex-col flex-1">
+              {/* Nama Produk */}
+              <div>
+                <h2 className="text-[9px] font-black leading-tight uppercase line-clamp-2">
+                  {product.name || product.Nama}
+                </h2>
               </div>
-            ))}
 
-            {/* Harga Grosir (Jika ada) */}
-            {(product.wholesalePrice || product.Grosir) > 0 && (
-              <div className="flex justify-between items-center leading-none bg-gray-100 px-0.5 rounded-sm mt-0.5">
-                <span className="text-[4px] font-black text-gray-800 uppercase">Grosir (Min {product.minWholesaleQty || product.Min_Grosir || 2})</span>
-                <span className="text-[6px] font-black tracking-tighter">{formatRp(product.wholesalePrice || product.Grosir)}</span>
+              {/* Harga Utama (Sangat Besar) */}
+              <div className="mt-1 flex flex-col">
+                <span className="text-[5px] font-bold text-gray-500 uppercase">Harga {product.unit || product.Satuan || 'PCS'}</span>
+                <span className="text-[14px] font-black tracking-tighter leading-none">
+                  {formatRp(product.price || product.Ecer)}
+                </span>
               </div>
-            )}
+
+              {/* List Harga Turunan & Grosir - Filter satuan utama agar tidak dobel */}
+              <div className="flex-1 mt-1 flex flex-col justify-start border-t border-dashed border-gray-300 pt-0.5">
+                {product.units && Array.isArray(product.units) && product.units
+                  .filter((u: any) => u.code?.toUpperCase() !== (product.unit || product.Satuan || 'PCS').toUpperCase())
+                  .map((u: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
+                    <span className="text-[5px] font-bold text-gray-600 uppercase">{u.code}</span>
+                    <span className="text-[6px] font-black tracking-tighter">{formatRp(u.price)}</span>
+                  </div>
+                ))}
+
+                {/* Harga Grosir (Jika ada) */}
+                {(product.wholesalePrice || product.Grosir) > 0 && (
+                  <div className="flex justify-between items-center leading-none bg-gray-100 px-0.5 rounded-sm mt-0.5">
+                    <span className="text-[4px] font-black text-gray-800 uppercase">Grosir</span>
+                    <span className="text-[6px] font-black tracking-tighter">{formatRp(product.wholesalePrice || product.Grosir)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Kanan: QR Code di Tengah Samping */}
+            <div className="flex flex-col justify-center items-center shrink-0">
+               <div className="bg-white p-0.5">
+                 <QRCodeSVG value={barcodeValue} size={24} />
+               </div>
+               <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center">SKU: {product.sku || product.id.slice(0,6)}</span>
+            </div>
           </div>
 
-          {/* Barcode & Keterangan Bawah */}
-          <div className="flex items-end justify-between mt-0.5 border-t border-black pt-0.5">
+          {/* Barcode Garis 1D & Keterangan Bawah */}
+          <div className="flex items-end justify-center mt-0.5 border-t border-black pt-0.5 w-full">
             <div className="flex flex-col w-full">
-              <div className="flex justify-between items-center mb-0.5">
-                <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest">SKU: {product.sku || product.id.slice(0,6)}</span>
-              </div>
               {/* Barcode Garis (1D) */}
-              <div className="flex justify-center bg-white -ml-2">
+              <div className="flex justify-center bg-white -ml-2 overflow-hidden w-full">
                 <Barcode 
                   value={barcodeValue} 
                   width={1} 
-                  height={15} 
-                  fontSize={8} 
+                  height={12} 
+                  fontSize={6} 
                   margin={0} 
                   displayValue={true} 
                   background="transparent"
                 />
               </div>
-            </div>
-            
-            {/* Area QR Code (Lebih mudah dibaca kamera HP / Scanner kecil) */}
-            <div className="shrink-0 bg-white ml-1">
-              <QRCodeSVG value={barcodeValue} size={20} />
             </div>
           </div>
         </div>
