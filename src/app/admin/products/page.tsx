@@ -531,6 +531,16 @@ export default function AdminProducts() {
             {selectedIds.length > 0 && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <button
+                  onClick={() => {
+                    const idsParam = selectedIds.join(',');
+                    // Kita bisa buka di tab baru atau redirect, karena ini mau di print, buka tab baru lebih baik
+                    window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
+                  }}
+                  className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
+                >
+                  <Printer size={16} /> Cetak Label ({selectedIds.length})
+                </button>
+                <button
                   onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
                   className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
                 >
