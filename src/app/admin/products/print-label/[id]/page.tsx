@@ -127,9 +127,22 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
 
           {/* Barcode & Keterangan Bawah */}
           <div className="flex items-end justify-between mt-0.5 border-t border-black pt-0.5">
-            <div className="flex flex-col">
-              <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest">SKU: {product.sku || product.id.slice(0,6)}</span>
-              <span className="text-[5px] font-bold text-gray-800 font-mono mt-0.5">{barcodeValue}</span>
+            <div className="flex flex-col w-full">
+              <div className="flex justify-between items-center mb-0.5">
+                <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest">SKU: {product.sku || product.id.slice(0,6)}</span>
+              </div>
+              {/* Barcode Garis (1D) */}
+              <div className="flex justify-center bg-white -ml-2">
+                <Barcode 
+                  value={barcodeValue} 
+                  width={1} 
+                  height={15} 
+                  fontSize={8} 
+                  margin={0} 
+                  displayValue={true} 
+                  background="transparent"
+                />
+              </div>
             </div>
             
             {/* Area QR Code (Lebih mudah dibaca kamera HP / Scanner kecil) */}
