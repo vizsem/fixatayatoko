@@ -483,14 +483,14 @@ export default function Home() {
               )}
             </div>
 
-            <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
-              <div className="flex justify-between items-center text-[8px] font-black uppercase italic text-blue-500">
-                <span>Grosir</span>
-                <span className="text-slate-900 not-italic">Rp{Number(product.wholesalePrice || 0).toLocaleString('id-ID')}</span>
+            <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black uppercase italic text-blue-500">Grosir</span>
+                <span className="text-[7px] bg-blue-50 text-blue-600 px-1.5 py-0.5 mt-0.5 rounded-md font-black uppercase tracking-tighter w-fit">
+                  Min. {product.minWholesale} {baseUnit}
+                </span>
               </div>
-              <span className="text-[7px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-black uppercase tracking-tighter">
-                Min. {product.minWholesale} {baseUnit}
-              </span>
+              <span className="text-slate-900 text-[10px] font-black not-italic">Rp{Number(product.wholesalePrice || 0).toLocaleString('id-ID')}</span>
             </div>
           </div>
 
