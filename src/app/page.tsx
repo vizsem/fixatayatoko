@@ -495,9 +495,11 @@ export default function Home() {
                 
                 // Cek mana yang ada nilainya secara berurutan, pastikan di-parsing ke Number
                 let wQty = 0;
-                if (minG !== undefined && minG !== null && Number(minG) > 0) wQty = Number(minG);
-                else if (minW !== undefined && minW !== null && Number(minW) > 0) wQty = Number(minW);
-                else if (minWq !== undefined && minWq !== null && Number(minWq) > 0) wQty = Number(minWq);
+                
+                // Gunakan Number() dan handle string kosong atau spasi
+                if (minG !== undefined && minG !== null && String(minG).trim() !== '' && !isNaN(Number(minG)) && Number(minG) > 0) wQty = Number(minG);
+                else if (minW !== undefined && minW !== null && String(minW).trim() !== '' && !isNaN(Number(minW)) && Number(minW) > 0) wQty = Number(minW);
+                else if (minWq !== undefined && minWq !== null && String(minWq).trim() !== '' && !isNaN(Number(minWq)) && Number(minWq) > 0) wQty = Number(minWq);
                 
                 // Hanya render jika Harga Grosir > 0 DAN Min Beli Grosir > 1 (karena grosir 1 PCS = eceran)
                 if (wPrice > 0 && wQty > 1) {
