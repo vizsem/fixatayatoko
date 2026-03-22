@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Grosir Sembako Kediri Termurah & Terlengkap | ATAYATOKO',
   description: 'Pusat belanja grosir sembako Kediri paling murah. Jual beras, minyak goreng, gula, snack partai besar & eceran. Gratis ongkir Kediri Kota.',
-  keywords: 'grosir sembako kediri, sembako murah kediri, distributor sembako kediri, agen sembako kediri, toko sembako kediri, grosir minyak goreng kediri, beras murah kediri, ATAYATOKO, atayamarket',
+  keywords: 'grosir sembako kediri, sembako murah kediri, distributor sembako kediri, agen sembako kediri, toko sembako kediri, grosir minyak goreng kediri, grosir beras kediri, grosir snack kediri, grosir rokok kediri, agen snack kediri, grosir gula kediri, grosir minuman kediri, ATAYATOKO, atayamarket',
   authors: [{ name: 'ATAYATOKO Team' }],
   manifest: '/site.webmanifest',
   robots: {
