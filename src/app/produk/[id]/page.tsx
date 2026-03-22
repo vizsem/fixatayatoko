@@ -104,10 +104,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
               id: d.id,
               name: rData.Nama || rData.name || "Produk",
               price: Number(rData.Ecer || rData.price) || 0,
-              image: rData.Link_Foto || rData.image || '/logo-atayatoko.png'
+              image: rData.Link_Foto || rData.image || '/logo-atayatoko.png',
+              isActive: typeof rData.isActive === 'boolean' ? rData.isActive : (Number(rData.Status ?? 1) !== 0)
             };
           })
-          .filter(p => p.id !== id);
+          .filter(p => p.id !== id && p.isActive)
+          .map(({ isActive, ...rest }) => rest);
         
         // Map Reviews
         reviews = reviewsSnap.docs.map(d => {

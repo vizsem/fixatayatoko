@@ -356,7 +356,7 @@ export default function ProductDetailClient({
 
             <div className={`rounded-[2.5rem] p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-600 text-white border-orange-700 shadow-xl scale-[1.02]' : 'bg-gray-50 border-gray-100'}`}>
               {/* Unit Selection */}
-              {product.units && product.units.length > 0 && (
+              {product.units && product.units.length > 0 && product.units.some(u => u.code !== product.unit) && (
                 <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
                   <button
                     onClick={() => setSelectedUnit(product.unit)}
@@ -364,7 +364,7 @@ export default function ProductDetailClient({
                   >
                     {product.unit} (Utama)
                   </button>
-                  {product.units.map((u) => (
+                  {product.units.filter(u => u.code !== product.unit).map((u) => (
                     <button
                       key={u.code}
                       onClick={() => setSelectedUnit(u.code)}
@@ -392,9 +392,6 @@ export default function ProductDetailClient({
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className={`text-[11px] font-black uppercase italic ${isWholesaleEligible ? 'text-white' : 'text-blue-600'}`}>Target Grosir</span>
-                    <p className={`text-[10px] font-bold uppercase ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-500'}`}>
-                      Min. {currentMinWholesale || 12} {currentUnit}
-                    </p>
                   </div>
                   <div className="text-right">
                     <span className={`text-xl font-black ${isWholesaleEligible ? 'text-white' : 'text-gray-900'}`}>
@@ -430,21 +427,21 @@ export default function ProductDetailClient({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Satuan', val: currentUnit, icon: ShieldCheck },
-                  { label: 'Minimal Grosir', val: `${currentMinWholesale || 12} ${currentUnit}`, icon: Sparkles },
-                  { label: 'Pengiriman', val: 'Kediri Kota', icon: Truck },
-                  { label: 'Kondisi', val: 'Baru / Segel', icon: Info },
-                ].map((item, idx) => (
-                  <div key={idx} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center gap-3">
-                    <item.icon size={16} className="text-gray-300" />
-                    <div>
-                      <span className="text-[8px] font-black text-gray-400 uppercase block leading-none mb-1">{item.label}</span>
-                      <span className="text-[10px] font-black text-gray-800 uppercase leading-none">{item.val}</span>
+                  {[
+                    { label: 'Satuan', val: currentUnit || 'PCS', icon: ShieldCheck },
+                    { label: 'Minimal Grosir', val: `${currentMinWholesale || 12} ${currentUnit || 'PCS'}`, icon: Sparkles },
+                    { label: 'Pengiriman', val: 'Kediri Kota', icon: Truck },
+                    { label: 'Kondisi', val: 'Baru / Segel', icon: Info },
+                  ].map((item, idx) => (
+                    <div key={idx} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center gap-3">
+                      <item.icon size={16} className="text-gray-300" />
+                      <div>
+                        <span className="text-[8px] font-black text-gray-400 uppercase block leading-none mb-1">{item.label}</span>
+                        <span className="text-[10px] font-black text-gray-800 uppercase leading-none">{item.val}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
             </div>
 
             {/* Review Section */}
@@ -510,16 +507,20 @@ export default function ProductDetailClient({
 
         {relatedProducts.length > 0 && (
           <div className="mt-20">
-            <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-gray-400 mb-8 px-2">Rekomendasi Serupa</h2>
-            <div className="flex overflow-x-auto gap-5 pb-10 no-scrollbar snap-x">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-900 mb-6 px-2 flex items-center gap-2">
+              <Sparkles size={16} className="text-amber-500" /> Pilihan Lainnya
+            </h2>
+            <div className="flex overflow-x-auto gap-4 pb-10 no-scrollbar snap-x px-2">
               {relatedProducts.map((item) => (
-                <div key={item.id} className="min-w-[170px] snap-start">
+                <div key={item.id} className="min-w-[160px] md:min-w-[180px] snap-start group cursor-pointer">
                   <Link href={`/produk/${item.id}`}>
-                    <div className="aspect-square rounded-[2.5rem] overflow-hidden bg-gray-50 border border-gray-100 mb-3 relative">
-                      <Image src={getProxiedImage(item.image)} alt="" fill className="object-cover" sizes="200px" />
+                    <div className="aspect-square rounded-[2rem] overflow-hidden bg-white border border-gray-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-300 mb-3 relative">
+                      <Image src={getProxiedImage(item.image)} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="200px" />
                     </div>
-                    <h3 className="text-[10px] font-black uppercase text-gray-800 line-clamp-1">{item.name}</h3>
-                    <p className="text-[11px] font-black text-green-600 mt-1">Rp{item.price.toLocaleString('id-ID')}</p>
+                    <div className="px-1">
+                      <h3 className="text-[11px] font-black uppercase text-gray-800 line-clamp-2 leading-tight group-hover:text-green-600 transition-colors">{item.name}</h3>
+                      <p className="text-xs font-black text-green-600 mt-1.5">Rp{item.price.toLocaleString('id-ID')}</p>
+                    </div>
                   </Link>
                 </div>
               ))}

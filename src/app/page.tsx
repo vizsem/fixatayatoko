@@ -485,12 +485,12 @@ export default function Home() {
 
             <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[8px] font-black text-gray-400 uppercase block leading-none mb-1">Minimal Grosir</span>
-                <span className="text-[10px] font-black text-gray-800 uppercase leading-none">
-                  {product.minWholesale || (product as any).Min_Grosir || (product as any).minWholesaleQty || 1} {baseUnit}
+                <span className="text-[8px] font-black text-blue-500 uppercase block leading-none mb-1 tracking-widest">Target Grosir</span>
+                <span className="text-[10px] font-black text-blue-600 uppercase leading-none flex items-center gap-1">
+                  Min. {product.minWholesale > 0 ? product.minWholesale : ((product as any).Min_Grosir > 0 ? (product as any).Min_Grosir : ((product as any).minWholesaleQty > 0 ? (product as any).minWholesaleQty : 10))} {baseUnit}
                 </span>
               </div>
-              <span className="text-slate-900 text-[10px] font-black not-italic">
+              <span className="text-blue-700 text-[11px] font-black not-italic bg-blue-50 px-2 py-1 rounded-lg">
                 Rp{Number(product.wholesalePrice || (product as any).Grosir || 0).toLocaleString('id-ID')}
               </span>
             </div>
