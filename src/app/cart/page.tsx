@@ -7,7 +7,7 @@ import { auth, db, storage } from '@/lib/firebase';
 import {
   CheckCircle2, ChevronLeft, Coins, CreditCard,
   Loader2, MapPin, Package, Send,
-  Snowflake, Ticket, Upload, Plus, Minus, Trash2, ShoppingBag
+  Snowflake, Ticket, Upload, Plus, Minus, Trash2, ShoppingBag, Sparkles
 } from 'lucide-react';
 
 
@@ -179,6 +179,30 @@ export default function CartPage() {
 
   const getLineTotal = (item: CartItem) => getItemUnitPrice(item) * Math.max(1, Math.floor(Number(item.quantity || 0)));
 
+  const getWholesaleUpsellInfo = (item: CartItem) => {
+    const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
+    const baseQty = getBaseQuantity(item);
+    
+    const baseEcer = Number((item as any).Ecer ?? item.basePrice ?? item.price ?? 0);
+    const baseGrosir = Number((item as any).wholesalePrice ?? (item as any).Grosir ?? 0);
+    const minGrosir = Number((item as any).minWholesale ?? (item as any).Min_Grosir ?? (item as any).minWholesaleQty ?? 0);
+
+    if (baseGrosir <= 0 || minGrosir <= 1) return null;
+
+    if (baseQty >= minGrosir) {
+      const savings = (baseEcer - baseGrosir) * baseQty;
+      return { isEligible: true, qtyNeeded: 0, savings, message: `🎉 Grosir Aktif (Hemat Rp${savings.toLocaleString('id-ID')})` };
+    }
+
+    if (baseQty >= Math.floor(minGrosir / 2)) {
+      const sisaQty = minGrosir - baseQty;
+      const potentialSavings = (baseEcer - baseGrosir) * minGrosir;
+      return { isEligible: false, qtyNeeded: Math.ceil(sisaQty / contains), savings: potentialSavings, message: `Tambah ${Math.ceil(sisaQty / contains)} ${item.unit} lagi untuk Grosir. Hemat Rp${potentialSavings.toLocaleString('id-ID')}!` };
+    }
+    
+    return null;
+  };
+
   const updateQuantity = (itemId: string, nextQty: number) => {
     const q = Math.max(1, Math.floor(Number(nextQty || 1)));
     const next = cart.map((i) => {
@@ -187,6 +211,25 @@ export default function CartPage() {
       const maxUnits = contains > 0 ? Math.max(1, Math.floor(Number(i.stock || 0) / contains)) : q;
       const safeQty = Math.min(q, maxUnits);
       if (q > maxUnits) notify.user.error(`Stok tidak cukup untuk ${i.unit}`);
+      
+      // Upsell Grosir check saat tambah barang
+      if (q > i.quantity) {
+        const baseQty = safeQty * contains;
+        const minGrosir = Number((i as any).minWholesale ?? (i as any).Min_Grosir ?? (i as any).minWholesaleQty ?? 0);
+        const baseEcer = Number((i as any).Ecer ?? i.basePrice ?? i.price ?? 0);
+        const baseGrosir = Number((i as any).wholesalePrice ?? (i as any).Grosir ?? 0);
+        
+        // Munculkan notifikasi Upsell jika pembeli memasukkan jumlah nanggung (separuh dari target)
+        if (minGrosir > 1 && baseGrosir > 0 && baseQty >= Math.floor(minGrosir / 2) && baseQty < minGrosir) {
+          const sisaQty = minGrosir - baseQty;
+          const saving = (baseEcer - baseGrosir) * minGrosir;
+          notify.user.success(`Tanggung! Tambah ${Math.ceil(sisaQty / contains)} ${i.unit} lagi untuk harga Grosir. Hemat Rp${saving.toLocaleString('id-ID')}!`);
+        } else if (minGrosir > 1 && baseGrosir > 0 && baseQty === minGrosir && i.quantity * contains < minGrosir) {
+          // Notif saat Hore berhasil mencapai grosir
+          notify.user.success(`Hore! Harga Grosir Aktif untuk ${i.name}`);
+        }
+      }
+
       return { ...i, quantity: safeQty };
     });
     persistCart(next);
@@ -755,8 +798,38 @@ export default function CartPage() {
                                   <Trash2 size={16} />
                                 </button>
                               </div>
-                            </div>
-                          </div>
+                  </div>
+                  
+                  {/* TAMPILAN UPSELL GROSIR PSIKOLOGIS */}
+                  {(() => {
+                    const upsell = getWholesaleUpsellInfo(item);
+                    if (!upsell) return null;
+
+                    return (
+                      <div className={`mt-3 p-3 rounded-xl flex items-start gap-2 ${
+                        upsell.isEligible 
+                          ? 'bg-green-50 border border-green-100 text-green-700' 
+                          : 'bg-orange-50 border border-orange-100 text-orange-700'
+                      }`}>
+                        <div className="mt-0.5">
+                          {upsell.isEligible ? <CheckCircle2 size={14} /> : <Sparkles size={14} />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-bold leading-tight">{upsell.message}</p>
+                          {!upsell.isEligible && (
+                            <button 
+                              onClick={() => updateQuantity(item.id, item.quantity + upsell.qtyNeeded)}
+                              className="mt-1.5 text-[9px] font-black uppercase bg-white px-2 py-1 rounded-lg border shadow-sm hover:bg-orange-50 active:scale-95 transition-all"
+                            >
+                              + Tambah {upsell.qtyNeeded} {item.unit}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
                         </div>
                       </div>
                     </div>

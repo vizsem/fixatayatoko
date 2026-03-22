@@ -59,11 +59,60 @@ export const getItemPrice = (item: CartItem): number => {
 
   const baseEcer = Number(item.price ?? item.Ecer ?? 0);
   const grosirPrice = Number(item.wholesalePrice ?? item.Grosir ?? 0);
-  const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? 0);
+  const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? (item as any).minWholesaleQty ?? 0);
 
-  const baseUnitPrice = grosirPrice > 0 && minGrosirQty > 0 && baseQty >= minGrosirQty ? grosirPrice : baseEcer;
+  const baseUnitPrice = grosirPrice > 0 && minGrosirQty > 1 && baseQty >= minGrosirQty ? grosirPrice : baseEcer;
   const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : baseUnitPrice * contains;
   return unitPrice;
+};
+
+// 💡 FITUR BARU: Analisis Psikologis Grosir
+// Menghitung berapa lagi item yang harus dibeli untuk mendapat harga grosir
+export const getWholesaleUpsellInfo = (item: CartItem): {
+  isEligible: boolean;
+  qtyNeeded: number;
+  potentialSavings: number;
+  message: string;
+} | null => {
+  const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
+  const baseQty = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
+  
+  const baseEcer = Number(item.price ?? item.Ecer ?? 0);
+  const grosirPrice = Number(item.wholesalePrice ?? item.Grosir ?? 0);
+  const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? (item as any).minWholesaleQty ?? 0);
+
+  // Jika produk tidak punya setting grosir yang valid, lewati
+  if (grosirPrice <= 0 || minGrosirQty <= 1) return null;
+
+  // Jika sudah mencapai grosir
+  if (baseQty >= minGrosirQty) {
+    const totalSavings = (baseEcer - grosirPrice) * baseQty;
+    return {
+      isEligible: true,
+      qtyNeeded: 0,
+      potentialSavings: totalSavings,
+      message: `🎉 Harga Grosir Aktif! Anda hemat Rp${totalSavings.toLocaleString('id-ID')}`
+    };
+  }
+
+  // Jika belum mencapai grosir, hitung kekurangannya
+  const qtyNeeded = minGrosirQty - baseQty;
+  
+  // Tampilkan pesan upsell jika pembeli sudah memasukkan minimal separuh dari target grosir
+  // (misal target 10, dia beli 5. Kita push agar dia nambah 5 lagi)
+  if (baseQty >= (minGrosirQty / 2)) {
+    const savingsPerItem = baseEcer - grosirPrice;
+    const totalPotentialSavings = savingsPerItem * minGrosirQty;
+    
+    return {
+      isEligible: false,
+      qtyNeeded: Math.ceil(qtyNeeded / contains), // Disesuaikan dengan unit yang dia pilih (misal BOX/PCS)
+      potentialSavings: totalPotentialSavings,
+      message: `Tanggung! Tambah ${Math.ceil(qtyNeeded / contains)} lagi untuk dapat Harga Grosir. Hemat Rp${totalPotentialSavings.toLocaleString('id-ID')}!`
+    };
+  }
+
+  return null;
 };
 
 export const getTotalPrice = (cart: CartItem[]): number => {
