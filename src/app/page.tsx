@@ -484,18 +484,20 @@ export default function Home() {
               </div>
 
             {(() => {
-                const wPrice = Number(product.wholesalePrice || (product as any).Grosir || 0);
+                // Harga Grosir ditarik dari field Grosir, wholesalePrice, atau Harga_Grosir
+                const rawPrice = product.wholesalePrice || (product as any).Grosir || (product as any).Harga_Grosir || 0;
+                const wPrice = Number(rawPrice);
                 
-                // Pastikan kita menarik dari field yang tepat (termasuk huruf besar Min_Grosir yang sering digunakan di admin)
+                // Pastikan kita menarik dari field yang tepat (terutama Min_Grosir yang digunakan di form admin)
                 const minW = product.minWholesale;
                 const minG = (product as any).Min_Grosir;
                 const minWq = (product as any).minWholesaleQty;
                 
-                // Cek mana yang ada nilainya (lebih dari 0)
+                // Cek mana yang ada nilainya secara berurutan, pastikan di-parsing ke Number
                 let wQty = 0;
-                if (typeof minG === 'number' && minG > 0) wQty = minG;
-                else if (typeof minW === 'number' && minW > 0) wQty = minW;
-                else if (typeof minWq === 'number' && minWq > 0) wQty = minWq;
+                if (minG !== undefined && minG !== null && Number(minG) > 0) wQty = Number(minG);
+                else if (minW !== undefined && minW !== null && Number(minW) > 0) wQty = Number(minW);
+                else if (minWq !== undefined && minWq !== null && Number(minWq) > 0) wQty = Number(minWq);
                 
                 // Hanya render jika Harga Grosir > 0 DAN Min Beli Grosir > 1 (karena grosir 1 PCS = eceran)
                 if (wPrice > 0 && wQty > 1) {
