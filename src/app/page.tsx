@@ -487,7 +487,7 @@ export default function Home() {
               <div className="flex flex-col">
                 <span className="text-[8px] font-black uppercase italic text-blue-500">Target Grosir</span>
                 <span className="text-[7px] font-bold uppercase tracking-tighter text-gray-500 mt-0.5">
-                  Min. {product.minWholesale || (product as any).Min_Grosir || 1} {baseUnit}
+                  Min. {product.minWholesale || (product as any).Min_Grosir || (product as any).minWholesaleQty || 1} {baseUnit}
                 </span>
               </div>
               <span className="text-slate-900 text-[10px] font-black not-italic">Rp{Number(product.wholesalePrice || (product as any).Grosir || 0).toLocaleString('id-ID')}</span>
