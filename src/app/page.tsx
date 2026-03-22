@@ -485,16 +485,19 @@ export default function Home() {
 
             {(() => {
                 const wPrice = Number(product.wholesalePrice || (product as any).Grosir || 0);
-                // Cek secara ketat, jika minWholesale adalah null/undefined, coba yang lain, JANGAN gunakan default 0 secara langsung 
-                // jika datanya memang tidak pernah diisi oleh admin.
+                
+                // Pastikan kita menarik dari field yang tepat (termasuk huruf besar Min_Grosir yang sering digunakan di admin)
                 const minW = product.minWholesale;
                 const minG = (product as any).Min_Grosir;
                 const minWq = (product as any).minWholesaleQty;
                 
-                // Ambil nilai yang valid, jika semuanya falsy (undefined/null/0/string kosong), wQty = 0
-                const wQty = Number(minW || minG || minWq || 0);
+                // Cek mana yang ada nilainya (lebih dari 0)
+                let wQty = 0;
+                if (typeof minG === 'number' && minG > 0) wQty = minG;
+                else if (typeof minW === 'number' && minW > 0) wQty = minW;
+                else if (typeof minWq === 'number' && minWq > 0) wQty = minWq;
                 
-                // Hanya render jika wPrice > 0 DAN wQty > 1 (karena grosir 1 PCS itu sama dengan eceran)
+                // Hanya render jika Harga Grosir > 0 DAN Min Beli Grosir > 1 (karena grosir 1 PCS = eceran)
                 if (wPrice > 0 && wQty > 1) {
                   return (
                     <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
