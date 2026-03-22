@@ -25,10 +25,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'ATAYATOKO2 - Pusat Sembako Grosir & Eceran Kediri',
-  description: 'Pusat belanja sembako murah di Kediri. Melayani pembelian grosir dan eceran dengan harga terbaik. Gratis ongkir untuk wilayah Kediri Kota.',
-  keywords: 'sembako murah kediri, grosir sembako, eceran sembako, minyak goreng murah, beras murah, toko sembako kediri, ATAYATOKO, atayamarket',
-  authors: [{ name: 'ATAYATOKO2 Team' }],
+  title: 'Grosir Sembako Kediri Termurah & Terlengkap | ATAYATOKO',
+  description: 'Pusat belanja grosir sembako Kediri paling murah. Jual beras, minyak goreng, gula, snack partai besar & eceran. Gratis ongkir Kediri Kota.',
+  keywords: 'grosir sembako kediri, sembako murah kediri, distributor sembako kediri, agen sembako kediri, toko sembako kediri, grosir minyak goreng kediri, beras murah kediri, ATAYATOKO, atayamarket',
+  authors: [{ name: 'ATAYATOKO Team' }],
   manifest: '/site.webmanifest',
   robots: {
     index: true,
@@ -42,10 +42,10 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'ATAYATOKO2 - Pusat Sembako Grosir & Eceran Kediri',
-    description: 'Pusat belanja sembako murah di Kediri. Melayani pembelian grosir dan eceran dengan harga terbaik.',
+    title: 'Grosir Sembako Kediri Termurah | ATAYATOKO',
+    description: 'Pusat belanja grosir sembako Kediri paling murah. Jual partai besar & eceran. Gratis ongkir Kediri Kota.',
     url: 'https://atayatoko.aty0.com',
-    siteName: 'ATAYATOKO2',
+    siteName: 'ATAYATOKO Sembako Kediri',
     locale: 'id_ID',
     type: 'website',
     images: [
@@ -53,16 +53,19 @@ export const metadata: Metadata = {
         url: '/logo-atayatoko.png',
         width: 800,
         height: 600,
-        alt: 'ATAYATOKO Logo',
+        alt: 'Grosir Sembako Kediri - ATAYATOKO',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ATAYATOKO2 - Pusat Sembako Grosir & Eceran Kediri',
-    description: 'Belanja sembako grosir dan eceran termurah di Kediri.',
+    title: 'Grosir Sembako Kediri Termurah | ATAYATOKO',
+    description: 'Pusat belanja grosir sembako Kediri paling murah. Gratis ongkir Kediri Kota.',
     images: ['/logo-atayatoko.png'],
   },
+  alternates: {
+    canonical: 'https://atayatoko.aty0.com',
+  }
 };
 
 /* =========================
