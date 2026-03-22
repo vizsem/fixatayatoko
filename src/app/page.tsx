@@ -12,7 +12,7 @@ import {
   ShieldCheck, Printer, ArrowRight, Info, Phone,
   Home as HomeIcon, Grid, Sparkles, Gift, RefreshCw, Flame,
   FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown, Store,
-  Ticket, Settings, LogOut
+  Ticket, Settings, LogOut, MapPin, Truck, Clock
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -495,14 +495,12 @@ export default function Home() {
                 
                 // Cek mana yang ada nilainya secara berurutan, pastikan di-parsing ke Number
                 let wQty = 0;
-                
-                // Gunakan Number() dan handle string kosong atau spasi
                 if (minG !== undefined && minG !== null && String(minG).trim() !== '' && !isNaN(Number(minG)) && Number(minG) > 0) wQty = Number(minG);
                 else if (minW !== undefined && minW !== null && String(minW).trim() !== '' && !isNaN(Number(minW)) && Number(minW) > 0) wQty = Number(minW);
                 else if (minWq !== undefined && minWq !== null && String(minWq).trim() !== '' && !isNaN(Number(minWq)) && Number(minWq) > 0) wQty = Number(minWq);
                 
-                // Hanya render jika Harga Grosir > 0 DAN Min Beli Grosir > 1 (karena grosir 1 PCS = eceran)
-                if (wPrice > 0 && wQty > 1) {
+                // Jika Harga Grosir Rp0, berarti "Tanya Admin"
+                if (wQty > 1) {
                   return (
                     <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
                       <div className="flex flex-col">
@@ -512,7 +510,7 @@ export default function Home() {
                         </span>
                       </div>
                       <span className="text-blue-700 text-[11px] font-black not-italic bg-blue-50 px-2 py-1 rounded-lg">
-                        Rp{wPrice.toLocaleString('id-ID')}
+                        {wPrice > 0 ? `Rp${wPrice.toLocaleString('id-ID')}` : 'Tanya Admin'}
                       </span>
                     </div>
                   );
@@ -980,30 +978,65 @@ export default function Home() {
       </main>
 
       {/* ✅ MENU TAMBAHAN: TENTANG & KONTAK + ADMIN & KASIR */}
-      <footer className="mt-12 mb-16 px-4 max-w-7xl mx-auto border-t border-gray-100 pt-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-          <div className="space-y-3">
-            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Informasi</h3>
-            <Link href="/tentang" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-green-600 transition-colors">
-              <Info size={14} /> Tentang Kami
-            </Link>
-            <Link href="https://wa.me/85790565666" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-green-600 transition-colors">
-              <Phone size={14} /> Hubungi Kami
-            </Link>
+      <footer className="mt-16 bg-gray-900 text-white pt-16 pb-24 md:pb-16 rounded-t-[3rem] px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          {/* Brand & Deskripsi */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-black tracking-tighter text-green-400">ATAYATOKO</h2>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Pusat belanja sembako grosir dan eceran termurah di Kediri. Melayani pengiriman cepat langsung ke depan pintu Anda.
+            </p>
           </div>
-          <div className="space-y-3">
-            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Internal</h3>
-            <Link href="/profil/login" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-orange-600 transition-colors">
-              <ShieldCheck size={14} /> Panel Admin
-            </Link>
-            <Link href="/cashier" className="flex items-center gap-2 text-[11px] font-bold text-gray-600 hover:text-blue-600 transition-colors">
-              <Printer size={14} /> Sistem Kasir
-            </Link>
+
+          {/* Kontak & Lokasi */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Hubungi Kami</h3>
+            <div className="space-y-3">
+              <a href="https://wa.me/6285853161174" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-gray-300 hover:text-green-400 transition-colors">
+                <div className="p-2 bg-gray-800 rounded-lg"><Phone size={16} /></div>
+                <span>0858-5316-1174</span>
+              </a>
+              <div className="flex items-start gap-3 text-sm text-gray-300">
+                <div className="p-2 bg-gray-800 rounded-lg shrink-0"><MapPin size={16} /></div>
+                <span>Kediri, Jawa Timur<br/>Indonesia</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Jam Operasional & Kebijakan */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Layanan Pelanggan</h3>
+            <ul className="space-y-3 text-sm text-gray-300">
+              <li className="flex items-center gap-2"><Clock size={14} className="text-gray-500" /> Buka Setiap Hari (08:00 - 21:00)</li>
+              <li className="flex items-center gap-2"><Truck size={14} className="text-gray-500" /> Gratis Ongkir (S&K Berlaku)</li>
+              <li className="flex items-center gap-2"><ShieldCheck size={14} className="text-gray-500" /> Garansi Retur Barang Rusak</li>
+            </ul>
+          </div>
+
+          {/* Tautan Internal */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Internal</h3>
+            <ul className="space-y-3">
+              <li>
+                <Link href="/profil/login" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                  <ShieldCheck size={14} /> Panel Admin
+                </Link>
+              </li>
+              <li>
+                <Link href="/cashier" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                  <Printer size={14} /> Sistem Kasir
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <div className="flex flex-col items-center opacity-50 border-t border-gray-50 pt-8">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">ATAYAMARKET Store Kediri • © 2026</p>
+        {/* Copyright */}
+        <div className="max-w-7xl mx-auto border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <p className="text-xs font-bold text-gray-500">© {new Date().getFullYear()} ATAYATOKO. All rights reserved.</p>
+          <div className="flex gap-4">
+            <span className="text-xs font-bold text-gray-600">Aman & Terpercaya</span>
+          </div>
         </div>
       </footer>
 
