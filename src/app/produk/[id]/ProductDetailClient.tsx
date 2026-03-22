@@ -414,6 +414,39 @@ export default function ProductDetailClient({
                   </div>
                 )}
               </div>
+
+              {/* ACTION BUTTONS UNTUK DESKTOP (Tersembunyi di Mobile) */}
+              <div className="hidden md:flex flex-col mt-8 pt-6 border-t border-gray-100">
+                <div className="flex items-center gap-4 mb-4">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Atur Jumlah</span>
+                  <div className="flex items-center bg-gray-50 rounded-2xl p-1 border border-gray-200">
+                    <button onClick={() => handleQuantity('minus')} className="p-3 text-gray-500 hover:bg-white hover:shadow-sm rounded-xl transition-all"><Minus size={18}/></button>
+                    <span className="w-12 text-center font-black text-lg">{quantity}</span>
+                    <button onClick={() => handleQuantity('plus')} className="p-3 text-gray-500 hover:bg-white hover:shadow-sm rounded-xl transition-all"><Plus size={18}/></button>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => syncToFirebaseCart(product, quantity)} 
+                    disabled={isOutOfStock || isAdding}
+                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-2 shadow-xl hover:-translate-y-1 ${
+                      isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 
+                      isAdding ? 'bg-green-700 text-white opacity-80' : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-green-600/30'
+                    }`}
+                  >
+                    {isAdding ? <Loader2 size={20} className="animate-spin" /> : <ShoppingCart size={20} />}
+                    {isOutOfStock ? 'STOK HABIS' : 'TAMBAH KERANJANG'}
+                  </button>
+                  <button 
+                    onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }}
+                    className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-center hover:-translate-y-1 ${
+                      inWishlist ? 'border-red-100 bg-red-50 text-red-500' : 'border-gray-100 bg-white text-gray-400 hover:border-red-100 hover:text-red-500'
+                    }`}
+                  >
+                    <Heart size={24} className={inWishlist ? 'fill-current' : ''} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 mb-10">
