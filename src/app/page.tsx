@@ -456,32 +456,32 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col mb-3">
-            {promoInfo.hasPromo && <span className="text-[9px] text-gray-400 line-through">Rp{Number(product.price || 0).toLocaleString('id-ID')}</span>}
-            <div className="flex items-baseline gap-1">
-              <span className={`text-[15px] font-black ${promoInfo.hasPromo ? 'text-orange-600' : 'text-green-600'}`}>Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
-              <span className="text-[9px] font-black text-gray-400">/{baseUnit}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {unitList.slice(0, 4).map((u) => (
-                <span
-                  key={u.code}
-                  className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-700"
-                  title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
-                >
-                  <span className="text-gray-900">{u.code}</span>
-                  {u.contains > 1 && <span className="text-gray-400">×{u.contains}</span>}
-                  <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
-                </span>
-              ))}
-              {unitList.length > 4 && (
-                <span
-                  className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-500"
-                  title={unitList.slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
-                >
-                  +{unitList.length - 4}
-                </span>
-              )}
-            </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[15px] font-black text-green-600">Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
+                <span className="text-[9px] font-black text-gray-400">/{baseUnit}</span>
+              </div>
+              
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {unitList.filter(u => u.code !== baseUnit).slice(0, 4).map((u) => (
+                  <span
+                    key={u.code}
+                    className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-700"
+                    title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
+                  >
+                    <span className="text-gray-900">{u.code}</span>
+                    {u.contains > 1 && <span className="text-gray-400">×{u.contains}</span>}
+                    <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
+                  </span>
+                ))}
+                {unitList.filter(u => u.code !== baseUnit).length > 4 && (
+                  <span
+                    className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-[8px] font-black uppercase text-gray-500"
+                    title={unitList.filter(u => u.code !== baseUnit).slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
+                  >
+                    +{unitList.filter(u => u.code !== baseUnit).length - 4}
+                  </span>
+                )}
+              </div>
 
             <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
               <div className="flex flex-col">
@@ -490,7 +490,9 @@ export default function Home() {
                   {product.minWholesale || (product as any).Min_Grosir || (product as any).minWholesaleQty || 1} {baseUnit}
                 </span>
               </div>
-              <span className="text-slate-900 text-[10px] font-black not-italic">Rp{Number(product.wholesalePrice || (product as any).Grosir || 0).toLocaleString('id-ID')}</span>
+              <span className="text-slate-900 text-[10px] font-black not-italic">
+                Rp{Number(product.wholesalePrice || (product as any).Grosir || 0).toLocaleString('id-ID')}
+              </span>
             </div>
           </div>
 
