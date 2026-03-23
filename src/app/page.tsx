@@ -421,12 +421,14 @@ export default function Home() {
 
     return (
       <div className="min-w-[165px] md:min-w-[210px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm hover:shadow-md transition-shadow flex flex-col relative group">
-        <button onClick={() => {
+        <button onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
           const newWish = wishlist.includes(product.id) ? wishlist.filter(i => i !== product.id) : [...wishlist, product.id];
           setWishlist(newWish);
           localStorage.setItem('atayatoko-wishlist', JSON.stringify(newWish));
         }}
-          className="absolute top-2 right-2 z-20 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md active:scale-75 transition-all">
+          className="absolute top-2 right-2 z-30 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md active:scale-75 transition-all cursor-pointer">
           <Heart size={14} className={isWish ? "fill-red-500 text-red-500" : "text-gray-400"} />
         </button>
 
@@ -436,7 +438,7 @@ export default function Home() {
             alt={product.name} 
             fill 
             className={`object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
-            sizes="190px"
+            sizes="(max-width: 768px) 165px, 210px"
             placeholder="blur"
             blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
           />
