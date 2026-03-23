@@ -14,6 +14,7 @@ import {
   FileText, Filter, Smartphone, Bell, ClipboardList, ChevronDown, Store,
   Ticket, Settings, LogOut, MapPin, Truck, Clock
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { UnitOption } from '@/lib/types';
@@ -136,6 +137,7 @@ export default function Home() {
     }
     localStorage.setItem('cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('cart-updated'));
+    toast.success(`${product.name} ditambahkan ke keranjang!`);
   }, [getDiscountedPrice]);
 
   const promoProducts = useMemo(() => {
@@ -428,7 +430,7 @@ export default function Home() {
           <Heart size={14} className={isWish ? "fill-red-500 text-red-500" : "text-gray-400"} />
         </button>
 
-        <Link href={`/produk/${product.id}`} className="relative aspect-square bg-gray-50 overflow-hidden block">
+        <Link href={`/produk/${product.id}`} className="relative aspect-square bg-gray-50 overflow-hidden block z-10">
           <Image 
             src={product.image} 
             alt={product.name} 
@@ -446,8 +448,10 @@ export default function Home() {
           )}
         </Link>
 
-        <div className="p-3 flex flex-col flex-1">
-          <h3 className="text-[10px] md:text-xs font-black text-gray-800 line-clamp-2 uppercase leading-tight">{product.name}</h3>
+        <div className="p-3 flex flex-col flex-1 relative z-20">
+          <Link href={`/produk/${product.id}`} className="block">
+            <h3 className="text-[10px] md:text-xs font-black text-gray-800 line-clamp-2 uppercase leading-tight hover:text-green-600 transition-colors">{product.name}</h3>
+          </Link>
           <div className="mt-1 flex items-center justify-between">
             <p className="text-[8px] font-bold text-gray-400 uppercase">{product.category}</p>
             <p className={`text-[8px] font-black uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
@@ -455,7 +459,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex flex-col mb-3">
+          <Link href={`/produk/${product.id}`} className="flex flex-col mb-3 block cursor-pointer">
               <div className="flex items-baseline gap-1">
                 <span className="text-[15px] font-black text-green-600">Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
                 <span className="text-[9px] font-black text-gray-400">/{baseUnit}</span>
@@ -517,9 +521,9 @@ export default function Home() {
                 }
                 return null;
               })()}
-            </div>
+            </Link>
 
-          <button onClick={() => addToCart(product)} disabled={isOut} className={`mt-auto w-full py-2.5 text-[9px] font-black rounded-xl uppercase shadow-sm transition-all ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}>
+          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToCart(product); }} disabled={isOut} className={`mt-auto w-full py-2.5 text-[9px] font-black rounded-xl uppercase shadow-sm transition-all relative z-30 ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}>
             {isOut ? 'Stok Habis' : '+ Keranjang'}
           </button>
         </div>
