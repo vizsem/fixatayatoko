@@ -17,7 +17,8 @@ import {
   getDocs,
   limit,
   startAfter,
-  runTransaction
+  runTransaction,
+  arrayUnion
 } from 'firebase/firestore';
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
@@ -194,9 +195,9 @@ export default function AdminPurchases() {
               const effectiveOldCost = currentCostPerPcs > 0 ? currentCostPerPcs : incomingCostPerPcs;
               
               const newStock = currentStock + incomingQtyPcs;
-              const nextAvgCost = newStock > 0
-                ? Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock)
-                : Math.round(incomingCostPerPcs);
+              const nextAvgCost = currentStock === 0
+                ? Math.round(incomingCostPerPcs)
+                : Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock);
 
               const whKey = pData.warehouseId || 'gudang-utama';
               
@@ -215,7 +216,15 @@ export default function AdminPurchases() {
                 purchasePrice: nextAvgCost,
                 Modal: nextAvgCost,
                 hargaBeli: nextAvgCost,
-                updatedAt: serverTimestamp()
+                updatedAt: serverTimestamp(),
+                inventoryLayers: arrayUnion({
+                  qty: incomingQtyPcs,
+                  costPerPcs: incomingCostPerPcs,
+                  ts: serverTimestamp(),
+                  purchaseId: id,
+                  supplierName: pData.supplierName || '',
+                  warehouseId: whKey
+                })
               });
             }
           }

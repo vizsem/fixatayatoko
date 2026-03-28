@@ -253,13 +253,43 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               // Jika diff < 0 (stok berkurang karena pesanan bertambah), kurangi stok gudang
               // Jika diff > 0 (stok bertambah karena pesanan berkurang), tambah stok gudang
               // Note: Logic di sini agak counter-intuitive.
-              // diff = newQty - oldQty.
-              // Jika newQty > oldQty (pesanan nambah), maka stok gudang harus BERKURANG.
-              // Jadi change = -diff.
               const stockChange = -diff;
               
               newStockByWarehouse[targetWarehouseId] = currentWarehouseStock + stockChange;
               
+              let cogsDelta = 0;
+              if (stockChange < 0) {
+                const consumeQty = Math.abs(stockChange);
+                const layers: Array<{ qty: number; costPerPcs: number; ts?: any }> = Array.isArray(pData.inventoryLayers) ? pData.inventoryLayers : [];
+                const nextLayers: Array<{ qty: number; costPerPcs: number; ts?: any }> = [];
+                let remaining = consumeQty;
+                for (const layer of layers) {
+                  if (remaining <= 0) {
+                    nextLayers.push(layer);
+                    continue;
+                  }
+                  const take = Math.min(Number(layer.qty || 0), remaining);
+                  if (take > 0) {
+                    cogsDelta += take * Number(layer.costPerPcs || 0);
+                    const left = Number(layer.qty || 0) - take;
+                    if (left > 0) nextLayers.push({ ...layer, qty: left });
+                    remaining -= take;
+                  } else {
+                    nextLayers.push(layer);
+                  }
+                }
+                if (remaining > 0) {
+                  const fallbackCost = Number(pData.Modal || pData.purchasePrice || 0);
+                  cogsDelta += remaining * fallbackCost;
+                }
+                tx.update(orderRef, {
+                  cogsTotal: ((current as any).cogsTotal || 0) + Math.round(cogsDelta)
+                });
+                tx.update(productRef, {
+                  inventoryLayers: nextLayers
+                });
+              }
+
               tx.update(productRef, {
                 stock: currentStock + stockChange,
                 stockByWarehouse: newStockByWarehouse

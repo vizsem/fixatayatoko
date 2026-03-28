@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -39,6 +40,8 @@ type FinancialRecord = {
   profit?: number;
   paymentMethod: string;
   channel?: string;
+  platformFee?: number;
+  hppSource?: 'FIFO' | 'Fallback';
 };
 
 export default function FinanceReport() {
@@ -117,7 +120,42 @@ export default function FinanceReport() {
           });
         }
 
+        // Build latest purchase cost map per product from Purchase Items (fallback untuk Modal kosong)
+        const latestCostMap = new Map<string, { costPerPcs: number; ts: number }>();
+        const allPurchasesSnap = await getDocs(collection(db, 'purchases'));
+        allPurchasesSnap.docs.forEach((pdoc) => {
+          const pdata = pdoc.data() as {
+            createdAt?: Timestamp | string;
+            items?: { id: string; purchasePrice: number; conversion?: number }[];
+          };
+          const created =
+            pdata.createdAt instanceof Timestamp
+              ? pdata.createdAt.toDate().getTime()
+              : new Date(pdata.createdAt || new Date().toISOString()).getTime();
+          (pdata.items || []).forEach((it) => {
+            const conv = Math.max(1, Number(it.conversion || 1));
+            const costPerPcs = conv > 0 ? Number(it.purchasePrice || 0) / conv : Number(it.purchasePrice || 0);
+            const cur = latestCostMap.get(it.id);
+            if (!cur || created > cur.ts) latestCostMap.set(it.id, { costPerPcs, ts: created });
+          });
+        });
+
         const financeRecords: FinancialRecord[] = [];
+        let feeShopee = 6.5;
+        let feeTiktok = 4.5;
+        let feeTokopedia = 5.0;
+        let feeLazada = 6.0;
+        try {
+          const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+          if (sysSnap.exists()) {
+            const sysData = sysSnap.data() as { marketplaceFees?: { shopee?: number; tiktok?: number; tokopedia?: number; lazada?: number } };
+            feeShopee = typeof sysData.marketplaceFees?.shopee === 'number' ? sysData.marketplaceFees!.shopee! : feeShopee;
+            feeTiktok = typeof sysData.marketplaceFees?.tiktok === 'number' ? sysData.marketplaceFees!.tiktok! : feeTiktok;
+            feeTokopedia = typeof sysData.marketplaceFees?.tokopedia === 'number' ? sysData.marketplaceFees!.tokopedia! : feeTokopedia;
+            feeLazada = typeof sysData.marketplaceFees?.lazada === 'number' ? sysData.marketplaceFees!.lazada! : feeLazada;
+          }
+        } catch {}
+        const ADMIN_FEES: Record<string, number> = { SHOPEE: feeShopee, TIKTOK: feeTiktok, TOKOPEDIA: feeTokopedia, LAZADA: feeLazada };
 
         // Proses penjualan dengan perhitungan profit (filter tanggal di sini)
         for (const orderDoc of salesSnapshot.docs) {
@@ -128,6 +166,7 @@ export default function FinanceReport() {
             paymentMethod?: string;
             items?: { id?: string; productId?: string; price: number; quantity: number }[];
             channel?: string;
+            shippingCost?: number;
           };
           const created =
             order.createdAt instanceof Timestamp
@@ -135,30 +174,32 @@ export default function FinanceReport() {
               : new Date(order.createdAt || new Date().toISOString());
           if (!(created >= startDate && created <= endDate)) continue;
 
+          let goodsRevenue = 0;
           let totalCost = 0;
-          let totalProfit = 0;
 
           // Hitung biaya & profit berdasarkan harga beli
           for (const item of order.items || []) {
             const product = productsMap.get(item.id || '') || productsMap.get(item.productId || '');
-            // Gunakan field 'Modal' dari produk, fallback ke purchasePrice, lalu estimasi 80%
             const modalPrice = Number(
               (product && (product.Modal as number | undefined)) ??
               (product && (product.purchasePrice as number | undefined)) ??
               0
             );
             const sellingPrice = Number(item.price);
-            
-            // Jika modal 0, gunakan estimasi margin 10% (be conservative) -> Modal = 90% Harga Jual
-            // Atau tetap 80% sesuai kode lama
-            const purchasePrice = modalPrice > 0 ? modalPrice : sellingPrice * 0.85;
-            
-            const itemCost = purchasePrice * item.quantity;
-            const itemProfit = (sellingPrice * item.quantity) - itemCost;
+            const fallbackCostEntry = latestCostMap.get(item.id || item.productId || '');
+            const purchasePrice = modalPrice > 0 ? modalPrice : Math.max(0, fallbackCostEntry?.costPerPcs || 0);
 
+            const itemCost = purchasePrice * item.quantity;
+            goodsRevenue += sellingPrice * item.quantity;
             totalCost += itemCost;
-            totalProfit += itemProfit;
           }
+
+          const channel = (order.channel || 'OFFLINE').toUpperCase();
+          const adminFeeRate = ADMIN_FEES[channel] || 0;
+          const serviceFee = Math.round(goodsRevenue * (adminFeeRate / 100));
+          const primaryCost = typeof (order as any).cogsTotal === 'number' ? Number((order as any).cogsTotal) : totalCost;
+          const profitCalc = goodsRevenue - primaryCost - serviceFee;
+          const shippingRevenue = Number(order.shippingCost || 0);
 
           financeRecords.push({
             id: orderDoc.id,
@@ -166,12 +207,27 @@ export default function FinanceReport() {
             description: `Penjualan #${orderDoc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'profit',
-            amount: Number(order.total || 0),
-            cost: totalCost,
-            profit: totalProfit,
+            amount: goodsRevenue,
+            cost: primaryCost,
+            profit: profitCalc,
             paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
-            channel: order.channel || 'OFFLINE'
+            channel: order.channel || 'OFFLINE',
+            platformFee: serviceFee,
+            hppSource: typeof (order as any).cogsTotal === 'number' ? 'FIFO' : 'Fallback'
           });
+
+          if (shippingRevenue > 0) {
+            financeRecords.push({
+              id: `${orderDoc.id}-SHIP`,
+              date: created.toISOString(),
+              description: `Ongkir Order #${orderDoc.id.substring(0, 8)}`,
+              category: 'Ongkir',
+              type: 'income',
+              amount: shippingRevenue,
+              paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
+              channel: order.channel || 'OFFLINE'
+            });
+          }
         }
 
         // Ambil semua pembelian, lalu filter tanggal di sisi klien (untuk konsistensi tipe createdAt)
@@ -222,6 +278,54 @@ export default function FinanceReport() {
             type: 'expense',
             amount: Number(data.amount || 0),
             paymentMethod: 'CASH' // Default, or add field if needed
+          });
+        });
+
+        // Integrasi retur penjualan: kurangi pendapatan & sesuaikan HPP
+        const returnsSnap = await getDocs(collection(db, 'returns'));
+        returnsSnap.docs.forEach((rdoc) => {
+          const r = rdoc.data() as {
+            type?: 'SALES_RETURN' | 'PURCHASE_RETURN';
+            status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+            refId?: string;
+            createdAt?: any;
+            items?: { productId: string; quantity: number; price: number }[];
+            totalValue?: number;
+          };
+          const created =
+            r.createdAt && r.createdAt.seconds
+              ? new Date(r.createdAt.seconds * 1000)
+              : new Date();
+          if (!(created >= startDate && created <= endDate)) return;
+          if (r.status !== 'APPROVED' || r.type !== 'SALES_RETURN') return;
+
+          let retRevenue = 0;
+          let retCost = 0;
+          (r.items || []).forEach((it) => {
+            const selling = Number(it.price || 0);
+            const prod = productsMap.get(it.productId || '');
+            const modalPrice = Number(
+              (prod && (prod.Modal as number | undefined)) ??
+              (prod && (prod.purchasePrice as number | undefined)) ??
+              0
+            );
+            const fallbackCostEntry = latestCostMap.get(it.productId || '');
+            const purchasePrice = modalPrice > 0 ? modalPrice : Math.max(0, fallbackCostEntry?.costPerPcs || 0);
+            retRevenue += selling * Number(it.quantity || 0);
+            retCost += purchasePrice * Number(it.quantity || 0);
+          });
+
+          financeRecords.push({
+            id: `RET-${rdoc.id}`,
+            date: created.toISOString(),
+            description: `Retur Penjualan #${(r.refId || '').toString().slice(-6)}`,
+            category: 'Retur Penjualan',
+            type: 'profit',
+            amount: -Math.abs(retRevenue),
+            cost: -Math.abs(retCost),
+            profit: -(Math.abs(retRevenue) - Math.abs(retCost)),
+            paymentMethod: 'REFUND',
+            channel: 'OFFLINE'
           });
         });
 
@@ -278,6 +382,9 @@ export default function FinanceReport() {
   const totalIncome = records
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + r.amount, 0);
+  const shippingIncome = records
+    .filter(r => r.type === 'income' && r.category === 'Ongkir')
+    .reduce((sum, r) => sum + r.amount, 0);
 
   const totalCost = records
     .filter(r => r.type === 'profit')
@@ -293,7 +400,7 @@ export default function FinanceReport() {
 
   const netProfit = totalProfit - totalExpense;
 
-  const channels: string[] = ['OFFLINE', 'WEBSITE', 'SHOPEE', 'TIKTOK'];
+  const channels: string[] = ['OFFLINE', 'WEBSITE', 'SHOPEE', 'TIKTOK', 'TOKOPEDIA', 'LAZADA'];
 
   const channelSummary = channels.map(channel => {
     const channelRecords = records.filter(
@@ -303,14 +410,22 @@ export default function FinanceReport() {
     const revenue = channelRecords.reduce((sum, r) => sum + r.amount, 0);
     const cost = channelRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
     const profit = channelRecords.reduce((sum, r) => sum + (r.profit || 0), 0);
+    const platformFee = channelRecords.reduce((sum, r) => sum + (r.platformFee || 0), 0);
 
     return {
       channel,
       revenue,
       cost,
       profit,
+      platformFee,
     };
   });
+
+  const goodsRevenue = totalIncome;
+  const grossMarginPct = goodsRevenue > 0 ? Math.max(0, (totalProfit / goodsRevenue) * 100) : 0;
+  const netMarginPct = goodsRevenue > 0 ? (netProfit / goodsRevenue) * 100 : 0;
+  const fifoCount = records.filter(r => r.type === 'profit' && (r as any).hppSource === 'FIFO').length;
+  const fallbackCount = records.filter(r => r.type === 'profit' && (r as any).hppSource !== 'FIFO').length;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -372,7 +487,7 @@ export default function FinanceReport() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-          {/* Pendapatan */}
+          {/* Pendapatan (Barang & Ongkir) */}
           <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl">
@@ -380,10 +495,17 @@ export default function FinanceReport() {
               </div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pendapatan</span>
             </div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
-              Rp{totalIncome.toLocaleString('id-ID')}
-            </h3>
-            <p className="text-xs font-medium text-slate-400 mt-1">Total Pemasukan</p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Barang</span>
+                <span className="text-lg font-black text-slate-800">Rp{goodsRevenue.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ongkir</span>
+                <span className="text-lg font-black text-slate-800">Rp{shippingIncome.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+            <p className="text-xs font-medium text-slate-400 mt-2">Pendapatan dipisah: barang dan ongkir</p>
           </div>
 
           {/* HPP */}
@@ -398,6 +520,15 @@ export default function FinanceReport() {
               Rp{totalCost.toLocaleString('id-ID')}
             </h3>
             <p className="text-xs font-medium text-slate-400 mt-1">Modal Produk Terjual</p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sumber</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-emerald-600">FIFO {fifoCount}</span>
+                <span className="text-[10px] font-black text-slate-400">•</span>
+                <span className="text-[10px] font-black text-amber-600">Fallback {fallbackCount}</span>
+                <Link href="/admin/inventory/layers" className="text-[10px] font-black text-indigo-600 underline">Audit Layers</Link>
+              </div>
+            </div>
           </div>
 
           {/* Laba Kotor */}
@@ -415,6 +546,7 @@ export default function FinanceReport() {
               Rp{totalProfit.toLocaleString('id-ID')}
             </h3>
             <p className="text-xs font-medium text-slate-400 mt-1 relative z-10">Pendapatan - HPP</p>
+            <p className="text-[10px] font-black text-blue-600/70 mt-1 relative z-10">Gross Margin: {grossMarginPct.toFixed(1)}%</p>
           </div>
 
           {/* Pengeluaran */}
@@ -446,6 +578,7 @@ export default function FinanceReport() {
               Rp{netProfit.toLocaleString('id-ID')}
             </h3>
             <p className="text-xs font-medium text-white/80 mt-1 relative z-10">Laba Kotor - Pengeluaran</p>
+            <p className="text-[10px] font-black text-white/80 mt-1 relative z-10">Net Margin: {netMarginPct.toFixed(1)}%</p>
           </div>
         </div>
 
@@ -482,6 +615,7 @@ export default function FinanceReport() {
                   <div className="flex justify-between mt-2 text-[10px] text-slate-400">
                     <span>Rev: {summary.revenue.toLocaleString('id-ID')}</span>
                     <span>HPP: {summary.cost.toLocaleString('id-ID')}</span>
+                    <span>Fee: {summary.platformFee.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
               ))}

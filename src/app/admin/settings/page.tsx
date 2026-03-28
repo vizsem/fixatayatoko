@@ -49,6 +49,7 @@ type SystemSettings = {
   printer: PrinterSettings;
   createdAt: string;
   displayWarehouseId?: string;
+  marketplaceFees?: { shopee: number; tiktok: number; tokopedia: number; lazada: number };
 };
 
 type Employee = { id?: string; name: string; role: 'admin' | 'kasir'; phone: string; email: string; isActive: boolean; };
@@ -82,7 +83,8 @@ const defaultSettings: SystemSettings = {
     { id: 'OJOL', name: 'Ojek Online', enabled: false, cost: 0, description: 'Ongkir bayar ditempat (COD)' }
   ],
   printer: { type: 'ESC/POS', paperWidth: 80, autoCut: true, characterSet: 'UTF-8' },
-  createdAt: new Date().toISOString()
+  createdAt: new Date().toISOString(),
+  marketplaceFees: { shopee: 6.5, tiktok: 4.5, tokopedia: 5.0, lazada: 6.0 }
 };
 
 export default function AdminSettings() {
@@ -365,6 +367,83 @@ export default function AdminSettings() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500">Nama Toko</label>
                   <input type="text" value={settings.store.name} onChange={e => setSettings({ ...settings, store: { ...settings.store, name: e.target.value } })} className="w-full p-3.5 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 focus:ring-slate-900 font-bold text-sm transition-all outline-none" />
+                </div>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500">Marketplace Fee (%)</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-100">
+                      <span className="text-[10px] font-black text-slate-600 min-w-[70px]">Shopee</span>
+                      <input
+                        type="number"
+                        value={settings.marketplaceFees?.shopee ?? 6.5}
+                        onChange={e => setSettings({
+                          ...settings,
+                          marketplaceFees: {
+                            shopee: Number(e.target.value),
+                            tiktok: settings.marketplaceFees?.tiktok ?? 4.5,
+                            tokopedia: settings.marketplaceFees?.tokopedia ?? 5.0,
+                            lazada: settings.marketplaceFees?.lazada ?? 6.0
+                          }
+                        })}
+                        className="w-24 bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-slate-900"
+                      />
+                      <span className="text-[10px] font-bold text-slate-400">%</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-100">
+                      <span className="text-[10px] font-black text-slate-600 min-w-[70px]">TikTok</span>
+                      <input
+                        type="number"
+                        value={settings.marketplaceFees?.tiktok ?? 4.5}
+                        onChange={e => setSettings({
+                          ...settings,
+                          marketplaceFees: {
+                            shopee: settings.marketplaceFees?.shopee ?? 6.5,
+                            tiktok: Number(e.target.value),
+                            tokopedia: settings.marketplaceFees?.tokopedia ?? 5.0,
+                            lazada: settings.marketplaceFees?.lazada ?? 6.0
+                          }
+                        })}
+                        className="w-24 bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-slate-900"
+                      />
+                      <span className="text-[10px] font-bold text-slate-400">%</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-100">
+                      <span className="text-[10px] font-black text-slate-600 min-w-[70px]">Tokopedia</span>
+                      <input
+                        type="number"
+                        value={settings.marketplaceFees?.tokopedia ?? 5.0}
+                        onChange={e => setSettings({
+                          ...settings,
+                          marketplaceFees: {
+                            shopee: settings.marketplaceFees?.shopee ?? 6.5,
+                            tiktok: settings.marketplaceFees?.tiktok ?? 4.5,
+                            tokopedia: Number(e.target.value),
+                            lazada: settings.marketplaceFees?.lazada ?? 6.0
+                          }
+                        })}
+                        className="w-24 bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-slate-900"
+                      />
+                      <span className="text-[10px] font-bold text-slate-400">%</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl ring-1 ring-slate-100">
+                      <span className="text-[10px] font-black text-slate-600 min-w-[70px]">Lazada</span>
+                      <input
+                        type="number"
+                        value={settings.marketplaceFees?.lazada ?? 6.0}
+                        onChange={e => setSettings({
+                          ...settings,
+                          marketplaceFees: {
+                            shopee: settings.marketplaceFees?.shopee ?? 6.5,
+                            tiktok: settings.marketplaceFees?.tiktok ?? 4.5,
+                            tokopedia: settings.marketplaceFees?.tokopedia ?? 5.0,
+                            lazada: Number(e.target.value)
+                          }
+                        })}
+                        className="w-24 bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-slate-900"
+                      />
+                      <span className="text-[10px] font-bold text-slate-400">%</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500">WhatsApp / Telepon</label>

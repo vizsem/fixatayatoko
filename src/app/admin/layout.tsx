@@ -98,6 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Kategori', href: '/admin/kategori', icon: Tag },
         { name: 'Gudang', href: '/admin/warehouses', icon: Database },
         { name: 'Inventory', href: '/admin/inventory', icon: History },
+        { name: 'Layer Persediaan', href: '/admin/inventory/layers', icon: Database },
       ]
     },
     {
