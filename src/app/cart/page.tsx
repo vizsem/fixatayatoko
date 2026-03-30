@@ -28,8 +28,14 @@ const compressImage = (file: File): Promise<Blob> => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
+      const result = event.target?.result;
+      if (!result) {
+        reject(new Error('File tidak valid'));
+        return;
+      }
       const img = new Image();
-      img.src = event.target?.result as string;
+      img.onerror = () => reject(new Error('Gagal memuat gambar'));
+      img.src = String(result);
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const MAX_WIDTH = 800;
@@ -508,6 +514,11 @@ export default function CartPage() {
     return { ok: true, msg: "Siap dipesan" };
   })();
   const handleCheckout = async () => {
+    if (!validation.ok) {
+      notify.user.error(validation.msg);
+      return;
+    }
+
     // 1. Validasi Stok Sebelum Checkout
     for (const item of cart) {
       try {
@@ -538,8 +549,10 @@ export default function CartPage() {
       }
     }
 
-    if (!userId) {
-      return notify.user.error("Akun sedang disiapkan. Coba lagi sebentar.");
+    const shouldUseWallet = useWallet || paymentMethod === 'wallet';
+
+    if (!userId && (usePoints || shouldUseWallet || appliedVoucher)) {
+      return notify.user.error("Silakan login untuk menggunakan poin, voucher, atau dompet.");
     }
 
     if (paymentMethod === 'transfer' && !paymentProof) {
@@ -547,7 +560,7 @@ export default function CartPage() {
     }
     if (paymentMethod === 'tempo' && !tempoDueDate) return notify.user.error("Pilih tanggal jatuh tempo untuk pembayaran tempo!");
     if (paymentMethod === 'wallet' && (!userData || userData.walletBalance === undefined)) return notify.user.error("Dompet tidak tersedia!");
-    if (paymentMethod === 'wallet' && userData && (userData.walletBalance || 0) < subtotal) return notify.user.error("Saldo dompet tidak mencukupi!");
+    if (paymentMethod === 'wallet' && userData && (userData.walletBalance || 0) < baseTotal) return notify.user.error("Saldo dompet tidak mencukupi!");
     
     setIsSubmitting(true);
     // const orderId = generateOrderId(); // Generated on server now
@@ -592,10 +605,10 @@ export default function CartPage() {
           },
           dueDate: paymentMethod === 'tempo' ? tempoDueDate : undefined,
           status: paymentMethod === 'tempo' ? 'BELUM_LUNAS' : undefined,
-          userId,
+          userId: userId || undefined,
           voucherCode: appliedVoucher?.code,
-          usePoints,
-          useWallet
+          usePoints: Boolean(userId && usePoints),
+          useWallet: Boolean(userId && shouldUseWallet)
         })
       });
 
@@ -1062,8 +1075,8 @@ export default function CartPage() {
               <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-4 text-center mb-8">
                 <p className="text-[10px] font-black text-blue-700 uppercase">Saldo Dompet</p>
                 <p className="text-lg font-black text-blue-700">Rp{(userData.walletBalance || 0).toLocaleString()}</p>
-                <p className="text-[10px] text-blue-600">Total belanja: Rp{subtotal.toLocaleString()}</p>
-                {(userData.walletBalance || 0) >= subtotal ? (
+                <p className="text-[10px] text-blue-600">Total dibayar: Rp{baseTotal.toLocaleString()}</p>
+                {(userData.walletBalance || 0) >= baseTotal ? (
                   <p className="text-[10px] text-green-600 font-bold">✓ Saldo mencukupi</p>
                 ) : (
                   <p className="text-[10px] text-red-600 font-bold">✗ Saldo tidak mencukupi</p>
@@ -1102,12 +1115,15 @@ export default function CartPage() {
 
             <button
               onClick={handleCheckout}
-              disabled={!validation.ok || isSubmitting}
+              disabled={isSubmitting}
               className="w-full bg-green-600 text-white py-5 rounded-[2rem] font-black mt-8 shadow-xl shadow-green-200 disabled:bg-slate-200 disabled:shadow-none transition-all flex items-center justify-center gap-3 uppercase text-xs"
             >
               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={18} />}
               {isSubmitting ? "Processing..." : "Konfirmasi & Bayar"}
             </button>
+            <div className={`mt-3 text-center text-[9px] font-black uppercase tracking-widest ${validation.ok ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {validation.msg}
+            </div>
           </div>
         </div>
       </main>

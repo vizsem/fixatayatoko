@@ -13,6 +13,7 @@ import {
   addDoc,
   query,
   orderBy,
+  Timestamp,
   serverTimestamp,
   getDocs,
   limit,
@@ -220,7 +221,7 @@ export default function AdminPurchases() {
                 inventoryLayers: arrayUnion({
                   qty: incomingQtyPcs,
                   costPerPcs: incomingCostPerPcs,
-                  ts: serverTimestamp(),
+                  ts: Timestamp.now(),
                   purchaseId: id,
                   supplierName: pData.supplierName || '',
                   warehouseId: whKey
