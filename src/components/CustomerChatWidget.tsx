@@ -143,7 +143,7 @@ export default function CustomerChatWidget() {
       {/* Chat Window */}
       <div 
         className={`bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden ${
-          isOpen ? 'scale-100 opacity-100 mb-4' : 'scale-0 opacity-0 h-0 mb-0'
+          isOpen ? 'scale-100 opacity-100 mb-4 pointer-events-auto visible' : 'scale-0 opacity-0 h-0 mb-0 pointer-events-none invisible'
         }`}
       >
         {/* Header */}

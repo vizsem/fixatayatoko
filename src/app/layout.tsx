@@ -84,7 +84,7 @@ export default function RootLayout({
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
       </head>
 
-      <body className="antialiased overflow-x-hidden">
+      <body className="antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <Toaster position="top-center" />
         <AuthBootstrap />
         <FCMManager />
