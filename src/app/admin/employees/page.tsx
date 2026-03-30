@@ -29,6 +29,7 @@ type Employee = {
   phone: string;
   status: 'AKTIF' | 'NON-AKTIF';
   manualSalary: number;
+  dailySalary: number;
   workSchedule: string;
   totalAttendance: number;
   bankName?: string;
@@ -225,6 +226,7 @@ export default function EmployeesPage() {
   const [formData, setFormData] = useState({
     name: '', role: 'Karyawan Toko', email: '', phone: '',
     manualSalary: 0,
+    dailySalary: 0,
     workSchedule: '07:00 - 14:00',
     status: 'AKTIF' as 'AKTIF' | 'NON-AKTIF',
     bankName: '',
@@ -888,7 +890,12 @@ export default function EmployeesPage() {
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const minutesLate = scheduleStart !== null ? Math.max(0, nowMinutes - (scheduleStart + Number(shift.graceMinutes || 0))) : 0;
-    const dailySalary = Math.round(Number(employee.manualSalary || 0) / 30);
+    
+    // Gunakan dailySalary jika ada, jika tidak fallback ke manualSalary / 30
+    const dailySalary = employee.dailySalary > 0 
+      ? employee.dailySalary 
+      : Math.round(Number(employee.manualSalary || 0) / 30);
+      
     const penaltyAmount = Math.round((Number(employee.manualSalary || 0) / 30) * (alphaDeductionPercent / 100));
 
     try {
@@ -1020,6 +1027,7 @@ export default function EmployeesPage() {
     setFormData({
       name: emp.name, role: emp.role, email: emp.email, phone: emp.phone,
       manualSalary: emp.manualSalary,
+      dailySalary: emp.dailySalary || 0,
       workSchedule: emp.workSchedule,
       status: emp.status,
       bankName: emp.bankName || '',
@@ -1061,6 +1069,7 @@ export default function EmployeesPage() {
       email: '',
       phone: '',
       manualSalary: 0,
+      dailySalary: 0,
       workSchedule: '07:00 - 14:00',
       status: 'AKTIF',
       bankName: '',
@@ -1150,7 +1159,7 @@ export default function EmployeesPage() {
         const paidLeaveDays = leaves.filter((r) => r.paid).reduce((sum, req) => sum + calcOverlapDays(req), 0);
         const unpaidLeaveDays = Math.max(0, leaveDays - paidLeaveDays);
 
-        const dailyRate = Math.round(Number(emp.manualSalary || 0) / 30);
+        const dailySalaryToUse = emp.dailySalary > 0 ? emp.dailySalary : Math.round(Number(emp.manualSalary || 0) / 30);
         const hourlyRate = Number(emp.manualSalary || 0) / 173;
         const adj = payrollAdjustments[emp.id] || { allowances: 0, deductions: 0, overtimeMinutes: 0 };
         const overtimeMinutes = overtimeMinutesFromAttendance + Number(adj.overtimeMinutes || 0);
@@ -1158,16 +1167,16 @@ export default function EmployeesPage() {
 
         const lateDeduction = Math.round((lateMinutes / 60) * hourlyRate);
 
-        const alphaDeduction = Math.round(alphaDays * dailyRate * (alphaDeductionPercent / 100));
-        const unpaidLeaveDeduction = Math.round(unpaidLeaveDays * dailyRate);
+        const alphaDeduction = Math.round(alphaDays * dailySalaryToUse * (alphaDeductionPercent / 100));
+        const unpaidLeaveDeduction = Math.round(unpaidLeaveDays * dailySalaryToUse);
 
         const reimbursements = monthReimbursements.filter((r) => r.employeeId === emp.id).reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
         const eligibleLoans = monthLoans.filter((l) => l.employeeId === emp.id && l.status === 'ACTIVE' && String(l.startMonth || '') <= payrollMonth);
         const loanDeduction = eligibleLoans.reduce((sum, l) => sum + Math.min(Number(l.installmentMonthly || 0), Number(l.remaining || 0)), 0);
 
-        const baseSalary = Math.round(Number(emp.manualSalary || 0));
-        const thr = includeTHR || payrollRun?.includeTHR ? baseSalary : 0;
+        const baseSalary = emp.dailySalary > 0 ? (attendanceDays * emp.dailySalary) : Math.round(Number(emp.manualSalary || 0));
+        const thr = includeTHR || payrollRun?.includeTHR ? (emp.dailySalary > 0 ? dailySalaryToUse * 30 : baseSalary) : 0;
         const kpiRow = payrollKpiScores[emp.id] || { bonusAmount: 0 };
         const kpiBonus = Math.round(Number((kpiRow as any).bonusAmount || 0));
 
@@ -1541,6 +1550,9 @@ export default function EmployeesPage() {
                             <td className="px-6 py-4">
                               <div className="space-y-1">
                                 <p className="text-xs font-bold text-slate-700">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                                {emp.dailySalary > 0 && (
+                                  <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter">Harian: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
+                                )}
                                 <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
                                   <CheckCircle2 size={12} className="text-emerald-500" />
                                   Hadir: {emp.totalAttendance || 0} hari
@@ -2475,18 +2487,33 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gaji Bulanan (Rp)</label>
-                 <div className="relative">
-                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
-                   <input 
-                     type="number" 
-                     required 
-                     value={formData.manualSalary} 
-                     onChange={e => setFormData({ ...formData, manualSalary: Number(e.target.value) })} 
-                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
-                   />
-                 </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gaji Bulanan (Rp)</label>
+                   <div className="relative">
+                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                     <input 
+                       type="number" 
+                       required 
+                       value={formData.manualSalary} 
+                       onChange={e => setFormData({ ...formData, manualSalary: Number(e.target.value) })} 
+                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                     />
+                   </div>
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gaji Harian (Rp)</label>
+                   <div className="relative">
+                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">Rp</span>
+                     <input 
+                       type="number" 
+                       value={formData.dailySalary} 
+                       onChange={e => setFormData({ ...formData, dailySalary: Number(e.target.value) })} 
+                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 outline-none" 
+                       placeholder="Opsional"
+                     />
+                   </div>
+                </div>
               </div>
 
               <div className="space-y-2">
