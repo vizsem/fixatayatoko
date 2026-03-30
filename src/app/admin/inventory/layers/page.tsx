@@ -14,12 +14,15 @@ type Product = {
   unit?: string;
   stock?: number;
   inventoryLayers?: ProductLayer[];
+  isActive?: boolean;
 };
 
 export default function InventoryLayersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
   const [summary, setSummary] = useState<{ oldQty: number; oldValue: number; newQty: number; newValue: number }>({ oldQty: 0, oldValue: 0, newQty: 0, newValue: 0 });
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>(() => {
     const now = new Date();
@@ -40,7 +43,8 @@ export default function InventoryLayersPage() {
           name: String(data.name || data.Nama || 'Produk'),
           unit: (data.unit || 'PCS')?.toString().toUpperCase(),
           stock: Number(data.stock || data.Stok || 0),
-          inventoryLayers: Array.isArray(data.inventoryLayers) ? data.inventoryLayers as ProductLayer[] : []
+          inventoryLayers: Array.isArray(data.inventoryLayers) ? data.inventoryLayers as ProductLayer[] : [],
+          isActive: data.isActive !== false
         };
       });
       setProducts(items);
@@ -48,12 +52,18 @@ export default function InventoryLayersPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, dateRange]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const start = new Date(dateRange.startDate);
     const end = new Date(dateRange.endDate);
     end.setHours(23,59,59,999);
+    
     return products
+      .filter(p => p.isActive !== false) // Only active products
       .map(p => ({
         ...p,
         inventoryLayers: (p.inventoryLayers || []).filter(l => {
@@ -63,6 +73,13 @@ export default function InventoryLayersPage() {
       }))
       .filter(p => (p.name || '').toLowerCase().includes(q));
   }, [products, search, dateRange]);
+
+  const currentItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   useEffect(() => {
     const now = new Date();
@@ -252,15 +269,15 @@ export default function InventoryLayersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-10 text-center text-xs font-bold text-gray-400">Tidak ada produk</td>
                 </tr>
-              ) : filtered.map((p) => {
+              ) : currentItems.map((p) => {
                 const layers = p.inventoryLayers || [];
                 const totalValue = layers.reduce((s, l) => s + (Number(l.qty || 0) * Number(l.costPerPcs || 0)), 0);
                 return (
-                  <tr key={p.id} className="align-top">
+                  <tr key={p.id} className="align-top hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Box size={18} className="text-gray-400" />
@@ -286,7 +303,7 @@ export default function InventoryLayersPage() {
                               <span className="text-[10px] font-black text-gray-600">Qty: {Number(l.qty || 0).toLocaleString('id-ID')}</span>
                               <span className="text-[10px] font-black text-indigo-600">Rp{Number(l.costPerPcs || 0).toLocaleString('id-ID')}</span>
                             </div>
-                            <div className="mt-1 text-[9px] font-bold text-gray-400 flex items-center justify-between">
+                            <div className="mt-1 text-[9px] font-bold text-gray-400 flex items-center justify-between gap-4">
                               <span>Supplier: {l.supplierName || '-'}</span>
                               <span>PO: {l.purchaseId ? l.purchaseId.slice(-6) : '-'}</span>
                               <span>Gudang: {l.warehouseId || '-'}</span>
@@ -304,6 +321,54 @@ export default function InventoryLayersPage() {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} produk
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-gray-100 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="flex items-center gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  // Only show current, first, last, and pages near current
+                  if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-xl text-[10px] font-black transition-all ${
+                          currentPage === page ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-100 text-gray-400 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  }
+                  if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="text-gray-300">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
+              >
+                Next Page
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

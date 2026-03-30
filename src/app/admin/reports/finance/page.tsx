@@ -41,7 +41,8 @@ type FinancialRecord = {
   paymentMethod: string;
   channel?: string;
   platformFee?: number;
-  hppSource?: 'FIFO' | 'Fallback';
+  discountTotal?: number;
+  hppSource?: 'FIFO' | 'Fallback' | 'Estimate (85%)';
 };
 
 export default function FinanceReport() {
@@ -141,27 +142,14 @@ export default function FinanceReport() {
         });
 
         const financeRecords: FinancialRecord[] = [];
-        let feeShopee = 6.5;
-        let feeTiktok = 4.5;
-        let feeTokopedia = 5.0;
-        let feeLazada = 6.0;
-        try {
-          const sysSnap = await getDoc(doc(db, 'settings', 'system'));
-          if (sysSnap.exists()) {
-            const sysData = sysSnap.data() as { marketplaceFees?: { shopee?: number; tiktok?: number; tokopedia?: number; lazada?: number } };
-            feeShopee = typeof sysData.marketplaceFees?.shopee === 'number' ? sysData.marketplaceFees!.shopee! : feeShopee;
-            feeTiktok = typeof sysData.marketplaceFees?.tiktok === 'number' ? sysData.marketplaceFees!.tiktok! : feeTiktok;
-            feeTokopedia = typeof sysData.marketplaceFees?.tokopedia === 'number' ? sysData.marketplaceFees!.tokopedia! : feeTokopedia;
-            feeLazada = typeof sysData.marketplaceFees?.lazada === 'number' ? sysData.marketplaceFees!.lazada! : feeLazada;
-          }
-        } catch {}
-        const ADMIN_FEES: Record<string, number> = { SHOPEE: feeShopee, TIKTOK: feeTiktok, TOKOPEDIA: feeTokopedia, LAZADA: feeLazada };
 
         // Proses penjualan dengan perhitungan profit (filter tanggal di sini)
         for (const orderDoc of salesSnapshot.docs) {
           const order = orderDoc.data() as {
             createdAt?: Timestamp | string;
             total?: number;
+            subtotal?: number;
+            discountTotal?: number;
             payment?: { method?: string };
             paymentMethod?: string;
             items?: { id?: string; productId?: string; price: number; quantity: number }[];
@@ -176,6 +164,7 @@ export default function FinanceReport() {
 
           let goodsRevenue = 0;
           let totalCost = 0;
+          let hppSource: FinancialRecord['hppSource'] = 'Fallback';
 
           // Hitung biaya & profit berdasarkan harga beli
           for (const item of order.items || []) {
@@ -187,7 +176,13 @@ export default function FinanceReport() {
             );
             const sellingPrice = Number(item.price);
             const fallbackCostEntry = latestCostMap.get(item.id || item.productId || '');
-            const purchasePrice = modalPrice > 0 ? modalPrice : Math.max(0, fallbackCostEntry?.costPerPcs || 0);
+            let purchasePrice = modalPrice > 0 ? modalPrice : Math.max(0, fallbackCostEntry?.costPerPcs || 0);
+
+            // Fallback 15% margin if cost is still 0
+            if (purchasePrice <= 0 && sellingPrice > 0) {
+              purchasePrice = sellingPrice * 0.85;
+              hppSource = 'Estimate (85%)';
+            }
 
             const itemCost = purchasePrice * item.quantity;
             goodsRevenue += sellingPrice * item.quantity;
@@ -195,10 +190,16 @@ export default function FinanceReport() {
           }
 
           const channel = (order.channel || 'OFFLINE').toUpperCase();
-          const adminFeeRate = ADMIN_FEES[channel] || 0;
-          const serviceFee = Math.round(goodsRevenue * (adminFeeRate / 100));
+          
+          // Apply discount if exists
+          const discountVal = Number(order.discountTotal || 0);
+          const netGoodsRevenue = Math.max(0, goodsRevenue - discountVal);
+          
+          const serviceFee = 0; // Removed marketplace fees
           const primaryCost = typeof (order as any).cogsTotal === 'number' ? Number((order as any).cogsTotal) : totalCost;
-          const profitCalc = goodsRevenue - primaryCost - serviceFee;
+          if (typeof (order as any).cogsTotal === 'number') hppSource = 'FIFO';
+          
+          const profitCalc = netGoodsRevenue - primaryCost;
           const shippingRevenue = Number(order.shippingCost || 0);
 
           financeRecords.push({
@@ -207,13 +208,14 @@ export default function FinanceReport() {
             description: `Penjualan #${orderDoc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'profit',
-            amount: goodsRevenue,
+            amount: netGoodsRevenue,
             cost: primaryCost,
             profit: profitCalc,
             paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
             channel: order.channel || 'OFFLINE',
             platformFee: serviceFee,
-            hppSource: typeof (order as any).cogsTotal === 'number' ? 'FIFO' : 'Fallback'
+            discountTotal: discountVal,
+            hppSource: hppSource
           });
 
           if (shippingRevenue > 0) {
@@ -410,22 +412,21 @@ export default function FinanceReport() {
     const revenue = channelRecords.reduce((sum, r) => sum + r.amount, 0);
     const cost = channelRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
     const profit = channelRecords.reduce((sum, r) => sum + (r.profit || 0), 0);
-    const platformFee = channelRecords.reduce((sum, r) => sum + (r.platformFee || 0), 0);
 
     return {
       channel,
       revenue,
       cost,
       profit,
-      platformFee,
     };
   });
 
   const goodsRevenue = totalIncome;
   const grossMarginPct = goodsRevenue > 0 ? Math.max(0, (totalProfit / goodsRevenue) * 100) : 0;
   const netMarginPct = goodsRevenue > 0 ? (netProfit / goodsRevenue) * 100 : 0;
-  const fifoCount = records.filter(r => r.type === 'profit' && (r as any).hppSource === 'FIFO').length;
-  const fallbackCount = records.filter(r => r.type === 'profit' && (r as any).hppSource !== 'FIFO').length;
+  const fifoCount = records.filter(r => r.type === 'profit' && r.hppSource === 'FIFO').length;
+  const fallbackCount = records.filter(r => r.type === 'profit' && r.hppSource === 'Fallback').length;
+  const estimateCount = records.filter(r => r.type === 'profit' && r.hppSource === 'Estimate (85%)').length;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -525,7 +526,9 @@ export default function FinanceReport() {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-emerald-600">FIFO {fifoCount}</span>
                 <span className="text-[10px] font-black text-slate-400">•</span>
-                <span className="text-[10px] font-black text-amber-600">Fallback {fallbackCount}</span>
+                <span className="text-[10px] font-black text-amber-600">Manual {fallbackCount}</span>
+                <span className="text-[10px] font-black text-slate-400">•</span>
+                <span className="text-[10px] font-black text-rose-500">Estimasi {estimateCount}</span>
                 <Link href="/admin/inventory/layers" className="text-[10px] font-black text-indigo-600 underline">Audit Layers</Link>
               </div>
             </div>
@@ -615,7 +618,6 @@ export default function FinanceReport() {
                   <div className="flex justify-between mt-2 text-[10px] text-slate-400">
                     <span>Rev: {summary.revenue.toLocaleString('id-ID')}</span>
                     <span>HPP: {summary.cost.toLocaleString('id-ID')}</span>
-                    <span>Fee: {summary.platformFee.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
               ))}
