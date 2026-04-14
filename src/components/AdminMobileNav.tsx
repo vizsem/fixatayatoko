@@ -186,7 +186,7 @@ export default function AdminMobileNav() {
   ];
 
   const mainNavItems = [
-    { name: 'Home', icon: LayoutDashboard, href: '/admin' },
+    { name: 'PO', icon: Receipt, href: '/purchases/add' },
     { name: 'Stok', icon: Package, action: () => setActiveModal('inventory') },
     { name: 'Order', icon: ShoppingBag, action: handleOpenMarketplace, center: true },
     { name: 'New', icon: Camera, action: handleOpenAddProduct },
