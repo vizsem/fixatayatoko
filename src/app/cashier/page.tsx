@@ -132,7 +132,9 @@ export default function CashierPOS() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+
   const [editPriceValue, setEditPriceValue] = useState('');
 
   // Transaksi States
@@ -1364,6 +1366,7 @@ export default function CashierPOS() {
       {activeTab === 'pos' ? (
         <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
           <div className="col-span-12 xl:col-span-8 flex flex-col gap-4">
+
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
               <div className="bg-green-50 p-2 rounded-xl text-green-600"><Search size={20} /></div>
               <input
@@ -1446,9 +1449,24 @@ export default function CashierPOS() {
             </div>
           </div>
 
-          <div className="col-span-12 xl:col-span-4 flex flex-col gap-4">
+          {/* Desktop Sidebar / Mobile Floating Drawer */}
+          <div className={`col-span-12 xl:col-span-4 flex flex-col gap-4 transition-all duration-300 ${
+            isMobileCartOpen 
+              ? 'fixed inset-0 z-[60] bg-gray-50 p-4 md:p-8 overflow-y-auto animate-in slide-in-from-bottom flex' 
+              : 'hidden xl:flex'
+          }`}>
+            {isMobileCartOpen && (
+              <div className="xl:hidden flex items-center justify-between mb-2">
+                <button onClick={() => setIsMobileCartOpen(false)} className="flex items-center gap-2 text-gray-500 font-bold text-xs uppercase">
+                  <X size={18} /> Kembali ke List Produk
+                </button>
+                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">Cart Mode</div>
+              </div>
+            )}
+            
             <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
               {transactionType === 'toko' && <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
+
               {transactionType === 'online' && <><Truck size={14} /> MODE PESANAN ONLINE</>}
               {transactionType === 'shopee' && <><Package size={14} /> MODE SHOPEE</>}
               {transactionType === 'tiktok' && <><ShoppingBag size={14} /> MODE TIKTOK</>}
@@ -1915,7 +1933,25 @@ export default function CashierPOS() {
         </div>
       )}
 
+      {/* Mobile Floating Cart Button */}
+      {!isMobileCartOpen && cart.length > 0 && activeTab === 'pos' && (
+        <button 
+          onClick={() => setIsMobileCartOpen(true)}
+          className="xl:hidden fixed bottom-28 right-6 z-50 bg-green-600 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-3 active:scale-95 transition-all animate-in slide-in-from-right duration-500"
+        >
+          <div className="relative">
+            <ShoppingCart size={24} />
+            <span className="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full border-2 border-white font-black">{cart.reduce((s, i) => s + i.quantity, 0)}</span>
+          </div>
+          <div className="text-left">
+            <p className="text-[10px] font-bold text-green-100 uppercase leading-none mb-1">Total Bayar</p>
+            <p className="text-sm font-black leading-none">Rp{total.toLocaleString()}</p>
+          </div>
+        </button>
+      )}
+
       {/* ADMIN CHAT MODAL */}
+
       {showChatModal && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowChatModal(false)}>
           <div className="bg-white w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
