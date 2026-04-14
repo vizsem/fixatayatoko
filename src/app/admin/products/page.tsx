@@ -86,11 +86,16 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
     : 0;
 
   const handleUpdate = async () => {
-    if (stokMasuk <= 0 || hargaBaru <= 0) return notify.admin.error("Lengkapi data!");
+    if (isNaN(stokMasuk) || stokMasuk <= 0 || isNaN(hargaBaru) || hargaBaru <= 0) {
+      return notify.admin.error("Data stok/harga tidak valid!");
+    }
+    
     setLoading(true);
     try {
+      const batch = writeBatch(db);
       const productRef = doc(db, 'products', product.id);
-      await updateDoc(productRef, {
+      
+      batch.update(productRef, {
         stock: totalStokBaru,
         Stok: totalStokBaru,
         purchasePrice: simulasiHargaAvg,
@@ -100,20 +105,27 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
         tgl_masuk: new Date().toISOString().split('T')[0]
       });
 
-      await addInventoryLog({
+      const logRef = doc(collection(db, 'inventory_logs'));
+      batch.set(logRef, {
         productId: product.id,
-        productName: product.Nama || '',
+        productName: product.name || product.Nama || '',
         type: 'MASUK',
         amount: stokMasuk,
         adminId: auth.currentUser?.uid || 'system',
         source: 'MANUAL',
         toWarehouseId: product.warehouseId || '',
-        note: `Restock (Avg Price). Old Price: ${hargaLama}, New Buy Price: ${hargaBaru}, Avg: ${simulasiHargaAvg}`
+        note: `Restock (Avg Price). Old: ${stokLama}@${hargaLama}, New: ${stokMasuk}@${hargaBaru}, Final Avg: ${simulasiHargaAvg}`,
+        date: serverTimestamp()
       });
 
-      notify.admin.success("Restock Berhasil!");
+      await batch.commit();
+
+      notify.admin.success("Restock & Log Berhasil!");
       onClose();
-    } catch { notify.admin.error("Gagal update data"); }
+    } catch (err) {
+      console.error(err);
+      notify.admin.error("Gagal update data restock");
+    }
     setLoading(false);
   };
 
@@ -166,34 +178,46 @@ export default function AdminProducts() {
     if (selectedIds.length === 0) return;
     const t = notify.admin.loading(`Mengubah ${selectedIds.length} produk...`);
     try {
-      const batch = writeBatch(db);
-      selectedIds.forEach(id => {
-        batch.update(doc(db, 'products', id), { Status: newStatus, updatedAt: serverTimestamp() });
-      });
-      await batch.commit();
+      const CHUNK_SIZE = 450;
+      for (let i = 0; i < selectedIds.length; i += CHUNK_SIZE) {
+        const chunk = selectedIds.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(id => {
+          batch.update(doc(db, 'products', id), { Status: newStatus, updatedAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
       setSelectedIds([]);
       notify.admin.success("Berhasil diperbarui!", { id: t });
-    } catch { notify.admin.error("Gagal memperbarui", { id: t }); }
-
+    } catch (err) {
+      console.error(err);
+      notify.admin.error("Gagal memperbarui", { id: t });
+    }
   };
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!confirm(`Arsipkan ${selectedIds.length} produk? Produk akan dinonaktifkan (Soft Delete).`)) return;
     const t = notify.admin.loading(`Mengarsipkan ${selectedIds.length} produk...`);
     try {
-      const batch = writeBatch(db);
-      selectedIds.forEach(id => {
-        // Soft Delete: Set isActive = false instead of deleting document
-        batch.update(doc(db, 'products', id), { 
-          isActive: false, 
-          status: 'ARCHIVED',
-          updatedAt: serverTimestamp() 
+      const CHUNK_SIZE = 450;
+      for (let i = 0; i < selectedIds.length; i += CHUNK_SIZE) {
+        const chunk = selectedIds.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(id => {
+          batch.update(doc(db, 'products', id), { 
+            isActive: false, 
+            status: 'ARCHIVED',
+            updatedAt: serverTimestamp() 
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
       setSelectedIds([]);
       notify.admin.success("Produk berhasil diarsipkan", { id: t });
-    } catch { notify.admin.error("Gagal mengarsipkan produk", { id: t }); }
+    } catch (err) {
+      console.error(err);
+      notify.admin.error("Gagal mengarsipkan produk", { id: t });
+    }
   };
   // States
   const [loading, setLoading] = useState(true);
@@ -347,42 +371,44 @@ export default function AdminProducts() {
       try {
         const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const data = (XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) as Record<string, unknown>[]);
+        const data = (XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) as Record<string, any>[]);
 
-        const batch = writeBatch(db);
-        data.forEach((item) => {
-          const exist = rows.find(p => p.sku === String(item.ID));
-          const pData = { ...item, updatedAt: serverTimestamp() };
-          if (exist) {
-            batch.update(doc(db, 'products', exist.id), pData);
-            
-            // Log if stock changed
-            const newStock = Number(item.Stok);
-            const oldStock = Number(exist.stock || exist.Stok || 0);
-            const diff = newStock - oldStock;
-            if (diff !== 0) {
-              const logRef = doc(collection(db, 'inventory_logs'));
-              batch.set(logRef, {
-                productId: exist.id,
-                productName: exist.name || '',
-                type: diff > 0 ? 'MASUK' : 'KELUAR',
-                amount: Math.abs(diff),
-                adminId: auth.currentUser?.uid || 'system',
-                source: 'MANUAL',
-                note: `Bulk Import Update. Prev: ${oldStock}, New: ${newStock}`,
-                date: serverTimestamp()
-              });
-            }
-          } else {
-             // New Product
-             const newRef = doc(collection(db, 'products'));
-             batch.set(newRef, { ...pData, createdAt: serverTimestamp() });
-             
-             // Log Initial Stock
-             const stock = Number(item.Stok || 0);
-             if (stock > 0) {
-               const logRef = doc(collection(db, 'inventory_logs'));
-               batch.set(logRef, {
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+          const chunk = data.slice(i, i + CHUNK_SIZE);
+          const batch = writeBatch(db);
+
+          chunk.forEach((item) => {
+            const exist = rows.find(p => p.sku === String(item.ID || ''));
+            const pData = { ...item, updatedAt: serverTimestamp() };
+            // Optional: clean up ID if it's just meant for internal mapping
+            delete pData.ID;
+
+            if (exist) {
+              batch.update(doc(db, 'products', exist.id), pData);
+              const newStock = Number(item.Stok);
+              const oldStock = Number(exist.stock || exist.Stok || 0);
+              const diff = newStock - oldStock;
+              if (diff !== 0) {
+                const logRef = doc(collection(db, 'inventory_logs'));
+                batch.set(logRef, {
+                  productId: exist.id,
+                  productName: exist.name || '',
+                  type: diff > 0 ? 'MASUK' : 'KELUAR',
+                  amount: Math.abs(diff),
+                  adminId: auth.currentUser?.uid || 'system',
+                  source: 'MANUAL',
+                  note: `Bulk Import Update. Prev: ${oldStock}, New: ${newStock}`,
+                  date: serverTimestamp()
+                });
+              }
+            } else {
+              const newRef = doc(collection(db, 'products'));
+              batch.set(newRef, { ...pData, createdAt: serverTimestamp() });
+              const stock = Number(item.Stok || 0);
+              if (stock > 0) {
+                const logRef = doc(collection(db, 'inventory_logs'));
+                batch.set(logRef, {
                   productId: newRef.id,
                   productName: String(item.Nama || 'New Product'),
                   type: 'MASUK',
@@ -391,14 +417,19 @@ export default function AdminProducts() {
                   source: 'MANUAL',
                   note: 'Bulk Import (New Product)',
                   date: serverTimestamp()
-               });
-             }
-          }
-        });
+                });
+              }
+            }
+          });
 
-        await batch.commit();
-        notify.admin.success("Berhasil!", { id: t });
-      } catch { notify.admin.error("Gagal!", { id: t }); }
+          await batch.commit();
+        }
+
+        notify.admin.success(`Berhasil mengimport ${data.length} produk!`, { id: t });
+      } catch (err) {
+        console.error("Import Error:", err);
+        notify.admin.error("Gagal import data!", { id: t });
+      }
     };
     reader.readAsBinaryString(file);
   };
