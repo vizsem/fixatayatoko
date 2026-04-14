@@ -10,10 +10,14 @@ import {
   Settings, Star, Truck, Receipt, Tag, Database,
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
-  Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw
+  Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
+  DollarSign, AlertTriangle
 } from 'lucide-react';
 
-import { collection, onSnapshot, orderBy, limit, query, Timestamp, where } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, limit, query, Timestamp, where, getDocs } from 'firebase/firestore';
+import AdminMobileNav from '@/components/AdminMobileNav';
+
+
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +34,43 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }>>([]);
   const initialLoaded = useRef(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const [mobileStats, setMobileStats] = useState({
+    todaySales: 0,
+    newOrders: 0,
+    lowStock: 0
+  });
+
+  useEffect(() => {
+    // Listen to new orders
+    const qOrders = query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']));
+    const unsubOrders = onSnapshot(qOrders, (snap) => {
+      setMobileStats(prev => ({ ...prev, newOrders: snap.size }));
+    });
+
+    // Listen to low stock
+    const qStock = query(collection(db, 'products'), where('stock', '<=', 10), where('isActive', '==', true));
+    const unsubStock = onSnapshot(qStock, (snap) => {
+      setMobileStats(prev => ({ ...prev, lowStock: snap.size }));
+    });
+
+    // Fetch today sales
+    const fetchTodaySales = async () => {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const qSales = query(collection(db, 'orders'), where('createdAt', '>=', today));
+      const snap = await getDocs(qSales);
+      let total = 0;
+      snap.forEach(d => total += (Number(d.data().total) || 0));
+      setMobileStats(prev => ({ ...prev, todaySales: total }));
+    };
+    fetchTodaySales();
+
+    return () => {
+      unsubOrders();
+      unsubStock();
+    };
+  }, []);
 
   // Listen to unread messages count
   useEffect(() => {
@@ -213,20 +254,58 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </aside>
-      <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-8">
-        <div className="md:hidden mb-4 flex items-center justify-between">
-          <button
-            className="p-2.5 bg-white rounded-xl shadow-sm border border-gray-100"
-            onClick={() => setIsOpen(true)}
-          >
-            <LayoutDashboard size={18} />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-green-600 rounded-lg flex items-center justify-center text-white font-black text-[10px]">AT</div>
-            <span className="text-[10px] font-black text-green-600">Admin</span>
+      <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-8 pb-32 md:pb-8">
+        {/* Mobile Header & Quick Grid */}
+        <div className="md:hidden mb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <button
+              className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 active:scale-95 transition-all"
+              onClick={() => setIsOpen(true)}
+            >
+              <LayoutDashboard size={20} className="text-gray-600" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">AtayaToko</p>
+                <p className="text-xs font-black text-green-600">Admin Panel</p>
+              </div>
+              <div className="w-10 h-10 bg-green-600 rounded-2xl flex items-center justify-center text-white font-black text-xs shadow-lg shadow-green-100">AT</div>
+            </div>
           </div>
-          <div />
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+                  <DollarSign size={12} />
+                </div>
+                <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Sales</span>
+              </div>
+              <p className="text-xs font-black text-gray-800">Rp{mobileStats.todaySales >= 1000000 ? (mobileStats.todaySales/1000000).toFixed(1) + 'M' : (mobileStats.todaySales/1000).toFixed(0) + 'K'}</p>
+            </div>
+            
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                  <ShoppingCart size={12} />
+                </div>
+                <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Orders</span>
+              </div>
+              <p className="text-xs font-black text-gray-800">{mobileStats.newOrders}</p>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
+                  <AlertTriangle size={12} />
+                </div>
+                <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Stock</span>
+              </div>
+              <p className="text-xs font-black text-red-600">{mobileStats.lowStock}</p>
+            </div>
+          </div>
         </div>
+
         {children}
         {!!toasts.length && (
           <div className="fixed bottom-4 right-4 z-[60] space-y-2">
@@ -264,6 +343,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         )}
       </main>
+      <AdminMobileNav />
     </div>
   );
 }
+
