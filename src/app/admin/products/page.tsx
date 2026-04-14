@@ -382,7 +382,7 @@ export default function AdminProducts() {
             const exist = rows.find(p => p.sku === String(item.ID || ''));
             const pData = { ...item, updatedAt: serverTimestamp() };
             // Optional: clean up ID if it's just meant for internal mapping
-            delete pData.ID;
+            delete (pData as any).ID;
 
             if (exist) {
               batch.update(doc(db, 'products', exist.id), pData);
