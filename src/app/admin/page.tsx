@@ -41,9 +41,9 @@ interface DailySales {
 
 const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600" }: { icon: LucideIcon; title: string; description: string; href: string; color?: string }) => (
   <Link href={href} className="group block h-full">
-    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all h-full flex flex-col items-center text-center">
-      <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm`}>
-        <Icon size={24} />
+    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all h-full flex flex-col items-center text-center">
+      <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-sm`}>
+        <Icon size={20} />
       </div>
       <h3 className="font-bold text-xs text-gray-800 mb-1">{title}</h3>
       <p className="text-[10px] text-gray-500 leading-tight">{description}</p>
@@ -52,13 +52,13 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
 );
 
 const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string, trend?: string }) => (
-  <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
+  <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
     <div className={`absolute top-0 right-0 p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500`}>
-      <Icon size={100} className={color.replace('text-', 'fill-')} />
+      <Icon size={80} className={color.replace('text-', 'fill-')} />
     </div>
-    <div className="flex justify-between items-start mb-4 z-10">
-      <div className={`${bg} ${color} p-3 rounded-2xl shadow-inner`}>
-        <Icon size={20} />
+    <div className="flex justify-between items-start mb-3 z-10">
+      <div className={`${bg} ${color} p-2.5 rounded-xl shadow-inner`}>
+        <Icon size={18} />
       </div>
       {trend && (
         <span className="bg-green-50 text-green-600 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
@@ -66,9 +66,9 @@ const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string
         </span>
       )}
     </div>
-    <div className="z-10">
-      <p className="text-2xl lg:text-3xl font-black text-gray-800 tracking-tight mb-1">{value}</p>
-      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+    <div className="z-10 mt-2">
+      <p className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight mb-0.5">{value}</p>
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">{label}</p>
     </div>
   </div>
 );
@@ -274,11 +274,11 @@ export default function AdminDashboard() {
   const maxChartValue = Math.max(...salesChartData.map(d => d.amount), 1);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 font-sans text-gray-900">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Dashboard Overview</h1>
+          <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Dashboard Overview</h1>
           <p className="text-gray-500 text-xs font-medium mt-1">
             Halo Admin, ini ringkasan performa toko hari ini.
           </p>
@@ -299,7 +299,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatBox 
           label="Total Pendapatan (Bulan Ini)" 
           value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`} 
@@ -336,15 +336,15 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 space-y-8">
           
           {/* Sales Chart Section */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Statistik Penjualan</h3>
                 <p className="text-xs text-gray-400 font-medium">Omzet 7 hari terakhir</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black text-gray-900">Rp{stats.weeklySales.toLocaleString('id-ID')}</p>
-                <p className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded-full inline-block">Minggu Ini</p>
+                <p className="text-xl font-black text-gray-900">Rp{stats.weeklySales.toLocaleString('id-ID')}</p>
+                <p className="text-[9px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full inline-block">Minggu Ini</p>
               </div>
             </div>
             
@@ -360,10 +360,10 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div 
-                      className={`w-full max-w-[40px] rounded-t-xl transition-all duration-500 ease-out hover:opacity-80 ${idx === salesChartData.length - 1 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gray-100 hover:bg-emerald-200'}`}
+                      className={`w-full max-w-[32px] rounded-t-lg transition-all duration-500 ease-out hover:opacity-80 ${idx === salesChartData.length - 1 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gray-100 hover:bg-emerald-200'}`}
                       style={{ height: `${heightPercentage}%` }}
                     ></div>
-                    <span className={`text-[10px] font-bold mt-3 ${idx === salesChartData.length - 1 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    <span className={`text-[9px] font-bold mt-2 ${idx === salesChartData.length - 1 ? 'text-emerald-600' : 'text-gray-400'}`}>
                       {data.dayName}
                     </span>
                   </div>
@@ -373,7 +373,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Orders Section */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-gray-900">Pesanan Terbaru</h3>
               <Link href="/admin/orders" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
@@ -389,7 +389,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:bg-white hover:border-gray-100 hover:shadow-sm transition-all group">
+                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-transparent hover:bg-white hover:border-gray-100 hover:shadow-sm transition-all group">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-400 shadow-sm group-hover:text-blue-600 transition-colors">
                         <Package size={18} />
@@ -428,7 +428,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Top Products Widget */}
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-gray-900">Produk Terlaris</h3>
               <MoreHorizontal size={16} className="text-gray-400" />
@@ -454,7 +454,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* System Info Widget */}
-          <div className="bg-gray-900 p-6 rounded-[2rem] text-white relative overflow-hidden">
+          <div className="bg-gray-900 p-5 rounded-2xl text-white relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-5">
                 <Database size={100} />
              </div>

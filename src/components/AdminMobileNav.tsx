@@ -245,20 +245,20 @@ export default function AdminMobileNav() {
       {activeModal === 'inventory' && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-t-[2.5rem] p-8 animate-in slide-in-from-bottom duration-300">
-            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8" />
-            <h2 className="text-xl font-black tracking-tighter mb-6">Pilih Aksi Inventaris</h2>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
+            <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
+            <h2 className="text-xl font-black tracking-tighter mb-5">Pilih Aksi Inventaris</h2>
+            <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={() => handleOpenScanner('po')}
-                className="flex flex-col items-center gap-4 p-6 bg-green-50 text-green-600 rounded-[2rem] border border-green-100 active:scale-95 transition-all"
+                className="flex flex-col items-center gap-3 p-5 bg-green-50 text-green-600 rounded-2xl border border-green-100 active:scale-95 transition-all"
               >
                 <ArrowDownLeft size={32} />
                 <span className="text-xs font-black tracking-widest">STOCK IN (PO)</span>
               </button>
               <button 
                 onClick={() => handleOpenScanner('update')}
-                className="flex flex-col items-center gap-4 p-6 bg-orange-50 text-orange-600 rounded-[2rem] border border-orange-100 active:scale-95 transition-all"
+                className="flex flex-col items-center gap-3 p-5 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100 active:scale-95 transition-all"
               >
                 <ArrowUpRight size={32} />
                 <span className="text-xs font-black tracking-widest">STOCK ADJUST</span>
@@ -271,40 +271,40 @@ export default function AdminMobileNav() {
       {/* More Menu Modal */}
       {activeModal === 'more' && (
         <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-in fade-in duration-300">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-2xl font-black tracking-tighter">Semua Fitur</h2>
-            <button onClick={() => setActiveModal(null)} className="p-3 bg-gray-50 rounded-2xl text-gray-400">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-xl font-black tracking-tighter">Semua Fitur</h2>
+            <button onClick={() => setActiveModal(null)} className="p-2.5 bg-gray-50 rounded-xl text-gray-400">
               <X size={20} />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 gap-3">
               {moreMenuItems.map((item, idx) => (
                 <Link
                   key={idx}
                   href={item.href}
                   onClick={() => { setActiveModal(null); triggerHaptic(10); }}
-                  className={`flex flex-col items-center gap-3 p-6 rounded-[2rem] ${item.bg} ${item.color} active:scale-95 transition-all`}
+                  className={`flex flex-col items-center gap-2.5 p-5 rounded-2xl ${item.bg} ${item.color} active:scale-95 transition-all`}
                 >
-                  <item.icon size={28} />
-                  <span className="text-[10px] font-black tracking-widest uppercase">{item.name}</span>
+                  <item.icon size={24} />
+                  <span className="text-[9px] font-black tracking-widest uppercase">{item.name}</span>
                 </Link>
               ))}
             </div>
             
-            <div className="mt-12 p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100">
-              <h3 className="text-sm font-black mb-4 flex items-center gap-2">
-                <TrendingUp size={16} className="text-green-600" /> Ringkasan Hari Ini
+            <div className="mt-8 p-6 bg-gray-50 rounded-3xl border border-gray-100">
+              <h3 className="text-[11px] font-black mb-4 flex items-center gap-2">
+                <TrendingUp size={14} className="text-green-600" /> Ringkasan Hari Ini
               </h3>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400">Total Penjualan</p>
-                  <p className="text-lg font-black text-gray-800">Rp 0</p>
+                  <p className="text-[9px] font-bold text-gray-400">Total Penjualan</p>
+                  <p className="text-base font-black text-gray-800">Rp 0</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400">Order Baru</p>
-                  <p className="text-lg font-black text-gray-800">0</p>
+                  <p className="text-[9px] font-bold text-gray-400">Order Baru</p>
+                  <p className="text-base font-black text-gray-800">0</p>
                 </div>
               </div>
             </div>
@@ -316,11 +316,11 @@ export default function AdminMobileNav() {
       {activeModal === 'marketplace' && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end transform transition-all duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-t-[2.5rem] p-8 animate-in slide-in-from-bottom duration-300">
-            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8" />
+          <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
+            <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
             
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black tracking-tighter text-gray-800">Order Marketplace</h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-black tracking-tighter text-gray-800">Order Marketplace</h2>
               <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 rounded-full text-gray-400">
                 <X size={20} />
               </button>
@@ -330,13 +330,13 @@ export default function AdminMobileNav() {
               <div className="relative">
                 <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Nama Produk</label>
                 <div className="relative">
-                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
                     type="text" 
                     value={mpProductName}
                     onChange={(e) => setMpProductName(e.target.value)}
                     placeholder="Cari produk..."
-                    className="w-full bg-gray-50 border-none rounded-2xl pl-14 pr-6 py-4 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full bg-gray-50 border-none rounded-xl pl-12 pr-4 py-3.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 
@@ -366,15 +366,15 @@ export default function AdminMobileNav() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">QTY</label>
-                  <div className="flex items-center bg-gray-50 rounded-2xl p-1">
-                    <button onClick={() => { setMpQty(Math.max(1, mpQty - 1)); triggerHaptic(5); }} className="w-12 h-12 flex items-center justify-center text-gray-400 font-bold text-xl">-</button>
+                  <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
+                    <button onClick={() => { setMpQty(Math.max(1, mpQty - 1)); triggerHaptic(5); }} className="w-10 h-10 flex items-center justify-center text-gray-400 font-bold text-lg">-</button>
                     <input 
                       type="number" 
                       value={mpQty}
                       onChange={(e) => setMpQty(Number(e.target.value))}
-                      className="flex-1 bg-transparent text-center text-sm font-black outline-none"
+                      className="flex-1 bg-transparent text-center text-xs font-black outline-none"
                     />
-                    <button onClick={() => { setMpQty(mpQty + 1); triggerHaptic(5); }} className="w-12 h-12 flex items-center justify-center text-gray-400 font-bold text-xl">+</button>
+                    <button onClick={() => { setMpQty(mpQty + 1); triggerHaptic(5); }} className="w-10 h-10 flex items-center justify-center text-gray-400 font-bold text-lg">+</button>
                   </div>
                 </div>
                 
@@ -383,7 +383,7 @@ export default function AdminMobileNav() {
                   <select 
                     value={mpSource}
                     onChange={(e) => setMpSource(e.target.value)}
-                    className="w-full h-14 bg-gray-50 border-none rounded-2xl px-4 text-xs font-bold outline-none font-black"
+                    className="w-full h-11 bg-gray-50 border-none rounded-xl px-4 text-xs font-bold outline-none font-black"
                   >
                     <option>Shopee</option>
                     <option>Tokped</option>
@@ -395,9 +395,9 @@ export default function AdminMobileNav() {
               <button 
                 onClick={saveMarketplaceOrder}
                 disabled={mpLoading}
-                className="w-full bg-blue-600 text-white h-16 rounded-3xl font-black text-sm tracking-widest shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
+                className="w-full bg-blue-600 text-white h-14 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-blue-100 active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
               >
-                {mpLoading ? <Zap className="animate-spin" size={18} /> : <Check size={20} />}
+                {mpLoading ? <Zap className="animate-spin" size={16} /> : <Check size={18} />}
                 SIMPAN ORDER
               </button>
             </div>
@@ -448,7 +448,7 @@ export default function AdminMobileNav() {
             </div>
           ) : (
             <div className="flex-1 animate-in zoom-in-95 duration-300">
-              <div className="bg-white rounded-[3rem] p-8">
+              <div className="bg-white rounded-3xl p-6">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center text-gray-300">
                     <Package size={32} />
@@ -481,7 +481,7 @@ export default function AdminMobileNav() {
 
                   <button 
                     onClick={saveStockUpdate}
-                    className="w-full bg-black text-white h-20 rounded-[2rem] font-black tracking-[0.2em] text-xs shadow-xl active:scale-95 transition-all"
+                    className="w-full bg-black text-white h-16 rounded-2xl font-black tracking-[0.2em] text-[10px] shadow-xl active:scale-95 transition-all"
                   >
                     UPDATE STOK REAL-TIME
                   </button>
@@ -496,16 +496,16 @@ export default function AdminMobileNav() {
       {/* Add Product Modal */}
       {activeModal === 'addProduct' && (
         <div className="fixed inset-0 z-[70] bg-gray-50 flex flex-col">
-          <div className="p-6 bg-white border-b border-gray-100 flex items-center justify-between">
+          <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tighter">Tambah Produk Baru</h2>
-            <button onClick={() => { setActiveModal(null); stopCamera(); }} className="p-2 bg-gray-100 rounded-full text-gray-400">
+            <button onClick={() => { setActiveModal(null); stopCamera(); }} className="p-2.5 bg-gray-100 rounded-xl text-gray-400">
               <X size={20} />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Camera View */}
-            <div className="aspect-square bg-gray-100 rounded-[3rem] overflow-hidden relative border-2 border-white shadow-lg">
+            <div className="aspect-square bg-gray-100 rounded-3xl overflow-hidden relative border-2 border-white shadow-lg">
               {!capturedImage ? (
                 <>
                   <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
@@ -550,13 +550,13 @@ export default function AdminMobileNav() {
                     type="number" 
                     value={newProductPrice}
                     onChange={(e) => setNewProductPrice(e.target.value)}
-                    className="w-full bg-white border border-gray-100 rounded-2xl pl-12 pr-6 py-4 text-xs font-bold outline-none"
-                    placeholder="0"
+                    className="w-full bg-white border border-gray-100 rounded-xl pl-11 pr-4 py-3.5 text-xs font-bold outline-none"
+                        placeholder="0"
                   />
                 </div>
               </div>
 
-              <button className="w-full bg-green-600 text-white h-16 rounded-3xl font-black text-sm tracking-widest shadow-xl shadow-green-100 active:scale-95 transition-all mt-4">
+              <button className="w-full bg-green-600 text-white h-14 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-green-100 active:scale-95 transition-all mt-4">
                 SIMPAN PRODUK & MASUK GUDANG
               </button>
             </div>

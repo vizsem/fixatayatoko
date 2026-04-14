@@ -721,106 +721,98 @@ export default function CartPage() {
                   const maxUnits = contains > 0 ? Math.max(1, Math.floor(Number(item.stock || 0) / contains)) : item.quantity;
 
                   return (
-                    <div key={itemId} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-                      <div className="flex gap-4">
-                          <div className="w-14 h-14 md:w-16 md:h-16 flex-shrink-0">
-                            <NextImage
-                              src={item.Link_Foto || item.image || '/logo-atayatoko.png'}
-                              alt={item.Nama || item.name || 'Produk'}
-                              width={64}
-                              height={64}
-                              className="w-full h-full rounded-2xl object-cover border border-slate-100"
-                            />
+                    <div key={itemId} className="bg-white rounded-2xl border border-slate-100 p-2 md:p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex gap-3 md:gap-4">
+                        <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0">
+                          <NextImage
+                            src={item.Link_Foto || item.image || '/logo-atayatoko.png'}
+                            alt={item.Nama || item.name || 'Produk'}
+                            width={64}
+                            height={64}
+                            className="w-full h-full rounded-xl md:rounded-2xl object-cover border border-slate-100"
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <p className="text-[10px] md:text-xs font-black uppercase leading-tight line-clamp-1">
+                                {item.Nama || item.name}
+                              </p>
+                              <div className="text-[8px] md:text-[10px] font-bold text-slate-400 mt-0.5">
+                                Stok: {Number(item.stock || 0).toLocaleString('id-ID')} {getBaseUnit(item)}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(itemId)}
+                              className="p-1.5 rounded-lg text-slate-300 hover:text-rose-600 transition-colors"
+                            >
+                              <Trash2 size={14} className="md:hidden" />
+                              <Trash2 size={18} className="hidden md:block" />
+                            </button>
                           </div>
 
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black uppercase leading-tight line-clamp-2">
-                            {item.Nama || item.name}
-                          </p>
-                          <div className="mt-1 text-[10px] font-bold text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
-                            <span>Stok: {Number(item.stock || 0).toLocaleString('id-ID')} {getBaseUnit(item)}</span>
-                            <span>Subtotal: Rp {getLineTotal(item).toLocaleString('id-ID')}</span>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
-                            <div className="bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100">
-                              <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Satuan</div>
+                          <div className="mt-2 md:mt-3 flex flex-wrap items-center gap-2 md:gap-4">
+                            {/* Satuan Selector - Ultra Compact on Mobile */}
+                            <div className="flex items-center bg-slate-50 rounded-lg px-2 py-1 border border-slate-100">
                               <select
                                 value={unit}
                                 disabled={item.promoType === 'TEBUS_MURAH'}
                                 onChange={(e) => updateUnit(itemId, e.target.value)}
-                                className="mt-1 w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-black text-slate-800 outline-none disabled:opacity-60"
+                                className="bg-transparent text-[9px] md:text-xs font-black text-slate-800 outline-none"
                               >
                                 {units.map((u) => (
-                                  <option key={u.code} value={u.code}>
-                                    {u.code} ({u.contains})
-                                  </option>
+                                  <option key={u.code} value={u.code}>{u.code}</option>
                                 ))}
                               </select>
-                              <div className="mt-1 text-[8px] md:text-[10px] font-bold text-slate-400 truncate">
-                                @ Rp {getItemUnitPrice(item).toLocaleString('id-ID')}
-                              </div>
                             </div>
 
-                            <div className="bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100 uppercase">
-                              <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Qty</div>
-                              <div className="mt-1 flex items-center gap-1 md:gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => updateQuantity(itemId, Number(item.quantity || 1) - 1)}
-                                  className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all text-slate-400"
-                                >
-                                  <Minus size={14} />
-                                </button>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={maxUnits}
-                                  value={item.quantity}
-                                  onChange={(e) => updateQuantity(itemId, Number(item.quantity || 1))}
-                                  className="flex-1 w-8 h-8 md:h-10 bg-white border border-slate-200 rounded-xl px-1 text-[10px] md:text-xs font-black text-center outline-none"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => updateQuantity(itemId, Number(item.quantity || 1) + 1)}
-                                  className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all text-slate-400"
-                                >
-                                  <Plus size={14} />
-                                </button>
-                              </div>
-                              <div className="mt-1 text-[8px] md:text-[10px] font-bold text-slate-400 truncate uppercase">
-                                {getBaseQuantity(item).toLocaleString('id-ID')} {getBaseUnit(item)}
-                              </div>
+                            {/* Qty Counter - Ultra Compact on Mobile */}
+                            <div className="flex items-center bg-slate-50 rounded-lg p-0.5 border border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(itemId, Number(item.quantity || 1) - 1)}
+                                className="w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-slate-400 hover:text-slate-600"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                max={maxUnits}
+                                value={item.quantity}
+                                onChange={(e) => updateQuantity(itemId, Number(item.quantity || 1))}
+                                className="w-6 md:w-8 text-center text-[10px] md:text-xs font-black bg-transparent outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(itemId, Number(item.quantity || 1) + 1)}
+                                className="w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-slate-400 hover:text-slate-600"
+                              >
+                                <Plus size={12} />
+                              </button>
                             </div>
 
-                            <div className="col-span-2 md:col-span-1 bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Total</div>
-                                  <div className="mt-1 text-xs md:text-sm font-black text-slate-900">
-                                    Rp {getLineTotal(item).toLocaleString('id-ID')}
-                                  </div>
-                                  {item.promoType === 'TEBUS_MURAH' && (
-                                    <div className="mt-1 text-[10px] font-black text-rose-600 uppercase tracking-widest">Promo</div>
-                                  )}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeItem(itemId)}
-                                  className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-                                  title="Hapus"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                            {/* Price Label */}
+                            <div className="ml-auto text-right">
+                              <div className="text-[10px] md:text-sm font-black text-slate-900">
+                                Rp {getLineTotal(item).toLocaleString('id-ID')}
                               </div>
-                  </div>
-                  
-                  {/* TAMPILAN UPSELL GROSIR PSIKOLOGIS */}
-                  {(() => {
-                    const upsell = getWholesaleUpsellInfo(item);
-                    if (!upsell) return null;
+                              {item.promoType === 'TEBUS_MURAH' && (
+                                <div className="text-[7px] font-black text-rose-600 uppercase tracking-widest">Promo</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-                    return (
+                      {/* TAMPILAN UPSELL GROSIR PSIKOLOGIS */}
+                      {(() => {
+                        const upsell = getWholesaleUpsellInfo(item);
+                        if (!upsell) return null;
+
+                        return (
                       <div className={`mt-3 p-3 rounded-xl flex items-start gap-2 ${
                         upsell.isEligible 
                           ? 'bg-green-50 border border-green-100 text-green-700' 
@@ -843,16 +835,12 @@ export default function CartPage() {
                       </div>
                     );
                   })()}
-
                 </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+              );
+            })
+          )}
+        </div>
+      </div>
 
           {/* WIDGET POIN & VOUCHER (Kombinasi Baru) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

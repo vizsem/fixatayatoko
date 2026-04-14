@@ -452,14 +452,14 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 lg:p-10">
+    <div className="min-h-screen bg-slate-50/50 p-4 md:p-6">
       <Toaster position="top-right" />
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Order Management</h1>
-          <p className="text-slate-500 font-medium">Kelola pesanan masuk & status pengiriman</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">Order Management</h1>
+          <p className="text-slate-500 text-[11px] font-medium">Kelola pesanan masuk & status pengiriman</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -478,28 +478,28 @@ export default function AdminOrders() {
       </div>
 
       {/* Stats Cards (Optional Summary) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Menunggu', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
           { label: 'Diproses', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Dikirim', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Selesai', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
-             <span className={`text-2xl font-black ${stat.color} mb-1`}>{stat.count}</span>
-             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">{stat.label}</span>
+          <div key={stat.label} className="bg-white p-3 md:p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+             <span className={`text-xl font-black ${stat.color} mb-0.5`}>{stat.count}</span>
+             <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider font-sans">{stat.label}</span>
           </div>
         ))}
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-white p-2 rounded-[1.5rem] shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row items-center gap-2">
+      <div className="bg-white p-1.5 md:p-2 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-center gap-2">
         <div className="relative w-full md:max-w-xs">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             placeholder="Cari ID / Nama Pelanggan..."
-            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 rounded-2xl text-sm font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:bg-slate-100 transition-all"
+            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:bg-slate-100 transition-all"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
@@ -507,7 +507,7 @@ export default function AdminOrders() {
 
         <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
 
-        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar p-1">
+        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar p-0.5">
           {['SEMUA', 'MENUNGGU', 'DIPROSES', 'DIKIRIM', 'SELESAI'].map((tab) => (
             <button
               key={tab}
@@ -589,7 +589,7 @@ export default function AdminOrders() {
           currentItems.map((order) => (
             <div
               key={order.id}
-              className={`group bg-white rounded-[2rem] p-4 md:p-6 border transition-all hover:shadow-lg hover:border-slate-200 relative overflow-hidden ${
+              className={`group bg-white rounded-2xl p-3 md:p-4 border transition-all hover:shadow-md hover:border-slate-200 relative overflow-hidden ${
                 selectedOrders.includes(order.id) ? 'border-slate-900 ring-1 ring-slate-900 bg-slate-50/50' : 'border-slate-100'
               }`}
             >
@@ -599,12 +599,12 @@ export default function AdminOrders() {
                   onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} 
                   className="mt-1 md:mt-0 text-slate-300 hover:text-slate-900 transition-colors"
                 >
-                  {selectedOrders.includes(order.id) ? <CheckSquare size={24} className="text-slate-900" /> : <Square size={24} />}
+                  {selectedOrders.includes(order.id) ? <CheckSquare size={20} className="text-slate-900" /> : <Square size={20} />}
                 </button>
 
                 {/* Status Icon */}
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
-                  <ShoppingCart size={20} className={getStatusColor(order.status).split(' ')[1]} />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
+                  <ShoppingCart size={16} className={getStatusColor(order.status).split(' ')[1]} />
                 </div>
 
                 {/* Order Details */}
@@ -629,9 +629,9 @@ export default function AdminOrders() {
                 </div>
 
                 {/* Amount & Method */}
-                <div className="flex flex-col md:items-end gap-1 pl-12 md:pl-0 border-l md:border-l-0 border-slate-100">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Tagihan</span>
-                  <span className="text-lg font-black text-slate-900">Rp {order.total.toLocaleString('id-ID')}</span>
+                <div className="flex flex-col md:items-end gap-0.5 pl-12 md:pl-0 border-l md:border-l-0 border-slate-100">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Tagihan</span>
+                  <span className="text-base font-black text-slate-900">Rp {order.total.toLocaleString('id-ID')}</span>
                   <div className="flex items-center gap-1.5 mt-1 px-2 py-1 bg-slate-100 rounded-lg w-fit">
                     <Truck size={12} className="text-slate-500" />
                     <span className="text-[10px] font-bold text-slate-600 uppercase">{order.deliveryMethod?.replace(/_/g, ' ') || 'KURIR'}</span>
@@ -642,15 +642,15 @@ export default function AdminOrders() {
                 <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
                   <Link
                     href={`/admin/orders/${order.id}`}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-emerald-600 px-5 py-3 rounded-xl text-xs font-bold uppercase transition-all shadow-lg shadow-slate-200"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-emerald-600 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-md shadow-slate-200"
                   >
-                    Detail <ChevronRight size={14} />
+                    Detail <ChevronRight size={12} />
                   </Link>
                   <button
                     onClick={() => handlePrint(order.id)}
-                    className="p-3 bg-white text-slate-400 hover:text-slate-900 rounded-xl border border-slate-200 hover:border-slate-900 transition-all"
+                    className="p-2.5 bg-white text-slate-400 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-900 transition-all"
                   >
-                    <Printer size={18} />
+                    <Printer size={16} />
                   </button>
                 </div>
               </div>
@@ -661,7 +661,7 @@ export default function AdminOrders() {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="mt-10 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
           <p className="text-xs font-medium text-slate-500">
             Menampilkan <span className="font-bold text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> dari <span className="font-bold text-slate-900">{filteredOrders.length}</span> data
           </p>
@@ -713,7 +713,7 @@ export default function AdminOrders() {
 
       {/* Bulk Action Floating Bar */}
       {selectedOrders.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-2 pl-6 pr-2 rounded-[2rem] shadow-2xl z-50 flex items-center gap-6 border border-slate-700/50 animate-in slide-in-from-bottom-10 fade-in duration-300">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-1.5 pl-5 pr-1.5 rounded-3xl shadow-2xl z-50 flex items-center gap-5 border border-slate-700/50 animate-in slide-in-from-bottom-10 fade-in duration-300">
           <div className="flex items-center gap-3">
             <span className="bg-white/10 px-2 py-1 rounded-lg text-xs font-black">{selectedOrders.length}</span>
             <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Item Dipilih</span>

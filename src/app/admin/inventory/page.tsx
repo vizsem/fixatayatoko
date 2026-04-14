@@ -320,11 +320,11 @@ export default function InventoryDashboard() {
   if (loading || productsLoading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
 
   return (
-    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-6 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
       <Toaster position="top-right" />
 
       {/* 1. Navigasi Cepat */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <NavCard icon={ArrowDownLeft} label="Stock In" href={`/admin/inventory/stock-in?ids=${selectedIds.join(',')}`} color="text-green-600" bg="bg-green-50" />
         <NavCard icon={ArrowUpRight} label="Stock Out" href={`/admin/inventory/stock-out?ids=${selectedIds.join(',')}`} color="text-red-600" bg="bg-red-50" />
         <NavCard icon={RefreshCw} label="Transfer" href={`/admin/inventory/transfer?ids=${selectedIds.join(',')}`} color="text-blue-600" bg="bg-blue-50" />
@@ -334,10 +334,10 @@ export default function InventoryDashboard() {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
-            <Package className="text-green-600" size={32} /> Inventory hub
+          <h1 className="text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
+            <Package className="text-green-600" size={28} /> Inventory hub
           </h1>
 
           <p className="text-gray-400 text-[10px] font-black tracking-widest mt-1">
@@ -345,27 +345,26 @@ export default function InventoryDashboard() {
 
           </p>
         </div>
-        <div className="flex gap-3">
-          <button className="bg-gray-100 p-4 rounded-2xl hover:bg-gray-200 transition-all"><ScanBarcode size={20} /></button>
-          <Link href="/admin/products/add" className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black tracking-widest shadow-xl flex items-center gap-2">
-
-            <Plus size={18} /> New Item
+        <div className="flex gap-2">
+          <button className="bg-gray-100 p-3 rounded-xl hover:bg-gray-200 transition-all"><ScanBarcode size={18} /></button>
+          <Link href="/admin/products/add" className="bg-black text-white px-6 py-3 rounded-xl text-[10px] font-black tracking-widest shadow-lg flex items-center gap-2">
+            <Plus size={16} /> New Item
           </Link>
         </div>
       </div>
 
       {/* 2. Advanced Filters & Rows Per Page */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8 space-y-4">
+      <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input className="w-full bg-gray-50 pl-12 pr-6 py-4 rounded-2xl text-xs font-bold outline-none border-none focus:ring-2 focus:ring-black transition-all" placeholder="Search SKU, Name..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input className="w-full bg-gray-50 pl-10 pr-4 py-3 rounded-xl text-xs font-bold outline-none border-none focus:ring-2 focus:ring-black transition-all" placeholder="Search SKU, Name..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
           </div>
-          <select className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-bold appearance-none outline-none" value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}>
+          <select className="bg-gray-50 px-4 py-3 rounded-xl text-xs font-bold appearance-none outline-none" value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}>
             <option value="all">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
           </select>
-          <select className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-bold appearance-none outline-none" value={selectedWarehouse} onChange={(e) => { setSelectedWarehouse(e.target.value); setCurrentPage(1); }}>
+          <select className="bg-gray-50 px-4 py-3 rounded-xl text-xs font-bold appearance-none outline-none" value={selectedWarehouse} onChange={(e) => { setSelectedWarehouse(e.target.value); setCurrentPage(1); }}>
             <option value="all">All Warehouses</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
@@ -389,7 +388,7 @@ export default function InventoryDashboard() {
       </div>
 
       {/* 3. Main Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
         {/* Mobile View */}
         <div className="md:hidden divide-y divide-gray-50">
           {currentItems.map(product => (
@@ -481,27 +480,27 @@ export default function InventoryDashboard() {
           <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-3 md:px-8 py-3 md:py-6 w-10">
+                <th className="px-3 md:px-5 py-3 md:py-4 w-10">
                   <button onClick={handleSelectAll} className="hover:scale-110 transition-transform">
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-300" size={20} />}
                   </button>
                 </th>
-                <th className="px-2 md:px-4 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest">Product</th>
-                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest">Warehouse</th>
-                <th className="px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
-                <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 tracking-widest">Details</th>
+                <th className="px-2 md:px-4 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest">Product</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest">Warehouse</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
+                <th className="px-3 md:px-5 py-3 md:py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Details</th>
 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {currentItems.map(product => (
                 <tr key={product.id} className={`hover:bg-gray-50/50 transition-all ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
-                  <td className="px-3 md:px-8 py-3 md:py-6">
+                  <td className="px-3 md:px-5 py-3 md:py-4">
                     <button onClick={() => toggleSelect(product.id)}>
-                      {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-200" size={20} />}
+                      {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={18} /> : <Square className="text-gray-200" size={18} />}
                     </button>
                   </td>
-                  <td className="px-2 md:px-4 py-3 md:py-6">
+                  <td className="px-2 md:px-4 py-3 md:py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 overflow-hidden relative">
                         {product.imageUrl ? (
@@ -535,12 +534,12 @@ export default function InventoryDashboard() {
                       </div>
                     </div>
                   </td>
-                  <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
+                  <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4">
                     <span className="text-[10px] font-black text-gray-500 flex items-center gap-2">
 
-                      <Warehouse size={14} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
+                      <Warehouse size={13} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
                     </span>
-                    <div className="mt-2 flex flex-wrap gap-1">
+                    <div className="mt-1.5 flex flex-wrap gap-1">
                       {Object.entries(product.stockByWarehouse || {})
                         .filter(([_, v]) => Number(v) > 0)
                         .map(([wid, val]) => (
@@ -550,7 +549,7 @@ export default function InventoryDashboard() {
                         ))}
                     </div>
                   </td>
-                  <td className="px-3 md:px-6 py-3 md:py-6 text-center">
+                  <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                     {editingId === product.id ? (
                       <div className="flex items-center justify-center gap-2">
                         <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-xs font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
@@ -577,9 +576,9 @@ export default function InventoryDashboard() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 md:px-8 py-3 md:py-6 text-right">
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-3 bg-white border border-gray-100 rounded-2xl inline-block hover:border-black transition-all">
-                      <ChevronRight size={18} className="text-gray-400" />
+                  <td className="px-3 md:px-5 py-3 md:py-4 text-right">
+                    <Link href={`/admin/products/edit/${product.id}`} className="p-2.5 bg-white border border-gray-100 rounded-xl inline-block hover:border-black transition-all">
+                      <ChevronRight size={16} className="text-gray-400" />
                     </Link>
                   </td>
                 </tr>
@@ -589,7 +588,7 @@ export default function InventoryDashboard() {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-3 md:px-8 py-4 md:py-6 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="px-3 md:px-6 py-3 md:py-4 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <span className="text-[10px] font-black text-gray-400 tracking-widest">
             Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredProducts.length)} dari {filteredProducts.length} produk
 
@@ -630,7 +629,7 @@ export default function InventoryDashboard() {
 
       {/* 4. Floating Batch Action Bar */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black text-white px-8 py-5 rounded-[2.5rem] shadow-2xl z-50 flex items-center gap-8 border border-white/10 animate-in slide-in-from-bottom-10 duration-500">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex items-center gap-6 border border-white/10 animate-in slide-in-from-bottom-10 duration-500">
           <div className="flex flex-col">
             <span className="text-[11px] font-black text-emerald-400 tracking-widest">{selectedIds.length} items</span>
             <span className="text-[8px] font-bold text-gray-500 text-center">SELECTED</span>
@@ -661,9 +660,9 @@ export default function InventoryDashboard() {
       {/* Batch Modal */}
       {isBatchModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] p-12 shadow-2xl">
-            <h2 className="text-2xl font-black tracking-tighter mb-2">{batchAction === 'warehouse' ? 'Relocate' : 'Reclassify'}</h2>
-            <p className="text-gray-400 text-[10px] font-bold mb-8">Ubah {selectedIds.length} produk sekaligus</p>
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl">
+            <h2 className="text-xl font-black tracking-tighter mb-1">{batchAction === 'warehouse' ? 'Relocate' : 'Reclassify'}</h2>
+            <p className="text-gray-400 text-[10px] font-bold mb-6">Ubah {selectedIds.length} produk sekaligus</p>
 
             <select className="w-full bg-gray-50 p-5 rounded-3xl text-xs font-black outline-none mb-10 border-none ring-1 ring-gray-100" value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
               <option value="">Pilih Tujuan...</option>
@@ -693,9 +692,9 @@ interface NavCardProps {
 
 function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
   const Content = (
-    <div className={`p-5 rounded-[2rem] ${bg} ${color} flex flex-col items-center gap-2 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
-      <Icon size={24} />
-      <span className="text-[10px] font-black tracking-[0.1em]">{label}</span>
+    <div className={`p-4 rounded-2xl ${bg} ${color} flex flex-col items-center gap-1.5 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
+      <Icon size={20} />
+      <span className="text-[9px] font-black tracking-[0.1em]">{label}</span>
 
     </div>
   );

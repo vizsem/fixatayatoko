@@ -446,56 +446,56 @@ export default function AdminProducts() {
 
   return (
     <ErrorBoundary>
-      <div className="p-4 md:p-6 bg-gray-50 min-h-screen text-black">
+      <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <Toaster />
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-3xl shadow-lg">
-            <Package size={28} />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-lg">
+            <Package size={24} />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Atayamarket</h1>
-            <p className="text-xs font-semibold text-gray-500 mt-1">Manajemen Produk</p>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Atayamarket</h1>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">Manajemen Produk</p>
           </div>
         </div>
 
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={handleSync}
-            className="bg-white border border-gray-200 text-blue-600 p-3 rounded-xl hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
+            className="bg-white border border-gray-200 text-blue-600 p-2.5 rounded-lg hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
             title="Sinkron & Reset Filter"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={16} />
           </button>
-          <button onClick={downloadTemplate} className="bg-white border border-gray-200 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-gray-50 transition-all"><FileSpreadsheet size={16} /> Template</button>
-          <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-md hover:bg-orange-600 transition-all"><Upload size={16} /> Import</button>
-          <button onClick={handleExport} className="bg-emerald-600 text-white px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-md hover:bg-emerald-700 transition-all"><Download size={16} /> Export</button>
-          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 shadow-xl hover:shadow-2xl transition-all"><Plus size={18} /> Item Baru</button>
+          <button onClick={downloadTemplate} className="bg-white border border-gray-200 px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 hover:bg-gray-50 transition-all"><FileSpreadsheet size={14} /> Template</button>
+          <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 shadow-md hover:bg-orange-600 transition-all"><Upload size={14} /> Import</button>
+          <button onClick={handleExport} className="bg-emerald-600 text-white px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 shadow-md hover:bg-emerald-700 transition-all"><Download size={14} /> Export</button>
+          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xl hover:shadow-2xl transition-all"><Plus size={16} /> Item Baru</button>
         </div>
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-lg flex items-center gap-5 hover:shadow-xl transition-all">
-          <div className="bg-blue-100 p-4 rounded-2xl text-blue-700"><Package size={28} /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md flex items-center gap-4 hover:shadow-lg transition-all">
+          <div className="bg-blue-100 p-3 rounded-xl text-blue-700"><Package size={24} /></div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1">Total Produk</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalJenis}</p>
+            <p className="text-[10px] font-semibold text-gray-500 mb-0.5">Total Produk</p>
+            <p className="text-xl font-bold text-gray-900">{stats.totalJenis}</p>
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-lg flex items-center gap-5 hover:shadow-xl transition-all">
-          <div className="bg-emerald-100 p-4 rounded-2xl text-emerald-700">
-            <Banknote size={28} />
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md flex items-center gap-4 hover:shadow-lg transition-all">
+          <div className="bg-emerald-100 p-3 rounded-xl text-emerald-700">
+            <Banknote size={24} />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1">Total Aset</p>
+            <p className="text-[10px] font-semibold text-gray-500 mb-0.5">Total Aset</p>
             <div className="flex items-baseline gap-1">
-              <span className="text-sm font-semibold text-emerald-800">Rp</span>
-              <p className="text-2xl font-bold text-emerald-800">
+              <span className="text-xs font-semibold text-emerald-800">Rp</span>
+              <p className="text-xl font-bold text-emerald-800">
                 {stats.totalAset.toLocaleString('id-ID')}
               </p>
             </div>
@@ -504,14 +504,14 @@ export default function AdminProducts() {
       </div>
 
       {/* TABLE BOX */}
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden mt-8">
-        <div className="p-6 border-b border-gray-100 flex flex-wrap items-center gap-6 bg-white">
-          <div className="relative flex-1 min-w-[280px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+      <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden mt-6">
+        <div className="p-3 md:p-4 border-b border-gray-100 flex flex-wrap items-center gap-4 bg-white">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="Cari produk, ID, atau barcode..."
-              className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
@@ -576,10 +576,10 @@ export default function AdminProducts() {
               const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
               const isSelected = selectedIds.includes(p.id);
               return (
-                <div key={p.id} className={`p-4 flex flex-col gap-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
-                  <div className="flex items-start gap-3">
-                    <button onClick={() => toggleSelectOne(p.id)} className="mt-1 text-gray-400">
-                      {isSelected ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                <div key={p.id} className={`p-3 flex flex-col gap-3 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                  <div className="flex items-start gap-2.5">
+                    <button onClick={() => toggleSelectOne(p.id)} className="mt-0.5 text-gray-400">
+                      {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
                     </button>
                     <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
                       {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
@@ -673,18 +673,18 @@ export default function AdminProducts() {
         {/* DESKTOP TABLE */}
         <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[640px] md:min-w-0">
-            <thead className="bg-gray-50 text-xs font-semibold text-gray-600 border-b border-gray-200">
+            <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200">
               <tr>
-                <th className="p-3 md:p-6 w-12 sticky left-0 bg-gray-50 z-10">
+                <th className="p-3 md:p-4 w-10 sticky left-0 bg-gray-50 z-10">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
-                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
                   </button>
                 </th>
-                <th className="p-3 md:p-6">Produk</th>
-                <th className="p-3 md:p-6">Stok & Gudang</th>
-                <th className="hidden md:table-cell p-3 md:p-6">Harga (Avg)</th>
-                <th className="hidden md:table-cell p-3 md:p-6">Tgl & Exp</th>
-                <th className="p-3 md:p-6 text-center sticky right-0 bg-gray-50 z-10">Aksi</th>
+                <th className="p-3 md:p-4">Produk</th>
+                <th className="p-3 md:p-4">Stok & Gudang</th>
+                <th className="hidden md:table-cell p-3 md:p-4">Harga (Avg)</th>
+                <th className="hidden md:table-cell p-3 md:p-4">Tgl & Exp</th>
+                <th className="p-3 md:p-4 text-center sticky right-0 bg-gray-50 z-10">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -695,48 +695,45 @@ export default function AdminProducts() {
 
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50' : ''}`}>
-                    <td className="p-3 md:p-6 sticky left-0 bg-white z-10">
+                    <td className="p-3 md:p-4 sticky left-0 bg-white z-10">
                       <button onClick={() => toggleSelectOne(p.id)} className="transition-colors">
-                        {isSelected ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} className="text-gray-300 hover:text-gray-400" />}
+                        {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-gray-300 hover:text-gray-400" />}
                       </button>
                     </td>
-                    <td className="p-3 md:p-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 md:w-14 md:h-14 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                    <td className="p-3 md:p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                           {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                             <Image
                               key={p.id}
                               src={p.imageUrl}
                               alt={p.name}
-                              width={56}
-                              height={56}
+                              width={48}
+                              height={48}
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <Camera size={20} className="text-gray-400" />
+                            <Camera size={16} className="text-gray-400" />
                           )}
                         </div>
                         <div>
-                          <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs font-semibold text-blue-600 tracking-tight">ID: {p.sku}</p>
-                          {/* Tampilkan badge "BARU" untuk produk yang dibuat dalam 7 hari terakhir */}
-                          {/* badge BARU dinonaktifkan */}
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className="text-[10px] font-bold text-blue-600 tracking-tight">ID: {p.sku}</p>
                         </div>
-                          <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{p.name}</h3>
-                          <p className="text-xs text-gray-500 font-medium">{p.category}</p>
+                          <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-0.5 line-clamp-1">{p.name}</h3>
+                          <p className="text-[9px] text-gray-500 font-medium">{p.category}</p>
                         </div>
-
                       </div>
                     </td>
-                    <td className="p-4 md:p-6">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                    <td className="p-3 md:p-4">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <p className={`font-bold text-[11px] ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
                             {p.stock} {p.unit}
                           </p>
                         </div>
                         {Number(p.stock) <= Number(p.minStock) && (
-                          <p className="text-xs font-medium text-red-500">
+                          <p className="text-[9px] font-medium text-red-500">
                             Min: {p.minStock}
                           </p>
                         )}
@@ -758,43 +755,34 @@ export default function AdminProducts() {
                         </div>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell p-4 md:p-6">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-medium text-blue-600">
-                            Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
-                          </p>
-                        </div>
-                        <p className="text-sm font-bold text-emerald-600">
-                          Rp{(p.priceEcer || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()}
+                    <td className="hidden md:table-cell p-3 md:p-4">
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-[10px] font-medium text-blue-600">
+                          Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                        </p>
+                        <p className="text-[11px] font-bold text-emerald-600">
+                          Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                         </p>
                         {Number(p.priceGrosir || 0) > 0 && (
-                          <p className="text-xs font-medium text-purple-600">
-                            Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()} {Number((p as ProductRow).Min_Grosir || 0) > 0 ? `(min.${Number((p as ProductRow).Min_Grosir || 0)})` : ''}
+                          <p className="text-[9px] font-medium text-purple-600">
+                            Grosir: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
                           </p>
                         )}
-                        {((Array.isArray(p.units) ? p.units : []) as UnitOption[])
-                          .filter((u: UnitOption) => (u?.code || '').toString().toUpperCase() !== (p.unit || 'PCS').toString().toUpperCase())
-                          .map((u: UnitOption, idx: number) => (
-                            <p key={idx} className="text-xs font-medium text-gray-700">
-                              {Number(u?.price || 0) > 0 ? `Rp${Number(u.price).toLocaleString('id-ID')}` : 'Rp -'} /{(u?.code || '').toString().toUpperCase()} {Number(u?.contains || 0) > 0 ? `(isi ${u.contains})` : ''}
-                            </p>
-                          ))}
                       </div>
                     </td>
-                    <td className="hidden md:table-cell p-4 md:p-6">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs font-medium text-gray-500">
-                          Masuk: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
+                    <td className="hidden md:table-cell p-3 md:p-4">
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-[9px] font-medium text-gray-500">
+                          M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                         </p>
-                        <p className={`text-xs font-medium flex items-center gap-1 ${isExpired ? 'text-red-600 animate-pulse' : 'text-orange-500'}`}>
-                          {isExpired && <AlertTriangle size={12} />} 
-                          Exp: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
+                        <p className={`text-[9px] font-bold flex items-center gap-1 ${isExpired ? 'text-red-600' : 'text-orange-500'}`}>
+                          {isExpired && <AlertTriangle size={10} />} 
+                          E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
                         </p>
                       </div>
                     </td>
 
-                    <td className="p-3 md:p-6 text-center sticky right-0 bg-white z-10">
+                    <td className="p-3 md:p-4 text-center sticky right-0 bg-white z-10">
                       <div className="flex justify-center gap-2">
                         <button 
                           onClick={() => setSelectedProductRestock(p)} 
