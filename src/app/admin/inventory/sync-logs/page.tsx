@@ -146,7 +146,7 @@ export default function SyncLogsPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-right" />
       
       {/* Header */}

@@ -124,7 +124,7 @@ import { auth, db } from '@/lib/firebase';
    }
  
    return (
-    <div className="p-6 md:p-10 bg-gray-50 min-h-screen text-black max-w-4xl mx-auto">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black max-w-4xl mx-auto">
       <Toaster position="top-right" />
        <div className="flex items-center gap-4 mb-8">
          <Link href="/admin/suppliers" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">

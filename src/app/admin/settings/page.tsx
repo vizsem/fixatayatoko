@@ -314,11 +314,11 @@ export default function AdminSettings() {
 
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto bg-[#F8FAFC] min-h-screen pb-32 font-sans text-slate-900">
+    <div className="p-3 md:p-4 max-w-7xl mx-auto bg-[#F8FAFC] min-h-screen pb-32 font-sans text-slate-900">
       <Toaster position="top-right" />
 
       {/* HEADER NAV */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Settings size={32} className="text-slate-900" /> Settings
@@ -349,7 +349,7 @@ export default function AdminSettings() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
           <div className="lg:col-span-2 space-y-8">
             {/* STORE IDENTITY */}
-            <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden">
+            <section className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden">
               <div className="flex justify-between items-start mb-6">
                 <h2 className="font-black text-xs tracking-widest text-slate-400 uppercase flex items-center gap-2"><Store size={16} /> Identitas Toko</h2>
                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
@@ -501,7 +501,7 @@ export default function AdminSettings() {
             </section>
 
             {/* PAYMENT METHODS */}
-            <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <section className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100">
               <h2 className="font-black text-xs tracking-widest text-slate-400 uppercase mb-6 flex items-center gap-2"><CreditCard size={16} /> Metode Pembayaran</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -603,7 +603,7 @@ export default function AdminSettings() {
                 {/* List Shipping */}
                 <div className="md:col-span-2 space-y-4">
                     {settings.deliveryMethods.map((dm, idx) => (
-                        <div key={idx} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center justify-between group hover:border-blue-100 transition-all">
+                        <div key={idx} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center justify-between group hover:border-blue-100 transition-all">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3 rounded-2xl ${dm.enabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
                                     <Truck size={20} />
@@ -633,7 +633,7 @@ export default function AdminSettings() {
                 </div>
 
                 {/* Add New Shipping */}
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm h-fit sticky top-6">
+                <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm h-fit sticky top-6">
                     <h2 className="font-black text-xs tracking-widest text-slate-400 uppercase mb-6">Tambah Metode</h2>
                     <div className="space-y-4">
                         <input type="text" placeholder="Nama Metode (ex: JNE)" value={newDelivery.name} onChange={e => setNewDelivery({ ...newDelivery, name: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 text-xs font-bold" />
@@ -660,7 +660,7 @@ export default function AdminSettings() {
       {/* 2. LOYALTY POINTS TAB */}
       {activeTab === 'points' && (
         <div className="max-w-2xl mx-auto animate-in slide-in-from-bottom-6 duration-500">
-          <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-100 space-y-10 relative overflow-hidden">
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-8 relative overflow-hidden">
             <Coins className="absolute -right-10 -top-10 text-slate-50 opacity-50" size={250} />
             <div className="relative z-10 flex justify-between items-center">
               <h2 className="font-black text-sm text-slate-800 flex items-center gap-3">
@@ -721,7 +721,7 @@ export default function AdminSettings() {
       {/* 3. CATEGORIES TAB */}
       {activeTab === 'categories' && (
         <div className="max-w-3xl mx-auto animate-in slide-in-from-bottom-6">
-          <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <h2 className="font-black text-[10px] tracking-widest text-slate-400 mb-8 flex items-center gap-2 uppercase"><Tag size={16} /> Master Kategori</h2>
 
             <div className="flex gap-3 mb-10">
@@ -750,7 +750,7 @@ export default function AdminSettings() {
       {activeTab === 'employees' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-6">
           <div className="lg:col-span-4">
-            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 sticky top-10">
+            <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100 sticky top-10">
               <h2 className="font-black text-[10px] tracking-widest text-slate-400 mb-6 uppercase">Registrasi Staff</h2>
 
               <div className="space-y-4">
@@ -771,7 +771,7 @@ export default function AdminSettings() {
             <h2 className="font-black text-[10px] tracking-widest text-slate-400 px-4 uppercase">Daftar Karyawan Aktif</h2>
 
             {employees.map(emp => (
-              <div key={emp.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-all">
+              <div key={emp.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-all">
                 <div className="flex items-center gap-5">
                   <div className={`p-4 rounded-2xl ${emp.role === 'admin' ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600'}`}>
                     <Users size={24} />
@@ -795,7 +795,7 @@ export default function AdminSettings() {
       {activeTab === 'banners' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-6">
           <div className="lg:col-span-4">
-            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 sticky top-10">
+            <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100 sticky top-10">
               <h2 className="font-black text-[10px] tracking-widest text-slate-400 mb-6 flex items-center gap-2 uppercase">Slot Iklan ({banners.length}/5)</h2>
 
               <div className="space-y-4">

@@ -320,7 +320,7 @@ export default function InventoryDashboard() {
   if (loading || productsLoading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
 
   return (
-    <div className="p-3 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
       <Toaster position="top-right" />
 
       {/* 1. Navigasi Cepat */}
@@ -470,44 +470,43 @@ export default function InventoryDashboard() {
           <table className="w-full text-left min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-3 md:px-5 py-3 md:py-4 w-10">
+                <th className="px-2 md:px-4 py-2 w-10">
                   <button onClick={handleSelectAll} className="hover:scale-110 transition-transform">
-                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={20} /> : <Square className="text-gray-300" size={20} />}
+                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-300" size={16} />}
                   </button>
                 </th>
-                <th className="px-2 md:px-4 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest">Product</th>
-                <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest">Warehouse</th>
-                <th className="px-3 md:px-6 py-3 md:py-4 text-[10px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
-                <th className="px-3 md:px-5 py-3 md:py-4 text-right text-[10px] font-black text-gray-400 tracking-widest">Details</th>
-
+                <th className="px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Product</th>
+                <th className="hidden md:table-cell px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Warehouse</th>
+                <th className="px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
+                <th className="px-2 md:px-4 py-2 text-right text-[9px] font-black text-gray-400 tracking-widest">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {currentItems.map(product => (
                 <tr key={product.id} className={`hover:bg-gray-50/50 transition-all ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
-                  <td className="px-3 md:px-5 py-3 md:py-4">
+                  <td className="px-2 md:px-4 py-2">
                     <button onClick={() => toggleSelect(product.id)}>
-                      {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={18} /> : <Square className="text-gray-200" size={18} />}
+                      {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-200" size={16} />}
                     </button>
                   </td>
-                  <td className="px-2 md:px-4 py-3 md:py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 overflow-hidden relative">
+                  <td className="px-2 md:px-4 py-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 overflow-hidden relative">
                         {product.imageUrl ? (
                           <Image
                             src={product.imageUrl}
                             fill
                             className="object-cover"
                             alt={product.name}
-                            sizes="48px"
+                            sizes="40px"
                           />
-                        ) : <ImageIcon size={20} />}
+                        ) : <ImageIcon size={16} />}
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-xs font-black text-gray-800 tracking-tight">{product.name}</span>
-                        <span className="text-[9px] font-bold text-gray-400 tracking-wider">{product.sku} • {product.category}</span>
-                        <span className="text-[10px] font-black text-emerald-600">
+                        <span className="text-[11px] font-black text-gray-800 tracking-tight leading-none">{product.name}</span>
+                        <span className="text-[8px] font-bold text-gray-400 tracking-wider mt-0.5">{product.sku} • {product.category}</span>
+                        <span className="text-[9px] font-black text-emerald-600">
                           {(() => {
                             const sel = (unitSelection[product.id] || product.unit).toUpperCase();
                             if (sel === (product.unit || '').toUpperCase()) {
@@ -524,39 +523,38 @@ export default function InventoryDashboard() {
                       </div>
                     </div>
                   </td>
-                  <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-4">
-                    <span className="text-[10px] font-black text-gray-500 flex items-center gap-2">
-
-                      <Warehouse size={13} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
+                  <td className="hidden md:table-cell px-2 md:px-4 py-2">
+                    <span className="text-[9px] font-black text-gray-500 flex items-center gap-1.5">
+                      <Warehouse size={11} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
                     </span>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       {Object.entries(product.stockByWarehouse || {})
                         .filter(([_, v]) => Number(v) > 0)
                         .map(([wid, val]) => (
-                          <span key={wid} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                          <span key={wid} className="text-[8px] font-bold bg-gray-50 border border-gray-100 rounded-md px-1.5 py-0.5">
                             {displayWarehouses.find(w => w.id === wid)?.name || wid}: {val}
                           </span>
                         ))}
                     </div>
                   </td>
-                  <td className="px-3 md:px-6 py-3 md:py-4 text-center">
+                  <td className="px-2 md:px-4 py-2 text-center">
                     {editingId === product.id ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-xs font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
-                        <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={14} /></button>
-                        <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={14} /></button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <input autoFocus type="number" className="w-14 p-1.5 bg-gray-100 rounded-md text-[10px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
+                        <button onClick={() => handleQuickUpdate(product.id)} className="p-1.5 bg-black text-white rounded-md"><Check size={12} /></button>
+                        <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-100 text-gray-400 rounded-md"><X size={12} /></button>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="group relative inline-block cursor-pointer" onDoubleClick={() => { setEditingId(product.id); setTempStock(product.stock); }}>
-                          <span className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800 hover:bg-black hover:text-white'}`}>
-                            {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-lg transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800 hover:bg-black hover:text-white'}`}>
+                            {displayedStock(product).toLocaleString()} <span className="text-[8px] opacity-60 ml-0.5">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
                           </span>
-                          {product.stock <= product.minStock && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />}
+                          {product.stock <= product.minStock && <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />}
                         </div>
                         {unitCodes(product).length > 1 && (
                           <select
-                            className="mt-0.5 text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1"
+                            className="text-[8px] font-bold bg-gray-50 border border-gray-100 rounded-md px-1.5 py-0.5"
                             value={(unitSelection[product.id] || product.unit).toUpperCase()}
                             onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
                           >
@@ -566,9 +564,9 @@ export default function InventoryDashboard() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 md:px-5 py-3 md:py-4 text-right">
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-2.5 bg-white border border-gray-100 rounded-xl inline-block hover:border-black transition-all">
-                      <ChevronRight size={16} className="text-gray-400" />
+                  <td className="px-2 md:px-4 py-2 text-right">
+                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 bg-white border border-gray-100 rounded-lg inline-flex items-center justify-center hover:border-black transition-all">
+                      <ChevronRight size={14} className="text-gray-400" />
                     </Link>
                   </td>
                 </tr>

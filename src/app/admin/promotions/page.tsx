@@ -125,9 +125,9 @@ export default function PromotionsPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
             <Gift size={22} />

@@ -136,7 +136,7 @@ export default function StockTransferPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black font-sans">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black font-sans">
       <div className="max-w-2xl mx-auto">
 
         <div className="flex items-center gap-3 mb-8">

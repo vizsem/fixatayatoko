@@ -131,7 +131,7 @@ export default function StockOpnamePage() {
   };
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black font-sans">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black font-sans">
       <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto">
 

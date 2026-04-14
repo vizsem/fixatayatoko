@@ -110,7 +110,7 @@ export default function AdminPointsDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen font-sans text-black">
       <div className="max-w-7xl mx-auto">
 
         {/* HEADER */}

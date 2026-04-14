@@ -169,7 +169,7 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="p-3 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-center" />
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

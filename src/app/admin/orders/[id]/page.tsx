@@ -436,7 +436,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 md:p-8 pb-24 text-black font-sans">
+    <div className="min-h-screen bg-gray-50 md:p-4 pb-24 text-black font-sans">
       <Toaster position="top-right" />
       <div className="max-w-4xl mx-auto bg-white shadow-2xl md:rounded-[3rem] overflow-hidden border border-white">
         <div className="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
@@ -475,7 +475,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        <div className="p-8 md:p-12">
+        <div className="p-5 md:p-6">
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b-2 border-slate-100 pb-12">
             <div>
               <h1 className="text-6xl font-black tracking-tighter italic mb-2">INVOICE.</h1>

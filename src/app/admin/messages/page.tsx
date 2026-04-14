@@ -98,7 +98,7 @@ export default function AdminMessages() {
   const unreadCount = messages.filter(m => m.status === 'unread').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto min-h-screen bg-gray-50/50">
+    <div className="p-3 md:p-4 max-w-7xl mx-auto min-h-screen bg-gray-50/50">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-black text-gray-800 flex items-center gap-2">

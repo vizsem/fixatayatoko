@@ -109,59 +109,59 @@ export default function ReturnsPage() {
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
-    <div className="p-6 md:p-8 min-h-screen bg-gray-50 text-slate-800">
+    <div className="p-3 md:p-4 min-h-screen bg-gray-50 text-slate-800">
       <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-end mb-6">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-              <RefreshCcw size={28} className="text-purple-600" /> Manajemen Retur
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <RefreshCcw size={22} className="text-purple-600" /> Manajemen Retur
             </h1>
-            <p className="text-slate-500 mt-2">Kelola pengembalian barang dari Penjualan dan ke Pembelian.</p>
+            <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Kelola pengembalian barang dari Penjualan dan ke Pembelian.</p>
           </div>
           {/* Untuk demo, bisa ditambah tombol buat retur manual di sini */}
         </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="p-4 font-bold text-slate-600">Tanggal</th>
-                <th className="p-4 font-bold text-slate-600">Tipe / Ref</th>
-                <th className="p-4 font-bold text-slate-600">Pihak</th>
-                <th className="p-4 font-bold text-slate-600">Alasan</th>
-                <th className="p-4 font-bold text-slate-600">Total (Rp)</th>
-                <th className="p-4 font-bold text-slate-600">Status</th>
-                <th className="p-4 font-bold text-slate-600 text-right">Aksi</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tanggal</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tipe / Ref</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Pihak</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Alasan</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Total (Rp)</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {returns.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400">Tidak ada data retur.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-10 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada data retur.</td></tr>
               ) : returns.map(ret => (
                 <tr key={ret.id} className="hover:bg-slate-50">
-                  <td className="p-4">{ret.createdAt ? new Date(ret.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '-'}</td>
-                  <td className="p-4">
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${ret.type === 'SALES_RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                  <td className="px-3 py-2 text-[10px] font-bold text-slate-600">{ret.createdAt ? new Date(ret.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '-'}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${ret.type === 'SALES_RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                       {ret.type === 'SALES_RETURN' ? 'RETUR JUAL' : 'RETUR BELI'}
                     </span>
-                    <div className="mt-1 text-xs font-mono text-slate-500">#{ret.refId.slice(-6)}</div>
+                    <div className="mt-0.5 text-[10px] font-mono font-bold text-slate-500">#{ret.refId.slice(-6)}</div>
                   </td>
-                  <td className="p-4 font-bold">{ret.customerOrSupplierName}</td>
-                  <td className="p-4 max-w-xs truncate">{ret.reason}</td>
-                  <td className="p-4 font-black">Rp {ret.totalValue.toLocaleString('id-ID')}</td>
-                  <td className="p-4">
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${
+                  <td className="px-3 py-2 text-[11px] font-black text-slate-800">{ret.customerOrSupplierName}</td>
+                  <td className="px-3 py-2 text-[10px] font-medium text-slate-600 max-w-xs">{ret.reason}</td>
+                  <td className="px-3 py-2 text-[11px] font-black text-slate-900">Rp {ret.totalValue.toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${
                       ret.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                       ret.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {ret.status}
                     </span>
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="px-3 py-2 text-right">
                     {ret.status === 'PENDING' && (
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => handleProcess(ret, 'APPROVE')} className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200"><CheckCircle size={16} /></button>
-                        <button onClick={() => handleProcess(ret, 'REJECT')} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><XCircle size={16} /></button>
+                      <div className="flex justify-end gap-1.5">
+                        <button onClick={() => handleProcess(ret, 'APPROVE')} className="p-1.5 bg-green-100 text-green-600 rounded-lg hover:bg-green-200"><CheckCircle size={14} /></button>
+                        <button onClick={() => handleProcess(ret, 'REJECT')} className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><XCircle size={14} /></button>
                       </div>
                     )}
                   </td>

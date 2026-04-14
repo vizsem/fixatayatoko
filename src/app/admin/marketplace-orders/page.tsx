@@ -469,10 +469,10 @@ export default function MarketplaceOrdersPage() {
   }
 
   return (
-    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
       <Toaster />
-      <div className="flex items-center gap-4 mb-10">
-        <Link href="/admin/orders" className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+      <div className="flex items-center gap-4 mb-6">
+        <Link href="/admin/orders" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
           <ChevronLeft size={20} />
         </Link>
         <div>
@@ -485,14 +485,14 @@ export default function MarketplaceOrdersPage() {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
                   <ShoppingBag size={14} /> Channel
                 </label>
                 <select
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as Channel)}
                 >
@@ -505,7 +505,7 @@ export default function MarketplaceOrdersPage() {
                   <Store size={14} /> ID Order Marketplace
                 </label>
                 <input
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                   placeholder="Isi nomor order Shopee/TikTok (opsional)"
                   value={externalOrderId}
                   onChange={(e) => setExternalOrderId(e.target.value)}
@@ -519,7 +519,7 @@ export default function MarketplaceOrdersPage() {
                   Nama Pelanggan
                 </label>
                 <input
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                   placeholder="Nama pelanggan (opsional)"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
@@ -530,7 +530,7 @@ export default function MarketplaceOrdersPage() {
                   <CreditCard size={14} /> Metode Pembayaran
                 </label>
                 <select
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
+                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
@@ -542,13 +542,13 @@ export default function MarketplaceOrdersPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-gray-50">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 md:p-6 border-b border-gray-50">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
-                  className="w-full bg-gray-50 pl-12 pr-6 py-5 rounded-2xl text-xs font-bold outline-none"
+                  className="w-full bg-gray-50 pl-10 pr-4 py-3 rounded-2xl text-[10px] font-bold outline-none"
                   placeholder="Cari produk untuk ditambahkan ke order marketplace..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -765,7 +765,7 @@ export default function MarketplaceOrdersPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
             <h2 className="text-xs font-black text-gray-800 uppercase tracking-[0.2em] flex items-center gap-2">
               <ShoppingBag size={16} /> Ringkasan Order
             </h2>

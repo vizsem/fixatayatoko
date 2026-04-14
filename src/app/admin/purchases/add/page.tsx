@@ -286,7 +286,7 @@ export default function AddPurchase() {
   ).slice(0, 5);
 
   return (
-    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-10">

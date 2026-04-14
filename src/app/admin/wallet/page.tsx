@@ -111,9 +111,9 @@ export default function AdminWalletDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-10 bg-gray-50 min-h-screen font-sans text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen font-sans text-black">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
               <Wallet size={22} />
@@ -131,19 +131,19 @@ export default function AdminWalletDashboard() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-white">
-          <div className="bg-black p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
-            <Wallet className="absolute right-[-10px] bottom-[-10px] text-white/10" size={120} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 text-white">
+          <div className="bg-black p-5 md:p-6 rounded-[2rem] shadow-xl relative overflow-hidden">
+            <Wallet className="absolute right-[-10px] bottom-[-10px] text-white/10" size={100} />
             <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Total Dana Masuk</p>
-            <h2 className="text-4xl font-black italic">Rp{stats.totalIn.toLocaleString()}</h2>
+            <h2 className="text-3xl md:text-4xl font-black italic">Rp{stats.totalIn.toLocaleString()}</h2>
           </div>
-          <div className="bg-white text-black border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
+          <div className="bg-white text-black border border-gray-100 p-5 md:p-6 rounded-[2rem] shadow-sm">
             <p className="text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">Total Dana Keluar</p>
-            <h2 className="text-4xl font-black italic text-red-600">Rp{stats.totalOut.toLocaleString()}</h2>
+            <h2 className="text-3xl md:text-4xl font-black italic text-red-600">Rp{stats.totalOut.toLocaleString()}</h2>
           </div>
-          <div className="bg-blue-600 p-8 rounded-[2.5rem] shadow-lg">
+          <div className="bg-blue-600 p-5 md:p-6 rounded-[2rem] shadow-lg">
             <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Saldo Aktif Beredar</p>
-            <h2 className="text-4xl font-black italic">Rp{(stats.totalIn - stats.totalOut).toLocaleString()}</h2>
+            <h2 className="text-3xl md:text-4xl font-black italic">Rp{(stats.totalIn - stats.totalOut).toLocaleString()}</h2>
           </div>
         </div>
 

@@ -238,7 +238,7 @@ export default function ReportsDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-3 md:p-8 bg-gray-50/50 min-h-screen">
+    <div className="p-3 md:p-4 bg-gray-50/50 min-h-screen">
       <Toaster position="top-right" />
       
       {/* Header Section */}

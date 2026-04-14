@@ -457,7 +457,7 @@ export default function AuditPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 min-h-screen bg-gray-50/50">
+    <div className="p-3 md:p-4 max-w-7xl mx-auto space-y-4 md:space-y-6 min-h-screen bg-gray-50/50">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-800 flex items-center gap-2">

@@ -147,7 +147,7 @@ export default function PurchaseDetail() {
     : 'N/A';
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-32 font-sans text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-32 font-sans text-black">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <Toaster position="top-right" />
         <div className="flex items-center gap-3">

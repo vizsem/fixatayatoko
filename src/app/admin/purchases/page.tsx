@@ -329,7 +329,7 @@ export default function AdminPurchases() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs">Loading Purchases...</div>;
 
   return (
-    <div className="p-3 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32">
       <Toaster position="top-right" />
 
       {/* Header Section */}
@@ -471,65 +471,65 @@ export default function AdminPurchases() {
         <table className="w-full text-left border-collapse min-w-[720px] md:min-w-0">
           <thead className="bg-gray-50/50">
             <tr>
-              <th className="px-3 md:px-8 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">ID & Tanggal</th>
-              <th className="px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier</th>
-              <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pembayaran</th>
-              <th className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-              <th className="px-3 md:px-8 py-3 md:py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+              <th className="px-3 md:px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">ID & Tanggal</th>
+              <th className="px-3 md:px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">Supplier</th>
+              <th className="hidden md:table-cell px-3 md:px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">Pembayaran</th>
+              <th className="hidden md:table-cell px-3 md:px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+              <th className="px-3 md:px-4 py-2 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filteredPurchases.map((purchase) => (
               <tr key={purchase.id} className="hover:bg-gray-50/50 transition-all">
-                <td className="px-3 md:px-8 py-3 md:py-6">
+                <td className="px-3 md:px-4 py-2">
                   <div className="flex flex-col">
-                    <span className="text-xs font-black text-gray-800 uppercase italic">#{purchase.id.slice(-6)}</span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase flex items-center gap-1 mt-1">
-                      <Calendar size={10} /> {new Date(purchase.createdAt).toLocaleDateString('id-ID')}
+                    <span className="text-[11px] font-black text-gray-800 uppercase italic leading-none">#{purchase.id.slice(-6)}</span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase flex items-center gap-1 mt-0.5">
+                      <Calendar size={9} /> {new Date(purchase.createdAt).toLocaleDateString('id-ID')}
                     </span>
                   </div>
                 </td>
-                <td className="px-3 md:px-6 py-3 md:py-6">
+                <td className="px-3 md:px-4 py-2">
                   <div className="flex flex-col">
-                    <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{purchase.supplierName}</span>
-                    <span className="text-[9px] font-bold text-blue-500 uppercase">{purchase.items.length} Items • {purchase.warehouseName}</span>
+                    <span className="text-[11px] font-black text-gray-700 uppercase tracking-tight leading-none">{purchase.supplierName}</span>
+                    <span className="text-[8px] font-bold text-blue-500 uppercase mt-0.5">{purchase.items.length} Items • {purchase.warehouseName}</span>
                   </div>
                 </td>
-                <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6">
+                <td className="hidden md:table-cell px-3 md:px-4 py-2">
                   <div className="flex flex-col">
-                    <span className="text-xs font-black text-gray-800">Rp {purchase.total.toLocaleString()}</span>
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-fit mt-1 ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                    <span className="text-[11px] font-black text-gray-800 leading-none">Rp {purchase.total.toLocaleString()}</span>
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md w-fit mt-0.5 ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                       }`}>
                       {purchase.paymentStatus}
                     </span>
                   </div>
                 </td>
-                <td className="hidden md:table-cell px-3 md:px-6 py-3 md:py-6 text-center">
-                  <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-xl border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
+                <td className="hidden md:table-cell px-3 md:px-4 py-2 text-center">
+                  <span className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-xl border inline-block ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
                     purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
                       'bg-red-50 text-red-600 border-red-100'
                     }`}>
                     {purchase.status}
                   </span>
                 </td>
-                <td className="px-3 md:px-8 py-3 md:py-6 text-right">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="px-3 md:px-4 py-2 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
                     {purchase.status === 'MENUNGGU' && (
-                      <div className="flex gap-1">
-                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100">
-                          <CheckCircle2 size={16} />
+                      <div className="flex gap-1.5">
+                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100">
+                          <CheckCircle2 size={12} />
                         </button>
-                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
-                          <XCircle size={16} />
+                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
+                          <XCircle size={12} />
                         </button>
                       </div>
                     )}
-                    <Link href={`/admin/purchases/${purchase.id}`} className="p-2 bg-gray-100 text-gray-400 rounded-lg hover:bg-black hover:text-white transition-all">
-                      <ChevronRight size={18} />
+                    <Link href={`/admin/purchases/${purchase.id}`} className="p-1.5 bg-gray-100 text-gray-400 rounded-lg hover:bg-black hover:text-white transition-all">
+                      <ChevronRight size={14} />
                     </Link>
                     {purchase.paymentStatus === 'HUTANG' && (
-                      <button onClick={() => openPaymentModal(purchase)} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
-                        <CreditCard size={16} />
+                      <button onClick={() => openPaymentModal(purchase)} className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                        <CreditCard size={12} />
                       </button>
                     )}
                   </div>

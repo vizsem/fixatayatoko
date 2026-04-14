@@ -213,9 +213,9 @@ export default function AdminCategories() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-10 min-h-screen">
+    <div className="max-w-7xl mx-auto p-3 md:p-4 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
             <Layers className="text-green-600" size={32} /> Inventory categories
@@ -251,12 +251,12 @@ export default function AdminCategories() {
       </div>
 
       {/* Category Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filtered.map((cat) => (
-          <div key={cat.id} className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
-            <div className="flex justify-between items-start relative z-10 mb-6">
-              <div className="bg-green-50 text-green-600 p-4 rounded-3xl group-hover:bg-green-600 group-hover:text-white transition-all">
-                <Grid size={24} />
+          <div key={cat.id} className="bg-white rounded-[2rem] p-5 md:p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+            <div className="flex justify-between items-start relative z-10 mb-4">
+              <div className="bg-green-50 text-green-600 p-3 rounded-2xl group-hover:bg-green-600 group-hover:text-white transition-all">
+                <Grid size={20} />
               </div>
               <div className="flex gap-1">
                 <button
@@ -276,11 +276,11 @@ export default function AdminCategories() {
 
             <div className="relative z-10">
               <h3 className="text-xl font-black text-gray-800 tracking-tighter mb-1">{cat.name}</h3>
-              <p className="text-[10px] font-bold text-gray-400 tracking-widest mb-4">slug: {cat.slug}</p>
+              <p className="text-[10px] font-bold text-gray-400 tracking-widest mb-3">slug: {cat.slug}</p>
 
-              <p className="text-xs text-gray-500 font-medium line-clamp-2 mb-6 h-8">{cat.description || 'Tidak ada deskripsi.'}</p>
+              <p className="text-xs text-gray-500 font-medium line-clamp-2 mb-4 h-8">{cat.description || 'Tidak ada deskripsi.'}</p>
 
-              <div className="flex items-center justify-between pt-6 border-t border-gray-50">
+              <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                 <div className="flex items-center gap-2">
                   <Package size={14} className="text-gray-400" />
                   <span className="text-xs font-black text-gray-800">{cat.productCount} <span className="text-gray-400 font-bold text-[9px]">Items</span></span>

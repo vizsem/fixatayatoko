@@ -186,7 +186,7 @@ export default function AdminSuppliers() {
 
   return (
     <ErrorBoundary>
-    <div className="p-3 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-right" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -234,22 +234,22 @@ export default function AdminSuppliers() {
           <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Supplier
                 </th>
-                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Kontak
                 </th>
-                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Kategori
                 </th>
-                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Alamat
                 </th>
-                <th scope="col" className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Satuan
                 </th>
-                <th scope="col" className="px-4 md:px-6 py-3 md:py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <th scope="col" className="px-3 md:px-4 py-2 text-right text-[9px] font-black text-gray-500 uppercase tracking-wide">
                   Aksi
                 </th>
               </tr>
@@ -257,13 +257,13 @@ export default function AdminSuppliers() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 md:px-6 py-16 md:py-20 text-center">
+                  <td colSpan={6} className="px-3 md:px-4 py-8 md:py-10 text-center">
                     <Users className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-                    <p className="text-lg font-semibold text-gray-500 mb-2">Belum ada supplier terdaftar</p>
-                    <p className="text-sm text-gray-400 mb-4">Mulai dengan menambahkan supplier pertama Anda</p>
+                    <p className="text-sm font-semibold text-gray-500 mb-2">Belum ada supplier terdaftar</p>
+                    <p className="text-xs text-gray-400 mb-4">Mulai dengan menambahkan supplier pertama Anda</p>
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-sm font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 mx-auto transition-all hover:scale-[1.02]"
+                      className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 mx-auto transition-all hover:scale-[1.02]"
                     >
                       <Plus size={16} /> Tambah Supplier Pertama
                     </button>
@@ -272,51 +272,51 @@ export default function AdminSuppliers() {
               ) : (
                 pageItems.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
-                      <div className="font-semibold text-gray-900 text-base">{supplier.name}</div>
-                      <div className="text-sm text-gray-600 mt-1">{supplier.contactPerson}</div>
+                    <td className="px-3 md:px-4 py-2 whitespace-nowrap">
+                      <div className="font-semibold text-gray-900 text-[11px]">{supplier.name}</div>
+                      <div className="text-[10px] text-gray-600 mt-0.5">{supplier.contactPerson}</div>
                     </td>
-                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Phone size={16} className="text-gray-500" />
-                        <span className="text-sm font-medium text-gray-800">{supplier.phone}</span>
+                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Phone size={12} className="text-gray-500" />
+                        <span className="text-[10px] font-medium text-gray-800">{supplier.phone}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Mail size={16} className="text-gray-500" />
-                        <span className="text-sm text-gray-600">{supplier.email}</span>
+                        <Mail size={12} className="text-gray-500" />
+                        <span className="text-[10px] text-gray-600">{supplier.email}</span>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm font-medium text-gray-800">
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] font-medium text-gray-800">
+                      <span className="px-2 py-0.5 text-[9px] bg-blue-100 text-blue-800 rounded-full">
                         {supplier.category || 'Umum'}
                       </span>
                     </td>
-                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm text-gray-700 max-w-xs">
-                      <div className="flex items-start gap-2">
-                        <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] text-gray-700 max-w-xs">
+                      <div className="flex items-start gap-1.5">
+                        <MapPin size={12} className="text-gray-400 mt-0.5 flex-shrink-0" />
                         <span className="truncate">{supplier.address}</span>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell px-4 md:px-6 py-4 md:py-5 whitespace-nowrap text-sm font-medium text-gray-800">
-                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] font-medium text-gray-800">
+                      <span className="px-2 py-0.5 text-[9px] bg-gray-100 text-gray-700 rounded-full">
                         {supplier.unit || '-'}
                       </span>
                     </td>
-                    <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 md:px-4 py-2 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)}
-                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                          className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
                           title="Edit Supplier"
                         >
-                          <Edit size={18} />
+                          <Edit size={14} />
                         </button>
                         <button
                           onClick={() => handleDelete(supplier.id, supplier.name)}
-                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                          className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors"
                           title="Hapus Supplier"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>

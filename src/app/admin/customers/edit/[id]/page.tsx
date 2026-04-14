@@ -105,7 +105,7 @@ export default function EditCustomer() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black font-sans p-4 lg:p-10">
+    <div className="min-h-screen bg-gray-50 text-black font-sans p-3 md:p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div className="flex items-center gap-4">

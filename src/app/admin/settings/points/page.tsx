@@ -31,7 +31,7 @@ export default function PointSettings() {
 
 
   return (
-    <div className="p-10 bg-[#FBFBFE] min-h-screen">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen">
       <div className="max-w-2xl">
         <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3 mb-10">
           <Coins className="text-orange-500" size={32} /> Point System

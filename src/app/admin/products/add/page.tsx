@@ -305,7 +305,7 @@ export default function AddProductPage() {
     return () => unsub();
   }, []);
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen pb-24 text-black font-sans">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-24 text-black font-sans">
       <div className="max-w-4xl mx-auto">
 
         {/* Header Navigation */}
@@ -423,7 +423,7 @@ export default function AddProductPage() {
           </div>
 
           {/* BAGIAN 2: STOK & KATEGORI */}
-          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-6 text-emerald-600">
               <Layers size={18} />
               <h3 className="text-xs font-black uppercase tracking-widest">Kategori & Stok</h3>
@@ -452,7 +452,7 @@ export default function AddProductPage() {
           </div>
 
           {/* BAGIAN 3: HARGA & GROSIR */}
-          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-6 text-orange-600">
               <Tag size={18} />
               <h3 className="text-xs font-black uppercase tracking-widest">Struktur Harga</h3>
@@ -557,7 +557,7 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2 text-gray-800">
                 <Tag size={18} />

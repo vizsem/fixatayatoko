@@ -5,7 +5,7 @@ import BankReconciliationWizard from './BankReconciliationWizard';
 
 export default function BankReconciliationPage() {
   return (
-    <div className="p-6 md:p-8 min-h-screen bg-gray-50 text-slate-800">
+    <div className="p-3 md:p-4 min-h-screen bg-gray-50 text-slate-800">
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Rekonsiliasi Bank</h1>

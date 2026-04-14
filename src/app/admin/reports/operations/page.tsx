@@ -467,7 +467,7 @@ export default function OperationsReport() {
   const totalMetrics = metrics.length;
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">

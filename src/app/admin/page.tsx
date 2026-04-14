@@ -274,7 +274,7 @@ export default function AdminDashboard() {
   const maxChartValue = Math.max(...salesChartData.map(d => d.amount), 1);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-3 md:p-6 font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50/50 p-3 md:p-4 font-sans text-gray-900">
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
@@ -333,11 +333,11 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
           
           {/* Sales Chart Section */}
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-5">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Statistik Penjualan</h3>
                 <p className="text-xs text-gray-400 font-medium">Omzet 7 hari terakhir</p>
@@ -373,8 +373,8 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Orders Section */}
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">Pesanan Terbaru</h3>
               <Link href="/admin/orders" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
                 Lihat Semua <ArrowRight size={14} />

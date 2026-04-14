@@ -206,7 +206,7 @@ function AddPromotionContent() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
       <div className="max-w-4xl mx-auto mb-6 flex items-center gap-3">
         <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
           <Gift size={22} />
