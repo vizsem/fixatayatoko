@@ -723,13 +723,15 @@ export default function CartPage() {
                   return (
                     <div key={itemId} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
                       <div className="flex gap-4">
-                        <NextImage
-                          src={item.Link_Foto || item.image || '/logo-atayatoko.png'}
-                          alt={item.Nama || item.name || 'Produk'}
-                          width={64}
-                          height={64}
-                          className="w-16 h-16 rounded-2xl object-cover border border-slate-100"
-                        />
+                          <div className="w-14 h-14 md:w-16 md:h-16 flex-shrink-0">
+                            <NextImage
+                              src={item.Link_Foto || item.image || '/logo-atayatoko.png'}
+                              alt={item.Nama || item.name || 'Produk'}
+                              width={64}
+                              height={64}
+                              className="w-full h-full rounded-2xl object-cover border border-slate-100"
+                            />
+                          </div>
 
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-black uppercase leading-tight line-clamp-2">
@@ -740,14 +742,14 @@ export default function CartPage() {
                             <span>Subtotal: Rp {getLineTotal(item).toLocaleString('id-ID')}</span>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                              <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Satuan</div>
+                          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                            <div className="bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100">
+                              <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Satuan</div>
                               <select
                                 value={unit}
                                 disabled={item.promoType === 'TEBUS_MURAH'}
                                 onChange={(e) => updateUnit(itemId, e.target.value)}
-                                className="mt-2 w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none disabled:opacity-60"
+                                className="mt-1 w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-black text-slate-800 outline-none disabled:opacity-60"
                               >
                                 {units.map((u) => (
                                   <option key={u.code} value={u.code}>
@@ -755,47 +757,47 @@ export default function CartPage() {
                                   </option>
                                 ))}
                               </select>
-                              <div className="mt-1 text-[10px] font-bold text-slate-400">
-                                Harga: Rp {getItemUnitPrice(item).toLocaleString('id-ID')} / {unit}
+                              <div className="mt-1 text-[8px] md:text-[10px] font-bold text-slate-400 truncate">
+                                @ Rp {getItemUnitPrice(item).toLocaleString('id-ID')}
                               </div>
                             </div>
 
-                            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                              <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Qty</div>
-                              <div className="mt-2 flex items-center gap-2">
+                            <div className="bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100 uppercase">
+                              <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Qty</div>
+                              <div className="mt-1 flex items-center gap-1 md:gap-2">
                                 <button
                                   type="button"
                                   onClick={() => updateQuantity(itemId, Number(item.quantity || 1) - 1)}
-                                  className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all"
+                                  className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all text-slate-400"
                                 >
-                                  <Minus size={16} />
+                                  <Minus size={14} />
                                 </button>
                                 <input
                                   type="number"
                                   min={1}
                                   max={maxUnits}
                                   value={item.quantity}
-                                  onChange={(e) => updateQuantity(itemId, Number(e.target.value || 1))}
-                                  className="flex-1 h-10 bg-white border border-slate-200 rounded-xl px-3 text-xs font-black text-center outline-none"
+                                  onChange={(e) => updateQuantity(itemId, Number(item.quantity || 1))}
+                                  className="flex-1 w-8 h-8 md:h-10 bg-white border border-slate-200 rounded-xl px-1 text-[10px] md:text-xs font-black text-center outline-none"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => updateQuantity(itemId, Number(item.quantity || 1) + 1)}
-                                  className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all"
+                                  className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95 transition-all text-slate-400"
                                 >
-                                  <Plus size={16} />
+                                  <Plus size={14} />
                                 </button>
                               </div>
-                              <div className="mt-1 text-[10px] font-bold text-slate-400">
-                                Setara: {getBaseQuantity(item).toLocaleString('id-ID')} {getBaseUnit(item)}
+                              <div className="mt-1 text-[8px] md:text-[10px] font-bold text-slate-400 truncate uppercase">
+                                {getBaseQuantity(item).toLocaleString('id-ID')} {getBaseUnit(item)}
                               </div>
                             </div>
 
-                            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                            <div className="col-span-2 md:col-span-1 bg-slate-50 rounded-2xl p-2.5 md:p-3 border border-slate-100">
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total</div>
-                                  <div className="mt-2 text-sm font-black text-slate-900">
+                                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">Total</div>
+                                  <div className="mt-1 text-xs md:text-sm font-black text-slate-900">
                                     Rp {getLineTotal(item).toLocaleString('id-ID')}
                                   </div>
                                   {item.promoType === 'TEBUS_MURAH' && (
