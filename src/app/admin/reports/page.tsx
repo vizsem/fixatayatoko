@@ -238,36 +238,36 @@ export default function ReportsDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto p-3 md:p-8 bg-gray-50/50 min-h-screen">
       <Toaster position="top-right" />
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight mb-0.5">
             Business Analytics
           </h1>
-          <p className="text-gray-500 font-medium">
-            Overview performa & kesehatan bisnis Anda
+          <p className="text-[10px] md:text-sm text-gray-400 font-medium uppercase tracking-widest">
+            Overview performa & kesehatan bisnis
           </p>
         </div>
 
         {/* Date Filter */}
-        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
-            <Calendar size={16} className="text-gray-400 group-focus-within:text-blue-600" />
+        <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
+            <Calendar size={14} className="text-gray-400 group-focus-within:text-blue-600" />
             <input
               type="date"
-              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-28 cursor-pointer"
+              className="text-[10px] font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
             />
           </div>
-          <span className="text-gray-300 font-bold">-</span>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
+          <span className="text-gray-200 font-bold">/</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
             <input
               type="date"
-              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-28 cursor-pointer"
+              className="text-[10px] font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
@@ -280,31 +280,31 @@ export default function ReportsDashboard() {
       ) : (
         <>
           {/* Main Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">
             <StatCard
               label="Total Revenue"
               value={`Rp${summary.totalSales.toLocaleString('id-ID')}`}
               icon={TrendingUp}
               color="text-emerald-600"
-              bg="bg-emerald-100/50"
+              bg="bg-emerald-50"
               borderColor="border-emerald-100"
-              trend="Periode ini"
+              trend="Sales"
             />
             <StatCard
               label="Total Orders"
               value={summary.totalOrders}
               icon={ShoppingCart}
               color="text-blue-600"
-              bg="bg-blue-100/50"
+              bg="bg-blue-50"
               borderColor="border-blue-100"
-              trend={`${summary.activeCustomers} Active Users`}
+              trend="Orders"
             />
             <StatCard
-              label="Avg. Order Value"
+              label="Avg. Value"
               value={`Rp${Math.round(summary.averageOrderValue).toLocaleString('id-ID')}`}
               icon={CreditCard}
               color="text-violet-600"
-              bg="bg-violet-100/50"
+              bg="bg-violet-50"
               borderColor="border-violet-100"
             />
             <StatCard
@@ -312,52 +312,52 @@ export default function ReportsDashboard() {
               value={`${summary.lowStockCount} SKU`}
               icon={AlertTriangle}
               color="text-amber-600"
-              bg="bg-amber-100/50"
+              bg="bg-amber-50"
               borderColor="border-amber-100"
-              subValue={`${summary.totalProducts} Total Produk`}
+              subValue={`${summary.totalProducts} SKU`}
             />
           </div>
 
           {/* Charts & Secondary Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 mb-8">
             
             {/* Sales Chart Card */}
-            <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-              <div className="flex justify-between items-center mb-8">
+            <div className="lg:col-span-2 bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-gray-900 font-extrabold text-xl">Tren Penjualan</h3>
-                  <p className="text-gray-400 text-xs font-medium mt-1">Grafik pendapatan harian periode ini</p>
+                  <h3 className="text-gray-900 font-extrabold text-lg">Tren Penjualan</h3>
+                  <p className="text-gray-400 text-[10px] font-medium mt-0.5">Pendapatan harian periode ini</p>
                 </div>
                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <BarChart3 size={20} />
+                  <BarChart3 size={18} />
                 </div>
               </div>
               
-              <div className="h-64 w-full">
+              <div className="h-56 w-full">
                 <SimpleAreaChart data={summary.dailySales} />
               </div>
             </div>
 
             {/* Financial & Debt Card */}
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between group">
+            <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between group">
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="p-2.5 bg-rose-50 rounded-xl">
-                    <Activity size={18} className="text-rose-500" />
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-rose-50 rounded-xl">
+                    <Activity size={16} className="text-rose-500" />
                   </div>
-                  <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Piutang Berjalan</h3>
+                  <h3 className="text-gray-400 text-[9px] font-bold uppercase tracking-wider">Piutang Berjalan</h3>
                 </div>
-                <p className="text-4xl font-black text-gray-900 tracking-tight">
+                <p className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
                   Rp{summary.outstandingDebt.toLocaleString('id-ID')}
                 </p>
                 
-                <div className="mt-6 space-y-4">
+                <div className="mt-4 space-y-3">
                   <div>
-                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1.5">
+                    <div className="flex justify-between text-[9px] font-bold text-gray-400 mb-1">
                       <span>Rasio Piutang</span>
                       <span>{((summary.outstandingDebt / (summary.totalSales || 1)) * 100).toFixed(1)}%</span>
                     </div>
-                    <div className="w-full bg-gray-50 h-2.5 rounded-full overflow-hidden border border-gray-100">
+                    <div className="w-full bg-gray-50 h-1.5 rounded-full overflow-hidden border border-gray-100">
                       <div 
                         className="bg-gradient-to-r from-rose-500 to-rose-400 h-full rounded-full" 
                         style={{ width: `${Math.min((summary.outstandingDebt / (summary.totalSales || 1)) * 100, 100)}%` }}
@@ -370,27 +370,24 @@ export default function ReportsDashboard() {
               <button
                 onClick={handleExportSummary}
                 disabled={isExporting}
-                className="mt-8 w-full bg-gray-900 text-white px-6 py-4 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200"
+                className="mt-6 w-full bg-gray-900 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200"
               >
-                {isExporting ? <Activity className="animate-spin" size={18} /> : <Download size={18} />}
-                Export Laporan Excel
+                {isExporting ? <Activity className="animate-spin" size={16} /> : <Download size={16} />}
+                Export Excel
               </button>
-
-              {/* Decorative */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
             </div>
           </div>
 
           {/* Module Links Grid */}
-          <div className="mb-6 flex items-center gap-3">
-            <div className="h-8 w-1.5 bg-blue-600 rounded-full"></div>
-            <h3 className="text-xl font-bold text-gray-900">Modul Laporan Detail</h3>
+          <div className="mb-4 flex items-center gap-2">
+            <div className="h-6 w-1.5 bg-blue-600 rounded-full"></div>
+            <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Laporan Detail</h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
             <ReportLink
-              title="Laporan Penjualan"
-              desc="Analisis detail omzet, produk terlaris, dan tren waktu."
+              title="Penjualan"
+              desc="Omzet & tren waktu."
               icon={FileText}
               href="/admin/reports/sales"
               color="text-emerald-600"
@@ -398,8 +395,8 @@ export default function ReportsDashboard() {
               hoverBorder="group-hover:border-emerald-200"
             />
             <ReportLink
-              title="Laporan Inventaris"
-              desc="Mutasi stok, valuasi aset, dan riwayat opname."
+              title="Inventaris"
+              desc="Mutasi & valuasi."
               icon={Database}
               href="/admin/reports/inventory"
               color="text-violet-600"
@@ -407,8 +404,8 @@ export default function ReportsDashboard() {
               hoverBorder="group-hover:border-violet-200"
             />
             <ReportLink
-              title="Laporan Keuangan"
-              desc="Arus kas masuk/keluar, laba rugi, dan pengeluaran."
+              title="Keuangan"
+              desc="Kas & laba rugi."
               icon={DollarSign}
               href="/admin/reports/finance"
               color="text-cyan-600"
@@ -416,8 +413,8 @@ export default function ReportsDashboard() {
               hoverBorder="group-hover:border-cyan-200"
             />
             <ReportLink
-              title="Laporan Operasional"
-              desc="Kinerja karyawan, pengiriman, dan logistik."
+              title="Operasional"
+              desc="Kinerja & logistik."
               icon={Package}
               href="/admin/reports/operations"
               color="text-amber-600"
@@ -425,8 +422,8 @@ export default function ReportsDashboard() {
               hoverBorder="group-hover:border-amber-200"
             />
              <ReportLink
-              title="Database Pelanggan"
-              desc="Analisis demografi, riwayat belanja, dan loyalitas."
+              title="Pelanggan"
+              desc="Analisis loyalitas."
               icon={Users}
               href="/admin/reports/customers"
               color="text-blue-600"
@@ -434,8 +431,8 @@ export default function ReportsDashboard() {
               hoverBorder="group-hover:border-blue-200"
             />
             <ReportLink
-              title="Promo & Diskon"
-              desc="Efektivitas kupon dan program promosi berjalan."
+              title="Promo"
+              desc="Efektivitas kupon."
               icon={Gift}
               href="/admin/reports/promotions"
               color="text-rose-600"
@@ -512,23 +509,23 @@ function SimpleAreaChart({ data }: { data: DailySales[] }) {
 
 function StatCard({ label, value, icon: Icon, color, bg, borderColor, trend, subValue }: any) {
   return (
-    <div className={`bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden`}>
-      <div className="flex justify-between items-start mb-4 relative z-10">
-        <div className={`${bg} ${color} p-3.5 rounded-2xl border ${borderColor} group-hover:scale-110 transition-transform duration-300`}>
-          <Icon size={22} />
+    <div className={`bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden`}>
+      <div className="flex justify-between items-start mb-3 relative z-10">
+        <div className={`${bg} ${color} p-2.5 md:p-3.5 rounded-xl border ${borderColor} group-hover:scale-110 transition-transform duration-300`}>
+          <Icon size={18} className="md:size-[22px]" />
         </div>
         {trend && (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+          <span className="hidden md:flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
             <ArrowUpRight size={12} /> {trend}
           </span>
         )}
       </div>
       
       <div className="relative z-10">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
-        <h3 className="text-2xl font-black text-gray-900 tracking-tight">{value}</h3>
+        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+        <h3 className="text-sm md:text-2xl font-black text-gray-900 tracking-tight">{value}</h3>
         {subValue && (
-          <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50 text-[10px] font-semibold text-gray-500">
+          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gray-50 text-[9px] font-bold text-gray-400">
             <AlertTriangle size={10} /> {subValue}
           </div>
         )}
@@ -542,19 +539,19 @@ function StatCard({ label, value, icon: Icon, color, bg, borderColor, trend, sub
 function ReportLink({ title, desc, icon: Icon, href, color, bg, hoverBorder }: any) {
   return (
     <Link href={href} className="group h-full">
-      <div className={`bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm ${hoverBorder} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col`}>
-        <div className="flex items-center justify-between mb-5">
-          <div className={`${bg} ${color} p-4 rounded-2xl group-hover:rotate-6 transition-transform duration-300`}>
-            <Icon size={24} />
+      <div className={`bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-sm ${hoverBorder} hover:shadow-xl transition-all duration-300 h-full flex flex-col`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className={`${bg} ${color} p-2.5 md:p-4 rounded-xl group-hover:rotate-6 transition-transform duration-300`}>
+            <Icon size={20} className="md:size-6" />
           </div>
-          <div className="bg-gray-50 p-2 rounded-full group-hover:bg-gray-100 transition-colors">
-            <ChevronRight size={18} className="text-gray-300 group-hover:text-gray-600 transition-colors" />
+          <div className="bg-gray-50 p-1.5 rounded-full group-hover:bg-gray-100 transition-colors">
+            <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-600" />
           </div>
         </div>
         
         <div className="mt-auto">
-          <h4 className="font-extrabold text-gray-900 text-sm tracking-wide mb-1.5">{title}</h4>
-          <p className="text-xs text-gray-500 font-medium leading-relaxed">{desc}</p>
+          <h4 className="font-black text-gray-900 text-[11px] md:text-sm uppercase tracking-tight mb-1">{title}</h4>
+          <p className="text-[9px] md:text-xs text-gray-400 font-medium leading-tight">{desc}</p>
         </div>
       </div>
     </Link>

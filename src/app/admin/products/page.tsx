@@ -477,221 +477,219 @@ export default function AdminProducts() {
 
   return (
     <ErrorBoundary>
-      <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
+      <div className="p-3 bg-gray-50 min-h-screen text-black">
       <Toaster />
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-lg">
-            <Package size={24} />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+        <div className="flex items-center gap-2">
+          <div className="p-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-sm">
+            <Package size={18} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Atayamarket</h1>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">Manajemen Produk</p>
+            <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">Atayamarket</h1>
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Inventory Management</p>
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           <button
             onClick={handleSync}
-            className="bg-white border border-gray-200 text-blue-600 p-2.5 rounded-lg hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
+            className="bg-white border border-gray-100 text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
             title="Sinkron & Reset Filter"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={14} />
           </button>
-          <button onClick={downloadTemplate} className="bg-white border border-gray-200 px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 hover:bg-gray-50 transition-all"><FileSpreadsheet size={14} /> Template</button>
-          <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 shadow-md hover:bg-orange-600 transition-all"><Upload size={14} /> Import</button>
-          <button onClick={handleExport} className="bg-emerald-600 text-white px-3 py-2.5 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 shadow-md hover:bg-emerald-700 transition-all"><Download size={14} /> Export</button>
-          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xl hover:shadow-2xl transition-all"><Plus size={16} /> Item Baru</button>
+          <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
+          <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
+          <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
+          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> NEW SKU</button>
         </div>
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md flex items-center gap-4 hover:shadow-lg transition-all">
-          <div className="bg-blue-100 p-3 rounded-xl text-blue-700"><Package size={24} /></div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:shadow-md transition-all">
+          <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Package size={16} /></div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 mb-0.5">Total Produk</p>
-            <p className="text-xl font-bold text-gray-900">{stats.totalJenis}</p>
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total SKU</p>
+            <p className="text-sm font-black text-gray-900 leading-none">{stats.totalJenis}</p>
           </div>
         </div>
         
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md flex items-center gap-4 hover:shadow-lg transition-all">
-          <div className="bg-emerald-100 p-3 rounded-xl text-emerald-700">
-            <Banknote size={24} />
+        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:shadow-md transition-all">
+          <div className="bg-emerald-50 p-2 rounded-lg text-emerald-600">
+            <Banknote size={16} />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 mb-0.5">Total Aset</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xs font-semibold text-emerald-800">Rp</span>
-              <p className="text-xl font-bold text-emerald-800">
-                {stats.totalAset.toLocaleString('id-ID')}
-              </p>
-            </div>
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total Value</p>
+            <p className="text-sm font-black text-emerald-700 leading-none">
+              <span className="text-[10px] font-bold mr-0.5">Rp</span>
+              {stats.totalAset.toLocaleString('id-ID')}
+            </p>
           </div>
         </div>
       </div>
 
       {/* TABLE BOX */}
-      <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden mt-6">
-        <div className="p-3 md:p-4 border-b border-gray-100 flex flex-wrap items-center gap-4 bg-white">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-2">
+        <div className="p-2 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
             <input
               type="text"
-              placeholder="Cari produk, ID, atau barcode..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              placeholder="Search SKU..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[10px] font-bold focus:ring-2 focus:ring-blue-100 transition-all outline-none"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="w-full sm:w-auto px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="px-2 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[9px] font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none"
             >
-              <option value="createdAt">Produk Baru</option>
-              <option value="updatedAt">Terakhir Diupdate</option>
-              <option value="name">Nama A-Z</option>
+              <option value="createdAt">SORT: NEWEST</option>
+              <option value="updatedAt">SORT: RECENT</option>
+              <option value="name">SORT: NAME A-Z</option>
             </select>
-            {/* Bulk Action Button */}
-            {selectedIds.length > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <button
-                  onClick={() => {
-                    const idsParam = selectedIds.join(',');
-                    window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
-                  }}
-                  className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
-                >
-                  <Printer size={16} /> Cetak Label ({selectedIds.length})
-                </button>
-                <button
-                  onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
-                  className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
-                >
-                  <CheckSquare size={16} /> {showInactive ? 'Aktifkan' : 'Arsipkan'} ({selectedIds.length})
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="w-full sm:w-auto bg-gradient-to-r from-black to-gray-900 text-white px-5 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 shadow-md hover:shadow-lg transition-all animate-in fade-in zoom-in"
-                >
-                  <Trash2 size={16} /> Hapus ({selectedIds.length})
-                </button>
-              </div>
-            )}
-
+            
             <button
               onClick={() => setShowInactive(!showInactive)}
-              className={`w-full sm:w-auto px-5 py-3 rounded-2xl text-sm font-semibold border transition-all flex items-center gap-2 shadow-sm hover:shadow-md ${
+              className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all flex items-center gap-1 shadow-sm active:scale-95 ${
                 showInactive 
-                  ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' 
-                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                  ? 'bg-red-50 text-red-600 border-red-100' 
+                  : 'bg-gray-50 text-gray-600 border-gray-100'
               }`}
             >
-              {showInactive ? <EyeOff size={16} /> : <Eye size={16} />}
-              {showInactive ? 'Tampilkan Aktif' : 'Tampilkan Arsip'}
+              {showInactive ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showInactive ? 'SHOW ACTIVE' : 'ARCHIVE'}
             </button>
           </div>
+
+          {/* Bulk Action Button Bar */}
+          {selectedIds.length > 0 && (
+            <div className="w-full flex flex-wrap gap-1.5 pt-1">
+              <button
+                onClick={() => {
+                  const idsParam = selectedIds.join(',');
+                  window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
+                }}
+                className="flex-1 max-w-[120px] bg-amber-500 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-amber-100 active:scale-95 transition-all"
+              >
+                <Printer size={12} /> LABELS ({selectedIds.length})
+              </button>
+              <button
+                onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
+                className="flex-1 max-w-[120px] bg-blue-600 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-blue-100 active:scale-95 transition-all"
+              >
+                <CheckSquare size={12} /> {showInactive ? 'RESTORE' : 'ARCHIVE'}
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 max-w-[120px] bg-red-600 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-red-100 active:scale-95 transition-all"
+              >
+                <Trash2 size={12} /> DELETE
+              </button>
+            </div>
+          )}
         </div>
 
         {/* MOBILE LIST (Card mode) */}
         <div className="md:hidden">
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-50">
             {currentItems.map((p) => {
               const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
               const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
               const isSelected = selectedIds.includes(p.id);
               return (
-                <div key={p.id} className={`p-3 flex flex-col gap-3 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                <div key={p.id} className={`p-2.5 flex flex-col gap-2 ${isSelected ? 'bg-blue-50/50' : 'bg-white'}`}>
                   <div className="flex items-start gap-2.5">
-                    <button onClick={() => toggleSelectOne(p.id)} className="mt-0.5 text-gray-400">
-                      {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                    <button onClick={() => toggleSelectOne(p.id)} className="mt-0.5 text-gray-300">
+                      {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
                     </button>
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                         <Image src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" />
                       ) : (
-                        <Camera size={18} className="text-gray-400" />
+                        <Camera size={16} className="text-gray-300" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[11px] font-semibold text-blue-600 tracking-tight">ID: {p.sku}</p>
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku || 'N/A'}</span>
                       </div>
-                      <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">{p.name}</h3>
-                      <p className="text-[11px] text-gray-500 font-medium">{p.category || '-'}</p>
+                      <h3 className="font-black text-gray-900 text-[10px] uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
+                      <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className={`font-bold text-sm ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                        {p.stock} {p.unit}
+
+                  <div className="grid grid-cols-2 gap-2 py-1.5 px-2 border-y border-gray-50 bg-gray-50/30 rounded-lg">
+                    <div className="space-y-0.5">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Stock</p>
+                      <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                        {p.stock} <span className="text-[9px] uppercase">{p.unit}</span>
                       </p>
-                      {Number(p.stock) <= Number(p.minStock) && (
-                        <p className="text-[11px] font-medium text-red-500">Min: {p.minStock}</p>
-                      )}
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1 mt-0.5">
                         {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
                           Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
                             const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
                             return (
-                              <span key={whId} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                              <span key={whId} className="text-[7px] font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
                                 {wName}: {qty}
                               </span>
                             );
                           })
                         ) : (
-                          <span className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                          <span className="text-[7px] font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
                             {whName}: {p.stock}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-medium text-blue-600">
-                        Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                    <div className="space-y-0.5 text-right">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
+                      <p className="text-xs font-black text-emerald-600 leading-none">
+                        <span className="text-[9px] mr-0.5">Rp</span>
+                        {(p.priceEcer || 0).toLocaleString('id-ID')}
                       </p>
-                      <p className="text-sm font-bold text-emerald-600">
-                        Rp{(p.priceEcer || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()}
+                      <p className="text-[8px] font-bold text-blue-500/70 italic mt-0.5">
+                        Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                       </p>
-                      {Number(p.priceGrosir || 0) > 0 && (
-                        <p className="text-[11px] font-medium text-purple-600">
-                          Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')} /{(p.unit || 'PCS').toString().toUpperCase()} {Number((p as ProductRow).Min_Grosir || 0) > 0 ? `(min.${Number((p as ProductRow).Min_Grosir || 0)})` : ''}
-                        </p>
-                      )}
                     </div>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <p className={`text-[11px] font-medium flex items-center gap-1 ${isExpired ? 'text-red-600' : 'text-orange-600'}`}>
-                      {isExpired && <AlertTriangle size={12} />}
-                      Exp: {p.expired_date || '-'}
-                    </p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col">
+                      <p className={`text-[9px] font-black uppercase tracking-tight flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
+                        {isExpired && <AlertTriangle size={10} className="animate-pulse" />}
+                        Exp: {p.expired_date || '-'}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5">
                       <button 
                         onClick={() => setSelectedProductRestock(p)} 
-                        className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
-                        title="Restock"
+                        className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        title="Quick Stock"
                       >
-                        <Calculator size={16} />
+                        <Calculator size={12} />
                       </button>
                       <Link 
                         href={`/admin/products/edit/${p.id}`} 
-                        className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-800 hover:text-white transition-all"
-                        title="Edit"
+                        className="w-7 h-7 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
+                        title="Edit Item"
                       >
-                        <Edit size={16} />
+                        <Edit size={12} />
                       </Link>
                       <button 
                         onClick={() => handleDelete(p)} 
-                        className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all"
-                        title="Hapus"
+                        className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                        title="Archive"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   </div>
@@ -704,144 +702,143 @@ export default function AdminProducts() {
         {/* DESKTOP TABLE */}
         <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[640px] md:min-w-0">
-            <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200">
+            <thead className="bg-gray-50 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
               <tr>
-                <th className="p-3 md:p-4 w-10 sticky left-0 bg-gray-50 z-10">
+                <th className="px-2 py-2.5 w-8 sticky left-0 bg-gray-50 z-10 text-center">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
-                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} />}
                   </button>
                 </th>
-                <th className="p-3 md:p-4">Produk</th>
-                <th className="p-3 md:p-4">Stok & Gudang</th>
-                <th className="hidden md:table-cell p-3 md:p-4">Harga (Avg)</th>
-                <th className="hidden md:table-cell p-3 md:p-4">Tgl & Exp</th>
-                <th className="p-3 md:p-4 text-center sticky right-0 bg-gray-50 z-10">Aksi</th>
+                <th className="px-2 py-2.5">Produk</th>
+                <th className="px-2 py-2.5">Stok & Gudang</th>
+                <th className="hidden md:table-cell px-2 py-2.5">Harga (Avg)</th>
+                <th className="hidden md:table-cell px-2 py-2.5">Tgl & Exp</th>
+                <th className="px-2 py-2.5 text-right pr-4 sticky right-0 bg-gray-50 z-10">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-50">
               {currentItems.map(p => {
                 const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
                 const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
                 const isSelected = selectedIds.includes(p.id);
 
                 return (
-                  <tr key={p.id} className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50' : ''}`}>
-                    <td className="p-3 md:p-4 sticky left-0 bg-white z-10">
-                      <button onClick={() => toggleSelectOne(p.id)} className="transition-colors">
-                        {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-gray-300 hover:text-gray-400" />}
+                  <tr key={p.id} className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                    <td className="px-2 py-2 sticky left-0 bg-white z-10 text-center">
+                      <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
+                        {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
                       </button>
                     </td>
-                    <td className="p-3 md:p-4">
+                    <td className="px-2 py-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
                           {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                             <Image
-                              key={p.id}
                               src={p.imageUrl}
                               alt={p.name}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="40px"
+                              className="object-cover"
                             />
                           ) : (
-                            <Camera size={16} className="text-gray-400" />
+                            <Camera size={14} className="text-gray-300" />
                           )}
                         </div>
                         <div>
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                          <p className="text-[10px] font-bold text-blue-600 tracking-tight">ID: {p.sku}</p>
-                        </div>
-                          <h3 className="font-bold text-gray-900 text-[11px] leading-tight mb-0.5 line-clamp-1">{p.name}</h3>
-                          <p className="text-[9px] text-gray-500 font-medium">{p.category}</p>
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <p className="text-[8px] font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
+                          </div>
+                          <h3 className="font-black text-gray-900 text-[10px] leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
+                          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="p-3 md:p-4">
+                    <td className="px-2 py-2">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <p className={`font-bold text-[11px] ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {p.stock} {p.unit}
+                          <p className={`font-black text-[10px] leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                            {p.stock} <span className="text-[8px] uppercase">{p.unit}</span>
                           </p>
                         </div>
                         {Number(p.stock) <= Number(p.minStock) && (
-                          <p className="text-[9px] font-medium text-red-500">
+                          <p className="text-[7px] font-bold text-red-500 uppercase">
                             Min: {p.minStock}
                           </p>
                         )}
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="flex flex-wrap gap-1 mt-0.5">
                           {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
                             Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
                               const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
                               return (
-                                <span key={whId} className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                                <span key={whId} className="text-[7px] font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
                                   {wName}: {qty}
-                                </span>
+                               </span>
                               );
                             })
                           ) : (
-                            <span className="text-[9px] font-bold bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                            <span className="text-[7px] font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
                               {whName}: {p.stock}
                             </span>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell p-3 md:p-4">
+                    <td className="hidden md:table-cell px-2 py-2">
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[10px] font-medium text-blue-600">
-                          Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                        <p className="text-[8px] font-bold text-blue-500 italic">
+                          Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                         </p>
-                        <p className="text-[11px] font-bold text-emerald-600">
+                        <p className="text-[10px] font-black text-emerald-600 leading-none">
                           Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                         </p>
                         {Number(p.priceGrosir || 0) > 0 && (
-                          <p className="text-[9px] font-medium text-purple-600">
-                            Grosir: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
+                          <p className="text-[8px] font-black text-purple-600">
+                            Gros: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
                           </p>
                         )}
                       </div>
                     </td>
-                    <td className="hidden md:table-cell p-3 md:p-4">
+                    <td className="hidden md:table-cell px-2 py-2">
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[9px] font-medium text-gray-500">
+                        <p className="text-[8px] font-bold text-gray-400">
                           M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                         </p>
-                        <p className={`text-[9px] font-bold flex items-center gap-1 ${isExpired ? 'text-red-600' : 'text-orange-500'}`}>
-                          {isExpired && <AlertTriangle size={10} />} 
+                        <p className={`text-[8px] font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
+                          {isExpired && <AlertTriangle size={8} />} 
                           E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
                         </p>
                       </div>
                     </td>
 
-                    <td className="p-3 md:p-4 text-center sticky right-0 bg-white z-10">
-                      <div className="flex justify-center gap-2">
+                    <td className="px-2 py-2 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-end gap-1.5">
                         <button 
                           onClick={() => setSelectedProductRestock(p)} 
-                          className="p-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm hover:shadow-md"
+                          className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                           title="Restock"
                         >
-                          <Calculator size={16} />
+                          <Calculator size={12} />
                         </button>
                         <Link 
                           href={`/admin/products/print-label/${p.id}`} 
-                          className="p-2.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm hover:shadow-md"
+                          className="w-7 h-7 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
                           title="Cetak Label Rak"
                         >
-                          <Printer size={16} />
+                          <Printer size={12} />
                         </Link>
                         <Link 
                           href={`/admin/products/edit/${p.id}`} 
-                          className="p-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-800 hover:text-white transition-all shadow-sm hover:shadow-md"
+                          className="w-7 h-7 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
                           title="Edit"
                         >
-                          <Edit size={16} />
+                          <Edit size={12} />
                         </Link>
                         <button 
                           onClick={() => handleDelete(p)} 
-                          className="p-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm hover:shadow-md"
+                          className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
                           title="Hapus"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </td>
@@ -853,24 +850,25 @@ export default function AdminProducts() {
         </div>
 
         {/* PAGINATION */}
-        <div className="p-6 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
-          <div className="text-[10px] font-black text-gray-400">Hal {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Produk</div>
+        <div className="px-3 py-2 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
+          <div className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Page {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Items</div>
 
-          <div className="flex gap-2 items-center">
-            <span className="text-[10px] font-black text-gray-400">Tampilan</span>
+          <div className="flex gap-1.5 items-center">
+            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mr-1">Tampilan</span>
             {[100, 500, 1000].map(n => (
               <button
                 key={n}
                 onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
-                className={`px-3 py-2 bg-white border rounded-xl text-[10px] font-black shadow-sm ${
-                  itemsPerPage === n ? 'bg-black text-white border-black' : ''
+                className={`px-2 py-1 bg-white border rounded-lg text-[9px] font-black shadow-sm transition-all ${
+                  itemsPerPage === n ? 'bg-black text-white border-black' : 'hover:bg-gray-50'
                 }`}
               >
                 {n}
               </button>
             ))}
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white border rounded-xl disabled:opacity-30 shadow-sm"><ChevronLeft size={20} /></button>
-            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white border rounded-xl disabled:opacity-30 shadow-sm"><ChevronRight size={20} /></button>
+            <div className="w-[1px] h-3 bg-gray-200 mx-1"></div>
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 px-2.5 bg-white border rounded-lg disabled:opacity-30 shadow-sm hover:bg-gray-50 transition-all"><ChevronLeft size={14} /></button>
+            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="p-1 px-2.5 bg-white border rounded-lg disabled:opacity-30 shadow-sm hover:bg-gray-50 transition-all"><ChevronRight size={14} /></button>
           </div>
         </div>
       </div>

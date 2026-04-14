@@ -1434,57 +1434,57 @@ export default function EmployeesPage() {
 
       {/* Hero Header */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-6">
-           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-2 py-3 md:px-4 md:py-3">
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                 <div className="p-2.5 bg-black text-white rounded-2xl shadow-lg">
-                    <UserCog size={22} />
+                 <div className="p-2 bg-black text-white rounded-xl shadow-sm">
+                    <UserCog size={18} />
                  </div>
                  <div>
-                    <h1 className="text-xl font-black text-gray-800 tracking-tighter">Human Capital</h1>
-                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-300">Staff & Payroll Engine</p>
+                    <h1 className="text-lg font-black text-gray-800 tracking-tighter leading-none">Human Capital</h1>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mt-0.5">Staff & Payroll Engine</p>
                  </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 md:w-56">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
                   <input
                     type="text"
                     placeholder="Search Staff..."
-                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-[11px] font-bold outline-none"
+                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border-none rounded-lg text-[10px] font-bold outline-none"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <button
                   onClick={() => { resetForm(); setIsModalOpen(true); }}
-                  className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg transition-transform active:scale-95"
+                  className="bg-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm transition-transform active:scale-95"
                 >
-                  <Plus size={16} /> NEW STAFF
+                  <Plus size={12} /> NEW STAFF
                 </button>
              </div>
            </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-6">
+      <main className="max-w-7xl mx-auto px-2 py-3 md:px-4 md:py-4">
         {!authorized ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Verifying session...</p>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Verifying session...</p>
           </div>
         ) : loading ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-emerald-600" size={24} /></div>
+          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-600" size={20} /></div>
         ) : (
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-gray-50 shadow-sm p-1.5 overflow-x-auto no-scrollbar">
+          <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-gray-50 shadow-sm p-1 overflow-x-auto no-scrollbar">
               <div className="flex gap-1 min-w-max">
                 {visibleTabs.map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setActiveTab(t.key)}
-                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                      activeTab === t.key ? 'bg-black text-white shadow-md' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
+                      activeTab === t.key ? 'bg-black text-white shadow-sm' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
                     }`}
                   >
                     {t.label}
@@ -1494,51 +1494,51 @@ export default function EmployeesPage() {
             </div>
 
             {activeTab === 'STAFF' && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[720px]">
+                  <table className="w-full text-left min-w-[640px]">
                     <thead className="bg-gray-50/50 border-b border-gray-100">
                       <tr>
-                        <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Profile</th>
-                        <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Position</th>
-                        <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Schedule & Auth</th>
-                        <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Salary & Attendance</th>
-                        <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Profile</th>
+                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Position</th>
+                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Schedule & Auth</th>
+                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Salary & Attendance</th>
+                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filteredEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-5 py-12 text-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                          <td colSpan={5} className="px-3 py-8 text-center text-gray-300 text-[9px] font-black uppercase tracking-widest">
                             No matching records
                           </td>
                         </tr>
                       ) : (
                         filteredEmployees.map((emp) => (
                           <tr key={emp.id} className="group hover:bg-gray-50/50 transition-colors">
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black text-[10px] border border-blue-100 shrink-0">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-black text-[9px] border border-blue-100 shrink-0">
                                   {emp.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[11px] font-black text-gray-800 uppercase leading-none truncate">{emp.name}</p>
-                                  <p className="text-[9px] text-gray-400 font-bold mt-1 tracking-tighter truncate">{emp.phone || '-'}</p>
+                                  <p className="text-[9px] font-black text-gray-800 uppercase leading-none truncate">{emp.name}</p>
+                                  <p className="text-[8px] text-gray-400 font-bold mt-0.5 tracking-tighter truncate">{emp.phone || '-'}</p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-5 py-3">
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
-                                <ShieldCheck size={10} /> {emp.role}
+                            <td className="px-3 py-2">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-indigo-100 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-tighter">
+                                <ShieldCheck size={8} /> {emp.role}
                               </span>
                             </td>
-                            <td className="px-5 py-3">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                                  <Clock size={12} className="text-gray-300" />
+                            <td className="px-3 py-2">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase tracking-tighter">
+                                  <Clock size={10} className="text-gray-300" />
                                   {emp.workSchedule}
                                 </div>
-                                <span className={`inline-flex self-start px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${
+                                <span className={`inline-flex self-start px-1 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${
                                   emp.status === 'AKTIF'
                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                     : 'bg-rose-50 text-rose-600 border border-rose-100'
@@ -1547,44 +1547,44 @@ export default function EmployeesPage() {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-5 py-3">
+                            <td className="px-3 py-2">
                               <div className="space-y-0.5">
-                                <p className="text-[11px] font-black text-gray-800">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                                <p className="text-[9px] font-black text-gray-800 leading-none">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
                                 {emp.dailySalary > 0 && (
-                                  <p className="text-[8px] font-black text-indigo-600 uppercase tracking-tighter leading-none">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
+                                  <p className="text-[7px] font-black text-indigo-600 uppercase tracking-tighter leading-none">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
                                 )}
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                                  <CheckCircle2 size={10} className="text-emerald-500" />
+                                <div className="flex items-center gap-1 text-[8px] font-bold text-gray-400 uppercase tracking-tighter">
+                                  <CheckCircle2 size={8} className="text-emerald-500" />
                                   Att: {emp.totalAttendance || 0}d
                                 </div>
                               </div>
                             </td>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center justify-end gap-1.5">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => handlePresent(emp)}
-                                  className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 active:scale-95"
+                                  className="p-1 bg-emerald-50 text-emerald-600 rounded border border-emerald-100 active:scale-95"
                                 >
-                                  <CheckCircle2 size={14} />
+                                  <CheckCircle2 size={12} />
                                 </button>
                                 <button
                                   onClick={() => handleAlpha(emp)}
-                                  className="p-1.5 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 active:scale-95"
+                                  className="p-1 bg-rose-50 text-rose-600 rounded border border-rose-100 active:scale-95"
                                 >
-                                  <X size={14} />
+                                  <X size={12} />
                                 </button>
-                                <div className="w-[1px] h-4 bg-gray-100 mx-0.5"></div>
+                                <div className="w-[1px] h-3 bg-gray-200 mx-0.5"></div>
                                 <button
                                   onClick={() => handleEdit(emp)}
-                                  className="p-1.5 text-gray-400 hover:text-black transition-all"
+                                  className="p-1 text-gray-400 hover:text-black transition-all"
                                 >
-                                  <Edit size={14} />
+                                  <Edit size={12} />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(emp.id)}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 transition-all"
+                                  className="p-1 text-gray-400 hover:text-red-600 transition-all"
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={12} />
                                 </button>
                               </div>
                             </td>
@@ -1633,11 +1633,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Assigned Shift</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Window</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Grace</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Assigned Shift</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Window</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Grace</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -1645,11 +1645,11 @@ export default function EmployeesPage() {
                           const s = getShiftFor(emp, selectedDate);
                           return (
                             <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{emp.name}</p>
                                 <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <select
                                   value={s.shiftId}
                                   onChange={(e) => upsertShiftAssignment(emp, selectedDate, e.target.value)}
@@ -1661,13 +1661,13 @@ export default function EmployeesPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="px-5 py-3 text-[10px] font-black text-gray-700 uppercase leading-none">
+                              <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase leading-none">
                                 {s.startTime} - {s.endTime}
                               </td>
-                              <td className="px-5 py-3 text-center text-[10px] font-black text-gray-500 uppercase leading-none truncate">
+                              <td className="px-3 py-2 text-center text-[10px] font-black text-gray-500 uppercase leading-none truncate">
                                 {Number(s.graceMinutes || 0)} min
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
@@ -1729,11 +1729,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff Profile</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Log Status</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-in</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-out</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff Profile</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Log Status</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-in</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-out</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -1744,7 +1744,7 @@ export default function EmployeesPage() {
                             const status = rec?.status || '-';
                             return (
                               <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="px-5 py-3">
+                                <td className="px-3 py-2">
                                   <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black text-[10px] border border-blue-100">
                                       {emp.name.charAt(0).toUpperCase()}
@@ -1755,7 +1755,7 @@ export default function EmployeesPage() {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-5 py-3">
+                                <td className="px-3 py-2">
                                   <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${
                                     status === 'HADIR'
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -1770,13 +1770,13 @@ export default function EmployeesPage() {
                                     {status}
                                   </span>
                                 </td>
-                                <td className="px-5 py-3 text-[10px] font-black text-gray-700 uppercase">
+                                <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase">
                                   {rec?.checkInAt ? new Date(rec.checkInAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                 </td>
-                                <td className="px-5 py-3 text-[10px] font-black text-gray-700 uppercase">
+                                <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase">
                                   {rec?.checkOutAt ? new Date(rec.checkOutAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                 </td>
-                                <td className="px-5 py-3">
+                                <td className="px-3 py-2">
                                   <div className="flex items-center justify-end gap-1">
                                     <button
                                       type="button"
@@ -1909,22 +1909,22 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[1400px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Base</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Att</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-rose-400">Alp</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-indigo-400">Lv</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-amber-400">Lt</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">OT Pay</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">BPJS</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">PPh21</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Loan</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THR</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">KPI</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Allow Adj</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Ded Adj</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THP</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Slip</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Base</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Att</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-rose-400">Alp</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-indigo-400">Lv</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-amber-400">Lt</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">OT Pay</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">BPJS</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">PPh21</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Loan</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THR</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">KPI</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Allow Adj</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Ded Adj</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THP</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Slip</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -1935,19 +1935,19 @@ export default function EmployeesPage() {
                         ) : (
                           payrollRows.map((r: any) => (
                             <tr key={r.employeeId} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
                                 <p className="text-[8px] text-gray-400 font-bold mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
                               </td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right">
                                 <p className="text-[10px] font-black text-gray-700 leading-none">Rp {Number(r.baseSalary || 0).toLocaleString('id-ID')}</p>
                               </td>
-                              <td className="px-5 py-3 text-center text-[10px] font-black text-gray-600">{r.attendanceDays}d</td>
-                              <td className="px-5 py-3 text-center text-[10px] font-black text-rose-600">{r.alphaDays}d</td>
-                              <td className="px-5 py-3 text-center text-[9px] font-black text-indigo-600">{r.paidLeaveDays}/{r.unpaidLeaveDays}</td>
-                              <td className="px-5 py-3 text-center text-[10px] font-black text-amber-600">{r.lateMinutes}m</td>
-                              <td className="px-5 py-3 text-right text-[10px] font-black text-gray-700">Rp {Number(r.overtimePay || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-center text-[10px] font-black text-gray-600">{r.attendanceDays}d</td>
+                              <td className="px-3 py-2 text-center text-[10px] font-black text-rose-600">{r.alphaDays}d</td>
+                              <td className="px-3 py-2 text-center text-[9px] font-black text-indigo-600">{r.paidLeaveDays}/{r.unpaidLeaveDays}</td>
+                              <td className="px-3 py-2 text-center text-[10px] font-black text-amber-600">{r.lateMinutes}m</td>
+                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-700">Rp {Number(r.overtimePay || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
                                   className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
@@ -1955,7 +1955,7 @@ export default function EmployeesPage() {
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { bpjsEmployee: Number(e.target.value || 0) })}
                                 />
                               </td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
                                   className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
@@ -1963,10 +1963,10 @@ export default function EmployeesPage() {
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { pph21: Number(e.target.value || 0) })}
                                 />
                               </td>
-                              <td className="px-5 py-3 text-right text-[10px] font-black text-gray-600">Rp {Number(r.loanDeduction || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-5 py-3 text-right text-[10px] font-black text-indigo-600">Rp {Number(r.thr || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-5 py-3 text-right text-[10px] font-black text-emerald-600">Rp {Number(r.kpiBonus || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-600">Rp {Number(r.loanDeduction || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right text-[10px] font-black text-indigo-600">Rp {Number(r.thr || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right text-[10px] font-black text-emerald-600">Rp {Number(r.kpiBonus || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
                                   className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
@@ -1974,7 +1974,7 @@ export default function EmployeesPage() {
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { allowances: Number(e.target.value || 0) })}
                                 />
                               </td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
                                   className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
@@ -1982,10 +1982,10 @@ export default function EmployeesPage() {
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { deductions: Number(e.target.value || 0) })}
                                 />
                               </td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right">
                                 <p className="text-[11px] font-black text-gray-900">Rp {Number(r.takeHomePay || 0).toLocaleString('id-ID')}</p>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <div className="flex items-center justify-end gap-1">
                                   <button
                                     type="button"
@@ -2042,12 +2042,12 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Type</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Timeline</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Paid</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Status</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Type</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Timeline</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Paid</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Status</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -2058,14 +2058,14 @@ export default function EmployeesPage() {
                         ) : (
                           leaveRequests.map((r) => (
                             <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
                                 <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
                               </td>
-                              <td className="px-5 py-3 text-[10px] font-black text-gray-600 uppercase leading-none">{r.type}</td>
-                              <td className="px-5 py-3 text-[10px] font-black text-gray-600 uppercase leading-none">{r.startDate} → {r.endDate}</td>
-                              <td className="px-5 py-3 text-[9px] font-black text-gray-400 uppercase leading-none">{r.paid ? 'YES' : 'NO'}</td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{r.type}</td>
+                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{r.startDate} → {r.endDate}</td>
+                              <td className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase leading-none">{r.paid ? 'YES' : 'NO'}</td>
+                              <td className="px-3 py-2">
                                 <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${
                                   r.status === 'APPROVED'
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -2076,7 +2076,7 @@ export default function EmployeesPage() {
                                   {r.status}
                                 </span>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <div className="flex items-center justify-end gap-1">
                                   {r.status === 'PENDING' ? (
                                     <>
@@ -2152,11 +2152,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Score</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Bonus Amt</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Internal Notes</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Score</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Bonus Amt</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Internal Notes</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -2164,11 +2164,11 @@ export default function EmployeesPage() {
                           const row = kpiScores[emp.id] || { score: 0, bonusAmount: 0, notes: '' };
                           return (
                             <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{emp.name}</p>
                                 <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
                               </td>
-                              <td className="px-5 py-3 text-center">
+                              <td className="px-3 py-2 text-center">
                                 <input
                                   type="number"
                                   min={0}
@@ -2178,7 +2178,7 @@ export default function EmployeesPage() {
                                   className="w-14 bg-gray-50 border-none rounded-lg px-2 py-1 text-[10px] font-black text-center outline-none"
                                 />
                               </td>
-                              <td className="px-5 py-3 text-right">
+                              <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
                                   min={0}
@@ -2187,7 +2187,7 @@ export default function EmployeesPage() {
                                   className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[10px] font-black text-right outline-none"
                                 />
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <input
                                   value={row.notes}
                                   onChange={(e) => setKpiScores((p) => ({ ...p, [emp.id]: { ...row, notes: e.target.value } }))}
@@ -2195,7 +2195,7 @@ export default function EmployeesPage() {
                                   placeholder="AUDIT LOG"
                                 />
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
@@ -2244,11 +2244,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Candidate</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Position</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Expectation</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Status Stage</th>
-                          <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Candidate</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Position</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Expectation</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Status Stage</th>
+                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -2259,13 +2259,13 @@ export default function EmployeesPage() {
                         ) : (
                           candidates.map((c) => (
                             <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{c.name}</p>
                                 <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter truncate max-w-[200px]">{c.phone || '-'} • {c.email || '-'}</p>
                               </td>
-                              <td className="px-5 py-3 text-[10px] font-black text-gray-600 uppercase leading-none">{c.position || '-'}</td>
-                              <td className="px-5 py-3 text-right text-[10px] font-black text-gray-700">Rp {Number(c.expectedSalary || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{c.position || '-'}</td>
+                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-700">Rp {Number(c.expectedSalary || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2">
                                 <select
                                   value={c.stage}
                                   onChange={(e) => updateCandidateStage(c, e.target.value as CandidateStage)}
@@ -2278,7 +2278,7 @@ export default function EmployeesPage() {
                                   <option value="REJECTED">REJECTED</option>
                                 </select>
                               </td>
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2">
                                 <div className="flex items-center justify-end">
                                   <button
                                     type="button"

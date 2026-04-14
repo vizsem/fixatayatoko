@@ -213,109 +213,108 @@ export default function AdminCustomers() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FBFBFE] p-4 lg:p-10">
+    <div className="min-h-screen bg-[#FBFBFE] p-3 lg:p-8">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-2">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
-            <Users className="text-green-600" size={32} /> Client database
+          <h1 className="text-lg md:text-xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
+            <Users className="text-green-600" size={20} /> Client Database
           </h1>
-          <p className="text-gray-400 text-xs font-bold tracking-widest mt-1">Manajemen pelanggan & piutang berjalan</p>
+          <p className="text-gray-400 text-[8px] font-black uppercase tracking-widest mt-0 leading-none">Customer CRM & Receivables</p>
         </div>
 
 
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[300px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+        <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
             <input
               type="text"
-              placeholder="Cari nama/hp..."
+              placeholder="Search Client..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold shadow-sm focus:ring-2 focus:ring-black outline-none transition-all"
+              className="w-full pl-8 pr-4 py-2 bg-gray-50 border-none rounded-xl text-[10px] font-bold outline-none"
             />
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-black text-white px-8 py-4 rounded-[1.5rem] text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-lg"
+            className="bg-black text-white px-4 py-2 rounded-xl text-[8px] font-black tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md uppercase"
           >
-            <Plus size={18} /> Tambah client
+            <Plus size={14} /> NEW CLIENT
           </button>
-
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <StatBox label="Total Client" value={customers.length} icon={Users} color="text-blue-600" bg="bg-blue-50" />
-        <StatBox label="Tipe Grosir" value={customers.filter(c => c.type === 'grosir').length} icon={Package} color="text-purple-600" bg="bg-purple-50" />
-        <StatBox label="Total Piutang" value={`Rp${customers.reduce((s, c) => s + c.outstandingDebt, 0).toLocaleString()}`} icon={CreditCard} color="text-red-600" bg="bg-red-50" />
+        <StatBox label="Wholesale" value={customers.filter(c => c.type === 'grosir').length} icon={Package} color="text-purple-600" bg="bg-purple-50" />
+        <StatBox label="Receivables" value={`Rp${customers.reduce((s, c) => s + c.outstandingDebt, 0).toLocaleString()}`} icon={CreditCard} color="text-red-600" bg="bg-red-50" />
         <StatBox label="Over Limit" value={customers.filter(isOverLimit).length} icon={AlertTriangle} color="text-orange-600" bg="bg-orange-50" />
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
         {/* Mobile View */}
-        <div className="md:hidden divide-y divide-gray-50">
+        <div className="md:hidden">
           {filteredCustomers.length === 0 ? (
-            <div className="p-8 text-center">
-               <Activity className="mx-auto text-gray-200 mb-4" size={40} />
-               <p className="text-[10px] font-black text-gray-400 tracking-widest">Tidak ada data ditemukan</p>
+            <div className="p-8 text-center bg-white rounded-2xl">
+               <Activity className="mx-auto text-gray-200 mb-4" size={32} />
+               <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">No matching clients</p>
             </div>
           ) : (
             filteredCustomers.map(customer => (
-              <div key={customer.id} className="p-4 flex flex-col gap-4">
+              <div key={customer.id} className="p-3 flex flex-col gap-2 border-b border-gray-50 bg-white first:rounded-t-[1.5rem] last:rounded-b-[1.5rem]">
                  <div className="flex justify-between items-start">
                     <div>
-                       <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{customer.name}</h3>
-                       <div className="flex items-center gap-2 mt-1">
-                          <span className={`px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest ${customer.type === 'grosir' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                             {customer.type.toUpperCase()}
+                       <h3 className="text-[10px] md:text-[11px] font-black text-gray-800 uppercase leading-none tracking-tight mb-1">{customer.name}</h3>
+                       <div className="flex items-center gap-1">
+                          <span className={`px-1.5 py-0.5 text-[7px] font-black rounded-md tracking-tighter uppercase ${customer.type === 'grosir' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                             {customer.type}
                           </span>
                           {customer.notes && (
-                            <span className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                            <span className="text-[7px] font-bold text-blue-500 bg-blue-50/50 px-1.5 py-0.5 rounded-md italic lowercase">
                               {customer.notes}
                             </span>
                           )}
                        </div>
                     </div>
-                    <div className="flex gap-2">
-                       <Link href={`/admin/customers/edit/${customer.id}`} className="p-2 bg-gray-50 rounded-xl text-blue-600">
-                          <Edit size={14} />
+                    <div className="flex gap-1">
+                       <Link href={`/admin/customers/edit/${customer.id}`} className="w-7 h-7 flex items-center justify-center bg-gray-50 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors">
+                          <Edit size={12} />
                        </Link>
-                       <button onClick={() => handleDelete(customer.id, customer.name)} className="p-2 bg-gray-50 rounded-xl text-red-500">
-                          <Trash2 size={14} />
+                       <button onClick={() => handleDelete(customer.id, customer.name)} className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">
+                          <Trash2 size={12} />
                        </button>
                     </div>
                  </div>
 
-                 <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                       <span className="text-[8px] font-black text-gray-400 tracking-widest uppercase">Kontak</span>
-                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
-                          <Phone size={10} className="text-green-500" /> {customer.phone}
+                 <div className="grid grid-cols-2 gap-4 py-1.5 px-1 border-y border-gray-50/50">
+                    <div className="flex flex-col gap-0.5">
+                       <span className="text-[7px] font-black text-gray-300 uppercase tracking-widest">Contact</span>
+                       <div className="flex items-center gap-1 text-[9px] font-black text-gray-600">
+                          <Phone size={9} className="text-green-500" /> {customer.phone}
                        </div>
                        {customer.email && (
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400">
-                             <Mail size={10} /> {customer.email}
+                          <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 italic">
+                             <Mail size={9} /> {customer.email}
                           </div>
                        )}
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <span className="text-[8px] font-black text-gray-400 tracking-widest uppercase">Keuangan</span>
-                        <div className={`text-xs font-black ${isOverLimit(customer) ? 'text-red-600' : 'text-gray-800'}`}>
+                    <div className="flex flex-col gap-0.5 text-right">
+                        <span className="text-[7px] font-black text-gray-300 uppercase tracking-widest">Financial</span>
+                        <div className={`text-[10px] font-black ${isOverLimit(customer) ? 'text-red-500' : 'text-gray-800'}`}>
                            Rp{customer.outstandingDebt.toLocaleString()}
-                           <span className="text-[8px] font-normal text-gray-400 ml-1">(Hutang)</span>
+                           <span className="text-[7px] font-normal text-gray-300 ml-1 italic">debt</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
-                           <TrendingUp size={10} className="text-green-500" /> Rp{customer.totalSpent.toLocaleString()}
+                        <div className="flex items-center justify-end gap-1 text-[8px] font-black text-emerald-600 uppercase">
+                           <TrendingUp size={9} /> Rp{customer.totalSpent.toLocaleString()}
                         </div>
                     </div>
                  </div>
                  
                  {customer.address && (
-                    <div className="flex items-start gap-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 p-2 rounded-xl">
-                       <MapPin size={10} className="shrink-0 mt-0.5" /> {customer.address}
+                    <div className="flex items-start gap-1 text-[8px] font-bold text-gray-400 bg-gray-50/30 p-1.5 rounded-lg border border-gray-50 lowercase italic">
+                       <MapPin size={9} className="shrink-0 mt-0.5 text-gray-300" /> {customer.address}
                     </div>
                  )}
               </div>
@@ -520,14 +519,14 @@ interface StatBoxProps {
 function StatBox({ label, value, icon: Icon, color, bg }: StatBoxProps) {
 
   return (
-    <div className="bg-white p-7 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all">
+    <div className="bg-white p-2.5 lg:p-3 rounded-2xl shadow-sm border border-gray-50 flex items-center justify-between group hover:shadow-md transition-all">
       <div>
-        <p className="text-[9px] font-black text-gray-400 tracking-[0.2em] mb-1">{label}</p>
+        <p className="text-[7px] font-black text-gray-300 uppercase tracking-widest mb-0.5">{label}</p>
 
-        <p className="text-xl font-black text-gray-800 tracking-tighter">{value}</p>
+        <p className="text-sm md:text-base font-black text-gray-800 tracking-tighter leading-none">{value}</p>
       </div>
-      <div className={`${bg} ${color} p-4 rounded-3xl group-hover:scale-110 transition-transform shadow-inner`}>
-        <Icon size={22} />
+      <div className={`${bg} ${color} p-2 rounded-xl group-hover:scale-110 transition-transform shadow-inner`}>
+        <Icon size={14} />
       </div>
     </div>
   );

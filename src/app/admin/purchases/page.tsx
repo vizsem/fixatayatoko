@@ -329,86 +329,62 @@ export default function AdminPurchases() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs">Loading Purchases...</div>;
 
   return (
-    <div className="p-4 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32">
+    <div className="p-3 lg:p-10 bg-[#FBFBFE] min-h-screen pb-32">
       <Toaster position="top-right" />
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3">
-            <ShoppingBag className="text-blue-600" size={32} /> Purchase Order
+          <h1 className="text-xl md:text-3xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-2">
+            <ShoppingBag className="text-blue-600" size={24} /> Purchases
           </h1>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
+          <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mt-0.5">
             Total Pengeluaran: <span className="text-red-500">Rp {purchases.reduce((s, p) => s + p.total, 0).toLocaleString()}</span>
           </p>
         </div>
-        <Link href="/admin/purchases/add" className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:scale-105 transition-all">
-          <Plus size={18} /> Buat PO Baru
+        <Link href="/admin/purchases/add" className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:scale-105 transition-all">
+          <Plus size={16} /> Buat PO
         </Link>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard label="Menunggu" val={purchases.filter(p => p.status === 'MENUNGGU').length} color="text-yellow-600" bg="bg-yellow-50" icon={Clock} />
         <StatCard label="Diterima" val={purchases.filter(p => p.status === 'DITERIMA').length} color="text-green-600" bg="bg-green-50" icon={CheckCircle2} />
-        <StatCard label="Hutang" val={`Rp ${purchases.filter(p => p.paymentStatus === 'HUTANG').reduce((s, p) => s + p.total, 0).toLocaleString()}`} color="text-red-600" bg="bg-red-50" icon={CreditCard} isWide />
+        <StatCard label="Hutang Total" val={`Rp ${purchases.filter(p => p.paymentStatus === 'HUTANG').reduce((s, p) => s + p.total, 0).toLocaleString()}`} color="text-red-600" bg="bg-red-50" icon={CreditCard} isWide />
       </div>
 
       {/* Filter & Search */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4">
+      <div className="bg-white p-4 md:p-6 rounded-[2rem] shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
           <input
-            className="w-full bg-gray-50 pl-12 pr-6 py-3 md:py-4 rounded-2xl text-xs font-bold outline-none"
-            placeholder="Cari Supplier atau ID PO..."
+            className="w-full bg-gray-50 pl-11 pr-6 py-2.5 md:py-3 rounded-xl text-[11px] font-bold outline-none"
+            placeholder="Cari Supplier / PO..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select
-          className="bg-gray-50 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">Semua Status</option>
-          <option value="MENUNGGU">Menunggu</option>
-          <option value="DITERIMA">Diterima</option>
-          <option value="DIBATALKAN">Dibatalkan</option>
-        </select>
-        <select
-          className="bg-gray-50 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          value={paymentFilter}
-          onChange={(e) => setPaymentFilter(e.target.value)}
-        >
-          <option value="all">Semua Pembayaran</option>
-          <option value="LUNAS">Lunas</option>
-          <option value="HUTANG">Hutang</option>
-          <option value="DP">DP</option>
-        </select>
-        <input
-          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          placeholder="Filter Supplier"
-          value={supplierFilter}
-          onChange={(e) => setSupplierFilter(e.target.value)}
-        />
-        <input
-          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          placeholder="Filter Gudang"
-          value={warehouseFilter}
-          onChange={(e) => setWarehouseFilter(e.target.value)}
-        />
-        <input
-          type="date"
-          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-        <input
-          type="date"
-          className="bg-gray-50 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
+        <div className="grid grid-cols-2 md:flex gap-2">
+          <select
+            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase outline-none border-none"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">Status</option>
+            <option value="MENUNGGU">Menunggu</option>
+            <option value="DITERIMA">Diterima</option>
+          </select>
+          <select
+            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase outline-none border-none"
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+          >
+            <option value="all">Bayar</option>
+            <option value="LUNAS">Lunas</option>
+            <option value="HUTANG">Hutang</option>
+          </select>
+        </div>
       </div>
 
       {/* Purchases Table */}
@@ -421,16 +397,16 @@ export default function AdminPurchases() {
            </div>
         ) : (
           filteredPurchases.map((purchase) => (
-            <div key={purchase.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+            <div key={purchase.id} className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-3">
                <div className="flex justify-between items-start">
                   <div>
-                     <span className="text-xs font-black text-gray-800 uppercase italic">#{purchase.id.slice(-6)}</span>
-                     <div className="flex items-center gap-1 mt-1 text-gray-400">
-                        <Calendar size={12} />
-                        <span className="text-[10px] font-bold uppercase">{new Date(purchase.createdAt).toLocaleDateString('id-ID')}</span>
+                     <span className="text-[10px] font-black text-gray-800 uppercase italic">#{purchase.id.slice(-6)}</span>
+                     <div className="flex items-center gap-1 mt-0.5 text-gray-400">
+                        <Calendar size={10} />
+                        <span className="text-[9px] font-bold uppercase">{new Date(purchase.createdAt).toLocaleDateString('id-ID')}</span>
                      </div>
                   </div>
-                   <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-xl border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
+                   <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg border ${purchase.status === 'DITERIMA' ? 'bg-green-50 text-green-600 border-green-100' :
                       purchase.status === 'MENUNGGU' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
                         'bg-red-50 text-red-600 border-red-100'
                       }`}>
@@ -438,52 +414,50 @@ export default function AdminPurchases() {
                     </span>
                </div>
 
-               <div className="space-y-2 pt-2 border-t border-gray-50">
-                  <div>
-                     <p className="text-[10px] font-bold text-gray-400 uppercase">Supplier</p>
-                     <p className="text-xs font-black text-gray-800 uppercase tracking-tight">{purchase.supplierName}</p>
+               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50">
+                  <div className="col-span-2">
+                     <p className="text-[9px] font-bold text-gray-400 uppercase">Supplier</p>
+                     <p className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{purchase.supplierName}</p>
                   </div>
-                  <div className="flex justify-between">
-                      <div>
-                         <p className="text-[10px] font-bold text-gray-400 uppercase">Gudang</p>
-                         <p className="text-xs font-bold text-gray-600 uppercase">{purchase.warehouseName}</p>
-                      </div>
-                       <div className="text-right">
-                         <p className="text-[10px] font-bold text-gray-400 uppercase">Items</p>
-                         <p className="text-xs font-bold text-blue-500 uppercase">{purchase.items.length} Items</p>
-                      </div>
+                  <div>
+                     <p className="text-[9px] font-bold text-gray-400 uppercase">Gudang</p>
+                     <p className="text-[11px] font-bold text-gray-600 uppercase truncate">{purchase.warehouseName}</p>
+                  </div>
+                   <div className="text-right">
+                     <p className="text-[9px] font-bold text-gray-400 uppercase">Items</p>
+                     <p className="text-[11px] font-bold text-blue-500 uppercase">{purchase.items.length} SKUs</p>
                   </div>
                </div>
 
-               <div className="bg-gray-50 p-3 rounded-xl flex justify-between items-center">
+               <div className="bg-gray-50 px-3 py-2 rounded-xl flex justify-between items-center">
                    <div>
-                       <p className="text-[10px] font-bold text-gray-400 uppercase">Total</p>
-                       <p className="text-sm font-black text-gray-900">Rp {purchase.total.toLocaleString()}</p>
+                       <p className="text-[9px] font-bold text-gray-400 uppercase">Total</p>
+                       <p className="text-xs font-black text-gray-900">Rp {purchase.total.toLocaleString()}</p>
                    </div>
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${purchase.paymentStatus === 'LUNAS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                       }`}>
                       {purchase.paymentStatus}
                     </span>
                </div>
 
-               <div className="flex gap-2 pt-2">
+               <div className="flex gap-1.5 pt-1.5">
                   {purchase.status === 'MENUNGGU' && (
                     <>
-                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="flex-1 p-2 bg-green-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-green-100">
-                        <CheckCircle2 size={16} />
+                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="flex-1 py-2 bg-green-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+                        <CheckCircle2 size={14} />
                       </button>
-                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="flex-1 p-2 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
-                        <XCircle size={16} />
+                      <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="flex-1 py-2 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
+                        <XCircle size={14} />
                       </button>
                     </>
                   )}
-                  <Link href={`/admin/purchases/${purchase.id}`} className="flex-1 p-2 bg-gray-100 text-gray-400 rounded-xl flex items-center justify-center hover:bg-black hover:text-white transition-all">
-                     <span className="text-[10px] font-bold uppercase mr-2">Detail</span>
-                     <ChevronRight size={16} />
+                  <Link href={`/admin/purchases/${purchase.id}`} className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center hover:bg-black hover:text-white transition-all">
+                     <span className="text-[9px] font-bold uppercase mr-1.5">Info</span>
+                     <ChevronRight size={14} />
                   </Link>
                   {purchase.paymentStatus === 'HUTANG' && (
-                    <button onClick={() => openPaymentModal(purchase)} className="p-2 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
-                      <CreditCard size={16} />
+                    <button onClick={() => openPaymentModal(purchase)} className="py-2 px-3 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+                      <CreditCard size={14} />
                     </button>
                   )}
                </div>
@@ -712,12 +686,12 @@ function PaymentModal({ isOpen, onClose, purchase, onConfirm }: PaymentModalProp
 
 function StatCard({ label, val, color, bg, icon: Icon, isWide }: StatCardProps) {
   return (
-    <div className={`p-6 rounded-[2rem] ${bg} ${color} border border-transparent hover:border-current transition-all flex flex-col gap-3 ${isWide ? 'md:col-span-2' : ''}`}>
+    <div className={`p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] ${bg} ${color} border border-transparent hover:border-current transition-all flex flex-col gap-2 ${isWide ? 'lg:col-span-2' : ''}`}>
       <div className="flex justify-between items-start">
-        <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{label}</span>
-        <Icon size={16} />
+        <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest opacity-60">{label}</span>
+        <Icon size={14} className="md:size-4" />
       </div>
-      <span className="text-xl font-black tracking-tighter uppercase">{val}</span>
+      <span className="text-sm md:text-xl font-black tracking-tighter uppercase truncate">{val}</span>
     </div>
   );
 }

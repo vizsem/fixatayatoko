@@ -452,106 +452,105 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-4 md:p-6">
+    <div className="min-h-screen bg-slate-50/50 p-3 md:p-8">
       <Toaster position="top-right" />
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 mb-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">Order Management</h1>
-          <p className="text-slate-500 text-[11px] font-medium">Kelola pesanan masuk & status pengiriman</p>
+          <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight mb-0">Order Management</h1>
+          <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none">Transaction & Delivery Pipeline</p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 text-slate-600 transition-all">
-             <LayoutDashboard size={20} />
+        <div className="flex items-center gap-1.5 font-sans">
+          <Link href="/admin" className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm hover:bg-slate-50 text-slate-400 transition-all">
+             <LayoutDashboard size={16} />
           </Link>
           <button 
             onClick={handleCleanupOldData}
             disabled={isDeleting}
-            className="flex items-center gap-2 px-5 py-3 bg-white border border-rose-100 text-rose-600 rounded-xl font-bold text-xs shadow-sm hover:bg-rose-50 transition-all"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-50 text-rose-500 rounded-xl font-black text-[8px] uppercase tracking-widest shadow-sm hover:bg-rose-50 transition-all"
           >
-             {isDeleting ? <RefreshCcw className="animate-spin" size={16} /> : <Trash2 size={16} />}
-             <span>Bersihkan Data Lama (&gt;90 Hari)</span>
+             {isDeleting ? <RefreshCcw className="animate-spin" size={12} /> : <Trash2 size={12} />}
+             <span>Cleanup Legacy</span>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards (Optional Summary) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-2 mb-4">
         {[
-          { label: 'Menunggu', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
-          { label: 'Diproses', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Dikirim', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Selesai', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Wait', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
+          { label: 'Process', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Ship', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Done', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white p-3 md:p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
-             <span className={`text-xl font-black ${stat.color} mb-0.5`}>{stat.count}</span>
-             <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider font-sans">{stat.label}</span>
+          <div key={stat.label} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+             <span className={`text-base font-black ${stat.color} leading-none`}>{stat.count}</span>
+             <span className="text-[7px] font-black uppercase text-slate-400 tracking-tighter mt-0.5">{stat.label}</span>
           </div>
         ))}
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-white p-1.5 md:p-2 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-center gap-2">
-        <div className="relative w-full md:max-w-xs">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+      <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-50 mb-3 flex flex-col md:flex-row items-center gap-1.5">
+        <div className="relative w-full md:max-w-[200px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
           <input
             type="text"
-            placeholder="Cari ID / Nama Pelanggan..."
-            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:bg-slate-100 transition-all"
+            placeholder="Search..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 outline-none"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
         </div>
 
-        <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
+        <div className="h-6 w-px bg-slate-100 hidden md:block mx-1"></div>
 
-        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar p-0.5">
+        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar">
           {['SEMUA', 'MENUNGGU', 'DIPROSES', 'DIKIRIM', 'SELESAI'].map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab as any); setCurrentPage(1); }}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all whitespace-nowrap ${
                 activeTab === tab 
-                  ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' 
-                  : 'text-slate-500 hover:bg-slate-50'
+                  ? 'bg-slate-900 text-white shadow-md' 
+                  : 'text-slate-400 hover:bg-slate-50'
               }`}
             >
               {tab}
               {tab === 'MENUNGGU' && orders.filter(o => o.status === 'MENUNGGU').length > 0 && (
-                <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === tab ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-600'}`}>
+                <span className={`ml-1 px-1 py-0.5 rounded-md text-[8px] ${activeTab === tab ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'}`}>
                   {orders.filter(o => o.status === 'MENUNGGU').length}
                 </span>
               )}
             </button>
           ))}
           
-          <div className="h-6 w-px bg-slate-200 mx-2 self-center shrink-0"></div>
+          <div className="h-5 w-px bg-slate-200 mx-1 self-center shrink-0"></div>
           
           <select 
             value={paymentStatusFilter}
             onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1); }}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-50 border-none text-slate-600 outline-none shrink-0 cursor-pointer hover:bg-slate-100 transition-colors"
+            className="px-3 py-2 rounded-xl text-[9px] font-black bg-slate-50 border-none text-slate-600 outline-none shrink-0 cursor-pointer uppercase tracking-tighter"
           >
-            <option value="ALL">Semua Pembayaran</option>
-            <option value="PAID">Lunas</option>
-            <option value="UNPAID">Belum Lunas</option>
+            <option value="ALL">ALL PMT</option>
+            <option value="PAID">PAID</option>
+            <option value="UNPAID">UNPAID</option>
           </select>
         </div>
 
-        <div className="h-8 w-px bg-slate-100 hidden md:block mx-2"></div>
-        <div className="flex items-center gap-2">
+        <div className="h-6 w-px bg-slate-100 hidden md:block mx-1"></div>
+        <div className="flex items-center gap-1.5">
           <input
             type="date"
-            className="px-3 py-2 rounded-xl bg-slate-50 text-xs font-bold outline-none"
+            className="px-2 py-1.5 rounded-lg bg-slate-50 text-[9px] font-black outline-none border-none"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
           />
-          <span className="text-slate-400 text-xs">s/d</span>
           <input
             type="date"
-            className="px-3 py-2 rounded-xl bg-slate-50 text-xs font-bold outline-none"
+            className="px-2 py-1.5 rounded-lg bg-slate-50 text-[9px] font-black outline-none border-none"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
           />
@@ -559,14 +558,14 @@ export default function AdminOrders() {
         
         <button
           onClick={handleSelectAll}
-          className={`shrink-0 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`shrink-0 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight flex items-center gap-1.5 transition-all ${
             currentItems.length > 0 && currentItems.every(id => selectedOrders.includes(id.id))
-            ? 'bg-emerald-100 text-emerald-700'
-            : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+            ? 'bg-emerald-50 text-emerald-600'
+            : 'bg-slate-50 text-slate-500'
           }`}
         >
-          <CheckCircle2 size={16} />
-          <span className="hidden md:inline">Pilih Semua</span>
+          <CheckCircle2 size={12} />
+          <span className="hidden md:inline">SELECT ALL</span>
         </button>
       </div>
 
@@ -589,68 +588,68 @@ export default function AdminOrders() {
           currentItems.map((order) => (
             <div
               key={order.id}
-              className={`group bg-white rounded-2xl p-3 md:p-4 border transition-all hover:shadow-md hover:border-slate-200 relative overflow-hidden ${
-                selectedOrders.includes(order.id) ? 'border-slate-900 ring-1 ring-slate-900 bg-slate-50/50' : 'border-slate-100'
+              className={`group bg-white rounded-xl p-2 md:p-2.5 border transition-all ${
+                selectedOrders.includes(order.id) ? 'border-slate-900 bg-slate-50/50' : 'border-slate-50'
               }`}
             >
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-6 relative z-10">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 relative z-10">
                 {/* Checkbox */}
                 <button 
                   onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} 
-                  className="mt-0.5 md:mt-0 text-slate-300 hover:text-slate-900 transition-colors"
+                  className="text-slate-200 shrink-0"
                 >
-                  {selectedOrders.includes(order.id) ? <CheckSquare size={18} className="text-slate-900" /> : <Square size={18} />}
+                  {selectedOrders.includes(order.id) ? <CheckSquare size={14} className="text-slate-900" /> : <Square size={14} />}
                 </button>
-
+                
                 {/* Status Icon */}
-                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
-                  <ShoppingCart size={14} className={getStatusColor(order.status).split(' ')[1]} />
+                <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
+                  <ShoppingCart size={11} className={getStatusColor(order.status).split(' ')[1]} />
                 </div>
 
                 {/* Order Details */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-black text-[10px] text-slate-900 uppercase tracking-wide">#{order.id.substring(0, 8)}</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border ${getStatusColor(order.status)}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="font-black text-[8px] text-slate-900 uppercase">#{order.id.substring(0, 8)}</span>
+                    <span className={`text-[7px] px-1.5 py-0.5 rounded-md font-black uppercase border ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-sm md:text-base truncate mb-1">{order.customerName || 'Pelanggan Umum'}</h3>
-                  <div className="flex items-center gap-3 md:gap-4 text-[10px] md:text-xs font-medium text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar size={12} />
-                      {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                  <h3 className="font-black text-slate-800 text-[10px] md:text-[11px] uppercase truncate leading-tight">{order.customerName || 'GENERAL CUSTOMER'}</h3>
+                  <div className="flex items-center gap-2.5 text-[8px] font-bold text-slate-400 mt-0.5">
+                    <div className="flex items-center gap-1 uppercase">
+                      <Calendar size={9} />
+                      {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Clock size={12} />
+                    <div className="flex items-center gap-1 uppercase">
+                      <Clock size={9} />
                       {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </div>
                   </div>
                 </div>
 
                 {/* Amount & Method */}
-                <div className="flex flex-col md:items-end gap-0 pl-11 md:pl-0 border-l-0 md:border-l-0 border-slate-100">
-                  <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Tagihan</span>
-                  <span className="text-sm md:text-base font-black text-slate-900">Rp {order.total.toLocaleString('id-ID')}</span>
-                  <div className="flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-slate-100 rounded-md w-fit">
-                    <Truck size={10} className="text-slate-500" />
-                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">{order.deliveryMethod?.replace(/_/g, ' ') || 'KURIR'}</span>
+                <div className="flex flex-col md:items-end gap-0">
+                  <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Billing</span>
+                  <span className="text-[11px] md:text-xs font-black text-slate-900 leading-tight">Rp {order.total.toLocaleString('id-ID')}</span>
+                  <div className="flex items-center gap-1 mt-0.5 px-1 py-0.5 bg-slate-50 border border-slate-100 rounded-md w-fit">
+                    <Truck size={9} className="text-slate-400" />
+                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-tight leading-none">{order.deliveryMethod?.replace(/_/g, ' ') || 'STORE'}</span>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1.5 w-full md:w-auto mt-2 md:mt-0 pt-2.5 md:pt-0 border-t md:border-t-0 border-slate-100">
+                <div className="flex items-center gap-1 w-full md:w-auto mt-1.5 md:mt-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-slate-50">
                   <Link
                     href={`/admin/orders/${order.id}`}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-slate-900 text-white hover:bg-emerald-600 px-3 py-2 rounded-lg text-[9px] md:text-[10px] font-black uppercase transition-all shadow-md shadow-slate-200"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-slate-900 text-white px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all shadow-sm"
                   >
-                    Detail <ChevronRight size={10} />
+                    Detail <ChevronRight size={9} />
                   </Link>
                   <button
                     onClick={() => handlePrint(order.id)}
-                    className="p-2 bg-white text-slate-400 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-900 transition-all"
+                    className="p-1.5 text-slate-300 hover:text-slate-900 transition-all shrink-0"
                   >
-                    <Printer size={14} />
+                    <Printer size={12} />
                   </button>
                 </div>
               </div>
