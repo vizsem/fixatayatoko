@@ -593,64 +593,64 @@ export default function AdminOrders() {
                 selectedOrders.includes(order.id) ? 'border-slate-900 ring-1 ring-slate-900 bg-slate-50/50' : 'border-slate-100'
               }`}
             >
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-6 relative z-10">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-6 relative z-10">
                 {/* Checkbox */}
                 <button 
                   onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} 
-                  className="mt-1 md:mt-0 text-slate-300 hover:text-slate-900 transition-colors"
+                  className="mt-0.5 md:mt-0 text-slate-300 hover:text-slate-900 transition-colors"
                 >
-                  {selectedOrders.includes(order.id) ? <CheckSquare size={20} className="text-slate-900" /> : <Square size={20} />}
+                  {selectedOrders.includes(order.id) ? <CheckSquare size={18} className="text-slate-900" /> : <Square size={18} />}
                 </button>
 
                 {/* Status Icon */}
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
-                  <ShoppingCart size={16} className={getStatusColor(order.status).split(' ')[1]} />
+                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
+                  <ShoppingCart size={14} className={getStatusColor(order.status).split(' ')[1]} />
                 </div>
 
                 {/* Order Details */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="font-black text-xs text-slate-900 uppercase tracking-wide">#{order.id.substring(0, 8)}</span>
-                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide border ${getStatusColor(order.status)}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-black text-[10px] text-slate-900 uppercase tracking-wide">#{order.id.substring(0, 8)}</span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-base truncate mb-1">{order.customerName || 'Pelanggan Umum'}</h3>
-                  <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar size={14} />
+                  <h3 className="font-bold text-slate-800 text-sm md:text-base truncate mb-1">{order.customerName || 'Pelanggan Umum'}</h3>
+                  <div className="flex items-center gap-3 md:gap-4 text-[10px] md:text-xs font-medium text-slate-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar size={12} />
                       {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={14} />
+                    <div className="flex items-center gap-1">
+                      <Clock size={12} />
                       {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </div>
                   </div>
                 </div>
 
                 {/* Amount & Method */}
-                <div className="flex flex-col md:items-end gap-0.5 pl-12 md:pl-0 border-l md:border-l-0 border-slate-100">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Tagihan</span>
-                  <span className="text-base font-black text-slate-900">Rp {order.total.toLocaleString('id-ID')}</span>
-                  <div className="flex items-center gap-1.5 mt-1 px-2 py-1 bg-slate-100 rounded-lg w-fit">
-                    <Truck size={12} className="text-slate-500" />
-                    <span className="text-[10px] font-bold text-slate-600 uppercase">{order.deliveryMethod?.replace(/_/g, ' ') || 'KURIR'}</span>
+                <div className="flex flex-col md:items-end gap-0 pl-11 md:pl-0 border-l-0 md:border-l-0 border-slate-100">
+                  <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Tagihan</span>
+                  <span className="text-sm md:text-base font-black text-slate-900">Rp {order.total.toLocaleString('id-ID')}</span>
+                  <div className="flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-slate-100 rounded-md w-fit">
+                    <Truck size={10} className="text-slate-500" />
+                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">{order.deliveryMethod?.replace(/_/g, ' ') || 'KURIR'}</span>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
+                <div className="flex items-center gap-1.5 w-full md:w-auto mt-2 md:mt-0 pt-2.5 md:pt-0 border-t md:border-t-0 border-slate-100">
                   <Link
                     href={`/admin/orders/${order.id}`}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-emerald-600 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all shadow-md shadow-slate-200"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-slate-900 text-white hover:bg-emerald-600 px-3 py-2 rounded-lg text-[9px] md:text-[10px] font-black uppercase transition-all shadow-md shadow-slate-200"
                   >
-                    Detail <ChevronRight size={12} />
+                    Detail <ChevronRight size={10} />
                   </Link>
                   <button
                     onClick={() => handlePrint(order.id)}
-                    className="p-2.5 bg-white text-slate-400 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-900 transition-all"
+                    className="p-2 bg-white text-slate-400 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-900 transition-all"
                   >
-                    <Printer size={16} />
+                    <Printer size={14} />
                   </button>
                 </div>
               </div>

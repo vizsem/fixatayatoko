@@ -192,22 +192,22 @@ export default function WarehousesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBFBFE] p-4 lg:p-10">
+    <div className="min-h-screen bg-[#FBFBFE] p-3 md:p-6">
       <Toaster position="top-right" />
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
-            <WarehouseIcon size={22} />
+          <div className="p-2.5 bg-green-50 text-green-600 rounded-2xl">
+            <WarehouseIcon size={20} />
           </div>
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-800">Warehouse Hub</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Distribusi & Kapasitas Stok Real-time</p>
+            <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-gray-800">Warehouse Hub</h1>
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Distribusi & Kapasitas Stok Real-time</p>
           </div>
         </div>
         <Link
           href="/admin/warehouses/add"
-          className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg active:scale-95"
+          className="bg-black text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg active:scale-95"
         >
           <Plus size={16} />
           Tambah Gudang
@@ -221,18 +221,18 @@ export default function WarehousesPage() {
       )}
 
       {/* Grid Stats Singkat */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Unit Gudang</p>
-          <p className="text-2xl font-black text-gray-800">{warehouses.length}</p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6">
+        <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm">
+          <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Total Gudang</p>
+          <p className="text-xl md:text-2xl font-black text-gray-800">{warehouses.length}</p>
         </div>
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Kapasitas Terpakai</p>
-          <p className="text-2xl font-black text-green-600">{warehouses.reduce((a, b) => a + b.usedCapacity, 0).toLocaleString()} <span className="text-xs text-gray-300 uppercase">Unit</span></p>
+        <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm">
+          <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Unit Terpakai</p>
+          <p className="text-xl md:text-2xl font-black text-green-600">{warehouses.reduce((a, b) => a + b.usedCapacity, 0).toLocaleString()} <span className="text-[10px] text-gray-300 uppercase font-bold">Unit</span></p>
         </div>
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Status Operasional</p>
-          <p className="text-2xl font-black text-blue-600">{warehouses.filter(w => w.isActive).length} <span className="text-xs text-gray-300 uppercase">Aktif</span></p>
+        <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm col-span-2 md:col-span-1">
+          <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Operasional</p>
+          <p className="text-xl md:text-2xl font-black text-blue-600">{warehouses.filter(w => w.isActive).length} <span className="text-[10px] text-gray-300 uppercase font-bold">Aktif</span></p>
         </div>
       </div>
 
@@ -346,13 +346,13 @@ export default function WarehousesPage() {
             const rate = utilizationRate(warehouse.usedCapacity, warehouse.capacity);
             const isCritical = rate >= 90;
             return (
-              <div key={warehouse.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+              <div key={warehouse.id} className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-3">
                  <div className="flex justify-between items-start">
                     <div>
-                       <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight uppercase">{warehouse.name}</h3>
-                       <div className="flex items-center gap-1 mt-1 text-gray-400">
-                          <MapPin size={12} />
-                          <span className="text-[10px] font-bold uppercase">{warehouse.location}</span>
+                       <h3 className="text-xs font-black text-gray-800 tracking-tight leading-tight uppercase">{warehouse.name}</h3>
+                       <div className="flex items-center gap-1 mt-0.5 text-gray-400">
+                          <MapPin size={10} />
+                          <span className="text-[9px] font-bold uppercase">{warehouse.location}</span>
                        </div>
                     </div>
                     <span className={`px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest uppercase flex items-center gap-1 ${warehouse.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -361,34 +361,34 @@ export default function WarehousesPage() {
                     </span>
                  </div>
                  
-                 <div className="space-y-2 pt-2 border-t border-gray-50">
+                 <div className="space-y-1.5 pt-1.5 border-t border-gray-50">
                     <div className="flex justify-between items-end">
-                       <span className="text-[10px] font-bold text-gray-400 uppercase">Kapasitas</span>
-                       <span className={`text-[10px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
+                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Kapasitas</span>
+                       <span className={`text-[9px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
                           {rate}%
                        </span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
                        <div
                           className={`h-full rounded-full transition-all duration-1000 ease-out ${isCritical ? 'bg-red-500' : 'bg-green-500'}`}
                           style={{ width: `${rate}%` }}
                        ></div>
                     </div>
-                    <div className="flex justify-between text-[10px] font-bold text-gray-600">
-                       <span>{warehouse.usedCapacity.toLocaleString()} Unit</span>
+                    <div className="flex justify-between text-[9px] font-bold text-gray-600">
+                       <span className="tracking-tight">{warehouse.usedCapacity.toLocaleString()} Unit</span>
                        <span className="text-gray-300">/ {warehouse.capacity.toLocaleString()}</span>
                     </div>
                  </div>
 
-                 <div className="flex gap-2 pt-2">
-                    <Link href={`/admin/warehouses/mutasi/${warehouse.id}`} className="flex-1 p-2 bg-purple-50 rounded-xl text-purple-600 flex items-center justify-center">
-                       <ArrowRightLeft size={16} />
+                 <div className="flex gap-1.5 pt-1.5">
+                    <Link href={`/admin/warehouses/mutasi/${warehouse.id}`} className="flex-1 py-2 bg-purple-50 rounded-xl text-purple-600 flex items-center justify-center">
+                       <ArrowRightLeft size={14} />
                     </Link>
-                    <Link href={`/admin/warehouses/edit/${warehouse.id}`} className="flex-1 p-2 bg-blue-50 rounded-xl text-blue-600 flex items-center justify-center">
-                       <Edit size={16} />
+                    <Link href={`/admin/warehouses/edit/${warehouse.id}`} className="flex-1 py-2 bg-blue-50 rounded-xl text-blue-600 flex items-center justify-center">
+                       <Edit size={14} />
                     </Link>
-                    <button onClick={() => handleDelete(warehouse.id, warehouse.name, warehouse.usedCapacity)} className="flex-1 p-2 bg-red-50 rounded-xl text-red-500 flex items-center justify-center">
-                       <Trash2 size={16} />
+                    <button onClick={() => handleDelete(warehouse.id, warehouse.name, warehouse.usedCapacity)} className="flex-1 py-2 bg-red-50 rounded-xl text-red-500 flex items-center justify-center">
+                       <Trash2 size={14} />
                     </button>
                  </div>
               </div>

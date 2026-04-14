@@ -41,7 +41,7 @@ interface DailySales {
 
 const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600" }: { icon: LucideIcon; title: string; description: string; href: string; color?: string }) => (
   <Link href={href} className="group block h-full">
-    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all h-full flex flex-col items-center text-center">
+    <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all h-full flex flex-col items-center text-center">
       <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-sm`}>
         <Icon size={20} />
       </div>
@@ -52,9 +52,9 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
 );
 
 const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string, value: string | number, icon: LucideIcon, color: string, bg: string, trend?: string }) => (
-  <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
-    <div className={`absolute top-0 right-0 p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500`}>
-      <Icon size={80} className={color.replace('text-', 'fill-')} />
+  <div className="bg-white p-3.5 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
+    <div className={`absolute top-0 right-0 p-3 md:p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500`}>
+      <Icon size={70} className={color.replace('text-', 'fill-')} />
     </div>
     <div className="flex justify-between items-start mb-3 z-10">
       <div className={`${bg} ${color} p-2.5 rounded-xl shadow-inner`}>
@@ -274,7 +274,7 @@ export default function AdminDashboard() {
   const maxChartValue = Math.max(...salesChartData.map(d => d.amount), 1);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50/50 p-3 md:p-6 font-sans text-gray-900">
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
@@ -299,7 +299,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
         <StatBox 
           label="Total Pendapatan (Bulan Ini)" 
           value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`} 
@@ -331,12 +331,12 @@ export default function AdminDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-8">
           
           {/* Sales Chart Section */}
-          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Statistik Penjualan</h3>
@@ -373,7 +373,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Orders Section */}
-          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-gray-900">Pesanan Terbaru</h3>
               <Link href="/admin/orders" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
@@ -428,7 +428,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Top Products Widget */}
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+          <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-gray-900">Produk Terlaris</h3>
               <MoreHorizontal size={16} className="text-gray-400" />

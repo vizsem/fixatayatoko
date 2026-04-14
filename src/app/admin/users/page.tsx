@@ -169,17 +169,17 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-8 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-center" />
       {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
-            <Users size={22} />
+          <div className="p-2.5 bg-green-50 text-green-600 rounded-2xl">
+            <Users size={20} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">User Management</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Akses & peran pengguna sistem</p>
+            <h1 className="text-xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">User Management</h1>
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Akses & peran pengguna sistem</p>
           </div>
         </div>
       </div>
@@ -192,57 +192,57 @@ export default function AdminUsers() {
       )}
 
       {/* Ringkasan Role */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center">
-            <Shield className="text-red-600 mr-2" size={24} />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <Shield className="text-red-600" size={20} />
             <div>
-              <p className="text-sm text-black">Admin</p>
-              <p className="font-bold text-black">
+              <p className="text-[10px] text-gray-400 font-bold uppercase">Admin</p>
+              <p className="font-black text-gray-800">
                 {users.filter(u => u.role === 'admin').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center">
-            <UserCheck className="text-emerald-600 mr-2" size={24} />
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <UserCheck className="text-emerald-600" size={20} />
             <div>
-              <p className="text-sm text-black">HR</p>
-              <p className="font-bold text-black">
+              <p className="text-[10px] text-gray-400 font-bold uppercase">HR</p>
+              <p className="font-black text-gray-800">
                 {users.filter(u => u.role === 'hr').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center">
-            <Shield className="text-indigo-600 mr-2" size={24} />
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <Shield className="text-indigo-600" size={20} />
             <div>
-              <p className="text-sm text-black">Supervisor</p>
-              <p className="font-bold text-black">
+              <p className="text-[10px] text-gray-400 font-bold uppercase">Spv</p>
+              <p className="font-black text-gray-800">
                 {users.filter(u => u.role === 'supervisor').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center">
-            <UserCheck className="text-blue-600 mr-2" size={24} />
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <UserCheck className="text-blue-600" size={20} />
             <div>
-              <p className="text-sm text-black">Kasir</p>
-              <p className="font-bold text-black">
+              <p className="text-[10px] text-gray-400 font-bold uppercase">Kasir</p>
+              <p className="font-black text-gray-800">
                 {users.filter(u => u.role === 'cashier').length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center">
-            <User className="text-gray-600 mr-2" size={24} />
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <User className="text-gray-600" size={20} />
             <div>
-              <p className="text-sm text-black">Pelanggan</p>
-              <p className="font-bold text-black">
+              <p className="text-[10px] text-gray-400 font-bold uppercase">Pelanggan</p>
+              <p className="font-black text-gray-800">
                 {users.filter(u => u.role === 'user').length}
               </p>
             </div>
@@ -348,13 +348,13 @@ export default function AdminUsers() {
           </div>
         ) : (
           users.map(user => (
-            <div key={user.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+            <div key={user.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-3">
                <div className="flex justify-between items-start">
                   <div>
                      <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{user.name}</h3>
-                     <p className="text-xs text-gray-500 font-medium mt-1">{user.email}</p>
+                     <p className="text-[11px] text-gray-500 font-medium mt-0.5">{user.email}</p>
                      <div className="mt-2">
-                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest flex items-center gap-1 w-fit ${getRoleColor(user.role)}`}>
+                        <span className={`px-2 py-0.5 text-[9px] font-black rounded-full tracking-widest flex items-center gap-1 w-fit ${getRoleColor(user.role)}`}>
                            {getRoleIcon(user.role)}
                            {user.role.toUpperCase()}
                         </span>
@@ -362,26 +362,26 @@ export default function AdminUsers() {
                   </div>
                   {user.id !== currentUser && (
                     <button onClick={() => handleDeleteUser(user.id, user.name)} className="p-2 bg-red-50 rounded-xl text-red-500">
-                       <UserX size={16} />
+                       <UserX size={14} />
                     </button>
                   )}
                </div>
                
-               <div className="space-y-3 pt-3 border-t border-gray-50">
-                  <div className="flex items-center gap-3 text-xs text-gray-600">
+               <div className="space-y-2 pt-2 border-t border-gray-50">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600">
                      <div className="p-1.5 bg-gray-50 text-gray-600 rounded-lg">
-                        <Phone size={12} />
+                        <Phone size={10} />
                      </div>
                      <span className="font-medium">{user.phone || '-'}</span>
                   </div>
                   
                   {user.id !== currentUser && (
-                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl">
-                       <span className="text-xs font-bold text-gray-500">Ubah Role:</span>
+                    <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-xl">
+                       <span className="text-[10px] font-bold text-gray-500">ROLE:</span>
                        <select
                           value={user.role}
                           onChange={(e) => handleUpdateRole(user.id, e.target.value as UserDoc['role'])}
-                          className="text-xs font-bold border-none bg-white rounded-lg px-2 py-1 shadow-sm focus:ring-0"
+                          className="text-[10px] font-black border-none bg-white rounded-lg px-2 py-1 shadow-sm focus:ring-0 uppercase"
                         >
                           <option value="admin">Admin</option>
                           <option value="hr">HR</option>
@@ -393,8 +393,8 @@ export default function AdminUsers() {
                   )}
                   
                   <div className="flex justify-end">
-                     <span className="text-[10px] font-bold text-gray-300">
-                        Terdaftar: {new Date(user.createdAt).toLocaleDateString('id-ID')}
+                     <span className="text-[9px] font-bold text-gray-300 uppercase tracking-tighter">
+                        Sejak: {new Date(user.createdAt).toLocaleDateString('id-ID')}
                      </span>
                   </div>
                </div>

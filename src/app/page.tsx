@@ -984,53 +984,53 @@ export default function Home() {
       </main>
 
       {/* ✅ MENU TAMBAHAN: TENTANG & KONTAK + ADMIN & KASIR */}
-      <footer className="mt-16 bg-gray-900 text-white pt-16 pb-24 md:pb-16 rounded-t-[3rem] px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+      <footer className="mt-12 md:mt-16 bg-gray-900 text-white pt-10 md:pt-16 pb-20 md:pb-16 rounded-t-[2.5rem] md:rounded-t-[3rem] px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12 mb-8 md:mb-12">
           {/* Brand & Deskripsi */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-black tracking-tighter text-green-400">ATAYATOKO</h2>
-            <p className="text-gray-400 text-sm leading-relaxed">
+          <div className="space-y-3 md:space-y-4">
+            <h2 className="text-xl md:text-2xl font-black tracking-tighter text-green-400 uppercase">ATAYATOKO</h2>
+            <p className="text-gray-400 text-[13px] md:text-sm leading-relaxed max-w-sm">
               Pusat belanja sembako grosir dan eceran termurah di Kediri. Melayani pengiriman cepat langsung ke depan pintu Anda.
             </p>
           </div>
 
           {/* Kontak & Lokasi */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Hubungi Kami</h3>
-            <div className="space-y-3">
+          <div className="space-y-3 md:space-y-4">
+            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Hubungi Kami</h3>
+            <div className="space-y-2 md:space-y-3">
               <a href="https://wa.me/6285853161174" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-gray-300 hover:text-green-400 transition-colors">
-                <div className="p-2 bg-gray-800 rounded-lg"><Phone size={16} /></div>
-                <span>0858-5316-1174</span>
+                <div className="p-1.5 bg-gray-800 rounded-lg"><Phone size={14} /></div>
+                <span className="text-[13px] md:text-sm">0858-5316-1174</span>
               </a>
               <div className="flex items-start gap-3 text-sm text-gray-300">
-                <div className="p-2 bg-gray-800 rounded-lg shrink-0"><MapPin size={16} /></div>
-                <span>Kediri, Jawa Timur<br/>Indonesia</span>
+                <div className="p-1.5 bg-gray-800 rounded-lg shrink-0"><MapPin size={14} /></div>
+                <span className="text-[13px] md:text-sm">Kediri, Jawa Timur, Indonesia</span>
               </div>
             </div>
           </div>
 
           {/* Jam Operasional & Kebijakan */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Layanan Pelanggan</h3>
-            <ul className="space-y-3 text-sm text-gray-300">
-              <li className="flex items-center gap-2"><Clock size={14} className="text-gray-500" /> Buka Setiap Hari (08:00 - 21:00)</li>
-              <li className="flex items-center gap-2"><Truck size={14} className="text-gray-500" /> Gratis Ongkir (S&K Berlaku)</li>
-              <li className="flex items-center gap-2"><ShieldCheck size={14} className="text-gray-500" /> Garansi Retur Barang Rusak</li>
+          <div className="space-y-3 md:space-y-4">
+            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Layanan Pelanggan</h3>
+            <ul className="space-y-2 md:space-y-3 text-[13px] md:text-sm text-gray-300">
+              <li className="flex items-center gap-2"><Clock size={12} className="text-gray-500" /> Buka Setiap Hari (08:00 - 21:00)</li>
+              <li className="flex items-center gap-2"><Truck size={12} className="text-gray-500" /> Gratis Ongkir (S&K Berlaku)</li>
+              <li className="flex items-center gap-2"><ShieldCheck size={12} className="text-gray-500" /> Garansi Retur Barang Rusak</li>
             </ul>
           </div>
 
           {/* Tautan Internal */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-4">Internal</h3>
-            <ul className="space-y-3">
+          <div className="space-y-3 md:space-y-4">
+            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Internal</h3>
+            <ul className="space-y-2 md:space-y-3">
               <li>
-                <Link href="/profil/login" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
-                  <ShieldCheck size={14} /> Panel Admin
+                <Link href="/profil/login" className="text-[13px] md:text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                  <ShieldCheck size={12} /> Panel Admin
                 </Link>
               </li>
               <li>
-                <Link href="/cashier" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
-                  <Printer size={14} /> Sistem Kasir
+                <Link href="/cashier" className="text-[13px] md:text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                  <Printer size={12} /> Sistem Kasir
                 </Link>
               </li>
             </ul>
@@ -1038,10 +1038,10 @@ export default function Home() {
         </div>
 
         {/* Copyright */}
-        <div className="max-w-7xl mx-auto border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-          <p className="text-xs font-bold text-gray-500">© {new Date().getFullYear()} ATAYATOKO. All rights reserved.</p>
+        <div className="max-w-7xl mx-auto border-t border-gray-800 pt-6 md:pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <p className="text-[10px] md:text-xs font-bold text-gray-500 tracking-tight">© {new Date().getFullYear()} ATAYATOKO. All rights reserved.</p>
           <div className="flex gap-4">
-            <span className="text-xs font-bold text-gray-600">Aman & Terpercaya</span>
+            <span className="text-[10px] md:text-xs font-bold text-gray-600">Aman & Terpercaya</span>
           </div>
         </div>
       </footer>

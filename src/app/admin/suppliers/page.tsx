@@ -186,26 +186,26 @@ export default function AdminSuppliers() {
 
   return (
     <ErrorBoundary>
-      <div className="p-4 md:p-8 bg-gray-50 min-h-screen text-black">
+    <div className="p-3 md:p-8 bg-gray-50 min-h-screen text-black">
       <Toaster position="top-right" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-            <ArrowLeft size={20} />
+          <button onClick={() => router.back()} className="p-2 md:p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+            <ArrowLeft size={16} />
           </button>
           <div>
-            <div className="p-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 rounded-2xl shadow-2xl inline-flex">
-              <Users size={22} />
+            <div className="p-2 md:p-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 rounded-2xl shadow-sm md:shadow-2xl inline-flex mb-1 md:mb-0">
+              <Users size={18} />
             </div>
-            <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Manajemen Supplier</h1>
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Kelola database pemasok toko</p>
+            <h1 className="text-xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">Suppliers</h1>
+            <p className="text-[9px] md:text-sm font-semibold text-gray-400 md:text-gray-500 uppercase tracking-wide">Database Pemasok</p>
           </div>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-sm font-bold uppercase tracking-wide shadow-2xl flex items-center gap-2 transition-all hover:scale-[1.02]"
+          className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-5 py-2.5 rounded-2xl text-[10px] md:text-sm font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 transition-all hover:scale-[1.02]"
         >
-          <Plus size={16} /> Tambah Supplier
+          <Plus size={14} /> Tambah Supplier
         </button>
       </div>
 
@@ -218,22 +218,14 @@ export default function AdminSuppliers() {
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
           <input
             type="text"
             placeholder="Cari supplier..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-black outline-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-black outline-none"
           />
-        </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 border border-orange-200 px-6 py-3 rounded-[1.5rem] text-sm font-bold uppercase tracking-wide shadow-2xl flex items-center gap-2 transition-all hover:scale-[1.02]"
-            >
-              <Plus size={16} /> Tambah
-            </button>
         </div>
       </div>
 
@@ -351,53 +343,53 @@ export default function AdminSuppliers() {
           </div>
         ) : (
           pageItems.map(supplier => (
-            <div key={supplier.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
+            <div key={supplier.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-3">
                <div className="flex justify-between items-start">
-                  <div>
-                     <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight">{supplier.name}</h3>
-                     <p className="text-xs text-gray-500 font-medium mt-1">{supplier.contactPerson}</p>
-                     <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest bg-blue-100 text-blue-700 uppercase">
+                  <div className="flex-1 min-w-0">
+                     <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight truncate">{supplier.name}</h3>
+                     <p className="text-[11px] text-gray-400 font-bold uppercase mt-0.5">{supplier.contactPerson}</p>
+                     <div className="flex items-center gap-1.5 mt-2">
+                        <span className="px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest bg-orange-50 text-orange-700 uppercase">
                            {supplier.category || 'Umum'}
                         </span>
                         {supplier.unit && (
-                          <span className="px-2 py-0.5 text-[10px] font-black rounded-full tracking-widest bg-gray-100 text-gray-600 uppercase">
+                          <span className="px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest bg-gray-100 text-gray-500 uppercase">
                              {supplier.unit}
                           </span>
                         )}
                      </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                      <button onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)} className="p-2 bg-blue-50 rounded-xl text-blue-600">
-                        <Edit size={16} />
+                        <Edit size={14} />
                      </button>
                      <button onClick={() => handleDelete(supplier.id, supplier.name)} className="p-2 bg-red-50 rounded-xl text-red-500">
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                      </button>
                   </div>
                </div>
                
                <div className="space-y-2 pt-2 border-t border-gray-50">
-                  <div className="flex items-center gap-3 text-xs text-gray-600">
-                     <div className="p-1.5 bg-green-50 text-green-600 rounded-lg">
-                        <Phone size={12} />
+                  <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
+                     <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
+                        <Phone size={10} />
                      </div>
-                     <span className="font-medium">{supplier.phone}</span>
+                     <span className="font-bold">{supplier.phone}</span>
                   </div>
                   {supplier.email && (
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
-                       <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                          <Mail size={12} />
+                    <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
+                       <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
+                          <Mail size={10} />
                        </div>
                        <span className="font-medium truncate">{supplier.email}</span>
                     </div>
                   )}
                   {supplier.address && (
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
-                       <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg">
-                          <MapPin size={12} />
+                    <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
+                       <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
+                          <MapPin size={10} />
                        </div>
-                       <span className="font-medium line-clamp-2">{supplier.address}</span>
+                       <span className="font-medium line-clamp-1">{supplier.address}</span>
                     </div>
                   )}
                </div>
