@@ -50,24 +50,65 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
     return () => unsub();
   }, []);
 
-  // 2. Fetch Chat Threads (Real-time)
+  // 2. Fetch Chat Threads (Real-time) with Notifications
   useEffect(() => {
     const q = query(
       collection(db, 'chats'),
       orderBy('lastMessageTime', 'desc')
     );
 
+    let previousThreads: ChatThread[] = [];
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const threadsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as ChatThread[];
+
+      // Check for new messages and send notifications
+      if (previousThreads.length > 0) {
+        threadsData.forEach(newThread => {
+          const oldThread = previousThreads.find(t => t.id === newThread.id);
+          
+          // If there's a new message from customer (not admin)
+          if (oldThread && 
+              newThread.lastMessage !== oldThread.lastMessage &&
+              !newThread.isReadByAdmin) {
+            
+            // Show browser notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(`Pesan baru dari ${newThread.userInfo.name}`, {
+                body: newThread.lastMessage,
+                icon: '/icon-192x192.png',
+                badge: '/badge-72x72.png',
+                tag: `chat-${newThread.id}`,
+              });
+            }
+
+            // Play notification sound
+            const audio = new Audio('/notification.mp3');
+            audio.play().catch(() => {
+              // Ignore audio errors
+            });
+
+            // Send push notification to other admins
+            if (userRole === 'admin') {
+              import('@/lib/pushNotificationService').then(({ sendChatMessagePush }) => {
+                // Get other admin IDs and notify them
+                // This would require fetching list of active admins
+              }).catch(console.error);
+            }
+          }
+        });
+      }
+
+      previousThreads = threadsData;
       setThreads(threadsData);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userRole]);
 
   // 3. Fetch Messages for Selected Thread
   useEffect(() => {

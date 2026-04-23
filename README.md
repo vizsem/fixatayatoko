@@ -1,6 +1,6 @@
 # Marketpleace - Sistem Manajemen Marketplace
 
-Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, inventory, penjualan, dan laporan.
+Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, inventory, penjualan, notifikasi multi-channel, dan real-time chat support.
 
 ## 🚀 Fitur Utama
 
@@ -12,6 +12,7 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 - ✅ Manajemen Pengguna & Karyawan
 - ✅ Laporan Keuangan & Penjualan
 - ✅ Manajemen Pesanan & Pembelian
+- ✅ **Real-time Chat Support** - Komunikasi langsung dengan pelanggan
 
 ### Customer Features
 - ✅ Pencarian dan Filter Produk
@@ -19,6 +20,13 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 - ✅ Sistem Poin & Reward
 - ✅ Wishlist & Favorit
 - ✅ Riwayat Transaksi
+- ✅ **Floating Chat Button** - Chat customer support kapan saja
+
+### Notification System
+- ✅ **Email Notifications** - Order confirmation, password reset, shipping updates
+- ✅ **SMS Notifications** - OTP, order updates, payment reminders
+- ✅ **Push Notifications (FCM)** - Real-time notifications di browser/mobile
+- ✅ **Multi-channel Delivery** - Kirim melalui email, SMS, atau push notification
 
 ### Teknologi
 - **Framework**: Next.js 16.1.1 dengan App Router
@@ -26,7 +34,7 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 - **Authentication**: Firebase Auth
 - **Styling**: Tailwind CSS
 - **Testing**: Vitest, Playwright
-- **Notifications**: React Hot Toast
+- **Notifications**: React Hot Toast, Nodemailer, Twilio, FCM
 - **PWA**: Next-PWA
 - **Error Tracking**: Sentry
 - **Code Quality**: ESLint, Prettier, Husky, Commitlint
@@ -36,6 +44,8 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 ### Prerequisites
 - Node.js 18+
 - Firebase Project
+- Email Service (Gmail SMTP atau lainnya)
+- SMS Service (Twilio)
 - Environment Variables
 
 ### Installation
@@ -60,6 +70,7 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
    
    Isi variabel environment di `.env.local`:
    ```env
+   # Firebase Configuration (Client-side)
    NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
@@ -70,15 +81,51 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
    # Firebase Admin (untuk server-side operations)
    FIREBASE_ADMIN_CLIENT_EMAIL=your_admin_email
    FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   
+   # Email Configuration (SMTP)
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=your-email@gmail.com
+   SMTP_PASS=your-app-password
+   SMTP_FROM_EMAIL=noreply@atayatoko.com
+   
+   # SMS Configuration (Twilio)
+   TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   TWILIO_AUTH_TOKEN=your_auth_token
+   TWILIO_PHONE_NUMBER=+1234567890
+   
+   # Application URL
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
 4. **Setup Firebase**
    - Buat project di [Firebase Console](https://console.firebase.google.com)
-   - Enable Authentication, Firestore Database, Storage
+   - Enable Authentication, Firestore Database, Storage, Cloud Messaging
    - Tambahkan web app dan dapatkan config
    - Download service account key untuk admin operations
+   - Generate Web Push Certificate untuk FCM
 
-5. **Run development server**
+5. **Setup Email (Gmail Example)**
+   - Enable 2-Factor Authentication di Google Account
+   - Generate App Password: https://myaccount.google.com/apppasswords
+   - Gunakan App Password di `SMTP_PASS`
+
+6. **Setup SMS (Twilio)**
+   - Daftar di https://www.twilio.com/
+   - Beli phone number
+   - Get Account SID dan Auth Token dari Console
+
+7. **Test Notifications**
+   ```bash
+   # Test email
+   npm run test:email
+   
+   # Test SMS
+   npm run test:sms
+   ```
+
+8. **Run development server**
    ```bash
    npm run dev
    ```
@@ -93,222 +140,264 @@ src/
 │   │   ├── inventory/     # Manajemen Inventory
 │   │   ├── orders/        # Manajemen Pesanan
 │   │   ├── reports/       # Laporan
-│   │   └── settings/      # Pengaturan
+│   │   ├── settings/      # Pengaturan
+│   │   └── chat/          # Admin Chat Interface
 │   ├── cart/              # Keranjang Belanja
 │   ├── products/          # Halaman Produk
 │   ├── profil/            # Autentikasi User
+│   ├── chat/              # Customer Chat Page
 │   └── api/               # API Routes
 ├── components/            # Shared Components
-│   ├── ErrorBoundary.tsx  # React Error Boundary
-│   ├── LoadingFallback.tsx # Loading State Components
-│   └── ...
-├── lib/                   # Utilities & Services
-│   ├── firebase.ts        # Firebase Configuration
-│   ├── auth.ts           # Authentication Helpers
-│   ├── notify.ts         # Notification System
-│   └── types.ts          # TypeScript Definitions
+│   ├── AdminChatInterface.tsx    # Admin chat UI
+│   ├── CustomerChat.tsx          # Customer chat UI
+│   ├── FloatingChatButton.tsx    # Floating chat widget
+│   ├── ErrorBoundary.tsx         # React error boundary
+│   └── LoadingFallback.tsx       # Loading states
+├── lib/                   # Business Logic & Services
+│   ├── emailService.ts           # Email notifications
+│   ├── smsService.ts             # SMS notifications
+│   ├── pushNotificationService.ts # FCM push notifications
+│   ├── notificationService.ts    # Unified notification layer
+│   ├── inventory.ts              # Inventory management
+│   ├── ledger.ts                 # Accounting
+│   └── types.ts                  # TypeScript types
 ├── utils/                 # Utility Functions
-│   └── retry.ts          # Retry Mechanism with Exponential Backoff
-└── test/                  # Test Setup
-    └── setup.ts
-scripts/
-├── migrate.js            # Database Migration Script
-├── seed-database.js      # Comprehensive Seeding Script
-├── backup.js             # Backup Script
-└── restore.js            # Restore Script
-docs/
-├── BACKUP_STRATEGY.md    # Backup & Recovery Documentation
-└── DEVELOPER_TOOLS.md    # Developer Tools Documentation
+│   └── retry.ts                  # Retry mechanism
+└── hooks/                 # Custom React Hooks
 ```
 
-## 🧪 Testing
+## 🔔 Notification System
 
-### Unit Tests
+### Email Notifications
+- Order confirmation
+- Password reset
+- Shipping updates
+- Order delivered
+- Welcome emails
+
+**Usage:**
+```typescript
+import { sendOrderConfirmation } from '@/lib/emailService';
+
+await sendOrderConfirmation({
+  id: 'ORDER123',
+  customerEmail: 'customer@example.com',
+  customerName: 'John Doe',
+  total: 150000,
+  items: [...],
+  paymentStatus: 'LUNAS'
+});
+```
+
+### SMS Notifications
+- Order confirmation
+- OTP verification
+- Payment reminders
+- Shipping updates
+
+**Usage:**
+```typescript
+import { sendOTPSMS } from '@/lib/smsService';
+
+await sendOTPSMS('+6281234567890', '123456');
+```
+
+### Push Notifications (FCM)
+- Real-time order updates
+- Chat message notifications
+- Promotional campaigns
+
+**Usage:**
+```typescript
+import { sendOrderConfirmationPush } from '@/lib/pushNotificationService';
+
+await sendOrderConfirmationPush(userId, order);
+```
+
+### Unified Notification Service
+Kirim melalui multiple channels sekaligus:
+
+```typescript
+import notificationService from '@/lib/notificationService';
+
+const results = await notificationService.sendOrderConfirmationNotification({
+  id: 'ORDER123',
+  userId: 'user-uid',
+  customerEmail: 'customer@example.com',
+  customerPhone: '+6281234567890',
+  customerName: 'John Doe',
+  total: 150000,
+  items: [...],
+  paymentStatus: 'LUNAS'
+});
+
+// Results: { email: true, sms: true, push: true }
+```
+
+## 💬 Chat System
+
+### Customer Chat
+- Floating chat button di bottom-right corner
+- Real-time messaging dengan admin
+- Image upload support (coming soon)
+- Responsive design (mobile & desktop)
+- Modal interface untuk quick access
+
+### Admin Chat Interface
+- Multi-thread management
+- Real-time message updates
+- Browser notifications untuk pesan baru
+- Sound alerts
+- Unread message tracking
+- Search conversations
+
+**Access:**
+- Customers: Klik floating chat button atau kunjungi `/chat`
+- Admins: Kunjungi `/admin/chat`
+
+## 📊 Testing & Quality
+
+### Run Tests
 ```bash
-npm test           # Run all tests in watch mode
-npm run test:unit  # Run unit tests once
-```
+# Unit tests
+npm run test:unit
 
-### E2E Tests
-```bash
-npm run test:e2e   # Run Playwright tests
-```
+# E2E tests
+npm run test:e2e
 
-### Coverage
-```bash
-npm run test:unit -- --coverage  # Generate coverage report
-```
+# Test coverage
+npm run test:coverage
 
-## 🔧 Developer Tools
+# Test email configuration
+npm run test:email
+
+# Test SMS configuration
+npm run test:sms
+```
 
 ### Code Quality
-
-#### Prettier - Code Formatter
 ```bash
-npm run format        # Format all files
-npm run format:check  # Check formatting
+# Linting
+npm run lint
+
+# Type checking
+npm run typecheck
+
+# Format code
+npm run format
+
+# Check formatting
+npm run format:check
 ```
 
-#### ESLint - Linter
+## 🗄️ Database Management
+
+### Migrations
 ```bash
-npm run lint          # Run linter
-npm run lint:fix      # Auto-fix issues
+# Run pending migrations
+npm run migrate up
+
+# Rollback last migration
+npm run migrate down
+
+# Check migration status
+npm run migrate status
 ```
 
-#### Pre-commit Hooks (Husky + lint-staged)
-Otomatis run linter dan formatter sebelum commit:
+### Seeding
 ```bash
-git add .
-git commit -m "feat: add new feature"
-# Husky akan auto-run lint-staged
+# Seed all data
+npm run seed all
+
+# Seed specific collection
+npm run seed categories
+npm run seed products
+
+# Clear collection
+npm run seed clear products
+
+# Clear all (dangerous!)
+CONFIRM_CLEAR_ALL=yes npm run seed clear-all
 ```
 
-#### Conventional Commits (Commitlint)
-Format commit message yang enforced:
+### Backup & Restore
 ```bash
-git commit -m "feat: add retry mechanism"
-git commit -m "fix(purchases): handle error gracefully"
-git commit -m "docs: update README"
+# Full backup
+npm run backup:full
+
+# Backup specific collections
+npm run backup:collection users orders products
+
+# Restore from backup
+npm run restore all ./backups/2026-04-24_12-00-00/
 ```
-
-**Types**: feat, fix, docs, style, refactor, test, chore, perf, ci, build
-
----
-
-### Database Management
-
-#### Migrations
-```bash
-npm run migrate up      # Run pending migrations
-npm run migrate down    # Rollback last migration
-npm run migrate status  # Check migration status
-```
-
-#### Seeding
-```bash
-npm run seed all                # Seed all data
-npm run seed products           # Seed products only
-npm run seed categories         # Seed categories only
-npm run seed clear products     # Clear specific collection
-```
-
-#### Backup & Restore
-```bash
-# Backup
-npm run backup:full                          # Backup all collections
-npm run backup:collection products orders    # Backup specific collections
-
-# Restore
-npm run restore products ./backups/.../products.json
-npm run restore all ./backups/2024-01-15_14-30-00/
-```
-
-📖 **Lengkap**: Lihat [Developer Tools Documentation](./docs/DEVELOPER_TOOLS.md) dan [Backup Strategy](./docs/BACKUP_STRATEGY.md)
-
----
 
 ## 🚀 Deployment
 
-### Production Build
+### Build for Production
 ```bash
 npm run build
 npm start
 ```
 
-### Firestore Rules
-Project ini menggunakan `firestore.rules` untuk membatasi akses:
-- User hanya bisa membaca pesanan miliknya sendiri.
-- User tidak bisa mengubah status pembayaran (diupdate oleh server/webhook).
-
-Jika kamu memakai Firebase CLI:
+### Deploy to Vercel
 ```bash
-firebase deploy --only firestore:rules
+vercel --prod
 ```
 
-### Environment Variables Production
-Pastikan semua environment variables sudah diset untuk production:
-- `NEXT_PUBLIC_*` variables untuk frontend
-- Firebase service account untuk backend
+### Firebase Rules & Indexes
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
 
-## 📊 Scripts Available
+## 📚 Documentation
 
-### Development
-- `npm run dev` - Development server
-- `npm run build` - Production build
-- `npm run start` - Production server
+- **[Notification & Chat System](docs/NOTIFICATION_AND_CHAT_SYSTEM.md)** - Complete guide untuk notifikasi dan chat
+- **[Developer Tools](docs/DEVELOPER_TOOLS.md)** - Developer tools dan utilities
+- **[Backup Strategy](docs/BACKUP_STRATEGY.md)** - Backup dan recovery procedures
+- **[Contributing Guide](CONTRIBUTING.md)** - Cara berkontribusi ke project
 
-### Code Quality
-- `npm run lint` - ESLint checking
-- `npm run lint:fix` - Auto-fix linting issues
-- `npm run format` - Format code with Prettier
-- `npm run format:check` - Check code formatting
-- `npm run typecheck` - TypeScript type checking
+## 🔧 Scripts Reference
 
-### Testing
-- `npm test` - Run all tests in watch mode
-- `npm run test:unit` - Run unit tests once
-- `npm run test:e2e` - Run E2E tests
-
-### Database
-- `npm run migrate up` - Run database migrations
-- `npm run migrate down` - Rollback migrations
-- `npm run migrate status` - Check migration status
-- `npm run seed all` - Seed database with sample data
-- `npm run backup:full` - Backup all collections
-- `npm run restore` - Restore from backup
-
-## 🔧 Configuration
-
-### Firebase Setup
-1. Enable Email/Password authentication
-2. Setup Firestore Database rules
-3. Configure Storage security rules
-4. Setup Indexes untuk query yang kompleks
-
-### PWA Configuration
-Project sudah configured sebagai PWA dengan:
-- Offline support
-- Push notifications
-- Install to home screen
-
-### Error Handling
-- **React Error Boundary**: Menangkap runtime errors di komponen
-- **Retry Mechanism**: Automatic retry untuk failed API calls dengan exponential backoff
-- **Sentry Integration**: Error tracking dan monitoring
-- **User-friendly Fallbacks**: Loading states dan error UI yang informatif
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript type check |
+| `npm run format` | Format code with Prettier |
+| `npm run test:unit` | Run unit tests |
+| `npm run test:e2e` | Run E2E tests |
+| `npm run test:email` | Test email configuration |
+| `npm run test:sms` | Test SMS configuration |
+| `npm run migrate up` | Run database migrations |
+| `npm run seed all` | Seed database with sample data |
+| `npm run backup:full` | Backup all collections |
+| `npm run restore` | Restore from backup |
 
 ## 🤝 Contributing
 
-1. Fork the project
+Kami menerima kontribusi! Silakan baca [Contributing Guide](CONTRIBUTING.md) untuk detailnya.
+
+1. Fork repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run quality checks:
-   ```bash
-   npm run lint:fix
-   npm run format
-   npm run typecheck
-   npm run test:unit
-   ```
-5. Commit dengan conventional commits:
-   ```bash
-   git commit -m "feat: add amazing feature"
-   ```
-6. Push to branch (`git push origin feature/amazing-feature`)
-7. Open Pull Request
+3. Commit changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-## 📝 License
+## 📄 License
 
-This project is licensed under the MIT License - see LICENSE file for details.
+Project ini dilisensikan di bawah MIT License - lihat file [LICENSE](LICENSE) untuk detailnya.
 
-## 🆘 Support
+## 👥 Support
 
-Untuk pertanyaan dan support:
-- Buat issue di GitHub
-- Email: support@marketpleace.com
-- Documentation: 
-  - [Developer Tools Guide](./docs/DEVELOPER_TOOLS.md)
-  - [Backup Strategy](./docs/BACKUP_STRATEGY.md)
+Untuk pertanyaan atau bantuan:
+- 📖 Baca dokumentasi di folder `docs/`
+- 🐛 Report issues di GitHub Issues
+- 💬 Diskusi di GitHub Discussions
 
 ---
 
-**Dibangun dengan ❤️ menggunakan Next.js, Firebase, dan modern developer tools**
+**Dibuat dengan ❤️ oleh ATAYATOKO Team**

@@ -7,6 +7,7 @@ import FCMManager from '@/components/FCMManager';
 import CustomerChatWidget from '@/components/CustomerChatWidget';
 import AuthBootstrap from '@/components/AuthBootstrap';
 import BuyerHeaderActions from '@/components/BuyerHeaderActions';
+import FloatingChatButton from '@/components/FloatingChatButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 declare global {
@@ -91,6 +92,7 @@ export default function RootLayout({
           <AuthBootstrap />
           <FCMManager />
           <CustomerChatWidget />
+          <FloatingChatButton />
           <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
             <BuyerHeaderActions />
           </div>
