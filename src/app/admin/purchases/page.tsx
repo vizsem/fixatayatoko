@@ -153,13 +153,23 @@ export default function AdminPurchases() {
   }, [loading]);
 
   const updatePurchaseStatus = async (id: string, newStatus: Purchase['status']) => {
+    console.log('updatePurchaseStatus called:', { id, newStatus });
+    
     const confirmMsg = newStatus === 'DITERIMA'
       ? 'Konfirmasi barang diterima? Stok akan bertambah otomatis.'
       : 'Batalkan transaksi ini?';
 
-    if (!confirm(confirmMsg)) return;
+    if (!confirm(confirmMsg)) {
+      console.log('User cancelled confirmation');
+      return;
+    }
 
+    console.log('User confirmed, processing...');
+    
     try {
+      // Show loading notification
+      notify.admin.info(newStatus === 'DITERIMA' ? 'Memproses konfirmasi...' : 'Membatalkan transaksi...');
+      
       await runTransaction(db, async (tx) => {
         // STEP 1: READ ALL DATA FIRST (before any writes)
         
@@ -530,10 +540,28 @@ export default function AdminPurchases() {
                   <div className="flex items-center justify-end gap-1.5">
                     {purchase.status === 'MENUNGGU' && (
                       <div className="flex gap-1.5">
-                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DITERIMA')} className="p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('Confirm button clicked for:', purchase.id);
+                            updatePurchaseStatus(purchase.id, 'DITERIMA');
+                          }} 
+                          className="p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-100 cursor-pointer active:scale-95"
+                          title="Konfirmasi barang diterima"
+                        >
                           <CheckCircle2 size={12} />
                         </button>
-                        <button onClick={() => updatePurchaseStatus(purchase.id, 'DIBATALKAN')} className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('Cancel button clicked for:', purchase.id);
+                            updatePurchaseStatus(purchase.id, 'DIBATALKAN');
+                          }} 
+                          className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all cursor-pointer active:scale-95"
+                          title="Batalkan pembelian"
+                        >
                           <XCircle size={12} />
                         </button>
                       </div>
@@ -542,7 +570,16 @@ export default function AdminPurchases() {
                       <ChevronRight size={14} />
                     </Link>
                     {purchase.paymentStatus === 'HUTANG' && (
-                      <button onClick={() => openPaymentModal(purchase)} className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Payment button clicked for:', purchase.id);
+                          openPaymentModal(purchase);
+                        }} 
+                        className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 cursor-pointer active:scale-95"
+                        title="Catat pembayaran"
+                      >
                         <CreditCard size={12} />
                       </button>
                     )}
