@@ -281,7 +281,6 @@ export default function AdminPurchases() {
 
       notify.admin.success(newStatus === 'DITERIMA' ? 'Pembelian dikonfirmasi, stok bertambah' : 'Pembelian dibatalkan');
     } catch (err: any) {
-      console.error(err);
       notify.admin.error(err.message || 'Gagal update status');
     }
   };
@@ -337,7 +336,6 @@ export default function AdminPurchases() {
       notify.admin.success('Pembayaran berhasil dicatat.');
       setPaymentModalOpen(false);
     } catch (error: any) {
-      console.error("Error processing payment: ", error);
       notify.admin.error(error.message || 'Gagal memproses pembayaran.');
     }
   };
