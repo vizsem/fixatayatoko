@@ -24,7 +24,6 @@ import {
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
 import notify from '@/lib/notify';
-import { addStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 import { Toaster } from 'react-hot-toast';
 
@@ -171,7 +170,9 @@ export default function AdminPurchases() {
       notify.admin.info(newStatus === 'DITERIMA' ? 'Memproses konfirmasi...' : 'Membatalkan transaksi...');
       
       await runTransaction(db, async (tx) => {
+        // ============================================
         // STEP 1: READ ALL DATA FIRST (before any writes)
+        // ============================================
         
         // 1. Idempotency Check
         const keyRef = doc(db, 'action_keys', `purchase:${id}:${newStatus}`);
@@ -202,7 +203,9 @@ export default function AdminPurchases() {
           }
         }
 
+        // ============================================
         // STEP 2: PROCESS ALL WRITES AFTER ALL READS
+        // ============================================
         
         if (newStatus === 'DITERIMA') {
           for (const item of pData.items) {
@@ -229,18 +232,14 @@ export default function AdminPurchases() {
 
             const whKey = pData.warehouseId || 'gudang-utama';
             
-            // Atomic Stock Add
-            await addStockTx(tx, {
-              productId: item.id,
-              amount: incomingQtyPcs,
-              warehouseId: whKey,
-              adminId: auth.currentUser?.uid || 'system',
-              note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
-              source: 'PURCHASE'
-            });
-
-            // Atomic Cost Update (Merged)
+            // Manual stock update (replacing addStockTx to avoid interleaved reads)
+            const stockByWarehouse: Record<string, number> = curData.stockByWarehouse || {};
+            const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
+            nextByWarehouse[whKey] = Number(nextByWarehouse[whKey] || 0) + incomingQtyPcs;
+            
             tx.update(productRef, {
+              stock: newStock,
+              stockByWarehouse: nextByWarehouse,
               purchasePrice: nextAvgCost,
               Modal: nextAvgCost,
               hargaBeli: nextAvgCost,
@@ -253,6 +252,22 @@ export default function AdminPurchases() {
                 supplierName: pData.supplierName || '',
                 warehouseId: whKey
               })
+            });
+
+            // Manual inventory log creation (replacing addStockTx logging)
+            const logRef = doc(collection(db, 'inventory_logs'));
+            tx.set(logRef, {
+              productId: item.id,
+              productName: curData.name || curData.Nama || 'Produk',
+              type: 'MASUK',
+              amount: incomingQtyPcs,
+              adminId: auth.currentUser?.uid || 'system',
+              source: 'PURCHASE',
+              note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
+              toWarehouseId: whKey,
+              prevStock: currentStock,
+              nextStock: newStock,
+              date: serverTimestamp()
             });
           }
 
