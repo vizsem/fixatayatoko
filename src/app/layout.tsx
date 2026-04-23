@@ -7,6 +7,7 @@ import FCMManager from '@/components/FCMManager';
 import CustomerChatWidget from '@/components/CustomerChatWidget';
 import AuthBootstrap from '@/components/AuthBootstrap';
 import BuyerHeaderActions from '@/components/BuyerHeaderActions';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 declare global {
   interface Window {
@@ -85,16 +86,18 @@ export default function RootLayout({
       </head>
 
       <body className="antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <Toaster position="top-center" />
-        <AuthBootstrap />
-        <FCMManager />
-        <CustomerChatWidget />
-        <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
-          <BuyerHeaderActions />
-        </div>
-        {children}
-        <MobileNav />
-        <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
+        <ErrorBoundary>
+          <Toaster position="top-center" />
+          <AuthBootstrap />
+          <FCMManager />
+          <CustomerChatWidget />
+          <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
+            <BuyerHeaderActions />
+          </div>
+          {children}
+          <MobileNav />
+          <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
+        </ErrorBoundary>
       </body>
     </html>
   );
