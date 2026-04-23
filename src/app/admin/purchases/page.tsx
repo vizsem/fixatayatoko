@@ -152,8 +152,6 @@ export default function AdminPurchases() {
     })();
   }, [loading]);
 
-
-
   const updatePurchaseStatus = async (id: string, newStatus: Purchase['status']) => {
     const confirmMsg = newStatus === 'DITERIMA'
       ? 'Konfirmasi barang diterima? Stok akan bertambah otomatis.'
@@ -163,6 +161,8 @@ export default function AdminPurchases() {
 
     try {
       await runTransaction(db, async (tx) => {
+        // STEP 1: READ ALL DATA FIRST (before any writes)
+        
         // 1. Idempotency Check
         const keyRef = doc(db, 'action_keys', `purchase:${id}:${newStatus}`);
         const keySnap = await tx.get(keyRef);
@@ -176,58 +176,74 @@ export default function AdminPurchases() {
 
         if (pData.status !== 'MENUNGGU') throw new Error('Status transaksi bukan MENUNGGU.');
 
-        // 3. Process Logic
+        // 3. Collect all product reads first (if DITERIMA)
+        const productReads: Map<string, { ref: any; data: any }> = new Map();
         if (newStatus === 'DITERIMA') {
           for (const item of pData.items) {
             const productRef = doc(db, 'products', item.id);
             const prodSnap = await tx.get(productRef);
             
             if (prodSnap.exists()) {
-              const curData = prodSnap.data() as Record<string, any>;
-              const currentStock = Number(curData.stock || curData.Stok || 0);
-              const conversion = Number(item.conversion || 1);
-              const qtyInUnit = Number(item.quantity || 0);
-              const pricePerUnit = Number(item.purchasePrice || 0);
-              
-              const incomingQtyPcs = qtyInUnit * conversion;
-              const incomingCostPerPcs = conversion > 0 ? (pricePerUnit / conversion) : pricePerUnit;
-              
-              const currentCostPerPcs = Number(curData.Modal || curData.purchasePrice || 0);
-              const effectiveOldCost = currentCostPerPcs > 0 ? currentCostPerPcs : incomingCostPerPcs;
-              
-              const newStock = currentStock + incomingQtyPcs;
-              const nextAvgCost = currentStock === 0
-                ? Math.round(incomingCostPerPcs)
-                : Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock);
-
-              const whKey = pData.warehouseId || 'gudang-utama';
-              
-              // Atomic Stock Add
-              await addStockTx(tx, {
-                productId: item.id,
-                amount: incomingQtyPcs,
-                warehouseId: whKey,
-                adminId: auth.currentUser?.uid || 'system',
-                note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
-                source: 'PURCHASE'
-              });
-
-              // Atomic Cost Update (Merged)
-              tx.update(productRef, {
-                purchasePrice: nextAvgCost,
-                Modal: nextAvgCost,
-                hargaBeli: nextAvgCost,
-                updatedAt: serverTimestamp(),
-                inventoryLayers: arrayUnion({
-                  qty: incomingQtyPcs,
-                  costPerPcs: incomingCostPerPcs,
-                  ts: Timestamp.now(),
-                  purchaseId: id,
-                  supplierName: pData.supplierName || '',
-                  warehouseId: whKey
-                })
+              productReads.set(item.id, {
+                ref: productRef,
+                data: prodSnap.data()
               });
             }
+          }
+        }
+
+        // STEP 2: PROCESS ALL WRITES AFTER ALL READS
+        
+        if (newStatus === 'DITERIMA') {
+          for (const item of pData.items) {
+            const productRead = productReads.get(item.id);
+            if (!productRead) continue;
+            
+            const productRef = productRead.ref;
+            const curData = productRead.data as Record<string, any>;
+            const currentStock = Number(curData.stock || curData.Stok || 0);
+            const conversion = Number(item.conversion || 1);
+            const qtyInUnit = Number(item.quantity || 0);
+            const pricePerUnit = Number(item.purchasePrice || 0);
+            
+            const incomingQtyPcs = qtyInUnit * conversion;
+            const incomingCostPerPcs = conversion > 0 ? (pricePerUnit / conversion) : pricePerUnit;
+            
+            const currentCostPerPcs = Number(curData.Modal || curData.purchasePrice || 0);
+            const effectiveOldCost = currentCostPerPcs > 0 ? currentCostPerPcs : incomingCostPerPcs;
+            
+            const newStock = currentStock + incomingQtyPcs;
+            const nextAvgCost = currentStock === 0
+              ? Math.round(incomingCostPerPcs)
+              : Math.round(((currentStock * effectiveOldCost) + (qtyInUnit * pricePerUnit)) / newStock);
+
+            const whKey = pData.warehouseId || 'gudang-utama';
+            
+            // Atomic Stock Add
+            await addStockTx(tx, {
+              productId: item.id,
+              amount: incomingQtyPcs,
+              warehouseId: whKey,
+              adminId: auth.currentUser?.uid || 'system',
+              note: `Penerimaan Barang PO #${id} (${item.quantity} ${item.unit})`,
+              source: 'PURCHASE'
+            });
+
+            // Atomic Cost Update (Merged)
+            tx.update(productRef, {
+              purchasePrice: nextAvgCost,
+              Modal: nextAvgCost,
+              hargaBeli: nextAvgCost,
+              updatedAt: serverTimestamp(),
+              inventoryLayers: arrayUnion({
+                qty: incomingQtyPcs,
+                costPerPcs: incomingCostPerPcs,
+                ts: Timestamp.now(),
+                purchaseId: id,
+                supplierName: pData.supplierName || '',
+                warehouseId: whKey
+              })
+            });
           }
 
           // DOUBLE ENTRY: Terima Barang (Inventory bertambah, tapi Hutang/Kas berkurang)
