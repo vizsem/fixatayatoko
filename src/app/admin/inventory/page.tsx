@@ -26,7 +26,7 @@ import {
   Box, Search, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw,
   ClipboardCheck, Package, Warehouse, ChevronRight,
   ChevronLeft, ScanBarcode, Image as ImageIcon, Trash2,
-  LucideIcon, BarChart3, CheckSquare, Square, Check, X, MapPinned, FolderInput, EyeOff
+  LucideIcon, BarChart3, CheckSquare, Square, Check, X, MapPinned, FolderInput, EyeOff, GitCompare
 } from 'lucide-react';
 
 import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
@@ -249,6 +249,7 @@ export default function InventoryDashboard() {
         <NavCard icon={ArrowUpRight} label="Out" href={`/admin/inventory/stock-out?ids=${selectedIds.join(',')}`} color="text-red-600" bg="bg-red-50" />
         <NavCard icon={RefreshCw} label="TF" href={`/admin/inventory/transfer?ids=${selectedIds.join(',')}`} color="text-blue-600" bg="bg-blue-50" />
         <NavCard icon={ClipboardCheck} label="Op" href="/admin/inventory/opname" color="text-purple-600" bg="bg-purple-50" />
+        <NavCard icon={GitCompare} label="Rec" href="/admin/inventory/reconciliation" color="text-teal-600" bg="bg-teal-50" />
         <NavCard icon={BarChart3} label="Sync" href="/admin/inventory/sync-monitor" color="text-indigo-600" bg="bg-indigo-50" />
         <NavCard icon={Box} label="Log" href="/admin/inventory/history" color="text-orange-600" bg="bg-orange-50" />
       </div>
