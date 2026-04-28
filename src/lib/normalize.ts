@@ -24,6 +24,8 @@ export type NormalizedProduct = {
   units?: UnitOption[];
   updatedAt?: number;
   createdAt?: number;
+  minWholesaleQty?: number;
+  Modal?: number;
 };
 
 export function normalizeProduct(id: string, raw: Record<string, unknown>): NormalizedProduct {
@@ -87,6 +89,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
 
   const rawUnits = (raw as Record<string, unknown>).units;
   result.units = parseUnits(rawUnits, unit, priceEcer, priceGrosir, minGrosir);
+  result.minWholesaleQty = minGrosir;
+  result.Modal = getNum(raw.purchasePrice ?? raw.Modal);
   return result;
 }
 

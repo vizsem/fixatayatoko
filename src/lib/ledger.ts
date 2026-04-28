@@ -23,6 +23,8 @@ export interface LedgerEntry {
   memo?: string;
   refType?: string;
   refId?: string;
+  referenceId?: string;
+  postedBy?: string;
   extra?: Record<string, unknown>;
 }
 

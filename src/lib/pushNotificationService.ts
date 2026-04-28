@@ -100,8 +100,9 @@ export const sendPushNotification = async (
     console.error('Error sending push notification:', error);
     
     // Handle invalid/expired tokens
-    if (error.code === 'messaging/invalid-registration-token' || 
-        error.code === 'messaging/registration-token-not-registered') {
+    const err = error as any;
+    if (err.code === 'messaging/invalid-registration-token' ||
+        err.code === 'messaging/registration-token-not-registered') {
       // Remove invalid token from database
       await admin.firestore().collection('user_tokens').doc(userId).delete();
     }

@@ -9,6 +9,7 @@ const adminTheme = {
   success: { icon: '✅', style: { color: '#059669', borderColor: '#10b981' } },
   error: { icon: '❌', style: { color: '#dc2626', borderColor: '#ef4444' } },
   info: { icon: 'ℹ️', style: { color: '#2563eb', borderColor: '#3b82f6' } },
+  warning: { icon: '⚠️', style: { color: '#d97706', borderColor: '#f59e0b' } },
   loading: { icon: '⏳', style: { color: '#4b5563', borderColor: '#6b7280' } }
 };
 
@@ -17,6 +18,7 @@ const userTheme = {
   success: { icon: '✅', style: { color: '#059669', borderColor: '#10b981' } },
   error: { icon: '❌', style: { color: '#dc2626', borderColor: '#ef4444' } },
   info: { icon: 'ℹ️', style: { color: '#2563eb', borderColor: '#3b82f6' } },
+  warning: { icon: '⚠️', style: { color: '#d97706', borderColor: '#f59e0b' } },
   loading: { icon: '⏳', style: { color: '#4b5563', borderColor: '#6b7280' } }
 };
 
@@ -52,6 +54,7 @@ export const notify = {
     success: (message: string, opts?: ToastOptions) => toast.success(message, mergeAdmin('success', opts)),
     error: (message: string, opts?: ToastOptions) => toast.error(message, mergeAdmin('error', opts)),
     info: (message: string, opts?: ToastOptions) => toast(message, mergeAdmin('info', opts)),
+    warning: (message: string, opts?: ToastOptions) => toast(message, mergeAdmin('warning', opts)),
     loading: (message: string, opts?: ToastOptions) => toast.loading(message, mergeAdmin('loading', opts)),
     custom: (content: ToastContent, opts?: ToastOptions) => toast(content, mergeAdmin('info', opts)),
   },
@@ -59,6 +62,7 @@ export const notify = {
     success: (message: string, opts?: ToastOptions) => toast.success(message, mergeUser('success', opts)),
     error: (message: string, opts?: ToastOptions) => toast.error(message, mergeUser('error', opts)),
     info: (message: string, opts?: ToastOptions) => toast(message, mergeUser('info', opts)),
+    warning: (message: string, opts?: ToastOptions) => toast(message, mergeUser('warning', opts)),
     loading: (message: string, opts?: ToastOptions) => toast.loading(message, mergeUser('loading', opts)),
     custom: (content: ToastContent, opts?: ToastOptions) => toast(content, mergeUser('info', opts)),
   },

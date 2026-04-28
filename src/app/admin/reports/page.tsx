@@ -292,7 +292,7 @@ export default function ReportsDashboard() {
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }} tickFormatter={(val) => `Rp${(val/1000).toLocaleString()}k`} />
                     <Tooltip 
                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
-                      formatter={(val: number) => [`Rp${val.toLocaleString()}`, 'Penjualan']}
+                      formatter={(val: any) => [`Rp${Number(val || 0).toLocaleString()}`, 'Penjualan']}
                     />
                     <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                   </AreaChart>

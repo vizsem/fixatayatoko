@@ -50,7 +50,7 @@ export default function OperationalExpensesPage() {
       
       let matchesDate = true;
       if (dateFilter === 'bulan-ini' && expense.date) {
-        const d = expense.date instanceof Timestamp ? expense.date.toDate() : new Date(expense.date);
+        const d = (expense.date as any)?.toDate ? (expense.date as any).toDate() : new Date(expense.date as any);
         const now = new Date();
         matchesDate = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       }

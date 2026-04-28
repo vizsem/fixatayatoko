@@ -22,6 +22,11 @@ export interface Product {
     category: string;   // Kategori (Primary)
     unit: string;       // Satuan (Primary)
     sku?: string;       // Stock Keeping Unit
+    priceEcer?: number;
+    priceShopee?: number;
+    priceTiktok?: number;
+    imageUrl?: string;
+    minWholesaleQty?: number;
     units?: UnitOption[];
     
     // Optional / Legacy Fields (Mapping from Excel)
@@ -81,6 +86,7 @@ export type UserAddress = {
 
 export interface CartItem extends Product {
     quantity: number;
+    productId?: string;
     promoType?: string;
     originalPrice?: number;
     unitContains?: number;
@@ -91,6 +97,8 @@ export interface CartItem extends Product {
 
 export interface OrderItem {
     id: string;
+    productId?: string;
+    warehouseId?: string;
     name: string;
     price: number;
     quantity: number;
@@ -140,6 +148,10 @@ export interface Order {
     discountTotal?: number;
     walletUsed?: number;
     channel?: 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
+    trackingNumber?: string;
+    shippingMethod?: string;
+    deliveryMethod?: string;
+    estimatedDelivery?: FirestoreTimestamp | Date | null;
 }
 
 
@@ -250,3 +262,61 @@ export interface OperationalExpense {
     recordedBy?: string; // User ID yang mencatat
     createdAt?: FirestoreTimestamp | Date | null;
 }
+
+export interface NotificationItem {
+    id: string;
+    title: string;
+    body: string;
+    type?: string;
+    category?: string;
+    createdAt: string;
+}
+
+export interface Banner {
+    id: string;
+    imageUrl: string;
+    linkUrl?: string;
+    isActive: boolean;
+    title: string;
+    subtitle: string;
+    buttonText: string;
+    gradient: string;
+}
+
+export interface SystemSettings {
+    displayWarehouseId?: string;
+    store?: {
+        name?: string;
+        address?: string;
+        footerMsg?: string;
+    };
+    notification?: {
+        enabled: boolean;
+    };
+}
+
+export interface ProductItem {
+    id: string;
+    name: string;
+    quantity: number;
+    purchasePrice: number;
+    conversion?: number;
+    unit?: string;
+}
+
+export interface Purchase {
+    id: string;
+    supplierName: string;
+    supplierId?: string;
+    total: number;
+    paidAmount?: number;
+    status: 'MENUNGGU' | 'DITERIMA' | 'DIBATALKAN';
+    paymentStatus: 'LUNAS' | 'HUTANG';
+    items: ProductItem[];
+    warehouseId?: string;
+    warehouseName?: string;
+    createdAt: string | Date | any;
+    updatedAt?: any;
+}
+
+export type User = UserProfile;

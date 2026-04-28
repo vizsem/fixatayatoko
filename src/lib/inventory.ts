@@ -2,7 +2,7 @@ import { addDoc, collection, serverTimestamp, WriteBatch, doc, Transaction, getD
 import { db } from '@/lib/firebase';
 
 export type InventoryLogType = 'MASUK' | 'KELUAR' | 'MUTASI';
-export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER';
+export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION';
 
 export interface InventoryLogData {
   productId: string;

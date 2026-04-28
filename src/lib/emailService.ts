@@ -178,8 +178,8 @@ export const sendOrderConfirmation = async (order: Order & { customerEmail?: str
     
     <div class="order-details">
       <h3>Detail Pesanan</h3>
-      <p><strong>Nomor Pesanan:</strong> #${order.id}</p>
-      <p><strong>Tanggal:</strong> ${new Date(order.createdAt?.toDate() || Date.now()).toLocaleDateString('id-ID')}</p>
+      <p><strong>Order ID:</strong> ${order.id}</p>
+      <p><strong>Tanggal:</strong> ${new Date((order.createdAt as any)?.toDate?.() || order.createdAt || Date.now()).toLocaleDateString('id-ID')}</p>
       <p><strong>Total:</strong> Rp ${order.total.toLocaleString('id-ID')}</p>
       <p><strong>Status Pembayaran:</strong> ${order.paymentStatus}</p>
       
@@ -248,7 +248,7 @@ export const sendShippingNotification = async (order: Order & { customerEmail?: 
       <p><strong>Nomor Pesanan:</strong> #${order.id}</p>
       <p><strong>No. Resi:</strong> ${order.trackingNumber || 'Sedang diproses'}</p>
       <p><strong>Kurir:</strong> ${order.shippingMethod || 'Reguler'}</p>
-      <p><strong>Estimasi Tiba:</strong> ${order.estimatedDelivery ? new Date(order.estimatedDelivery.toDate()).toLocaleDateString('id-ID') : '2-3 hari kerja'}</p>
+      <p><strong>Estimasi Tiba:</strong> ${order.estimatedDelivery ? new Date((order.estimatedDelivery as any).toDate?.() || order.estimatedDelivery).toLocaleDateString('id-ID') : '2-3 hari kerja'}</p>
     </div>
     
     <a href="${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}" class="button">Track Pesanan</a>
