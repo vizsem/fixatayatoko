@@ -16,6 +16,7 @@ import {
 
 import { collection, onSnapshot, orderBy, limit, query, Timestamp, where, getDocs } from 'firebase/firestore';
 import AdminMobileHeader from '@/components/AdminMobileHeader';
+import AdminMobileNav from '@/components/AdminMobileNav';
 
 
 
@@ -294,6 +295,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </main>
       <AdminMobileHeader />
+      <AdminMobileNav />
     </div>
   );
 }

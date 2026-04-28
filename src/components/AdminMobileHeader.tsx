@@ -152,15 +152,18 @@ export default function AdminMobileHeader() {
   return (
     <>
       {/* Mobile Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm md:hidden">
+      <header className="fixed top-0 left-0 right-0 z-[70] bg-white border-b border-gray-100 shadow-sm md:hidden">
         <div className="nav__inner flex items-center justify-between px-4 h-16">
           
           {/* Left Section: Menu Button + Brand */}
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setIsMenuOpen(true)}
-              className="nav__menu-button p-2 hover:bg-gray-50 rounded-xl transition-all active:scale-95 touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMenuOpen(true);
+              }}
+              className="nav__menu-button p-2 hover:bg-gray-50 rounded-xl transition-all active:scale-95 touch-manipulation relative z-[80]"
               aria-label="Menu"
             >
               <Menu size={24} className="text-gray-700" />
@@ -206,8 +209,11 @@ export default function AdminMobileHeader() {
 
             <button
               type="button"
-              onClick={() => setIsMenuOpen(true)}
-              className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded-xl transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMenuOpen(true);
+              }}
+              className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded-xl transition-all relative z-[80]"
               aria-label="User menu"
             >
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">

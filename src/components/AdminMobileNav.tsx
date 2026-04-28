@@ -198,7 +198,7 @@ export default function AdminMobileNav() {
   return (
     <>
       {/* Bottom Nav Bar */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+      <nav className="fixed bottom-0 inset-x-0 z-[70] bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
         <div className="flex items-center justify-around px-2 h-16">
           {mainNavItems.map((item, idx) => {
             const Icon = item.icon;
@@ -245,7 +245,7 @@ export default function AdminMobileNav() {
 
       {/* Inventory Options Modal */}
       {activeModal === 'inventory' && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
           <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
             <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
@@ -272,7 +272,7 @@ export default function AdminMobileNav() {
 
       {/* More Menu Modal */}
       {activeModal === 'more' && (
-        <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in fade-in duration-300">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tighter">Semua Fitur</h2>
             <button onClick={() => setActiveModal(null)} className="p-2.5 bg-gray-50 rounded-xl text-gray-400">
@@ -316,7 +316,7 @@ export default function AdminMobileNav() {
 
       {/* Marketplace Modal (Bottom Sheet Style) */}
       {activeModal === 'marketplace' && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end transform transition-all duration-300">
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end transform transition-all duration-300">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
           <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
             <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
@@ -409,7 +409,7 @@ export default function AdminMobileNav() {
 
       {/* Scanner & Quick Adjust Modal */}
       {activeModal === 'scanner' && (
-        <div className="fixed inset-0 z-[70] bg-black flex flex-col p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[110] bg-black flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-white text-xl font-black tracking-tight">
@@ -497,7 +497,7 @@ export default function AdminMobileNav() {
 
       {/* Add Product Modal */}
       {activeModal === 'addProduct' && (
-        <div className="fixed inset-0 z-[70] bg-gray-50 flex flex-col">
+        <div className="fixed inset-0 z-[110] bg-gray-50 flex flex-col">
           <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tighter">Tambah Produk Baru</h2>
             <button onClick={() => { setActiveModal(null); stopCamera(); }} className="p-2.5 bg-gray-100 rounded-xl text-gray-400">
