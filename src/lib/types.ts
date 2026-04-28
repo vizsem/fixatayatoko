@@ -21,6 +21,7 @@ export interface Product {
     stock: number;      // Stok (Primary)
     category: string;   // Kategori (Primary)
     unit: string;       // Satuan (Primary)
+    sku?: string;       // Stock Keeping Unit
     units?: UnitOption[];
     
     // Optional / Legacy Fields (Mapping from Excel)

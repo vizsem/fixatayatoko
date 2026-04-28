@@ -93,7 +93,7 @@ export default function AdminMobileNav() {
           limit(5)
         );
         const snap = await getDocs(q);
-        setMpSearchSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setMpSearchSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
         setShowSuggestions(true);
       };
       fetchSuggestions();
@@ -591,7 +591,7 @@ export default function AdminMobileNav() {
       const q = query(collection(db, 'products'), where('sku', '==', sku), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        setScannedProduct({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        setScannedProduct({ id: snap.docs[0].id, ...snap.docs[0].data() } as Product);
       } else {
         notify.admin.error('Produk tidak ditemukan');
       }
