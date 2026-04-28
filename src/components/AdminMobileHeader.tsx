@@ -32,7 +32,8 @@ import {
   ArrowDownCircle,
   Banknote,
   Landmark,
-  AlertTriangle
+  AlertTriangle,
+  ChevronRight
 } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
