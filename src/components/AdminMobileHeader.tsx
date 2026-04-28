@@ -88,6 +88,11 @@ export default function AdminMobileHeader() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [filteredItems, setFilteredItems] = useState<NavItem[]>([]);
 
+  // Debug state changes
+  useEffect(() => {
+    console.log('AdminMobileHeader - isMenuOpen changed:', isMenuOpen);
+  }, [isMenuOpen]);
+
   // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -131,7 +136,9 @@ export default function AdminMobileHeader() {
     }
   }, [searchQuery]);
 
-  if (!pathname.startsWith('/admin')) return null;
+  if (!pathname || !pathname.startsWith('/admin')) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
@@ -153,7 +160,7 @@ export default function AdminMobileHeader() {
             <button
               type="button"
               onClick={() => setIsMenuOpen(true)}
-              className="nav__menu-button p-2 hover:bg-gray-50 rounded-xl transition-all"
+              className="nav__menu-button p-2 hover:bg-gray-50 rounded-xl transition-all active:scale-95 touch-manipulation"
               aria-label="Menu"
             >
               <Menu size={24} className="text-gray-700" />
@@ -246,7 +253,7 @@ export default function AdminMobileHeader() {
 
       {/* Full Screen Menu Modal */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden">
+        <div className="fixed inset-0 z-[9999] md:hidden">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -254,7 +261,7 @@ export default function AdminMobileHeader() {
           />
 
           {/* Menu Content */}
-          <div className="absolute inset-x-0 bottom-0 top-16 bg-white rounded-t-3xl overflow-hidden animate-slide-up">
+          <div className="absolute inset-x-0 bottom-0 top-0 bg-white rounded-t-3xl overflow-hidden animate-slide-up flex flex-col">
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
               <div>
@@ -290,7 +297,7 @@ export default function AdminMobileHeader() {
             </div>
 
             {/* Menu Items */}
-            <div className="overflow-y-auto max-h-[calc(100vh-280px)] pb-24">
+            <div className="flex-1 overflow-y-auto pb-24">
               {['Overview', 'Sales', 'Inventory', 'Finance', 'Marketing', 'Communication', 'System'].map((category) => {
                 const categoryItems = navItems.filter(item => item.category === category);
                 if (categoryItems.length === 0) return null;
