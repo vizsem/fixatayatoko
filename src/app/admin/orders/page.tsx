@@ -5,31 +5,19 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, query, orderBy, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs, runTransaction, increment, addDoc, serverTimestamp
+  collection, query, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs, runTransaction, increment, serverTimestamp
 } from 'firebase/firestore';
 import {
   ShoppingCart, Search, Truck, Printer, XCircle,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
-  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar, XOctagon
+  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
-
-type Order = {
-  id: string;
-  createdAt: Timestamp | null;
-  customerName?: string;
-  customerPhone?: string;
-  total: number;
-  status: 'MENUNGGU' | 'DIPROSES' | 'DIKIRIM' | 'SELESAI' | 'DIBATALKAN';
-  deliveryMethod: 'AMBIL_DI_TOKO' | 'KURIR_TOKO' | 'OJOL';
-  userId?: string;
-  items?: any[]; // Added for cancel logic
-  walletUsed?: number; // Added for cancel logic
-  pointsUsed?: number; // Added for cancel logic
-  paymentStatus?: string;
-};
+import { Order, OrderItem } from '@/lib/types';
+import * as Sentry from '@sentry/nextjs';
+import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 
 export default function AdminOrders() {
   const router = useRouter();
@@ -42,146 +30,57 @@ export default function AdminOrders() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 15;
 
-  // 1. Proteksi Akses & Cek Role (Admin/Cashier)
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const role = userDoc.data()?.role;
-      if (role !== 'admin' && role !== 'cashier') return router.push('/profil');
+      if (role !== 'admin' && role !== 'cashier') {
+        notify.aksesDitolakAdmin();
+        return router.push('/profil');
+      }
     });
     return () => unsubAuth();
   }, [router]);
 
-  // 2. Real-time Data Fetching (Fetch ALL relevant orders for client-side pagination)
-    // We remove the limit(10) to allow client-side pagination to work correctly
-    // Also removing orderBy from query to ensure we get docs even if createdAt is missing, then sort client-side
-    useEffect(() => {
-      const q = query(collection(db, 'orders'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-        
-        // Client-side sorting
-        list.sort((a, b) => {
-            const dateA = a.createdAt ? a.createdAt.toMillis() : 0;
-            const dateB = b.createdAt ? b.createdAt.toMillis() : 0;
-            return dateB - dateA;
-        });
-
-        setOrders(list);
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    }, []);
-
-  // 6. Fungsi Auto-Update Status (Simulasi Cron Job)
-  // Menjalankan logika update status otomatis setiap kali halaman ini dimuat oleh admin
   useEffect(() => {
-    const runAutoUpdate = async () => {
-      // Hanya jalankan jika data sudah ada
-      if (orders.length === 0) return;
-
-      const batch = writeBatch(db);
-      let batchCount = 0;
-      const now = new Date().getTime();
-
-      orders.forEach((order) => {
-        if (!order.createdAt) return;
-        const createdTime = order.createdAt.toDate().getTime();
-        const diffHours = (now - createdTime) / (1000 * 60 * 60);
-        
-        let newStatus = '';
-
-        // Aturan 1: 'MENUNGGU' -> 'DIPROSES' (Max 24 Jam)
-        if (order.status === 'MENUNGGU' && diffHours > 24) {
-          newStatus = 'DIPROSES';
-        }
-        
-        // Aturan 2: 'DIPROSES' -> 'DIKIRIM' (Setelah 12 Jam)
-        // Kita asumsikan 'updatedAt' jika ada, tapi pakai createdAt sebagai estimasi kasar jika tidak
-        else if (order.status === 'DIPROSES' && diffHours > 36) { // 24 + 12
-          newStatus = 'DIKIRIM';
-        }
-
-        // Aturan 3: 'DIKIRIM' -> 'SELESAI'
-        else if (order.status === 'DIKIRIM') {
-          // Estimasi berdasarkan deliveryMethod
-          let finishThresholdHours = 24; // Default 24 jam untuk lokal/toko
-          
-          // @ts-ignore - Check for channel property
-          if (order.channel === 'SHOPEE') finishThresholdHours = 72; // 3 Hari
-          // @ts-ignore
-          else if (order.channel === 'TIKTOK') finishThresholdHours = 216; // 9 Hari
-
-          // Total waktu sejak dibuat > waktu proses + waktu kirim
-          if (diffHours > (36 + finishThresholdHours)) {
-             newStatus = 'SELESAI';
-          }
-        }
-
-        if (newStatus && batchCount < 400) { // Limit batch size
-          const ref = doc(db, 'orders', order.id);
-          batch.update(ref, { 
-            status: newStatus,
-            // @ts-ignore
-            updatedAt: Timestamp.now() 
-          });
-          
-          // Kirim Notifikasi ke User
-          if (order.userId) {
-            const notifRef = doc(collection(db, 'notifications'));
-            batch.set(notifRef, {
-              title: `Pesanan ${newStatus}`,
-              body: `Status pesanan #${order.id.slice(0, 8)} telah diperbarui menjadi ${newStatus}.`,
-              type: 'transaction',
-              category: 'Pesanan',
-              userId: order.userId,
-              createdAt: Timestamp.now(),
-              read: false,
-              orderId: order.id
-            });
-          }
-          
-          batchCount++;
-        }
+    const q = query(collection(db, 'orders'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      
+      list.sort((a, b) => {
+          const dateA = a.createdAt ? (a.createdAt as any).toMillis() : 0;
+          const dateB = b.createdAt ? (b.createdAt as any).toMillis() : 0;
+          return dateB - dateA;
       });
 
-      if (batchCount > 0) {
-        console.log(`Auto-updating ${batchCount} orders...`);
-        await batch.commit();
-        notify.admin.success(`${batchCount} pesanan diperbarui otomatis.`);
-      }
-    };
+      setOrders(list);
+      setLoading(false);
+    }, (error) => {
+      Sentry.captureException(error);
+      notify.error("Gagal sinkronisasi pesanan");
+    });
+    return () => unsubscribe();
+  }, []);
 
-    // Jalankan dengan debounce/timeout agar tidak spamming saat data baru load
-    const timer = setTimeout(() => {
-      runAutoUpdate();
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [orders]); // Depend on orders to check when loaded
-
-  // 7. Fungsi Cetak Cepat
   const handlePrint = (orderId: string) => {
     router.push(`/admin/orders/print/${orderId}`);
   };
 
-  // 4. Fungsi Ubah Status Masal
   const handleBulkUpdate = async (newStatus: string) => {
     if (selectedOrders.length === 0) return;
     if (!confirm(`Ubah ${selectedOrders.length} pesanan menjadi ${newStatus}?`)) return;
 
+    const t = notify.admin.loading(`Memperbarui ${selectedOrders.length} pesanan...`);
     try {
       const batch = writeBatch(db);
       selectedOrders.forEach((orderId) => {
         const orderRef = doc(db, 'orders', orderId);
-        batch.update(orderRef, { status: newStatus });
+        batch.update(orderRef, { status: newStatus, updatedAt: serverTimestamp() });
         
-        // Kirim Notifikasi
         const order = orders.find(o => o.id === orderId);
         if (order?.userId) {
           const notifRef = doc(collection(db, 'notifications'));
@@ -191,7 +90,7 @@ export default function AdminOrders() {
             type: 'transaction',
             category: 'Pesanan',
             userId: order.userId,
-            createdAt: Timestamp.now(),
+            createdAt: serverTimestamp(),
             read: false,
             orderId: order.id
           });
@@ -199,16 +98,16 @@ export default function AdminOrders() {
       });
       await batch.commit();
       setSelectedOrders([]);
-      notify.admin.success('Berhasil diperbarui!');
-    } catch {
-      notify.admin.error('Gagal memperbarui status.');
+      notify.admin.success('Berhasil diperbarui!', { id: t });
+    } catch (err) {
+      Sentry.captureException(err);
+      notify.admin.error('Gagal memperbarui status.', { id: t });
     }
   };
 
-  // Fungsi Batalkan Transaksi (Dengan Refund Stok & Dana)
   const handleBulkCancel = async () => {
     if (selectedOrders.length === 0) return;
-    if (!confirm(`Yakin ingin membatalkan ${selectedOrders.length} pesanan? \n\n⚠️ Stok akan dikembalikan otomatis.\n⚠️ Dana/Poin akan direfund ke user.`)) return;
+    if (!confirm(`Yakin ingin membatalkan ${selectedOrders.length} pesanan? \n\n⚠️ Stok akan dikembalikan otomatis.`)) return;
 
     const t = notify.admin.loading("Memproses pembatalan...");
     let successCount = 0;
@@ -222,213 +121,118 @@ export default function AdminOrders() {
           
           if (!orderSnap.exists()) throw new Error("Pesanan tidak ditemukan");
           
-          const orderData = orderSnap.data();
-          if (orderData.status === 'DIBATALKAN') throw new Error("Pesanan sudah dibatalkan sebelumnya");
+          const orderData = orderSnap.data() as Order;
+          if (orderData.status === 'DIBATALKAN') throw new Error("Sudah dibatalkan");
 
-          // 1. Restore Stock
-          if (orderData.items && Array.isArray(orderData.items)) {
+          if (orderData.items) {
             for (const item of orderData.items) {
               if (!item.productId) continue;
-              
-              const productRef = doc(db, 'products', item.productId);
-              const productSnap = await transaction.get(productRef);
-              
-              if (productSnap.exists()) {
-                const pData = productSnap.data();
-                const currentStock = Number(pData.stock || 0);
-                const qtyToRestore = Number(item.quantity || 0);
+              const pRef = doc(db, 'products', item.productId);
+              const pSnap = await transaction.get(pRef);
+              if (pSnap.exists()) {
+                const pData = pSnap.data();
+                const stockByWh = pData.stockByWarehouse || {};
+                const whId = item.warehouseId || 'gudang-utama';
+                stockByWh[whId] = (stockByWh[whId] || 0) + item.quantity;
                 
-                // Handle Stock by Warehouse (Restore to Main Warehouse or Default)
-                const stockByWarehouse = pData.stockByWarehouse || {};
-                // Default logic: restore to 'gudang-utama' or the first warehouse found
-                // Ideally we should know which warehouse it came from, but for now we default to main
-                const targetWh = 'gudang-utama';
-                stockByWarehouse[targetWh] = (stockByWarehouse[targetWh] || 0) + qtyToRestore;
-
-                transaction.update(productRef, {
-                  stock: currentStock + qtyToRestore,
-                  stockByWarehouse: stockByWarehouse
+                transaction.update(pRef, {
+                  stock: increment(item.quantity),
+                  stockByWarehouse: stockByWh
                 });
 
-                // Log Inventory (Manual because we are inside transaction)
-                const logRef = doc(collection(db, 'inventory_logs'));
-                transaction.set(logRef, {
+                transaction.set(doc(collection(db, 'inventory_logs')), {
                   productId: item.productId,
                   productName: item.name || 'Unknown',
                   type: 'MASUK',
-                  amount: qtyToRestore,
+                  amount: item.quantity,
                   adminId: auth.currentUser?.uid || 'admin',
-                  source: 'ORDER',
-                  orderId: orderId,
-                  referenceId: orderId,
-                  note: `Pembatalan Pesanan #${orderId.substring(0,8)}`,
-                  date: serverTimestamp(),
-                  prevStock: currentStock,
-                  nextStock: currentStock + qtyToRestore
+                  source: 'CANCEL_ORDER',
+                  orderId,
+                  note: `Refund Pembatalan #${orderId.substring(0,8)}`,
+                  date: serverTimestamp()
                 });
               }
             }
           }
 
-          // 2. Refund Wallet & Points
           if (orderData.userId && orderData.userId !== 'guest') {
-            const userRef = doc(db, 'users', orderData.userId);
-            const userSnap = await transaction.get(userRef);
-            
-            if (userSnap.exists()) {
-              const walletToRefund = Number(orderData.walletUsed || 0);
-              const pointsToRefund = Number(orderData.pointsUsed || 0);
-
-              if (walletToRefund > 0 || pointsToRefund > 0) {
-                transaction.update(userRef, {
-                  walletBalance: increment(walletToRefund),
-                  points: increment(pointsToRefund)
-                });
-
-                if (walletToRefund > 0) {
-                  const wLogRef = doc(collection(db, 'wallet_logs'));
-                  transaction.set(wLogRef, {
-                    userId: orderData.userId,
-                    orderId: orderId,
-                    amountChanged: walletToRefund,
-                    type: 'REFUND',
-                    description: `Refund Pembatalan Order #${orderId.substring(0,8)}`,
-                    createdAt: serverTimestamp()
-                  });
+             const userRef = doc(db, 'users', orderData.userId);
+             const userSnap = await transaction.get(userRef);
+             if (userSnap.exists()) {
+                const refundW = orderData.walletUsed || 0;
+                const refundP = orderData.pointsUsed || 0;
+                if (refundW > 0 || refundP > 0) {
+                   transaction.update(userRef, {
+                      walletBalance: increment(refundW),
+                      points: increment(refundP)
+                   });
                 }
-
-                if (pointsToRefund > 0) {
-                  const pLogRef = doc(collection(db, 'point_logs'));
-                  transaction.set(pLogRef, {
-                    userId: orderData.userId,
-                    pointsChanged: pointsToRefund,
-                    type: 'REFUND',
-                    description: `Refund Poin Order #${orderId.substring(0,8)}`,
-                    createdAt: serverTimestamp()
-                  });
-                }
-              }
-            }
+             }
           }
 
-          // 3. Update Order Status
-          transaction.update(orderRef, {
-            status: 'DIBATALKAN',
-            updatedAt: serverTimestamp()
-          });
-          
-          // 4. Send Notification
-          if (orderData.userId) {
-             const notifRef = doc(collection(db, 'notifications'));
-             transaction.set(notifRef, {
-                title: 'Pesanan Dibatalkan',
-                body: `Pesanan #${orderId.substring(0,8)} telah dibatalkan. Dana/Poin telah dikembalikan (jika ada).`,
-                type: 'transaction',
-                category: 'Pesanan',
-                userId: orderData.userId,
-                createdAt: serverTimestamp(),
-                read: false,
-                orderId: orderId
-             });
-          }
+          transaction.update(orderRef, { status: 'DIBATALKAN', updatedAt: serverTimestamp() });
         });
         successCount++;
       } catch (err) {
-        console.error(`Gagal membatalkan order ${orderId}:`, err);
+        Sentry.captureException(err);
         failCount++;
       }
     }
 
     notify.dismiss(t);
-    if (successCount > 0) notify.admin.success(`${successCount} pesanan berhasil dibatalkan`);
-    if (failCount > 0) notify.admin.error(`${failCount} pesanan gagal dibatalkan`);
+    if (successCount > 0) notify.admin.success(`${successCount} pesanan dibatalkan`);
+    if (failCount > 0) notify.admin.error(`${failCount} pesanan gagal`);
     setSelectedOrders([]);
   };
 
-  // FITUR HAPUS DATA LAMA (> 90 HARI)
   const handleCleanupOldData = async () => {
-    if (!confirm("Apakah Anda yakin ingin menghapus data pesanan yang lebih lama dari 90 hari? Tindakan ini tidak dapat dibatalkan.")) return;
-    
+    if (!confirm("Hapus data > 90 hari?")) return;
     setIsDeleting(true);
     try {
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      
-      const q = query(
-        collection(db, 'orders'),
-        where('createdAt', '<', ninetyDaysAgo)
-      );
-      
-      const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) {
-        notify.admin.success("Tidak ada data lama yang perlu dihapus.");
-        setIsDeleting(false);
-        return;
-      }
-
+      const q = query(collection(db, 'orders'), where('createdAt', '<', ninetyDaysAgo));
+      const snap = await getDocs(q);
+      if (snap.empty) return notify.admin.success("Data sudah bersih");
       const batch = writeBatch(db);
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-
+      snap.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
-      notify.admin.success(`Berhasil menghapus ${snapshot.size} pesanan lama.`);
-    } catch (error) {
-      console.error(error);
-      notify.admin.error("Gagal menghapus data lama.");
+      notify.admin.success(`Berhasil menghapus ${snap.size} data lama.`);
+    } catch (err) {
+      Sentry.captureException(err);
+      notify.admin.error("Gagal hapus data lama");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // FITUR TANDAI SEMUA (Sesuai Filter yang sedang aktif)
   const handleSelectAll = () => {
     const filteredIds = currentItems.map(order => order.id);
     const isAllSelected = filteredIds.every(id => selectedOrders.includes(id));
-
-    if (isAllSelected) {
-      setSelectedOrders(prev => prev.filter(id => !filteredIds.includes(id)));
-    } else {
-      setSelectedOrders(prev => [...new Set([...prev, ...filteredIds])]);
-    }
+    if (isAllSelected) setSelectedOrders(prev => prev.filter(id => !filteredIds.includes(id)));
+    else setSelectedOrders(prev => [...new Set([...prev, ...filteredIds])]);
   };
 
-  // 5. Filter tambahan
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // 6. Logika Filter & Pagination
   const filteredOrders = orders.filter(order => {
     const matchesSearch = (order.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.customerName || "").toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Normalize status for flexible matching
     const s = (order.status || '').toUpperCase();
-    
-    let matchesTab = false;
-    if (activeTab === 'SEMUA') {
-      matchesTab = true;
-    } else if (activeTab === 'MENUNGGU') {
-      // Include 'PENDING' and 'BELUM_LUNAS' (Tempo) in 'MENUNGGU' tab
-      matchesTab = s === 'MENUNGGU' || s === 'PENDING' || s === 'BELUM_LUNAS';
-    } else {
-      matchesTab = s === activeTab;
-    }
+    let matchesTab = activeTab === 'SEMUA' || (activeTab === 'MENUNGGU' ? (s === 'MENUNGGU' || s === 'PENDING' || s === 'BELUM_LUNAS') : s === activeTab);
 
-    let matchesPaymentStatus = true;
+    let matchesPayment = true;
     const ps = (order.paymentStatus || '').toUpperCase();
-    if (paymentStatusFilter === 'PAID') {
-      matchesPaymentStatus = ps === 'PAID' || ps === 'LUNAS' || ps === 'SUCCESS' || ps === 'SETTLED';
-    } else if (paymentStatusFilter === 'UNPAID') {
-      matchesPaymentStatus = ps === 'UNPAID' || ps === 'BELUM_LUNAS' || ps === 'PENDING' || !ps;
-    }
+    if (paymentStatusFilter === 'PAID') matchesPayment = ['PAID', 'LUNAS', 'SUCCESS', 'SETTLED'].includes(ps);
+    else if (paymentStatusFilter === 'UNPAID') matchesPayment = ['UNPAID', 'BELUM_LUNAS', 'PENDING', ''].includes(ps);
 
-    const tMs = order.createdAt?.toDate ? order.createdAt.toDate().getTime() : 0;
+    const tMs = (order.createdAt as any)?.toMillis?.() || 0;
     const startOk = startDate ? tMs >= new Date(startDate).getTime() : true;
-    const endOk = endDate ? tMs <= new Date(endDate).getTime() + 86400000 - 1 : true;
+    const endOk = endDate ? tMs <= new Date(endDate).getTime() + 86400000 : true;
 
-    return matchesSearch && matchesTab && matchesPaymentStatus && startOk && endOk;
+    return matchesSearch && matchesTab && matchesPayment && startOk && endOk;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -437,298 +241,136 @@ export default function AdminOrders() {
   const getStatusColor = (status: string) => {
     const s = (status || '').toUpperCase();
     switch (s) {
-      case 'MENUNGGU': 
-      case 'PENDING':
-      case 'BELUM_LUNAS':
-        return 'bg-rose-100 text-rose-600 border-rose-200';
-      case 'DIPROSES': return 'bg-amber-100 text-amber-600 border-amber-200';
-      case 'DIKIRIM': return 'bg-blue-100 text-blue-600 border-blue-200';
-      case 'SELESAI': 
-      case 'LUNAS':
-        return 'bg-emerald-100 text-emerald-600 border-emerald-200';
-      case 'DIBATALKAN': return 'bg-slate-100 text-slate-500 border-slate-200';
-      default: return 'bg-gray-100 text-gray-500 border-gray-200';
+      case 'MENUNGGU': case 'PENDING': case 'BELUM_LUNAS': return 'bg-rose-50 text-rose-600 border-rose-100';
+      case 'DIPROSES': return 'bg-amber-50 text-amber-600 border-amber-100';
+      case 'DIKIRIM': return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'SELESAI': case 'LUNAS': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      default: return 'bg-slate-50 text-slate-400 border-slate-100';
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-3 md:p-4">
+    <div className="min-h-screen bg-[#F8FAFC] p-3 md:p-6 pb-32">
       <Toaster position="top-right" />
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 mb-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight mb-0">Order Management</h1>
-          <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none">Transaction & Delivery Pipeline</p>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders Pipeline</h1>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Transaction flow management</p>
         </div>
         
-        <div className="flex items-center gap-1.5 font-sans">
-          <Link href="/admin" className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm hover:bg-slate-50 text-slate-400 transition-all">
-             <LayoutDashboard size={16} />
-          </Link>
-          <button 
-            onClick={handleCleanupOldData}
-            disabled={isDeleting}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-rose-50 text-rose-500 rounded-xl font-black text-[8px] uppercase tracking-widest shadow-sm hover:bg-rose-50 transition-all"
-          >
-             {isDeleting ? <RefreshCcw className="animate-spin" size={12} /> : <Trash2 size={12} />}
-             <span>Cleanup Legacy</span>
+        <div className="flex items-center gap-2">
+          <button onClick={handleCleanupOldData} disabled={isDeleting} className="px-4 py-2.5 bg-white border border-rose-100 text-rose-500 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-rose-50 transition-all flex items-center gap-2">
+             {isDeleting ? <RefreshCcw className="animate-spin" size={14} /> : <Trash2 size={14} />} Cleanup 90d
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {[
-          { label: 'Wait', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
-          { label: 'Process', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Ship', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Done', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Pending', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
+          { label: 'Processing', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Shipping', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Finished', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
-             <span className={`text-base font-black ${stat.color} leading-none`}>{stat.count}</span>
-             <span className="text-[7px] font-black uppercase text-slate-400 tracking-tighter mt-0.5">{stat.label}</span>
+          <div key={stat.label} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+             <span className={`text-2xl font-black ${stat.color}`}>{stat.count}</span>
+             <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">{stat.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Filters & Search Toolbar */}
-      <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-50 mb-3 flex flex-col md:flex-row items-center gap-1.5">
-        <div className="relative w-full md:max-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+      <div className="bg-white p-2 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex flex-col lg:flex-row items-center gap-2">
+        <div className="relative w-full lg:max-w-[240px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
           <input
             type="text"
-            placeholder="Search..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 outline-none"
+            placeholder="Search orders..."
+            className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
         </div>
 
-        <div className="h-6 w-px bg-slate-100 hidden md:block mx-1"></div>
-
-        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar">
+        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar px-1">
           {['SEMUA', 'MENUNGGU', 'DIPROSES', 'DIKIRIM', 'SELESAI'].map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab as any); setCurrentPage(1); }}
-              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all whitespace-nowrap ${
-                activeTab === tab 
-                  ? 'bg-slate-900 text-white shadow-md' 
-                  : 'text-slate-400 hover:bg-slate-50'
-              }`}
+              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
             >
               {tab}
-              {tab === 'MENUNGGU' && orders.filter(o => o.status === 'MENUNGGU').length > 0 && (
-                <span className={`ml-1 px-1 py-0.5 rounded-md text-[8px] ${activeTab === tab ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'}`}>
-                  {orders.filter(o => o.status === 'MENUNGGU').length}
-                </span>
-              )}
             </button>
           ))}
-          
-          <div className="h-5 w-px bg-slate-200 mx-1 self-center shrink-0"></div>
-          
-          <select 
-            value={paymentStatusFilter}
-            onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 rounded-xl text-[9px] font-black bg-slate-50 border-none text-slate-600 outline-none shrink-0 cursor-pointer uppercase tracking-tighter"
-          >
-            <option value="ALL">ALL PMT</option>
-            <option value="PAID">PAID</option>
-            <option value="UNPAID">UNPAID</option>
-          </select>
         </div>
 
-        <div className="h-6 w-px bg-slate-100 hidden md:block mx-1"></div>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="date"
-            className="px-2 py-1.5 rounded-lg bg-slate-50 text-[9px] font-black outline-none border-none"
-            value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
-          />
-          <input
-            type="date"
-            className="px-2 py-1.5 rounded-lg bg-slate-50 text-[9px] font-black outline-none border-none"
-            value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
-          />
+        <div className="flex items-center gap-2 w-full lg:w-auto px-1">
+          <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="bg-slate-50 border-none rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none">
+            <option value="ALL">All Payment</option>
+            <option value="PAID">Paid</option>
+            <option value="UNPAID">Unpaid</option>
+          </select>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-50 border-none rounded-xl px-3 py-2 text-[10px] font-black" />
+          <button onClick={handleSelectAll} className="p-3 bg-slate-900 text-white rounded-xl shadow-md"><CheckCircle2 size={16} /></button>
         </div>
-        
-        <button
-          onClick={handleSelectAll}
-          className={`shrink-0 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight flex items-center gap-1.5 transition-all ${
-            currentItems.length > 0 && currentItems.every(id => selectedOrders.includes(id.id))
-            ? 'bg-emerald-50 text-emerald-600'
-            : 'bg-slate-50 text-slate-500'
-          }`}
-        >
-          <CheckCircle2 size={12} />
-          <span className="hidden md:inline">SELECT ALL</span>
-        </button>
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <RefreshCcw className="animate-spin text-slate-300 mb-4" size={32} />
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Memuat Data Transaksi...</p>
-          </div>
-        ) : currentItems.length === 0 ? (
-          <div className="bg-white rounded-[2rem] border border-dashed border-slate-200 p-20 text-center">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-              <ShoppingCart size={32} />
-            </div>
-            <h3 className="text-slate-900 font-bold text-lg mb-1">Tidak ada pesanan ditemukan</h3>
-            <p className="text-slate-400 text-sm">Coba ubah filter atau kata kunci pencarian Anda</p>
-          </div>
-        ) : (
-          currentItems.map((order) => (
-            <div
-              key={order.id}
-              className={`group bg-white rounded-xl p-2 md:p-2.5 border transition-all ${
-                selectedOrders.includes(order.id) ? 'border-slate-900 bg-slate-50/50' : 'border-slate-50'
-              }`}
-            >
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 relative z-10">
-                {/* Checkbox */}
-                <button 
-                  onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} 
-                  className="text-slate-200 shrink-0"
-                >
-                  {selectedOrders.includes(order.id) ? <CheckSquare size={14} className="text-slate-900" /> : <Square size={14} />}
+      {loading ? (
+        <TableSkeleton rows={8} />
+      ) : (
+        <div className="grid grid-cols-1 gap-3">
+          {currentItems.map((order) => (
+            <div key={order.id} className={`bg-white rounded-[1.5rem] p-4 border transition-all ${selectedOrders.includes(order.id) ? 'border-slate-900 ring-4 ring-slate-50' : 'border-slate-100 hover:border-slate-200'}`}>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <button onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} className="text-slate-200">
+                  {selectedOrders.includes(order.id) ? <CheckSquare size={20} className="text-slate-900" /> : <Square size={20} />}
                 </button>
                 
-                {/* Status Icon */}
-                <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center shrink-0 border ${getStatusColor(order.status).replace('text-', 'border-').split(' ')[2] || 'border-slate-100'} ${getStatusColor(order.status).split(' ')[0]}`}>
-                  <ShoppingCart size={11} className={getStatusColor(order.status).split(' ')[1]} />
-                </div>
-
-                {/* Order Details */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="font-black text-[8px] text-slate-900 uppercase">#{order.id.substring(0, 8)}</span>
-                    <span className={`text-[7px] px-1.5 py-0.5 rounded-md font-black uppercase border ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </span>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">#{order.id.substring(0, 8)}</span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(order.status)}`}>{order.status}</span>
                   </div>
-                  <h3 className="font-black text-slate-800 text-[10px] md:text-[11px] uppercase truncate leading-tight">{order.customerName || 'GENERAL CUSTOMER'}</h3>
-                  <div className="flex items-center gap-2.5 text-[8px] font-bold text-slate-400 mt-0.5">
-                    <div className="flex items-center gap-1 uppercase">
-                      <Calendar size={9} />
-                      {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}
-                    </div>
-                    <div className="flex items-center gap-1 uppercase">
-                      <Clock size={9} />
-                      {order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                    </div>
+                  <h3 className="font-black text-slate-800 text-sm uppercase truncate">{order.customerName || 'Walk-in Customer'}</h3>
+                  <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 mt-1">
+                    <span className="flex items-center gap-1"><Calendar size={12} /> {order.createdAt ? (order.createdAt as any).toDate().toLocaleDateString('id-ID') : '-'}</span>
+                    <span className="flex items-center gap-1"><Clock size={12} /> {order.createdAt ? (order.createdAt as any).toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
                   </div>
                 </div>
 
-                {/* Amount & Method */}
-                <div className="flex flex-col md:items-end gap-0">
-                  <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Billing</span>
-                  <span className="text-[11px] md:text-xs font-black text-slate-900 leading-tight">Rp {order.total.toLocaleString('id-ID')}</span>
-                  <div className="flex items-center gap-1 mt-0.5 px-1 py-0.5 bg-slate-50 border border-slate-100 rounded-md w-fit">
-                    <Truck size={9} className="text-slate-400" />
-                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-tight leading-none">{order.deliveryMethod?.replace(/_/g, ' ') || 'STORE'}</span>
+                <div className="flex flex-col md:items-end md:text-right">
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">Total</p>
+                  <p className="text-lg font-black text-slate-900 leading-tight">Rp {order.total.toLocaleString()}</p>
+                  <div className="flex items-center gap-1 mt-1 text-[9px] font-black text-slate-500 uppercase">
+                    <Truck size={12} /> {order.deliveryMethod?.replace(/_/g, ' ') || 'STORE'}
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 w-full md:w-auto mt-1.5 md:mt-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-slate-50">
-                  <Link
-                    href={`/admin/orders/${order.id}`}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-slate-900 text-white px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all shadow-sm"
-                  >
-                    Detail <ChevronRight size={9} />
-                  </Link>
-                  <button
-                    onClick={() => handlePrint(order.id)}
-                    className="p-1.5 text-slate-300 hover:text-slate-900 transition-all shrink-0"
-                  >
-                    <Printer size={12} />
-                  </button>
+                <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-none border-slate-50">
+                  <Link href={`/admin/orders/${order.id}`} className="flex-1 md:flex-none px-5 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest text-center">Detail</Link>
+                  <button onClick={() => handlePrint(order.id)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-900 transition-all"><Printer size={16} /></button>
                 </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-xs font-medium text-slate-500">
-            Menampilkan <span className="font-bold text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> dari <span className="font-bold text-slate-900">{filteredOrders.length}</span> data
-          </p>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              disabled={currentPage === 1} 
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-all"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            
-            <div className="flex items-center gap-1 px-2">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Logic to show generic page numbers if too many
-                let pageNum = i + 1;
-                if (totalPages > 5 && currentPage > 3) {
-                  pageNum = currentPage - 2 + i;
-                  if (pageNum > totalPages) pageNum = totalPages - (4 - i);
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                      currentPage === pageNum 
-                        ? 'bg-slate-900 text-white shadow-md' 
-                        : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button 
-              disabled={currentPage === totalPages} 
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white transition-all"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Bulk Action Floating Bar */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
+           <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} className="p-3 bg-white border border-slate-100 rounded-xl"><ChevronLeft size={16}/></button>
+           <span className="flex items-center px-4 text-xs font-black text-slate-400">PAGE {currentPage} / {totalPages}</span>
+           <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} className="p-3 bg-white border border-slate-100 rounded-xl"><ChevronRight size={16}/></button>
+        </div>
+      )}
+
       {selectedOrders.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-1.5 pl-5 pr-1.5 rounded-3xl shadow-2xl z-50 flex items-center gap-5 border border-slate-700/50 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          <div className="flex items-center gap-3">
-            <span className="bg-white/10 px-2 py-1 rounded-lg text-xs font-black">{selectedOrders.length}</span>
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Item Dipilih</span>
-          </div>
-          
-          <div className="h-8 w-px bg-white/10"></div>
-          
-          <div className="flex gap-1">
-            <button onClick={handleBulkCancel} className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Batal</button>
-            <button onClick={() => handleBulkUpdate('DIPROSES')} className="bg-amber-500 hover:bg-amber-400 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Proses</button>
-            <button onClick={() => handleBulkUpdate('DIKIRIM')} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Kirim</button>
-            <button onClick={() => handleBulkUpdate('SELESAI')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all">Selesai</button>
-            <button onClick={() => setSelectedOrders([])} className="bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-xl transition-all ml-2">
-              <XCircle size={18} />
-            </button>
-          </div>
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 p-2 rounded-[2.5rem] shadow-2xl flex items-center gap-2 z-[100] animate-in slide-in-from-bottom-10">
+          <div className="px-4 py-2 bg-white/10 rounded-full text-[10px] font-black text-white">{selectedOrders.length} SELECTED</div>
+          <button onClick={handleBulkCancel} className="px-5 py-2.5 bg-rose-600 text-white rounded-full text-[10px] font-black uppercase">Cancel</button>
+          <button onClick={() => handleBulkUpdate('DIPROSES')} className="px-5 py-2.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase">Process</button>
+          <button onClick={() => handleBulkUpdate('DIKIRIM')} className="px-5 py-2.5 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase">Ship</button>
+          <button onClick={() => handleBulkUpdate('SELESAI')} className="px-5 py-2.5 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase">Done</button>
         </div>
       )}
     </div>

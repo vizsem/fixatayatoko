@@ -180,6 +180,37 @@ export default function PublicOrderDetailPage() {
                 </div>
             </div>
 
+            {/* Payment Instructions (If Transfer) */}
+            {(order.paymentMethod === 'transfer' || order.paymentMethod === 'TRANSFER') && (order.status === 'MENUNGGU' || order.status === 'PENDING') && (
+               <div className="mb-10 bg-blue-50 border border-blue-100 rounded-[2rem] p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                     <AlertTriangle size={16} className="text-blue-600" />
+                     <h3 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Instruksi Pembayaran</h3>
+                  </div>
+                  <div className="space-y-4">
+                     <div className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
+                        <div>
+                           <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Bank BRI</p>
+                           <p className="text-sm font-black text-slate-800 tracking-wider">0123-01-000-456-789</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">a.n ATAYA MANDIRI</p>
+                        </div>
+                        <button 
+                           onClick={() => {
+                              navigator.clipboard.writeText('012301000456789');
+                              toast.success('No. Rekening berhasil disalin');
+                           }}
+                           className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                        >
+                           Salin
+                        </button>
+                     </div>
+                     <p className="text-[9px] font-bold text-blue-600/70 uppercase leading-relaxed text-center px-4">
+                        Harap lakukan transfer tepat sesuai nominal total bayar. Pesanan akan diproses otomatis setelah verifikasi.
+                     </p>
+                  </div>
+               </div>
+            )}
+
             {/* Produk List */}
             <div className="mb-10">
                 <h2 className="text-[10px] font-black text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-widest">

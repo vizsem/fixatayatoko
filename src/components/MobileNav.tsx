@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Grid3X3,
+  Search,
   ShoppingCart,
   FileText,
   User,
@@ -46,7 +47,7 @@ export default function MobileNav() {
 
   const navItems = [
     { href: '/', label: 'Beranda', icon: Home },
-    { href: '/semua-kategori', label: 'Kategori', icon: Grid3X3 },
+    { href: '/search', label: 'Cari', icon: Search },
     { href: '/orders', label: 'Pesanan', icon: FileText },
     { href: '/cart', label: 'Keranjang', icon: ShoppingCart },
     { href: '/profil', label: 'Akun', icon: User },

@@ -1,3 +1,4 @@
+import { Inter } from 'next/font/google';
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import './globals.css';
@@ -9,6 +10,9 @@ import AuthBootstrap from '@/components/AuthBootstrap';
 import BuyerHeaderActions from '@/components/BuyerHeaderActions';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { CartProvider } from '@/lib/context/CartContext';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 declare global {
   interface Window {
@@ -27,6 +31,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://atayatoko.aty0.com'),
   title: 'Grosir Sembako Kediri Termurah & Terlengkap | ATAYATOKO',
   description: 'Pusat belanja grosir sembako Kediri paling murah. Jual beras, minyak goreng, gula, snack partai besar & eceran. Gratis ongkir Kediri Kota.',
   keywords: 'grosir sembako kediri, sembako murah kediri, distributor sembako kediri, agen sembako kediri, toko sembako kediri, grosir minyak goreng kediri, grosir beras kediri, grosir snack kediri, grosir rokok kediri, agen snack kediri, grosir gula kediri, grosir minuman kediri, ATAYATOKO, atayamarket',
@@ -86,19 +91,43 @@ export default function RootLayout({
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
       </head>
 
-      <body className="antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <body className={`${inter.className} antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
+        <Script
+          id="structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "LocalBusiness",
+              "name": "ATAYATOKO Sembako Kediri",
+              "image": "https://atayatoko.aty0.com/logo-atayatoko.png",
+              "description": "Pusat belanja grosir sembako Kediri paling murah dan terlengkap.",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Kediri",
+                "addressRegion": "Jawa Timur",
+                "addressCountry": "ID"
+              },
+              "url": "https://atayatoko.aty0.com",
+              "telephone": "+628123456789",
+              "priceRange": "$$"
+            })
+          }}
+        />
         <ErrorBoundary>
-          <Toaster position="top-center" />
-          <AuthBootstrap />
-          <FCMManager />
-          <CustomerChatWidget />
-          <FloatingChatButton />
-          <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
-            <BuyerHeaderActions />
-          </div>
-          {children}
-          <MobileNav />
-          <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
+          <CartProvider>
+            <Toaster position="top-center" />
+            <AuthBootstrap />
+            <FCMManager />
+            <CustomerChatWidget />
+            <FloatingChatButton />
+            <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
+              <BuyerHeaderActions />
+            </div>
+            {children}
+            <MobileNav />
+            <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
+          </CartProvider>
         </ErrorBoundary>
       </body>
     </html>

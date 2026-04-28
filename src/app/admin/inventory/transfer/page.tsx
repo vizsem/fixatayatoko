@@ -1,116 +1,67 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { transferStockTx } from '@/lib/inventory';
+import { collection, getDocs, doc, query, orderBy, runTransaction, getDoc } from 'firebase/firestore';
+import { ArrowRightLeft, Search, AlertCircle, CheckCircle2, Package, ArrowRight, X, Warehouse } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import notify from '@/lib/notify';
+import { Toaster } from 'react-hot-toast';
+import * as Sentry from '@sentry/nextjs';
+import { Product } from '@/lib/types';
 
-import {
-  collection,
-  getDocs,
-  doc,
-  serverTimestamp,
-  query,
-  orderBy,
-  runTransaction
-} from 'firebase/firestore';
-
-import {
-  ArrowRightLeft,
-  Search,
-  AlertCircle,
-  CheckCircle2,
-  Package,
-  ArrowRight
-} from 'lucide-react';
-
-
-
-
-
- 
-
-type Product = {
-  id: string;
-  name: string;
-  stock: number;
-  unit: string;
-  stockByWarehouse?: Record<string, number>;
-  isActive?: boolean;
-  Status?: number;
-};
-
-type WarehouseType = {
-  id: string;
-  name: string;
-};
+type WarehouseType = { id: string; name: string; };
 
 export default function StockTransferPage() {
-
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Form State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [fromWarehouse, setFromWarehouse] = useState('');
   const [toWarehouse, setToWarehouse] = useState('');
   const [qty, setQty] = useState<number>(0);
-  const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
-  // 1. Fetch Produk & Gudang
   useEffect(() => {
-    const fetchData = async () => {
-      const q = query(
-        collection(db, 'products'),
-        orderBy('name', 'asc')
-      );
-      const prodSnap = await getDocs(q);
-      const rawProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-      const activeProducts = rawProducts.filter((p) => (typeof p.isActive === 'boolean' ? p.isActive : typeof p.Status === 'number' ? p.Status === 1 : true));
-      setProducts(activeProducts);
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) return router.push('/profil/login');
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.data()?.role !== 'admin') {
+        notify.aksesDitolakAdmin();
+        return router.push('/profil');
+      }
+    });
+    return () => unsubAuth();
+  }, [router]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const pSnap = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
+      setProducts(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)).filter(p => (p as any).isActive !== false));
 
       const whSnap = await getDocs(collection(db, 'warehouses'));
-      const baseWarehouses = whSnap.docs.map(d => ({ id: d.id, name: (d.data() as Record<string, unknown>).name as string } as WarehouseType));
-      const knownIds = new Set(baseWarehouses.map(w => w.id));
-      const knownNames = new Set(baseWarehouses.map(w => w.name));
-      const derivedIds = new Set<string>();
-      activeProducts.forEach(p => {
-        if (p.stockByWarehouse) {
-          Object.keys(p.stockByWarehouse).forEach(k => derivedIds.add(k));
-        }
-      });
-      const virtuals: WarehouseType[] = Array.from(derivedIds)
-        .filter(k => !knownIds.has(k) && !knownNames.has(k))
-        .map(k => ({ id: k, name: k }));
-      setWarehouses([...baseWarehouses, ...virtuals].sort((a, b) => a.name.localeCompare(b.name)));
-    };
-    fetchData();
+      setWarehouses(whSnap.docs.map(d => ({ id: d.id, name: d.data().name } as WarehouseType)).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err) {
+      Sentry.captureException(err);
+      notify.error("Gagal memuat data");
+    }
   }, []);
 
-  const filteredProducts = products.filter(p => {
-    // Pastikan name dikonversi ke string dan beri fallback jika undefined/null
-    const productName = p.name ? String(p.name).toLowerCase() : "";
-    const search = searchTerm.toLowerCase();
-    return productName.includes(search);
-  });
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. Eksekusi Transfer
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct || !fromWarehouse || !toWarehouse || qty <= 0) return;
-    if (fromWarehouse === toWarehouse) {
-      setStatus({ type: 'error', msg: 'Gudang asal dan tujuan tidak boleh sama!' });
-      return;
-    }
+    if (fromWarehouse === toWarehouse) return notify.error("Gudang asal & tujuan sama");
 
-    const currentFromStock = selectedProduct.stockByWarehouse?.[fromWarehouse] || 0;
-    if (qty > currentFromStock) {
-      setStatus({ type: 'error', msg: `Stok di gudang asal tidak cukup! (Hanya ada ${currentFromStock})` });
-      return;
-    }
+    const currentStock = selectedProduct.stockByWarehouse?.[fromWarehouse] || 0;
+    if (qty > currentStock) return notify.error(`Stok tidak cukup (${currentStock} available)`);
 
     setLoading(true);
+    const t = notify.admin.loading("Memproses mutasi...");
     try {
       await runTransaction(db, async (tx) => {
         await transferStockTx(tx, {
@@ -123,153 +74,112 @@ export default function StockTransferPage() {
           note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
         });
       });
-
-      setStatus({ type: 'success', msg: 'Transfer stok berhasil!' });
+      notify.admin.success('Mutasi stok berhasil!', { id: t });
       setQty(0);
+      setSelectedProduct(null);
       setSearchTerm('');
+      fetchData();
     } catch (err: any) {
-      console.error(err);
-      setStatus({ type: 'error', msg: err.message || 'Gagal melakukan mutasi.' });
+      Sentry.captureException(err);
+      notify.admin.error(err.message || 'Gagal mutasi', { id: t });
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black font-sans">
-      <div className="max-w-2xl mx-auto">
+  const filtered = products.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-            <ArrowRightLeft size={22} />
+  return (
+    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
+      <Toaster position="top-right" />
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-4 mb-10">
+          <div className="p-4 bg-blue-50 text-blue-600 rounded-[1.5rem] shadow-sm">
+            <ArrowRightLeft size={28} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-black">Mutasi Antar Gudang</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Distribusi stok antar lokasi</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Stock Mutation</h1>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Intra-warehouse distribution</p>
           </div>
         </div>
 
-        {status && (
-          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm border ${status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
-            }`}>
-            {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-            {status.msg}
-          </div>
-        )}
-
-        <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
-          <form onSubmit={handleTransfer} className="space-y-6">
-
-            {/* 1. CARI PRODUK */}
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 mb-2 tracking-widest">1. Pilih barang</label>
-
+        <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-sm border border-slate-100 relative overflow-hidden">
+          <form onSubmit={handleTransfer} className="space-y-8 relative z-10">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Inventory SKU</label>
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input
-                  type="text"
-                  placeholder="Cari nama produk..."
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-black"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                <input type="text" placeholder="Type product name..." className="w-full pl-14 pr-6 py-5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                {searchTerm && !selectedProduct && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 overflow-hidden max-h-60 overflow-y-auto py-2">
+                    {filtered.map(p => (
+                      <button key={p.id} type="button" onClick={() => { setSelectedProduct(p); setSearchTerm(p.name); }} className="w-full text-left px-6 py-4 hover:bg-slate-50 flex justify-between items-center transition-colors">
+                        <span className="text-xs font-black text-slate-800 uppercase">{p.name}</span>
+                        <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase">Total: {p.stock}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {searchTerm && !selectedProduct && (
-                <div className="mt-2 border rounded-2xl overflow-hidden bg-white shadow-2xl max-h-48 overflow-y-auto z-10 relative">
-                  {filteredProducts.map(p => (
-                    <button key={p.id} type="button" onClick={() => { setSelectedProduct(p); setSearchTerm(p.name); }}
-                      className="w-full text-left px-5 py-4 text-sm hover:bg-purple-50 flex justify-between items-center border-b border-gray-50 transition-colors">
-                      <span className="font-black">{p.name}</span>
-                      <span className="text-[10px] bg-gray-100 px-3 py-1 rounded-full font-bold">Total: {p.stock}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {selectedProduct && (
-                <div className="mt-4 p-4 bg-purple-50 border border-purple-100 rounded-2xl flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Package className="text-purple-600" />
+                <div className="p-6 bg-blue-50/50 border border-blue-100 rounded-[2rem] flex items-center justify-between animate-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white rounded-2xl shadow-sm text-blue-600"><Package size={20} /></div>
                     <div>
-                      <p className="text-xs font-black text-purple-900">{selectedProduct.name}</p>
-
-                      <div className="flex gap-2 mt-1">
-                        {warehouses.map(wh => (
-                          <span key={wh.id} className="text-[9px] bg-white px-2 py-0.5 rounded border border-purple-200 font-bold text-purple-700">
-                            {wh.name}: {selectedProduct.stockByWarehouse?.[wh.id] || 0}
-                          </span>
+                      <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{selectedProduct.name}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {Object.entries(selectedProduct.stockByWarehouse || {}).map(([id, s]) => (
+                          <span key={id} className="text-[8px] font-black bg-white/80 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-50 uppercase">{warehouses.find(w => w.id === id)?.name || id}: {s}</span>
                         ))}
                       </div>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setSelectedProduct(null)} className="text-[10px] font-black text-red-500 underline">GANTI</button>
+                  <button type="button" onClick={() => setSelectedProduct(null)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><X size={18} /></button>
                 </div>
               )}
             </div>
 
-            {/* 2. PILIH GUDANG */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 mb-2 tracking-widest">2. Gudang asal</label>
-                <select
-                  required
-                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-black"
-                  value={fromWarehouse}
-                  onChange={(e) => setFromWarehouse(e.target.value)}
-                >
-                  <option value="">Pilih asal...</option>
-                  {warehouses.map(wh => (
-                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                  ))}
-                </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source Node</label>
+                <div className="relative">
+                   <Warehouse className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                   <select required className="w-full pl-14 pr-6 py-5 bg-slate-50 border-none rounded-2xl text-[10px] font-black uppercase outline-none focus:ring-4 focus:ring-blue-50 appearance-none" value={fromWarehouse} onChange={e => setFromWarehouse(e.target.value)}>
+                      <option value="">FROM WAREHOUSE...</option>
+                      {warehouses.map(wh => <option key={wh.id} value={wh.id}>{wh.name.toUpperCase()}</option>)}
+                   </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 mb-2 tracking-widest">3. Gudang tujuan</label>
-                <select
-                  required
-                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-black"
-                  value={toWarehouse}
-                  onChange={(e) => setToWarehouse(e.target.value)}
-                >
-                  <option value="">PILIH TUJUAN...</option>
-                  {warehouses.map(wh => (
-                    <option key={wh.id} value={wh.id}>{wh.name.toUpperCase()}</option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Node</label>
+                <div className="relative">
+                   <Warehouse className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                   <select required className="w-full pl-14 pr-6 py-5 bg-slate-50 border-none rounded-2xl text-[10px] font-black uppercase outline-none focus:ring-4 focus:ring-blue-50 appearance-none" value={toWarehouse} onChange={e => setToWarehouse(e.target.value)}>
+                      <option value="">TO WAREHOUSE...</option>
+                      {warehouses.map(wh => <option key={wh.id} value={wh.id}>{wh.name.toUpperCase()}</option>)}
+                   </select>
+                </div>
               </div>
             </div>
 
-            {/* 3. JUMLAH TRANSFER */}
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 mb-2 tracking-widest text-center">4. Jumlah barang dipindahkan</label>
-
-              <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-3xl">
-                <input
-                  type="number"
-                  required
-                  placeholder="0"
-                  className="flex-1 p-4 bg-transparent border-none text-2xl font-black text-center outline-none"
-                  value={qty}
-                  onChange={(e) => setQty(Number(e.target.value))}
-                />
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center">Mutation Quantity</label>
+              <div className="bg-slate-50 rounded-[2.5rem] p-4 flex items-center gap-6">
+                 <button type="button" onClick={() => setQty(q => Math.max(0, q - 1))} className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center text-2xl font-black text-slate-300 active:scale-90 transition-all">-</button>
+                 <input type="number" required placeholder="0" className="flex-1 bg-transparent border-none text-4xl font-black text-center outline-none" value={qty} onChange={e => setQty(Number(e.target.value))} />
+                 <button type="button" onClick={() => setQty(q => q + 1)} className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center text-2xl font-black text-slate-300 active:scale-90 transition-all">+</button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading || !selectedProduct}
-              className="w-full bg-black text-white py-5 rounded-[2rem] font-black text-sm shadow-2xl shadow-purple-100 hover:bg-purple-900 transition-all flex items-center justify-center gap-2 group"
-            >
-              {loading ? 'Memproses transfer...' : (
-                <>
-                  Konfirmasi pindah barang <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
-                </>
-              )}
+            <button type="submit" disabled={loading || !selectedProduct} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl hover:bg-black active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30 group">
+              {loading ? 'Processing...' : <><ArrowRightLeft size={16}/> Execute Mutation <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform"/></>}
             </button>
-
-
           </form>
+
+          <div className="absolute -bottom-20 -right-20 text-slate-50 opacity-20 pointer-events-none rotate-12">
+             <ArrowRightLeft size={300} />
+          </div>
         </div>
       </div>
     </div>

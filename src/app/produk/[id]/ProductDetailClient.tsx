@@ -13,6 +13,7 @@ import { doc, getDoc, collection, getDocs, query, orderBy, addDoc, serverTimesta
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 import { onAuthStateChanged } from 'firebase/auth';
+import { ProductSkeleton } from '@/components/home/ProductSkeleton';
 
 export type Review = {
   id: string;
@@ -272,12 +273,7 @@ export default function ProductDetailClient({
     if (type === 'minus' && quantity > 1) setQuantity(prev => prev - 1);
   };
 
-  if (loading || !product) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
-      <Loader2 className="animate-spin text-green-600" size={40} />
-      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Menyiapkan Detail...</span>
-    </div>
-  );
+  if (loading || !product) return <ProductSkeleton />;
 
   const isOutOfStock = product.stock <= 0;
   

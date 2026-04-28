@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -49,6 +50,7 @@ import {
 } from 'firebase/firestore';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import notify from '@/lib/notify';
+import { Product } from '@/lib/types';
 
 // UI Helpers
 const triggerHaptic = (duration = 15) => {
@@ -67,11 +69,11 @@ export default function AdminMobileNav() {
   const [mpQty, setMpQty] = useState(1);
   const [mpSource, setMpSource] = useState('Shopee');
   const [mpLoading, setMpLoading] = useState(false);
-  const [mpSearchSuggestions, setMpSearchSuggestions] = useState<any[]>([]);
+  const [mpSearchSuggestions, setMpSearchSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Quick Adjust State
-  const [scannedProduct, setScannedProduct] = useState<any>(null);
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
 
   // Add Product State
@@ -520,7 +522,15 @@ export default function AdminMobileNav() {
                 </>
               ) : (
                 <>
-                  <img src={capturedImage} className="w-full h-full object-cover" />
+                  <div className="relative w-full h-full">
+                    <Image 
+                      src={capturedImage} 
+                      alt="Captured product" 
+                      fill 
+                      className="object-cover"
+                      unoptimized // Since it's a base64 data URL
+                    />
+                  </div>
                   <div className="absolute top-4 right-4">
                     <button onClick={() => setCapturedImage(null)} className="p-3 bg-black/50 backdrop-blur-md rounded-2xl text-white">
                       <RefreshCcw size={20} />

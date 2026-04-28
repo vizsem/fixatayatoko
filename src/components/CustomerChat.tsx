@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { 
   collection, 
   addDoc, 
@@ -16,7 +15,8 @@ import {
   limit,
   getDocs
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Send, Paperclip, X, Image as ImageIcon, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
@@ -37,11 +37,18 @@ interface CustomerChatProps {
 }
 
 export default function CustomerChat({ onClose, isModal = false }: CustomerChatProps) {
-  const { user } = useAuth();
+  const [user, setUser] = useState<any>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatId, setChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsub();
+  }, []);
   const [uploadingImage, setUploadingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

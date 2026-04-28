@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, serverTimestamp, query, orderBy, runTransaction, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, runTransaction, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
@@ -12,799 +11,283 @@ import { Toaster } from 'react-hot-toast';
 import {
   ChevronLeft,
   ShoppingBag,
-  Search,
-  Camera,
-  Plus,
-  Trash2,
   Save,
   Store,
-  CreditCard
+  CreditCard,
+  Truck,
+  Hash,
+  User,
+  Activity
 } from 'lucide-react';
+
+import { ProductSearchList } from '@/components/admin/marketplace/ProductSearchList';
+import { CartTable } from '@/components/admin/marketplace/CartTable';
+import { Product } from '@/lib/types';
+import * as Sentry from '@sentry/nextjs';
 
 type Channel = 'SHOPEE' | 'TIKTOK';
 
-type Product = {
-  id: string;
-  name: string;
-  Nama?: string;
-  Ecer?: number;
-  price?: number;
-  Satuan?: string;
-  unit?: string;
-  stock?: number;
-  isActive?: boolean;
-  Status?: number;
-  channelPricing?: {
-    offline?: {
-      price?: number;
-      wholesalePrice?: number;
-    };
-    website?: {
-      price?: number;
-      wholesalePrice?: number;
-    };
-    shopee?: {
-      price?: number;
-      wholesalePrice?: number;
-    };
-    tiktok?: {
-      price?: number;
-      wholesalePrice?: number;
-    };
-  };
-};
-
-type CartItem = {
+interface CartItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
   unit: string;
-  conversion?: number;
-  availableUnits?: { code: string; contains: number }[];
-};
+}
 
 export default function MarketplaceOrdersPage() {
   const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [channel, setChannel] = useState<Channel>('SHOPEE');
   const [externalOrderId, setExternalOrderId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER');
   const [shippingCost, setShippingCost] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannerReady, setScannerReady] = useState(false);
-
-  // === GLOBAL BARCODE SCANNER LISTENER ===
-  const [barcodeBuffer, setBarcodeBuffer] = useState('');
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        return;
-      }
-
-      if (e.key !== 'Enter') {
-        if (e.key.length === 1) {
-          setBarcodeBuffer((prev) => prev + e.key);
-        }
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          setBarcodeBuffer('');
-        }, 50); 
-      } else {
-        if (barcodeBuffer) {
-          e.preventDefault();
-          handleScan(barcodeBuffer);
-          setBarcodeBuffer('');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-      clearTimeout(timeout);
-    };
-  }, [barcodeBuffer, products]); // products is implicitly used inside handleScan via state or we can just call handleScan
-  // ========================================
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        notify.admin.error('Akses ditolak. Hanya admin yang dapat mengakses halaman ini.');
-        router.push('/profil');
-        return;
-      }
-      setAuthorized(true);
+      if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
+      fetchProducts();
     });
-    return () => unsub();
+    return () => unsubAuth();
   }, [router]);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const q = query(
-        collection(db, 'products'),
-        orderBy('name', 'asc')
-      );
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Product));
-      const active = list.filter((p) => (typeof p.isActive === 'boolean' ? p.isActive : typeof p.Status === 'number' ? p.Status === 1 : true));
-      setProducts(active);
-    };
-    fetchProducts();
-  }, []);
+  const fetchProducts = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)));
+      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+    } catch (err) {
+      Sentry.captureException(err);
+      notify.error("Gagal memuat produk");
+    }
+  };
 
   const filteredProducts = useMemo(() => {
-    if (!search) return [];
-    const lower = search.toLowerCase();
-    return products
-      .filter(p => {
-        const name = p.name || p.Nama || '';
-        return name.toLowerCase().includes(lower);
-      })
-      .slice(0, 8);
-  }, [products, search]);
+    if (!searchTerm) return [];
+    return products.filter(p => 
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (p as any).sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    ).slice(0, 10);
+  }, [products, searchTerm]);
 
-  const addToCart = (product: Product) => {
-    const existing = cart.find(c => c.id === product.id);
-    const baseName = product.name || product.Nama || 'Produk';
-    const baseUnit = product.unit || product.Satuan || 'pcs';
-    const availableUnits = (product as any).units || [];
-    const defaultUnit = Array.isArray(availableUnits) && availableUnits.length > 0 ? availableUnits[0] : { code: baseUnit, contains: 1 };
-    const availableStock = product.stock ?? 0;
-    if (availableStock <= 0) {
-      notify.admin.error(`Stok kosong: ${baseName}`);
-      return;
-    }
-
-    let basePrice = Number(product.Ecer || product.price || 0);
-    if (product.channelPricing) {
-      if (channel === 'SHOPEE' && product.channelPricing.shopee?.price != null) {
-        basePrice = Number(product.channelPricing.shopee.price);
+  const handleAddToCart = (p: Product) => {
+    const price = channel === 'SHOPEE' ? p.priceShopee : channel === 'TIKTOK' ? p.priceTiktok : p.priceEcer;
+    setCart(prev => {
+      const existing = prev.find(item => item.id === p.id);
+      if (existing) {
+        return prev.map(item => item.id === p.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      if (channel === 'TIKTOK' && product.channelPricing.tiktok?.price != null) {
-        basePrice = Number(product.channelPricing.tiktok.price);
-      }
-    }
-
-    if (existing) {
-      setCart(cart.map(item =>
-        item.id === product.id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
-      setCart([
-        ...cart,
-        {
-          id: product.id,
-          name: baseName,
-          price: basePrice,
-          quantity: 1,
-          unit: defaultUnit.code || baseUnit,
-          conversion: defaultUnit.contains || 1,
-          availableUnits: availableUnits
-        }
-      ]);
-    }
-    setSearch('');
+      return [...prev, {
+        id: p.id,
+        name: p.name || '',
+        price: price || 0,
+        quantity: 1,
+        unit: p.unit || 'Pcs'
+      }];
+    });
+    setSearchTerm('');
   };
 
-  const handleScan = async (code: string) => {
-    try {
-      // Offline/Local first: Cari di state `products` yang sudah dimuat di awal
-      const localProduct = products.find(p => 
-        (p as any).Barcode === code || 
-        (p as any).barcode === code || 
-        ((p as any).units && (p as any).units.some((u: any) => u.barcode === code))
-      );
-
-      if (localProduct) {
-        // Jika barcode yang dipindai adalah barcode unit tertentu, gunakan logika addToCart yang lebih spesifik jika diperlukan
-        // Untuk sekarang kita panggil addToCart biasa (seperti di handleScan lama)
-        addToCart(localProduct);
-        setShowScanner(false);
-        notify.admin.success(`Berhasil memindai: ${localProduct.name || (localProduct as any).Nama}`);
-        return;
+  const updateQty = (id: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty };
       }
-
-      // Jika tidak ketemu di lokal, fallback ke database (berjaga-jaga)
-      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
-      const s1 = await getDocs(q1);
-      let prod: any | null = null;
-      if (!s1.empty) {
-        const d = s1.docs[0];
-        prod = { id: d.id, ...d.data() };
-      } else {
-        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
-        const s2 = await getDocs(q2);
-        if (!s2.empty) {
-          const d2 = s2.docs[0];
-          prod = { id: d2.id, ...d2.data() };
-        }
-      }
-      if (!prod) {
-        notify.admin.error('Barcode tidak ditemukan');
-        return;
-      }
-      addToCart(prod as Product);
-      setShowScanner(false);
-      notify.admin.success(`Berhasil memindai: ${prod.name || prod.Nama}`);
-    } catch {
-      notify.admin.error('Gagal membaca barcode');
-    }
+      return item;
+    }));
   };
 
-  useEffect(() => {
-    let scanner: any = null;
-    const init = async () => {
-      if (!showScanner || scannerReady) return;
-      const mod: any = await import('html5-qrcode');
-      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
-      scanner = new Html5QrcodeScanner('mp-scanner', { fps: 10, qrbox: 200 }, false);
-      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
-      setScannerReady(true);
-    };
-    init();
-    return () => {
-      const el = document.getElementById('mp-scanner');
-      if (el) el.innerHTML = '';
-      setScannerReady(false);
-    };
-  }, [showScanner, scannerReady]);
   const removeFromCart = (id: string) => {
-    setCart(cart.filter(item => item.id !== id));
+    setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const updateCartItem = (id: string, field: keyof CartItem, value: string | number) => {
-    setCart(cart.map(item =>
-      item.id === id ? { ...item, [field]: field === 'quantity' || field === 'price' || field === 'conversion' ? Number(value) : value } : item
-    ));
-  };
-
-  const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cart]
-  );
-
+  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const total = subtotal + shippingCost;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authorized) return;
-    if (!cart.length) {
-      notify.admin.error('Tambahkan minimal satu produk.');
-      return;
-    }
+  const handleSaveOrder = async () => {
+    if (cart.length === 0) return notify.error("Keranjang kosong");
+    if (!externalOrderId) return notify.error("Order ID Marketplace wajib diisi");
+    
     setLoading(true);
     try {
-      // Preflight stock validation BEFORE creating order
-      // REMOVED: This validation is redundant and potentially buggy if not atomic.
-      // We rely on deductStockTx to throw if stock is insufficient during transaction.
-
-      // Atomic transaction with idempotency key
-      await runTransaction(db, async (tx) => {
-        // --- PHASE 1: READS ---
-        
-        // 1a. Check Idempotency Key
-        let idempKeyRef = null;
-        if (externalOrderId) {
-          const idempKey = `mp:${channel}:${externalOrderId}`;
-          idempKeyRef = doc(db, 'action_keys', idempKey);
-          const keySnap = await tx.get(idempKeyRef);
-          if (keySnap.exists()) {
-            throw new Error('Order marketplace dengan ID ini sudah diproses.');
-          }
-        }
-
-        // 1b. Read All Product Stocks
-        // We cannot use deductStockTx here because it mixes read/write.
-        // We must implement the deduction logic manually in batch.
-        // NOTE: Promise.all works for concurrent reads, but we need to ensure the refs are unique if duplicate items?
-        // Cart should have unique items by ID ideally.
-        const productRefs = cart.map(item => doc(db, 'products', item.id));
-        const productSnaps = [];
-        
-        // Sequential read to be absolutely safe with Firestore transaction requirements
-        for (const ref of productRefs) {
-          productSnaps.push(await tx.get(ref));
-        }
-        
-        // --- PHASE 2: VALIDATION & LOGIC ---
-        
-        const updates: { ref: any, data: any }[] = [];
-        const logs: { ref: any, data: any }[] = [];
-
-        productSnaps.forEach((pSnap, idx) => {
-          if (!pSnap.exists()) throw new Error(`Produk tidak ditemukan (ID: ${cart[idx].id})`);
-          
-          const item = cart[idx];
-          const pData: any = pSnap.data();
-          const currentStock = Number(pData.stock || 0);
-          const deductionQty = (item.quantity || 0) * (item.conversion || 1);
-
-          if (currentStock < deductionQty) {
-            throw new Error(`Stok tidak cukup: ${item.name}. Sisa: ${currentStock}, Butuh: ${deductionQty}`);
-          }
-
-          // Calculate new stock distribution
-          const stockByWarehouse: Record<string, number> = pData.stockByWarehouse || {};
-          const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-          let remaining = deductionQty;
-          const mainWarehouseId = 'gudang-utama';
-
-          // Prioritize Main Warehouse
-          if (nextByWarehouse[mainWarehouseId] && nextByWarehouse[mainWarehouseId] > 0) {
-            const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
-            nextByWarehouse[mainWarehouseId] -= cut;
-            remaining -= cut;
-          }
-
-          // Then others
-          if (remaining > 0) {
-            for (const [whId, qty] of Object.entries(nextByWarehouse)) {
-              if (whId === mainWarehouseId) continue;
-              if (remaining <= 0) break;
-              const cut = Math.min(qty as number, remaining);
-              nextByWarehouse[whId] = (qty as number) - cut;
-              remaining -= cut;
-            }
-          }
-
-          if (remaining > 0) {
-             // Force deduct from main if somehow still remaining (negative stock allowed? No, usually error)
-             // But we already checked total stock. So this case implies stockByWarehouse inconsistency.
-             // We'll force deduct from main to keep total consistent even if it goes negative per warehouse
-             nextByWarehouse[mainWarehouseId] = (nextByWarehouse[mainWarehouseId] || 0) - remaining;
-          }
-
-          const nextStock = currentStock - deductionQty;
-
-          updates.push({
-            ref: pSnap.ref,
-            data: { stock: nextStock, stockByWarehouse: nextByWarehouse }
-          });
-
-          // Prepare Log
-          logs.push({
-            ref: doc(collection(db, 'inventory_logs')),
-            data: {
-              productId: item.id,
-              productName: pData.name || pData.Nama || 'Produk',
-              type: 'KELUAR',
-              amount: deductionQty,
-              adminId: auth.currentUser?.uid || 'admin',
-              source: 'MARKETPLACE',
-              note: `Order Marketplace ${channel} ${externalOrderId ? '(' + externalOrderId + ')' : ''}`,
-              date: serverTimestamp(),
-              prevStock: currentStock,
-              nextStock
-            }
-          });
-        });
-
-        // --- PHASE 3: WRITES ---
-
-        // 3a. Write Idempotency Key
-        if (idempKeyRef) {
-          tx.set(idempKeyRef, {
-            createdAt: serverTimestamp(),
-            channel,
-            externalOrderId,
-            by: auth.currentUser?.uid || 'admin'
-          });
-        }
-
-        // 3b. Update Products
-        updates.forEach(u => tx.update(u.ref, u.data));
-
-        // 3c. Write Logs
-        logs.forEach(l => tx.set(l.ref, l.data));
-
-        // 3d. Create Order
-        const orderDocRef = doc(collection(db, 'orders'));
-        const itemsData = cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          unit: item.unit,
-          productId: item.id
-        }));
-
-        tx.set(orderDocRef, {
-          orderId: externalOrderId || null,
-          customerName: customerName || 'Marketplace',
-          userId: 'marketplace',
-          items: itemsData,
+      await runTransaction(db, async (transaction) => {
+        const orderRef = doc(collection(db, 'orders'));
+        const orderData = {
+          orderId: `MKT-${Date.now()}`,
+          externalOrderId,
+          customerName: customerName || `Customer ${channel}`,
+          items: cart,
           subtotal,
           shippingCost,
           total,
-          status: 'SELESAI',
-          paymentStatus: 'LUNAS',
-          paymentMethod: paymentMethod,
-          payment: { method: paymentMethod },
-          delivery: {
-            method: channel === 'SHOPEE' ? 'Shopee' : 'TikTok',
-            address: 'Marketplace'
-          },
           channel,
-          createdAt: serverTimestamp()
-        });
+          paymentMethod,
+          status: 'SELESAI',
+          createdAt: serverTimestamp(),
+          adminId: auth.currentUser?.uid
+        };
+
+        transaction.set(orderRef, orderData);
+
+        for (const item of cart) {
+          await deductStockTx(transaction, {
+            productId: item.id,
+            amount: item.quantity,
+            adminId: auth.currentUser?.uid || 'system',
+            source: 'MARKETPLACE',
+            note: `Marketplace Order: ${channel} - ${externalOrderId}`
+          });
+        }
       });
 
-      notify.admin.success('Order marketplace berhasil disimpan.');
+      notify.success("Pesanan marketplace berhasil disimpan");
       setCart([]);
       setExternalOrderId('');
       setCustomerName('');
       setShippingCost(0);
-      router.push('/admin/reports/sales');
-    } catch (err: any) {
-      console.error(err);
-      notify.admin.error(err.message || 'Gagal menyimpan order marketplace.');
+    } catch (err) {
+      Sentry.captureException(err);
+      notify.error("Gagal menyimpan pesanan");
     } finally {
       setLoading(false);
     }
   };
 
-  if (!authorized) {
-    return (
-      <div className="p-8">
-        <Toaster />
-        <p className="text-sm text-gray-500">Memverifikasi akses admin...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
-      <Toaster />
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/admin/orders" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-          <ChevronLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Order Marketplace</h1>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
-            Input penjualan dari Shopee dan TikTok Shop
-          </p>
+    <div className="p-3 md:p-6 bg-[#FBFBFE] min-h-screen pb-32">
+      <Toaster position="top-right" />
+      
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><ChevronLeft size={20} /></button>
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                <ShoppingBag className="text-orange-500" /> Marketplace Input
+              </h1>
+            </div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-10">Manual Marketplace Entry</p>
+          </div>
+
+          <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
+            <button onClick={() => setChannel('SHOPEE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${channel === 'SHOPEE' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}>SHOPEE</button>
+            <button onClick={() => setChannel('TIKTOK')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${channel === 'TIKTOK' ? 'bg-black text-white shadow-lg shadow-gray-200' : 'text-gray-400 hover:bg-gray-50'}`}>TIKTOK</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-6">
+            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                  <Hash size={12} /> Order ID Marketplace
+                </label>
+                <input 
+                  type="text" 
+                  value={externalOrderId} 
+                  onChange={e => setExternalOrderId(e.target.value)}
+                  placeholder="Contoh: 240427SHPXXX" 
+                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-orange-500 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                  <User size={12} /> Nama Pembeli (Opsional)
+                </label>
+                <input 
+                  type="text" 
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                  placeholder="Nama Customer..." 
+                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-blue-500 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                  <Truck size={12} /> Ongkos Kirim
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400">Rp</span>
+                  <input 
+                    type="number" 
+                    value={shippingCost}
+                    onChange={e => setShippingCost(Number(e.target.value))}
+                    className="w-full bg-gray-50 p-4 pl-10 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-green-500 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <CartTable 
+              cart={cart} 
+              onUpdateQty={updateQty} 
+              onRemove={removeFromCart} 
+            />
+          </div>
+
+          <div className="lg:col-span-4 space-y-6">
+            <div className="h-[400px]">
+              <ProductSearchList 
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                products={filteredProducts}
+                onAddToCart={handleAddToCart}
+                channel={channel}
+              />
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-[0.03] rotate-12">
+                <Store size={120} />
+              </div>
+              <div className="relative z-10 space-y-4">
+                <div className="flex justify-between items-center text-gray-400">
+                  <span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span>
+                  <span className="text-xs font-black">Rp{subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-gray-400">
+                  <span className="text-[10px] font-black uppercase tracking-widest">Shipping</span>
+                  <span className="text-xs font-black">Rp{shippingCost.toLocaleString()}</span>
+                </div>
+                <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
+                  <span className="text-xs font-black uppercase tracking-widest">Grand Total</span>
+                  <span className="text-2xl font-black text-orange-600">Rp{total.toLocaleString()}</span>
+                </div>
+
+                <div className="pt-6 space-y-3">
+                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <CreditCard className="text-gray-400" size={18} />
+                    <select 
+                      value={paymentMethod}
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none w-full"
+                    >
+                      <option value="TRANSFER">Transfer Bank</option>
+                      <option value="CASH">Saldo Marketplace</option>
+                      <option value="QRIS">QRIS / E-Wallet</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    onClick={handleSaveOrder}
+                    disabled={loading || cart.length === 0}
+                    className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    {loading ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
+                    Simpan Pesanan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                  <ShoppingBag size={14} /> Channel
-                </label>
-                <select
-                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
-                  value={channel}
-                  onChange={(e) => setChannel(e.target.value as Channel)}
-                >
-                  <option value="SHOPEE">Shopee (Estimasi 2-3 Hari)</option>
-                  <option value="TIKTOK">TikTok Shop (Estimasi 7-9 Hari)</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                  <Store size={14} /> ID Order Marketplace
-                </label>
-                <input
-                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
-                  placeholder="Isi nomor order Shopee/TikTok (opsional)"
-                  value={externalOrderId}
-                  onChange={(e) => setExternalOrderId(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                  Nama Pelanggan
-                </label>
-                <input
-                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
-                  placeholder="Nama pelanggan (opsional)"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                  <CreditCard size={14} /> Metode Pembayaran
-                </label>
-                <select
-                  className="w-full bg-gray-50 p-3 rounded-2xl text-[10px] font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  <option value="TRANSFER">Transfer</option>
-                  <option value="COD">COD</option>
-                  <option value="OTHER">Lainnya</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-5 md:p-6 border-b border-gray-50">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  className="w-full bg-gray-50 pl-10 pr-4 py-3 rounded-2xl text-[10px] font-bold outline-none"
-                  placeholder="Cari produk untuk ditambahkan ke order marketplace..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowScanner(!showScanner)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1"
-                >
-                  <Camera size={12} /> Scan
-                </button>
-                {showScanner && (
-                  <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100" id="mp-scanner" />
-                )}
-                {search && (
-                  <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-                    {filteredProducts.map(p => {
-                      const name = p.name || p.Nama || 'Produk';
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => addToCart(p)}
-                          className="w-full p-4 text-left hover:bg-gray-50 flex justify-between items-center group"
-                        >
-                          <div>
-                            <p className="text-xs font-black uppercase text-gray-800">{name}</p>
-                            <p className="text-[9px] font-bold text-gray-400">
-                              Stok: {p.stock ?? 0} {p.unit || p.Satuan || 'pcs'}
-                            </p>
-                          </div>
-                          <Plus size={16} className="text-gray-300 group-hover:text-black" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="md:hidden space-y-4 mb-6">
-              {cart.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
-                  <ShoppingBag className="mx-auto text-gray-200 mb-4" size={40} />
-                  <p className="text-[10px] font-black text-gray-400 tracking-widest">KERANJANG KOSONG</p>
-                </div>
-              ) : (
-                cart.map((item) => (
-                  <div key={item.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
-                     <div className="flex justify-between items-start">
-                        <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">{item.name}</h3>
-                        <button
-                           type="button"
-                           onClick={() => removeFromCart(item.id)}
-                           className="p-2 bg-red-50 text-red-500 rounded-xl"
-                        >
-                           <Trash2 size={14} />
-                        </button>
-                     </div>
-                     
-                     <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-gray-50 p-2 rounded-xl">
-                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Qty</label>
-                           <input
-                              type="number"
-                              className="w-full bg-transparent text-xs font-black text-center outline-none"
-                              value={item.quantity}
-                              onChange={(e) => updateCartItem(item.id, 'quantity', e.target.value)}
-                              min={1}
-                           />
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-xl">
-                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Harga Satuan</label>
-                           <input
-                              type="number"
-                              className="w-full bg-transparent text-xs font-black text-center outline-none"
-                              value={item.price}
-                              onChange={(e) => updateCartItem(item.id, 'price', e.target.value)}
-                              min={0}
-                           />
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-2xl">
-                           <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Satuan</label>
-                           <select
-                             className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black uppercase"
-                             value={item.unit}
-                             onChange={(e) => {
-                               const newUnit = e.target.value;
-                               const found = item.availableUnits?.find(u => u.code === newUnit);
-                               updateCartItem(item.id, 'unit', newUnit);
-                               updateCartItem(item.id, 'conversion', found?.contains || 1);
-                             }}
-                           >
-                             {item.availableUnits && item.availableUnits.length > 0 ? (
-                               item.availableUnits.map(u => (
-                                 <option key={u.code} value={u.code}>{u.code}</option>
-                               ))
-                             ) : (
-                               <option value={item.unit}>{item.unit}</option>
-                             )}
-                           </select>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-2xl">
-                          <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Isi (Pcs)</label>
-                          <input
-                            type="number"
-                            className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
-                            value={item.conversion || 1}
-                            onChange={(e) => updateCartItem(item.id, 'conversion', e.target.value)}
-                            min={1}
-                          />
-                        </div>
-                     </div>
-
-                     <div className="flex justify-between items-center border-t border-gray-50 pt-3">
-                        <span className="text-[10px] font-black text-gray-400 uppercase">Subtotal</span>
-                        <span className="text-sm font-black text-gray-900">Rp {(item.quantity * item.price).toLocaleString()}</span>
-                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full text-left min-w-[680px] md:min-w-0">
-              <thead className="bg-gray-50/50">
-                <tr>
-                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Satuan</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
-                  <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga</th>
-                  <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {cart.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 md:px-8 py-3 md:py-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-[9px] text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline"
-                        >
-                          <Trash2 size={10} /> Hapus
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center justify-center">
-                        <input
-                          type="number"
-                          className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
-                          value={item.quantity}
-                          onChange={(e) => updateCartItem(item.id, 'quantity', e.target.value)}
-                          min={1}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
-                      <select
-                        className="bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none uppercase"
-                        value={item.unit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value;
-                          const found = item.availableUnits?.find(u => u.code === newUnit);
-                          updateCartItem(item.id, 'unit', newUnit);
-                          updateCartItem(item.id, 'conversion', found?.contains || 1);
-                        }}
-                      >
-                        {item.availableUnits && item.availableUnits.length > 0 ? (
-                          item.availableUnits.map(u => (
-                            <option key={u.code} value={u.code}>{u.code}</option>
-                          ))
-                        ) : (
-                          <option value={item.unit}>{item.unit}</option>
-                        )}
-                      </select>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
-                        value={item.conversion || 1}
-                        onChange={(e) => updateCartItem(item.id, 'conversion', e.target.value)}
-                        min={1}
-                      />
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-center">
-                      <input
-                        type="number"
-                        className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
-                        value={item.price}
-                        onChange={(e) => updateCartItem(item.id, 'price', e.target.value)}
-                        min={0}
-                      />
-                    </td>
-                    <td className="px-3 md:px-8 py-3 md:py-4 text-right text-xs font-black text-gray-800">
-                      Rp {(item.quantity * item.price).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-                {!cart.length && (
-                  <tr>
-                    <td colSpan={6} className="px-3 md:px-8 py-10 text-center text-[11px] font-bold text-gray-400">
-                      Belum ada produk di order marketplace ini.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
-            <h2 className="text-xs font-black text-gray-800 uppercase tracking-[0.2em] flex items-center gap-2">
-              <ShoppingBag size={16} /> Ringkasan Order
-            </h2>
-            <div className="flex items-center justify-between text-xs font-bold text-gray-600">
-              <span>Subtotal</span>
-              <span>Rp {subtotal.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs font-bold text-gray-600">
-              <span>Ongkir / Biaya Lain</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-400">Rp</span>
-                <input
-                  type="number"
-                  className="w-24 bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none"
-                  value={shippingCost}
-                  onChange={(e) => setShippingCost(Number(e.target.value))}
-                  min={0}
-                />
-              </div>
-            </div>
-            <div className="border-t border-dashed border-gray-100 pt-4 mt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-gray-800 uppercase tracking-[0.2em]">Total</span>
-                <span className="text-lg font-black text-gray-900">
-                  Rp {total.toLocaleString()}
-                </span>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !cart.length}
-              className="mt-4 w-full bg-black text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Save size={16} />
-              {loading ? 'Menyimpan...' : 'Simpan Order'}
-            </button>
-          </div>
-        </div>
-      </form>
     </div>
   );
 }

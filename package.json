@@ -21,7 +21,8 @@
     "backup:collection": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "test:email": "node scripts/test-email.js",
-    "test:sms": "node scripts/test-sms.js"
+    "test:sms": "node scripts/test-sms.js",
+    "setup:firebase-admin": "node scripts/setup-firebase-admin.js"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -39,13 +40,14 @@
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.1.0",
     "lucide-react": "^0.562.0",
-    "nodemailer": "^6.10.1",
     "next": "^16.1.6",
+    "nodemailer": "^6.10.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-barcode": "^1.6.1",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
+    "recharts": "^3.8.1",
     "twilio": "^5.11.2",
     "xlsx": "^0.18.5"
   },

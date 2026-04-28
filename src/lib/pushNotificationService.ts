@@ -313,7 +313,7 @@ export const sendToTopic = async (
   }
 };
 
-export default {
+const pushNotificationService = {
   saveFCMToken,
   getUserFCMToken,
   sendPushNotification,
@@ -328,3 +328,5 @@ export default {
   unsubscribeFromTopic,
   sendToTopic,
 };
+
+export default pushNotificationService;

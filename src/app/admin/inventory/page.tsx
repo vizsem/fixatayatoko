@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { auth, db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
-import type { UnitOption } from '@/lib/normalize';
+import { Product } from '@/lib/types';
 import { addInventoryLog } from '@/lib/inventory';
-
+import * as Sentry from '@sentry/nextjs';
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -25,33 +25,11 @@ import {
 import {
   Box, Search, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw,
   ClipboardCheck, Package, Warehouse, ChevronRight,
-  ChevronLeft, Download, Activity, ListFilter, CheckSquare, Square,
-  X, MapPinned, FolderInput, EyeOff, Check, ScanBarcode, Image as ImageIcon, Trash2,
-  LucideIcon, BarChart3
+  ChevronLeft, ScanBarcode, Image as ImageIcon, Trash2,
+  LucideIcon, BarChart3, CheckSquare, Square, Check, X, MapPinned, FolderInput, EyeOff
 } from 'lucide-react';
 
-
-import * as XLSX from 'xlsx';
-
-// --- TYPES ---
-type Product = {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  warehouseId: string;
-  stock: number;
-  minStock: number;
-  priceEcer: number;
-  priceGrosir: number;
-  unit: string;
-  isActive?: boolean;
-  imageUrl?: string;
-  units?: UnitOption[];
-  stockByWarehouse?: Record<string, number>;
-  updatedAt?: number;
-  createdAt?: number;
-};
+import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
 
 export default function InventoryDashboard() {
   const router = useRouter();
@@ -84,28 +62,18 @@ export default function InventoryDashboard() {
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
-    
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        return;
-      }
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
 
       if (e.key !== 'Enter') {
-        if (e.key.length === 1) {
-          setBarcodeBuffer((prev) => prev + e.key);
-        }
+        if (e.key.length === 1) setBarcodeBuffer((prev) => prev + e.key);
         clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          setBarcodeBuffer('');
-        }, 50); 
-      } else {
-        if (barcodeBuffer) {
-          e.preventDefault();
-          // Set searchTerm ke barcodeBuffer agar langsung memfilter list inventory
-          setSearchTerm(barcodeBuffer);
-          setBarcodeBuffer('');
-          notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
-        }
+        timeout = setTimeout(() => setBarcodeBuffer(''), 50); 
+      } else if (barcodeBuffer) {
+        e.preventDefault();
+        setSearchTerm(barcodeBuffer);
+        setBarcodeBuffer('');
+        notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
       }
     };
 
@@ -115,13 +83,12 @@ export default function InventoryDashboard() {
       clearTimeout(timeout);
     };
   }, [barcodeBuffer]);
-  // ========================================
 
   useEffect(() => {
     if (liveProducts) {
-      const sorted = [...(liveProducts as Product[])].sort((a, b) => {
-        const timeA = a.updatedAt || a.createdAt || 0;
-        const timeB = b.updatedAt || b.createdAt || 0;
+      const sorted = [...(liveProducts as unknown as Product[])].sort((a, b) => {
+        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
         return timeB - timeA;
       });
       setProducts(sorted);
@@ -129,26 +96,16 @@ export default function InventoryDashboard() {
   }, [liveProducts]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push('/profil/login');
         return;
       }
       const unsubCats = onSnapshot(collection(db, 'categories'), (s) => {
-        setCategories(
-          s.docs.map((d) => {
-            const data = d.data() as Record<string, unknown>;
-            return { id: d.id, name: String(data.name || '') };
-          })
-        );
+        setCategories(s.docs.map(d => ({ id: d.id, name: String(d.data().name || '') })));
       });
       const unsubWh = onSnapshot(collection(db, 'warehouses'), (s) => {
-        setWarehouses(
-          s.docs.map((d) => {
-            const data = d.data() as Record<string, unknown>;
-            return { id: d.id, name: String(data.name || '') };
-          })
-        );
+        setWarehouses(s.docs.map(d => ({ id: d.id, name: String(d.data().name || '') })));
       });
       setLoading(false);
       return () => {
@@ -156,18 +113,20 @@ export default function InventoryDashboard() {
         unsubWh();
       };
     });
-    return () => unsub();
+    return () => unsubAuth();
   }, [router]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const nameMatch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const skuMatch = ((p as any).sku || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = nameMatch || skuMatch;
       const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-      const matchesWarehouse = selectedWarehouse === 'all' || p.warehouseId === selectedWarehouse;
+      const matchesWarehouse = selectedWarehouse === 'all' || ((p as any).warehouseId || '') === selectedWarehouse;
       return matchesSearch && matchesCategory && matchesWarehouse;
     });
   }, [products, searchTerm, selectedCategory, selectedWarehouse]);
+
   const displayWarehouses = useMemo(() => {
     const base = warehouses;
     const knownIds = new Set(base.map(w => w.id));
@@ -176,7 +135,8 @@ export default function InventoryDashboard() {
     products.forEach((p) => {
       const by = (p.stockByWarehouse || {});
       Object.keys(by).forEach(k => derived.add(k));
-      if (p.warehouseId) derived.add(String(p.warehouseId));
+      const pAny = p as any;
+      if (pAny.warehouseId) derived.add(String(pAny.warehouseId));
     });
     const virtuals = Array.from(derived)
       .filter(k => !knownIds.has(k) && !knownNames.has(k))
@@ -198,46 +158,22 @@ export default function InventoryDashboard() {
   const displayedStock = (p: Product) => {
     const selected = (unitSelection[p.id] || p.unit || '').toUpperCase();
     if (!selected || selected === (p.unit || '').toUpperCase()) return p.stock;
-    const found = (p.units || []).find(u => (u.code || '').toUpperCase() === selected && typeof u.contains === 'number' && (u.contains as number) > 0);
+    const found = (p.units || []).find(u => (u.code || '').toUpperCase() === selected && typeof u.contains === 'number' && u.contains > 0);
     if (!found) return p.stock;
     return Math.floor(p.stock / (found.contains as number));
   };
-
-  const handleExport = useCallback(() => {
-    const exportData = filteredProducts.map(p => ({
-      'Name': p.name,
-      'SKU': p.sku,
-      'Category': p.category,
-      'Warehouse': warehouses.find(w => w.id === p.warehouseId)?.name || 'Central',
-      'Stock': p.stock,
-      'Min Stock': p.minStock,
-      'Price Ecer': p.priceEcer,
-      'Price Grosir': p.priceGrosir,
-      'Unit': p.unit,
-      'Status': p.isActive ? 'Active' : 'Inactive'
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory');
-    XLSX.writeFile(workbook, 'inventory-export.xlsx');
-  }, [filteredProducts, warehouses]);
-
 
   const handleQuickUpdate = async (id: string) => {
     try {
       const product = products.find(p => p.id === id);
       if (!product) return;
-
       const diff = tempStock - product.stock;
       if (diff === 0) {
         setEditingId(null);
         return;
       }
-
       const ref = doc(db, 'products', id);
       await updateDoc(ref, { stock: tempStock, updatedAt: serverTimestamp() });
-
-      // Log it
       await addInventoryLog({
         productId: id,
         productName: product.name,
@@ -249,28 +185,19 @@ export default function InventoryDashboard() {
         toWarehouseId: diff > 0 ? 'gudang-utama' : undefined,
         fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined
       });
-
       setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: tempStock } : p));
       setEditingId(null);
       notify.admin.success('Stok diperbarui');
-    } catch { notify.admin.error('Gagal memperbarui stok'); }
+    } catch (err) { 
+      Sentry.captureException(err, { extra: { productId: id, action: 'quickUpdate' } });
+      notify.admin.error('Gagal memperbarui stok'); 
+    }
   };
 
-  // --- PAGINATION LOGIC ---
   const totalPages = useMemo(() => Math.ceil(filteredProducts.length / rowsPerPage), [filteredProducts.length, rowsPerPage]);
-  const indexOfLastItem = useMemo(() => currentPage * rowsPerPage, [currentPage, rowsPerPage]);
-  const indexOfFirstItem = useMemo(() => indexOfLastItem - rowsPerPage, [indexOfLastItem, rowsPerPage]);
-  const currentItems = useMemo(() => filteredProducts.slice(indexOfFirstItem, indexOfLastItem), [filteredProducts, indexOfFirstItem, indexOfLastItem]);
-
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === currentItems.length) setSelectedIds([]);
-    else setSelectedIds(currentItems.map(p => p.id));
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+  const indexOfLastItem = currentPage * rowsPerPage;
+  const indexOfFirstItem = indexOfLastItem - rowsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
 
   const executeBatchUpdate = async () => {
     if (!batchAction || selectedIds.length === 0) return;
@@ -278,52 +205,45 @@ export default function InventoryDashboard() {
     const batch = writeBatch(db);
     selectedIds.forEach(id => {
       const pRef = doc(db, 'products', id);
-      const updateData: Omit<Partial<Product>, 'updatedAt'> & { updatedAt: ReturnType<typeof serverTimestamp> } = { updatedAt: serverTimestamp() };
-
+      const updateData: any = { updatedAt: serverTimestamp() };
       if (batchAction === 'category') updateData.category = batchValue;
-      if (batchAction === 'warehouse') updateData.warehouseId = batchValue;
+      if (batchAction === 'warehouse') (updateData as any).warehouseId = batchValue;
       if (batchAction === 'status') updateData.isActive = false;
       batch.update(pRef, updateData);
     });
-
     try {
       await batch.commit();
       setSelectedIds([]);
       setIsBatchModalOpen(false);
       notify.admin.success('Batch update berhasil');
-    } catch { notify.admin.error('Batch update gagal'); }
-
-    finally { setLoading(false); }
+    } catch (err) { 
+      Sentry.captureException(err, { extra: { action: 'batchUpdate', count: selectedIds.length } });
+      notify.admin.error('Batch update gagal'); 
+    } finally { setLoading(false); }
   };
 
   const executeBatchDelete = async () => {
     if (selectedIds.length === 0) return;
-    const ok = typeof window !== 'undefined' ? window.confirm(`Hapus permanen ${selectedIds.length} produk?`) : true;
+    const ok = window.confirm(`Hapus permanen ${selectedIds.length} produk?`);
     if (!ok) return;
     setLoading(true);
     const batch = writeBatch(db);
-    selectedIds.forEach(id => {
-      const pRef = doc(db, 'products', id);
-      batch.delete(pRef);
-    });
+    selectedIds.forEach(id => batch.delete(doc(db, 'products', id)));
     try {
       await batch.commit();
       setSelectedIds([]);
       notify.admin.success('Produk berhasil dihapus');
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, { extra: { action: 'batchDelete', count: selectedIds.length } });
       notify.admin.error('Gagal menghapus produk');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  if (loading || productsLoading) return <div className="min-h-screen flex items-center justify-center"><Activity className="animate-spin text-green-600" /></div>;
+  if (loading || productsLoading) return <InventorySkeleton />;
 
   return (
     <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
       <Toaster position="top-right" />
-
-      {/* 1. Navigasi Cepat */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4">
         <NavCard icon={ArrowDownLeft} label="In" href={`/admin/inventory/stock-in?ids=${selectedIds.join(',')}`} color="text-green-600" bg="bg-green-50" />
         <NavCard icon={ArrowUpRight} label="Out" href={`/admin/inventory/stock-out?ids=${selectedIds.join(',')}`} color="text-red-600" bg="bg-red-50" />
@@ -333,99 +253,76 @@ export default function InventoryDashboard() {
         <NavCard icon={Box} label="Log" href="/admin/inventory/history" color="text-orange-600" bg="bg-orange-50" />
       </div>
 
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
         <div>
           <h1 className="text-xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
             <Package className="text-green-600" size={22} /> Inventory Hub
           </h1>
-
-          <p className="text-gray-400 text-[8px] font-black uppercase tracking-widest mt-0.5">
-            Realtime SKU Monitor
-          </p>
+          <p className="text-gray-400 text-[8px] font-black uppercase tracking-widest mt-0.5">Realtime SKU Monitor</p>
         </div>
         <div className="flex gap-1.5">
-          <button className="bg-gray-100 p-2.5 rounded-xl hover:bg-gray-200 transition-all shadow-sm"><ScanBarcode size={16} /></button>
           <Link href="/admin/products/add" className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg flex items-center gap-1.5">
             <Plus size={14} /> NEW SKU
           </Link>
         </div>
       </div>
 
-      {/* 2. Advanced Filters & Rows Per Page */}
-      <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-50 mb-4 space-y-3">
+      <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-4 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-            <input className="w-full bg-gray-50 pl-9 pr-4 py-2.5 rounded-xl text-[11px] font-bold outline-none" placeholder="Search SKU, Name..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+            <input className="w-full bg-gray-50 pl-9 pr-4 py-2.5 rounded-xl text-[11px] font-bold outline-none" placeholder="Search SKU, Name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}>
+          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
             <option value="all">CAT: ALL</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
           </select>
-          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedWarehouse} onChange={(e) => { setSelectedWarehouse(e.target.value); setCurrentPage(1); }}>
+          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedWarehouse} onChange={(e) => setSelectedWarehouse(e.target.value)}>
             <option value="all">WH: ALL</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name.toUpperCase()}</option>)}
           </select>
         </div>
-
-        {/* Rows Selector */}
         <div className="flex items-center gap-3 pt-2 border-t border-gray-50">
           <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">ROWS:</span>
-
           {[50, 100, 300].map(val => (
-            <button
-              key={val}
-              onClick={() => { setRowsPerPage(val); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${rowsPerPage === val ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-            >
-              {val}
-            </button>
+            <button key={val} onClick={() => setRowsPerPage(val)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${rowsPerPage === val ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>{val}</button>
           ))}
         </div>
       </div>
 
-      {/* 3. Main Table */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
         <div className="md:hidden">
           {currentItems.map(product => (
             <div key={product.id} className={`p-3.5 flex flex-col gap-3 border-b border-gray-50 ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : 'bg-white'}`}>
-              <div className="flex items-start gap-3">
-                <button onClick={() => toggleSelect(product.id)} className="mt-1 text-gray-200">
+               <div className="flex items-start gap-3">
+                <button onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i => i !== product.id) : [...prev, product.id])} className="mt-1 text-gray-200">
                   {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={18} /> : <Square size={18} />}
                 </button>
                 <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-200 overflow-hidden relative shrink-0">
-                  {product.imageUrl ? (
-                    <Image src={product.imageUrl} fill className="object-cover" alt={product.name} sizes="56px" />
-                  ) : <ImageIcon size={18} />}
+                  {product.image ? <Image src={product.image} fill className="object-cover" alt={product.name} sizes="56px" /> : <ImageIcon size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[8px] font-black text-blue-500 italic">#{product.sku || 'N/A'}</span>
+                    <span className="text-[8px] font-black text-blue-500 italic">#{(product as any).sku || 'N/A'}</span>
                     <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">• {product.category || 'GENERAL'}</span>
                   </div>
                   <h3 className="text-[11px] font-black text-gray-800 uppercase leading-none tracking-tight line-clamp-2 mb-1.5">{product.name}</h3>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black text-emerald-600">
                       {(() => {
-                        const sel = (unitSelection[product.id] || product.unit).toUpperCase();
-                        if (sel === (product.unit || '').toUpperCase()) {
-                          return `Rp${Number(product.priceEcer || 0).toLocaleString('id-ID')} /${sel}`;
-                        }
+                        const sel = (unitSelection[product.id] || product.unit || '').toUpperCase();
+                        if (sel === (product.unit || '').toUpperCase()) return `Rp${Number(product.price || 0).toLocaleString('id-ID')} /${sel}`;
                         const found = (product.units || []).find(u => (u.code || '').toUpperCase() === sel);
                         return `Rp${Number(found?.price || 0).toLocaleString('id-ID')} /${sel}`;
                       })()}
                     </span>
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg">
-                      <ChevronRight size={14} />
-                    </Link>
+                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg"><ChevronRight size={14} /></Link>
                   </div>
                 </div>
               </div>
-
               <div className="flex items-center justify-between pt-2 px-1 border-t border-gray-50/50">
                 <div className="flex flex-col">
-                   <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Available Stock</p>
+                  <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Available Stock</p>
                   {editingId === product.id ? (
                     <div className="flex items-center gap-2">
                       <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-[11px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
@@ -433,234 +330,100 @@ export default function InventoryDashboard() {
                       <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={12} /></button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-[11px] font-black px-2.5 py-1.5 rounded-xl transition-all w-fit ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
-                      {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5 font-bold">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
+                    <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-[11px] font-black px-2.5 py-1.5 rounded-xl transition-all w-fit ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
+                      {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5 font-bold">{(unitSelection[product.id] || product.unit || '').toUpperCase()}</span>
                     </button>
                   )}
                 </div>
-                {unitCodes(product).length > 1 && !editingId && (
-                  <select
-                    className="text-[9px] font-black bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 outline-none uppercase"
-                    value={(unitSelection[product.id] || product.unit).toUpperCase()}
-                    onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
-                  >
-                    {unitCodes(product).map(code => <option key={code} value={code}>{code}</option>)}
-                  </select>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap gap-1.5">
-                 <span className="text-[8px] font-black text-gray-400 uppercase flex items-center gap-1">
-                    <Warehouse size={10} className="text-gray-200" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
-                 </span>
-                 {Object.entries(product.stockByWarehouse || {})
-                    .filter(([_, v]) => Number(v) > 0)
-                    .map(([wid, val]) => (
-                      <span key={wid} className="text-[8px] font-black text-gray-500 bg-gray-50/50 border border-gray-100 rounded-md px-1.5 py-0.5 uppercase">
-                        {displayWarehouses.find(w => w.id === wid)?.name || wid}: {val}
-                      </span>
-                 ))}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Desktop View */}
-        <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full text-left min-w-[720px] md:min-w-0">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left">
             <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-2 md:px-4 py-2 w-10">
-                  <button onClick={handleSelectAll} className="hover:scale-110 transition-transform">
+                <th className="px-4 py-2 w-10">
+                  <button onClick={() => setSelectedIds(selectedIds.length === currentItems.length ? [] : currentItems.map(p => p.id))}>
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-300" size={16} />}
                   </button>
                 </th>
-                <th className="px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Product</th>
-                <th className="hidden md:table-cell px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Warehouse</th>
-                <th className="px-2 md:px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest text-center">Stock level</th>
-                <th className="px-2 md:px-4 py-2 text-right text-[9px] font-black text-gray-400 tracking-widest">Details</th>
+                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Product</th>
+                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Warehouse</th>
+                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest text-center">Stock</th>
+                <th className="px-4 py-2 text-right text-[9px] font-black text-gray-400 tracking-widest">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {currentItems.map(product => (
-                <tr key={product.id} className={`hover:bg-gray-50/50 transition-all ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
-                  <td className="px-2 md:px-4 py-2">
-                    <button onClick={() => toggleSelect(product.id)}>
+                <tr key={product.id} className={`hover:bg-gray-50/50 ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
+                  <td className="px-4 py-2">
+                    <button onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i => i !== product.id) : [...prev, product.id])}>
                       {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-200" size={16} />}
                     </button>
                   </td>
-                  <td className="px-2 md:px-4 py-2">
+                  <td className="px-4 py-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 overflow-hidden relative">
-                        {product.imageUrl ? (
-                          <Image
-                            src={product.imageUrl}
-                            fill
-                            className="object-cover"
-                            alt={product.name}
-                            sizes="40px"
-                          />
-                        ) : <ImageIcon size={16} />}
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl relative overflow-hidden">
+                        {product.image ? <Image src={product.image} fill className="object-cover" alt={product.name} /> : <ImageIcon size={16} className="m-3 text-gray-300" />}
                       </div>
-
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-gray-800 tracking-tight leading-none">{product.name}</span>
-                        <span className="text-[8px] font-bold text-gray-400 tracking-wider mt-0.5">{product.sku} • {product.category}</span>
-                        <span className="text-[9px] font-black text-emerald-600">
-                          {(() => {
-                            const sel = (unitSelection[product.id] || product.unit).toUpperCase();
-                            if (sel === (product.unit || '').toUpperCase()) {
-                              return `Rp${Number(product.priceEcer || 0).toLocaleString('id-ID')} /${sel}`;
-                            }
-                            const found = (product.units || []).find(u => (u.code || '').toUpperCase() === sel);
-                            const price = Number(found?.price || 0);
-                            const contains = Number(found?.contains || 0);
-                            const partA = price > 0 ? `Rp${price.toLocaleString('id-ID')}` : 'Rp -';
-                            const partB = contains > 0 ? ` (isi ${contains})` : '';
-                            return `${partA} /${sel}${partB}`;
-                          })()}
-                        </span>
+                        <span className="text-[11px] font-black text-gray-800">{product.name}</span>
+                        <span className="text-[8px] font-bold text-gray-400">{(product as any).sku} • {product.category}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="hidden md:table-cell px-2 md:px-4 py-2">
-                    <span className="text-[9px] font-black text-gray-500 flex items-center gap-1.5">
-                      <Warehouse size={11} className="text-gray-300" /> {displayWarehouses.find(w => w.id === product.warehouseId)?.name || 'Central'}
+                  <td className="px-4 py-2 text-[9px] font-black text-gray-500">
+                    {displayWarehouses.find(w => w.id === (product as any).warehouseId)?.name || 'Central'}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
+                      {displayedStock(product).toLocaleString()} {(unitSelection[product.id] || product.unit || '').toUpperCase()}
                     </span>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {Object.entries(product.stockByWarehouse || {})
-                        .filter(([_, v]) => Number(v) > 0)
-                        .map(([wid, val]) => (
-                          <span key={wid} className="text-[8px] font-bold bg-gray-50 border border-gray-100 rounded-md px-1.5 py-0.5">
-                            {displayWarehouses.find(w => w.id === wid)?.name || wid}: {val}
-                          </span>
-                        ))}
-                    </div>
                   </td>
-                  <td className="px-2 md:px-4 py-2 text-center">
-                    {editingId === product.id ? (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <input autoFocus type="number" className="w-14 p-1.5 bg-gray-100 rounded-md text-[10px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
-                        <button onClick={() => handleQuickUpdate(product.id)} className="p-1.5 bg-black text-white rounded-md"><Check size={12} /></button>
-                        <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-100 text-gray-400 rounded-md"><X size={12} /></button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <div className="group relative inline-block cursor-pointer" onDoubleClick={() => { setEditingId(product.id); setTempStock(product.stock); }}>
-                          <span className={`text-[10px] font-black px-2 py-1 rounded-lg transition-all ${product.stock <= product.minStock ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800 hover:bg-black hover:text-white'}`}>
-                            {displayedStock(product).toLocaleString()} <span className="text-[8px] opacity-60 ml-0.5">{(unitSelection[product.id] || product.unit).toUpperCase()}</span>
-                          </span>
-                          {product.stock <= product.minStock && <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />}
-                        </div>
-                        {unitCodes(product).length > 1 && (
-                          <select
-                            className="text-[8px] font-bold bg-gray-50 border border-gray-100 rounded-md px-1.5 py-0.5"
-                            value={(unitSelection[product.id] || product.unit).toUpperCase()}
-                            onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
-                          >
-                            {unitCodes(product).map(code => <option key={code} value={code}>{code}</option>)}
-                          </select>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2 md:px-4 py-2 text-right">
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 bg-white border border-gray-100 rounded-lg inline-flex items-center justify-center hover:border-black transition-all">
-                      <ChevronRight size={14} className="text-gray-400" />
-                    </Link>
+                  <td className="px-4 py-2 text-right">
+                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 border rounded-lg inline-block"><ChevronRight size={14} /></Link>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination Footer */}
-        <div className="px-3 md:px-6 py-3 md:py-4 bg-gray-50/50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <span className="text-[10px] font-black text-gray-400 tracking-widest">
-            Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredProducts.length)} dari {filteredProducts.length} produk
-
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-3 bg-white border border-gray-100 rounded-xl disabled:opacity-30 hover:bg-gray-50 transition-all shadow-sm"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex gap-1">
-              {[...Array(totalPages)].map((_, i) => {
-                const pageNum = i + 1;
-                if (totalPages > 5 && Math.abs(currentPage - pageNum) > 1 && pageNum !== 1 && pageNum !== totalPages) return null;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-10 h-10 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum ? 'bg-black text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'}`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-3 bg-white border border-gray-100 rounded-xl disabled:opacity-30 hover:bg-gray-50 transition-all shadow-sm"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+      <div className="mt-4 flex justify-between items-center px-4">
+        <span className="text-[10px] font-black text-gray-400 uppercase">Page {currentPage} of {totalPages}</span>
+        <div className="flex gap-2">
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 border rounded-xl disabled:opacity-30"><ChevronLeft size={16} /></button>
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 border rounded-xl disabled:opacity-30"><ChevronRight size={16} /></button>
         </div>
       </div>
 
-      {/* 4. Floating Batch Action Bar */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex items-center gap-6 border border-white/10 animate-in slide-in-from-bottom-10 duration-500">
-          <div className="flex flex-col">
-            <span className="text-[11px] font-black text-emerald-400 tracking-widest">{selectedIds.length} items</span>
-            <span className="text-[8px] font-bold text-gray-500 text-center">SELECTED</span>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex items-center gap-6 animate-in slide-in-from-bottom-10">
+          <span className="text-[11px] font-black text-emerald-400">{selectedIds.length} SELECTED</span>
+          <div className="flex gap-4">
+            <button onClick={() => { setBatchAction('warehouse'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1"><MapPinned size={18} /><span className="text-[8px] font-black">Move</span></button>
+            <button onClick={() => { setBatchAction('category'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1"><FolderInput size={18} /><span className="text-[8px] font-black">Category</span></button>
+            <button onClick={executeBatchDelete} className="flex flex-col items-center gap-1"><Trash2 size={18} className="text-red-400" /><span className="text-[8px] font-black">Delete</span></button>
           </div>
-
-          <div className="h-8 w-[1px] bg-gray-800" />
-          <div className="flex gap-6">
-            <button onClick={() => { setBatchAction('warehouse'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1 group transition-all">
-              <MapPinned size={18} className="group-hover:text-emerald-400" /><span className="text-[8px] font-black">Move</span>
-            </button>
-            <button onClick={() => { setBatchAction('category'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1 group transition-all">
-              <FolderInput size={18} className="group-hover:text-blue-400" /><span className="text-[8px] font-black">Category</span>
-            </button>
-
-            <button onClick={() => { setBatchAction('status'); executeBatchUpdate(); }} className="flex flex-col items-center gap-1 group transition-all">
-              <EyeOff size={18} className="group-hover:text-red-400" /><span className="text-[8px] font-black">Disable</span>
-            </button>
-
-            <button onClick={executeBatchDelete} className="flex flex-col items-center gap-1 group transition-all">
-              <Trash2 size={18} className="group-hover:text-rose-500" /><span className="text-[8px] font-black">Delete</span>
-            </button>
-
-          </div>
-          <button onClick={() => setSelectedIds([])} className="bg-gray-800 p-2 rounded-full hover:bg-white hover:text-black transition-all"><X size={16} /></button>
+          <button onClick={() => setSelectedIds([])} className="bg-gray-800 p-2 rounded-full"><X size={16} /></button>
         </div>
       )}
 
-      {/* Batch Modal */}
       {isBatchModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl">
-            <h2 className="text-xl font-black tracking-tighter mb-1">{batchAction === 'warehouse' ? 'Relocate' : 'Reclassify'}</h2>
-            <p className="text-gray-400 text-[10px] font-bold mb-6">Ubah {selectedIds.length} produk sekaligus</p>
-
-            <select className="w-full bg-gray-50 p-5 rounded-3xl text-xs font-black outline-none mb-10 border-none ring-1 ring-gray-100" value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
-              <option value="">Pilih Tujuan...</option>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-8">
+            <h2 className="text-xl font-black mb-6">{batchAction === 'warehouse' ? 'Relocate' : 'Reclassify'}</h2>
+            <select className="w-full bg-gray-50 p-5 rounded-3xl text-xs font-black outline-none mb-10" value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
+              <option value="">Select Target...</option>
               {batchAction === 'warehouse' ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>) : categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
             <div className="flex gap-4">
               <button onClick={() => setIsBatchModalOpen(false)} className="flex-1 py-5 text-[10px] font-black text-gray-400">Cancel</button>
-              <button onClick={executeBatchUpdate} className="flex-1 py-5 bg-black text-white rounded-[2rem] text-[10px] font-black tracking-widest shadow-lg">Confirm</button>
+              <button onClick={executeBatchUpdate} className="flex-1 py-5 bg-black text-white rounded-[2rem] text-[10px] font-black">Confirm</button>
             </div>
-
           </div>
         </div>
       )}
@@ -670,22 +433,17 @@ export default function InventoryDashboard() {
 
 interface NavCardProps {
   icon: LucideIcon;
-
   label: string;
   href?: string;
   color: string;
   bg: string;
-  onClick?: () => void;
 }
 
-function NavCard({ icon: Icon, label, href, color, bg, onClick }: NavCardProps) {
-  const Content = (
-    <div className={`p-3 rounded-2xl ${bg} ${color} flex flex-col items-center gap-1 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
+function NavCard({ icon: Icon, label, href, color, bg }: NavCardProps) {
+  return (
+    <Link href={href || '#'} className={`p-3 rounded-2xl ${bg} ${color} flex flex-col items-center gap-1 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
       <Icon size={18} />
       <span className="text-[8px] font-black tracking-widest uppercase">{label}</span>
-    </div>
+    </Link>
   );
-
-  if (onClick) return <button onClick={onClick} className="w-full">{Content}</button>;
-  return <Link href={href || '#'} className="w-full">{Content}</Link>;
 }

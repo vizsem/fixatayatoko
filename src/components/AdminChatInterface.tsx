@@ -93,10 +93,8 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
 
             // Send push notification to other admins
             if (userRole === 'admin') {
-              import('@/lib/pushNotificationService').then(({ sendChatMessagePush }) => {
-                // Get other admin IDs and notify them
-                // This would require fetching list of active admins
-              }).catch(console.error);
+              // TODO: Make a fetch call to a Next.js API route to send push notifications
+              // e.g., fetch('/api/notifications/chat', { method: 'POST', body: ... })
             }
           }
         });

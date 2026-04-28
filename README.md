@@ -79,8 +79,15 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
    
    # Firebase Admin (untuk server-side operations)
-   FIREBASE_ADMIN_CLIENT_EMAIL=your_admin_email
-   FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   # PILIH SALAH SATU METODE:
+   
+   # Metode 1: GCP Service Account JSON (Recommended)
+   GCP_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"..."}'
+   
+   # Metode 2: Individual Variables
+   # FIREBASE_PROJECT_ID=your_project_id
+   # FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your_project.iam.gserviceaccount.com
+   # FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
    
    # Email Configuration (SMTP)
    SMTP_HOST=smtp.gmail.com
@@ -98,6 +105,15 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
    # Application URL
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
+
+   **🔥 Setup Firebase Admin Credentials:**
+   
+   Untuk konfigurasi Firebase Admin yang lengkap, jalankan helper script:
+   ```bash
+   npm run setup:firebase-admin
+   ```
+   
+   Atau baca dokumentasi lengkap di [FIREBASE_ADMIN_SETUP.md](./FIREBASE_ADMIN_SETUP.md) dan file `.env.example`.
 
 4. **Setup Firebase**
    - Buat project di [Firebase Console](https://console.firebase.google.com)
