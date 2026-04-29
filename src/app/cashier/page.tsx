@@ -1453,7 +1453,7 @@ export default function CashierPOS() {
                       }
                       return (
                         <div key={u.code} className="flex items-center justify-between mt-0.5 gap-1">
-                          <span className="text-[9px] font-bold text-blue-400 shrink-0">{u.code}</span>
+                          <span className="text-[9px] font-bold text-blue-400 shrink-0">{u.code} <span className="text-gray-300 font-medium">Isi {contains}</span></span>
                           <span className="text-[9px] font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
                             {unitStock} {u.code}
