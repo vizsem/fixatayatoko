@@ -1384,25 +1384,30 @@ export default function CashierPOS() {
         <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
           <div className="col-span-12 xl:col-span-8 flex flex-col gap-4">
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
-              <div className="bg-green-50 p-2 rounded-xl text-green-600"><Search size={20} /></div>
-              <input
-                ref={searchInputRef}
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Cari Produk atau Scan Barcode [F1]..."
-                className="flex-1 outline-none font-medium text-gray-700"
-              />
-              <button
-                type="button"
-                onClick={() => setShowScanner(!showScanner)}
-                className="px-3 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1"
-              >
-                <Camera size={14} /> Scan
-              </button>
-              <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={18} /></button>
-                <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={18} /></button>
+            <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-3 w-full flex-1">
+                <div className="bg-green-50 p-2 rounded-xl text-green-600 shrink-0"><Search size={18} className="md:w-5 md:h-5" /></div>
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Cari Produk atau Scan Barcode [F1]..."
+                  className="flex-1 outline-none text-sm md:text-base font-medium text-gray-700 min-w-0"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-gray-50 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(!showScanner)}
+                  className="px-4 py-2 flex-1 md:flex-none justify-center bg-black text-white rounded-xl text-[10px] md:text-xs font-black uppercase flex items-center gap-2"
+                >
+                  <Camera size={14} /> Scan
+                </button>
+                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                  <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                </div>
               </div>
             </div>
             {showScanner && <div id="pos-scanner" className="p-2 bg-white rounded-2xl border border-gray-100" />}
