@@ -67,6 +67,21 @@ export default function MarketplaceOrdersPage() {
     }
   };
 
+  // Auto-sync cart prices when channel changes
+  useEffect(() => {
+    if (cart.length === 0) return;
+    setCart(prev => prev.map(item => {
+      const p = products.find(prod => prod.id === item.id);
+      if (!p) return item;
+      const newPrice = channel === 'SHOPEE' 
+        ? (p.priceShopee || p.price || p.priceEcer || 0) 
+        : channel === 'TIKTOK' 
+          ? (p.priceTiktok || p.price || p.priceEcer || 0) 
+          : (p.priceEcer || p.price || 0);
+      return { ...item, price: newPrice };
+    }));
+  }, [channel, products]);
+
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return [];
     return products.filter(p => 
@@ -76,7 +91,11 @@ export default function MarketplaceOrdersPage() {
   }, [products, searchTerm]);
 
   const handleAddToCart = (p: Product) => {
-    const price = channel === 'SHOPEE' ? p.priceShopee : channel === 'TIKTOK' ? p.priceTiktok : p.priceEcer;
+    const price = channel === 'SHOPEE' 
+      ? (p.priceShopee || p.price || p.priceEcer || 0) 
+      : channel === 'TIKTOK' 
+        ? (p.priceTiktok || p.price || p.priceEcer || 0) 
+        : (p.priceEcer || p.price || 0);
     setCart(prev => {
       const existing = prev.find(item => item.id === p.id);
       if (existing) {
@@ -101,6 +120,10 @@ export default function MarketplaceOrdersPage() {
       }
       return item;
     }));
+  };
+
+  const updatePrice = (id: string, price: number) => {
+    setCart(prev => prev.map(item => item.id === id ? { ...item, price } : item));
   };
 
   const removeFromCart = (id: string) => {
@@ -235,6 +258,7 @@ export default function MarketplaceOrdersPage() {
             <CartTable 
               cart={cart} 
               onUpdateQty={updateQty} 
+              onUpdatePrice={updatePrice}
               onRemove={removeFromCart} 
             />
           </div>

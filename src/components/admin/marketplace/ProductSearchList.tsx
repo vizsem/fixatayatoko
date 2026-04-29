@@ -36,7 +36,11 @@ export const ProductSearchList = ({ searchTerm, onSearchChange, products, onAddT
           </div>
         ) : (
           products.map((p) => {
-            const price = channel === 'SHOPEE' ? p.priceShopee : channel === 'TIKTOK' ? p.priceTiktok : p.priceEcer;
+            const price = channel === 'SHOPEE' 
+              ? (p.priceShopee || p.price || p.priceEcer || 0) 
+              : channel === 'TIKTOK' 
+                ? (p.priceTiktok || p.price || p.priceEcer || 0) 
+                : (p.priceEcer || p.price || 0);
             return (
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all group">
                 <div className="w-12 h-12 bg-gray-50 rounded-xl relative overflow-hidden shrink-0 border border-gray-100">

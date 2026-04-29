@@ -13,10 +13,11 @@ interface CartItem {
 interface CartTableProps {
   cart: CartItem[];
   onUpdateQty: (id: string, delta: number) => void;
+  onUpdatePrice: (id: string, price: number) => void;
   onRemove: (id: string) => void;
 }
 
-export const CartTable = ({ cart, onUpdateQty, onRemove }: CartTableProps) => {
+export const CartTable = ({ cart, onUpdateQty, onUpdatePrice, onRemove }: CartTableProps) => {
   if (cart.length === 0) {
     return (
       <div className="bg-white rounded-[2rem] border-2 border-dashed border-gray-100 p-12 text-center">
@@ -45,8 +46,16 @@ export const CartTable = ({ cart, onUpdateQty, onRemove }: CartTableProps) => {
                   <p className="text-[11px] font-black text-gray-800 uppercase">{item.name}</p>
                   <p className="text-[9px] font-bold text-gray-400 uppercase">{item.unit}</p>
                 </td>
-                <td className="px-4 py-2.5 font-black text-[11px] text-gray-700">
-                  Rp{item.price.toLocaleString()}
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-black text-gray-400">Rp</span>
+                    <input 
+                      type="number"
+                      value={item.price}
+                      onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
+                      className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[11px] font-black outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-center gap-3">
