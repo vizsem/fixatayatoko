@@ -118,10 +118,10 @@ describe('EmployeesPage', () => {
     render(<EmployeesPage />);
     
     await waitFor(() => {
-      expect(screen.getByText('Team Ataya')).toBeInTheDocument();
-      expect(screen.getByText('Manajemen staf & kehadiran')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Cari nama, jabatan...')).toBeInTheDocument();
-      expect(screen.getByText('Tambah Staff')).toBeInTheDocument();
+      expect(screen.getByText('Human Capital')).toBeInTheDocument();
+      expect(screen.getByText('Staff & Payroll Engine')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search Staff...')).toBeInTheDocument();
+      expect(screen.getByText(/NEW STAFF/i)).toBeInTheDocument();
     });
   });
 
@@ -129,14 +129,14 @@ describe('EmployeesPage', () => {
     render(<EmployeesPage />);
     
     await waitFor(() => {
-      expect(screen.getByText('Team Ataya')).toBeInTheDocument();
+      expect(screen.getByText('Human Capital')).toBeInTheDocument();
     });
   });
 
   it('should handle search input', async () => {
     render(<EmployeesPage />);
     
-    const searchInput = await screen.findByPlaceholderText('Cari nama, jabatan...');
+    const searchInput = await screen.findByPlaceholderText('Search Staff...');
     fireEvent.change(searchInput, { target: { value: 'john doe' } });
     
     await waitFor(() => {
@@ -150,7 +150,7 @@ describe('EmployeesPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
       expect(screen.getByText(/Kasir/i)).toBeInTheDocument();
-      expect(screen.getByText(/Hadir:\s*5\s*hari/i)).toBeInTheDocument();
+      expect(screen.getByText(/Att:\s*5\s*d/i)).toBeInTheDocument();
     });
   });
 

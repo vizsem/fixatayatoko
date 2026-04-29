@@ -272,13 +272,32 @@ export default function InventoryDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-            <input className="w-full bg-gray-50 pl-9 pr-4 py-2.5 rounded-xl text-[11px] font-bold outline-none" placeholder="Search SKU, Name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input 
+              id="inventory-search" 
+              name="inventory-search" 
+              className="w-full bg-gray-50 pl-9 pr-4 py-2.5 rounded-xl text-[11px] font-bold outline-none" 
+              placeholder="Search SKU, Name..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
           </div>
-          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+          <select 
+            id="category-filter" 
+            name="category-filter" 
+            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
             <option value="all">CAT: ALL</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
           </select>
-          <select className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" value={selectedWarehouse} onChange={(e) => setSelectedWarehouse(e.target.value)}>
+          <select 
+            id="warehouse-filter" 
+            name="warehouse-filter" 
+            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" 
+            value={selectedWarehouse} 
+            onChange={(e) => setSelectedWarehouse(e.target.value)}
+          >
             <option value="all">WH: ALL</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name.toUpperCase()}</option>)}
           </select>

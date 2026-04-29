@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { adjustStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
@@ -54,7 +54,7 @@ export default function StockReconciliationPage() {
   const [reconciliationNote, setReconciliationNote] = useState('');
 
   // Initialize reconciliation items when products load
-  useState(() => {
+  useEffect(() => {
     if (products.length > 0 && reconciliationItems.length === 0) {
       const items = products.map(p => ({
         product: p,
@@ -65,7 +65,7 @@ export default function StockReconciliationPage() {
       }));
       setReconciliationItems(items);
     }
-  });
+  }, [products, reconciliationItems.length]);
 
   // Filter products based on search and status
   const filteredItems = useMemo(() => {
@@ -330,6 +330,8 @@ export default function StockReconciliationPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
               <input
+                id="recon-search"
+                name="recon-search"
                 type="text"
                 placeholder="Cari SKU atau Nama..."
                 value={searchTerm}
@@ -340,6 +342,8 @@ export default function StockReconciliationPage() {
             
             <div>
               <select
+                id="recon-status-filter"
+                name="recon-status-filter"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
                 className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-blue-500 transition-all"
@@ -352,6 +356,8 @@ export default function StockReconciliationPage() {
 
             <div>
               <select
+                id="recon-warehouse-select"
+                name="recon-warehouse-select"
                 value={selectedWarehouse}
                 onChange={(e) => setSelectedWarehouse(e.target.value)}
                 className="w-full px-4 py-2.5 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-blue-500 transition-all"
@@ -456,6 +462,8 @@ export default function StockReconciliationPage() {
               
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 <input
+                  id="recon-note"
+                  name="recon-note"
                   type="text"
                   placeholder="Catatan rekonsiliasi (opsional)"
                   value={reconciliationNote}

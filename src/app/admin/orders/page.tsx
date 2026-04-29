@@ -284,6 +284,8 @@ export default function AdminOrders() {
         <div className="relative w-full lg:max-w-[240px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
           <input
+            id="order-search"
+            name="order-search"
             type="text"
             placeholder="Search orders..."
             className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none"
@@ -305,12 +307,25 @@ export default function AdminOrders() {
         </div>
 
         <div className="flex items-center gap-2 w-full lg:w-auto px-1">
-          <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="bg-slate-50 border-none rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none">
+          <select 
+            id="payment-status-filter" 
+            name="payment-status-filter" 
+            value={paymentStatusFilter} 
+            onChange={(e) => setPaymentStatusFilter(e.target.value)} 
+            className="bg-slate-50 border-none rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none"
+          >
             <option value="ALL">All Payment</option>
             <option value="PAID">Paid</option>
             <option value="UNPAID">Unpaid</option>
           </select>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-50 border-none rounded-xl px-3 py-2 text-[10px] font-black" />
+          <input 
+            id="start-date" 
+            name="start-date" 
+            type="date" 
+            value={startDate} 
+            onChange={e => setStartDate(e.target.value)} 
+            className="bg-slate-50 border-none rounded-xl px-3 py-2 text-[10px] font-black" 
+          />
           <button onClick={handleSelectAll} className="p-3 bg-slate-900 text-white rounded-xl shadow-md"><CheckCircle2 size={16} /></button>
         </div>
       </div>

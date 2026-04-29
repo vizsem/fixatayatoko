@@ -307,10 +307,9 @@ export default function AddPurchase() {
           {/* 1. Supplier & Warehouse */}
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                <Store size={14} /> Pilih Supplier
-              </label>
               <select
+                id="supplier-select"
+                name="supplier-select"
                 required
                 className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                 value={selectedSupplier}
@@ -321,10 +320,9 @@ export default function AddPurchase() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                <Truck size={14} /> Gudang Tujuan
-              </label>
               <select
+                id="warehouse-select"
+                name="warehouse-select"
                 required
                 className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-none ring-1 ring-gray-100 focus:ring-black transition-all"
                 value={selectedWarehouse}
@@ -342,6 +340,8 @@ export default function AddPurchase() {
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
+                  id="product-search"
+                  name="product-search"
                   type="text"
                   className="w-full bg-gray-50 pl-12 pr-6 py-5 rounded-2xl text-xs font-bold outline-none"
                   placeholder="Ketik Nama Produk atau Scan Barcode..."
@@ -405,6 +405,8 @@ export default function AddPurchase() {
                     <div className="bg-gray-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Qty</p>
                       <input
+                        id={`qty-${item.id}`}
+                        name={`qty-${item.id}`}
                         type="number"
                         className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
                         value={item.quantity}
@@ -414,6 +416,8 @@ export default function AddPurchase() {
                     <div className="bg-gray-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Satuan</p>
                       <select
+                        id={`unit-${item.id}`}
+                        name={`unit-${item.id}`}
                         className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black uppercase"
                         value={item.unit}
                         onChange={(e) => {
@@ -438,6 +442,8 @@ export default function AddPurchase() {
                     <div className="bg-gray-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Isi (Pcs)</p>
                       <input
+                        id={`conv-${item.id}`}
+                        name={`conv-${item.id}`}
                         type="number"
                         className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
                         value={item.conversion}
@@ -447,6 +453,8 @@ export default function AddPurchase() {
                     <div className="bg-gray-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
                       <input
+                        id={`price-${item.id}`}
+                        name={`price-${item.id}`}
                         type="number"
                         className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black"
                         value={item.purchasePrice}
@@ -484,6 +492,8 @@ export default function AddPurchase() {
                       <td className="px-3 md:px-4 py-3 md:py-4 text-center">
                         <div className="flex items-center justify-center">
                           <input
+                            id={`qty-desktop-${item.id}`}
+                            name={`qty-desktop-${item.id}`}
                             type="number"
                             className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
                             value={item.quantity}
@@ -493,6 +503,8 @@ export default function AddPurchase() {
                       </td>
                       <td className="px-3 md:px-4 py-3 md:py-4 text-center">
                         <select
+                          id={`unit-desktop-${item.id}`}
+                          name={`unit-desktop-${item.id}`}
                           className="bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none uppercase"
                           value={item.unit}
                           onChange={(e) => {
@@ -517,6 +529,8 @@ export default function AddPurchase() {
                       </td>
                       <td className="px-3 md:px-4 py-3 md:py-4 text-center">
                         <input
+                          id={`conv-desktop-${item.id}`}
+                          name={`conv-desktop-${item.id}`}
                           type="number"
                           className="w-16 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
                           value={item.conversion}
@@ -525,6 +539,8 @@ export default function AddPurchase() {
                       </td>
                       <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                         <input
+                          id={`price-desktop-${item.id}`}
+                          name={`price-desktop-${item.id}`}
                           type="number"
                           className="w-28 bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none"
                           value={item.purchasePrice}
@@ -564,6 +580,8 @@ export default function AddPurchase() {
               <div className="flex justify-between items-center text-xs font-bold">
                 <span className="opacity-60">SHIPPING</span>
                 <input
+                  id="shipping-cost"
+                  name="shipping-cost"
                   type="number"
                   className="bg-white/10 w-24 p-2 rounded-lg text-right outline-none focus:bg-white/20 transition-all"
                   value={shippingCost}
@@ -596,6 +614,8 @@ export default function AddPurchase() {
               </div>
 
               <select
+                id="payment-method"
+                name="payment-method"
                 className="w-full bg-white/5 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
@@ -619,6 +639,8 @@ export default function AddPurchase() {
               <Info size={14} /> Additional Notes
             </h3>
             <textarea
+              id="purchase-notes"
+              name="purchase-notes"
               className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none h-32 resize-none"
               placeholder="Tambahkan instruksi pengiriman atau catatan nota..."
               value={notes}

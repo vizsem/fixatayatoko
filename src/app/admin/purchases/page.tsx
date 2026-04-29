@@ -56,7 +56,7 @@ export default function AdminPurchases() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [lastDoc]);
+  }, [lastDoc]); // Keep lastDoc here if needed for isMore logic
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
@@ -66,10 +66,13 @@ export default function AdminPurchases() {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }
+      // Only call once after auth is verified
       fetchPurchases();
     });
     return () => unsubAuth();
-  }, [router, fetchPurchases]);
+    // Remove fetchPurchases from dependencies to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
@@ -262,15 +265,35 @@ export default function AdminPurchases() {
       <div className="bg-white p-3 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8 flex flex-col lg:flex-row items-center gap-4">
         <div className="relative flex-1 w-full">
            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-           <input type="text" placeholder="Search supplier or PO ID..." className="w-full pl-16 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+           <input 
+             id="purchase-search" 
+             name="purchase-search" 
+             type="text" 
+             placeholder="Search supplier or PO ID..." 
+             className="w-full pl-16 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" 
+             value={searchTerm} 
+             onChange={e => setSearchTerm(e.target.value)} 
+           />
         </div>
         <div className="flex gap-2 w-full lg:w-auto">
-           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none">
+           <select 
+             id="status-filter" 
+             name="status-filter" 
+             value={statusFilter} 
+             onChange={e => setStatusFilter(e.target.value)} 
+             className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none"
+           >
               <option value="all">Status</option>
               <option value="MENUNGGU">Pending</option>
               <option value="DITERIMA">Received</option>
            </select>
-           <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none">
+           <select 
+             id="payment-filter" 
+             name="payment-filter" 
+             value={paymentFilter} 
+             onChange={e => setPaymentFilter(e.target.value)} 
+             className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none"
+           >
               <option value="all">Payment</option>
               <option value="LUNAS">Paid</option>
               <option value="HUTANG">Debt</option>
@@ -399,8 +422,15 @@ function PaymentModal({ purchase, onClose, onConfirm }: { purchase: Purchase; on
                 <p className="text-xl font-black text-rose-600">Rp {remaining.toLocaleString()}</p>
              </div>
              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payment Amount</label>
-                <input type="number" value={amt} onChange={e => setAmt(Number(e.target.value))} className="w-full bg-slate-50 mt-2 px-8 py-5 rounded-[2rem] text-2xl font-black text-center outline-none focus:ring-4 focus:ring-blue-50 transition-all" />
+                <label htmlFor="payment-amount" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payment Amount</label>
+                <input 
+                  id="payment-amount" 
+                  name="payment-amount" 
+                  type="number" 
+                  value={amt} 
+                  onChange={e => setAmt(Number(e.target.value))} 
+                  className="w-full bg-slate-50 mt-2 px-8 py-5 rounded-[2rem] text-2xl font-black text-center outline-none focus:ring-4 focus:ring-blue-50 transition-all" 
+                />
              </div>
           </div>
           <button onClick={() => onConfirm(amt)} disabled={amt <= 0 || amt > remaining} className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black disabled:opacity-30 transition-all">

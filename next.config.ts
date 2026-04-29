@@ -80,11 +80,19 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'shopee.co.id',
+      },
+      {
+        protocol: 'https',
         hostname: '**.shopee.co.id',
       },
       {
         protocol: 'https',
         hostname: '**.susercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cf.shopee.co.id',
       },
     ],
   },

@@ -1563,12 +1563,14 @@ export default function EmployeesPage() {
                               <div className="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => handlePresent(emp)}
+                                  title="Absen Hadir"
                                   className="p-1 bg-emerald-50 text-emerald-600 rounded border border-emerald-100 active:scale-95"
                                 >
                                   <CheckCircle2 size={12} />
                                 </button>
                                 <button
                                   onClick={() => handleAlpha(emp)}
+                                  title="Absen Alpha"
                                   className="p-1 bg-rose-50 text-rose-600 rounded border border-rose-100 active:scale-95"
                                 >
                                   <X size={12} />

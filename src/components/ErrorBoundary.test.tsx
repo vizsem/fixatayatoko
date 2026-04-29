@@ -37,8 +37,9 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByText('Terjadi Kesalahan')).toBeInTheDocument();
-    expect(screen.getByText('Maaf, terjadi kesalahan yang tidak terduga. Silakan refresh halaman atau coba lagi nanti.')).toBeInTheDocument();
-    expect(screen.getByText('Refresh Halaman')).toBeInTheDocument();
+    expect(screen.getByText(/Maaf, terjadi kesalahan yang tidak terduga/i)).toBeInTheDocument();
+    expect(screen.getByText('Reload Halaman')).toBeInTheDocument();
+    expect(screen.getByText('Coba Lagi')).toBeInTheDocument();
   });
 
   it('should render custom fallback when provided', () => {
@@ -70,7 +71,7 @@ describe('ErrorBoundary', () => {
     );
 
     expect(console.error).toHaveBeenCalledWith(
-      'ErrorBoundary caught an error:',
+      'Uncaught error:',
       error,
       expect.any(Object)
     );
