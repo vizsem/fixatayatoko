@@ -1443,10 +1443,19 @@ export default function CashierPOS() {
                     {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).map(u => {
                       const contains = Number(u.contains);
                       const unitStock = Math.floor((p.stock || 0) / contains);
+                      const channel = getChannelKey(transactionType);
+                      let unitPrice = Number(u.price || (p.price * contains));
+                      const chPrice = (p.channelPricing as ChannelPricing)?.[channel]?.[u.code]?.price;
+                      if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+                        unitPrice = chPrice;
+                      } else if ((channel === 'shopee' || channel === 'tiktok') && (p.channelPricing as ChannelPricing)?.['website']?.[u.code]?.price) {
+                        unitPrice = (p.channelPricing as ChannelPricing)['website']![u.code].price!;
+                      }
                       return (
-                        <div key={u.code} className="flex items-center justify-between mt-0.5">
-                          <span className="text-[9px] font-bold text-blue-400">{u.code}</span>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                        <div key={u.code} className="flex items-center justify-between mt-0.5 gap-1">
+                          <span className="text-[9px] font-bold text-blue-400 shrink-0">{u.code}</span>
+                          <span className="text-[9px] font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
                             {unitStock} {u.code}
                           </span>
                         </div>
