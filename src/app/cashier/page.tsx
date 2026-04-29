@@ -1436,35 +1436,23 @@ export default function CashierPOS() {
                   <div className="flex-1">
                     <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
                     <p className="text-green-600 font-black text-sm">Rp{p.price.toLocaleString()}</p>
-                    <div className="mt-1 flex items-center justify-between">
+                    <div className="mt-1 flex items-center justify-between flex-wrap gap-y-1">
                       <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
                       <span className={`text-[10px] font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
                     </div>
-                    <div className="mt-2 space-y-1">
-                      {(p.units || []).slice(0,3).map(u => {
-                        const contains = Number(u.contains || (u.code === 'PCS' ? 1 : 0));
-                        const channel = getChannelKey(transactionType);
-                        let unitPrice = Number(u.price || (contains > 0 ? p.price * contains : p.price));
-                        const chPrice = (p.channelPricing as ChannelPricing)?.[channel]?.[u.code]?.price;
+                    {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).map(u => {
+                      const contains = Number(u.contains);
+                      const unitStock = Math.floor((p.stock || 0) / contains);
+                      return (
+                        <div key={u.code} className="flex items-center justify-between mt-0.5">
+                          <span className="text-[9px] font-bold text-blue-400">{u.code}</span>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                            {unitStock} {u.code}
+                          </span>
+                        </div>
+                      );
+                    })}
 
-                        if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
-                          unitPrice = chPrice;
-                        } else if ((channel === 'shopee' || channel === 'tiktok') && (p.channelPricing as ChannelPricing)?.['website']?.[u.code]?.price) {
-                          unitPrice = (p.channelPricing as ChannelPricing)['website']![u.code].price!;
-                        }
-                        const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
-                        return (
-                          <button
-                            key={u.code}
-                            onClick={() => addToCartWithUnit(p, u)}
-                            className="w-full text-left text-[10px] font-black text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg px-2 py-1"
-                            title={`Tambah 1 ${u.code}`}
-                          >
-                            {u.code} - Rp{p.price.toLocaleString()}  Rp{unitPrice.toLocaleString()} / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                 </div>
               ))}
