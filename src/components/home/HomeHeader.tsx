@@ -72,7 +72,7 @@ export const HomeHeader = ({
               <select 
                 value={selectedWarehouseId} 
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer uppercase"
+                className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer"
               >
                 <option value="">Semua Gudang</option>
                 {warehouses.map(w => (
@@ -226,7 +226,7 @@ export const HomeHeader = ({
                       filteredNotifications.map((n) => (
                         <div key={n.id} className="p-4 border-b border-gray-50">
                           <div className="flex justify-between mb-1">
-                            <span className="text-[10px] text-blue-600 font-bold uppercase bg-blue-50 px-2 py-0.5 rounded">{n.category || n.type}</span>
+                            <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{n.category || n.type}</span>
                             <span className="text-[10px] text-gray-400">{n.createdAt}</span>
                           </div>
                           <h4 className="text-sm font-bold">{n.title}</h4>

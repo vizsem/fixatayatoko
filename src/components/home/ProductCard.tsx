@@ -87,10 +87,10 @@ export const ProductCard = ({
 
       <div className="p-3 flex flex-col flex-1 relative z-20">
         <Link href={`/produk/${product.id}`} className="block">
-          <h3 className="text-[10px] md:text-xs font-black text-gray-800 line-clamp-2 uppercase leading-tight hover:text-green-600 transition-colors">{product.name}</h3>
+          <h3 className="text-[10px] md:text-xs font-black text-gray-800 line-clamp-2 leading-tight hover:text-green-600 transition-colors">{product.name}</h3>
         </Link>
         <div className="mt-1 flex items-center justify-between">
-          <p className="text-[8px] font-bold text-gray-400 uppercase">{product.category}</p>
+          <p className="text-[8px] font-bold text-gray-400">{product.category}</p>
           <p className={`text-[8px] font-black uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
             {isOut ? 'Habis' : `Stok ${product.stock}`}
           </p>
@@ -154,7 +154,7 @@ export const ProductCard = ({
             onAddToCart(product); 
           }} 
           disabled={isOut} 
-          className={`mt-auto w-full py-2.5 text-[9px] font-black rounded-xl uppercase shadow-sm transition-all relative z-30 ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
+          className={`mt-auto w-full py-2.5 text-[9px] font-black rounded-xl shadow-sm transition-all relative z-30 ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
         >
           {isOut ? 'Stok Habis' : '+ Keranjang'}
         </button>

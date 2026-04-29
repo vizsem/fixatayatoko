@@ -124,8 +124,21 @@ export default function MarketplaceOrdersPage() {
     }));
   };
 
+  const setQty = (id: string, qty: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, quantity: Math.max(1, qty) };
+      }
+      return item;
+    }));
+  };
+
   const updatePrice = (id: string, price: number) => {
     setCart(prev => prev.map(item => item.id === id ? { ...item, price } : item));
+  };
+
+  const updateUnit = (id: string, unit: string) => {
+    setCart(prev => prev.map(item => item.id === id ? { ...item, unit } : item));
   };
 
   const removeFromCart = (id: string) => {
@@ -260,7 +273,9 @@ export default function MarketplaceOrdersPage() {
             <CartTable 
               cart={cart} 
               onUpdateQty={updateQty} 
+              onSetQty={setQty}
               onUpdatePrice={updatePrice}
+              onUpdateUnit={updateUnit}
               onRemove={removeFromCart} 
             />
           </div>

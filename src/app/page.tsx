@@ -256,14 +256,14 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2">
           <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Min Harga</label>
+              <label className="text-[10px] font-bold text-gray-500 mb-1 block">Min Harga</label>
               <input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500" />
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Max Harga</label>
+              <label className="text-[10px] font-bold text-gray-500 mb-1 block">Max Harga</label>
               <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Tak Terbatas" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500" />
             </div>
-            <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-black uppercase hover:bg-gray-200 transition-colors h-[34px]">Reset</button>
+            <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-black hover:bg-gray-200 transition-colors h-[34px]">Reset</button>
           </div>
         </div>
       )}
@@ -275,7 +275,7 @@ export default function Home() {
           <div className="px-4 space-y-8"><div className="flex gap-4 overflow-hidden"><SkeletonCard /><SkeletonCard /></div></div>
         ) : searchQuery ? (
           <section className="px-4">
-            <h2 className="text-sm font-black uppercase mb-4">Hasil Pencarian</h2>
+            <h2 className="text-sm font-black mb-4">Hasil Pencarian</h2>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               {filteredProducts.map(p => <ProductCard key={p.id} product={p} promoInfo={getDiscountedPrice(p)} isWish={wishlist.includes(p.id)} onWishlistToggle={onWishlistToggle} onAddToCart={addToCart} />)}
             </div>
@@ -286,7 +286,7 @@ export default function Home() {
               <div className="mb-8 px-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="bg-red-600 p-1.5 rounded-lg text-white animate-bounce"><Flame size={16} fill="currentColor" /></div>
-                  <h2 className="text-sm font-black uppercase text-red-600 tracking-tighter">Penawaran Terbatas</h2>
+                  <h2 className="text-sm font-black text-red-600 tracking-tighter">Penawaran Terbatas</h2>
                 </div>
                 <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
                   {promoProducts.map(p => <ProductCard key={`promo-${p.id}`} product={p} promoInfo={getDiscountedPrice(p)} isWish={wishlist.includes(p.id)} onWishlistToggle={onWishlistToggle} onAddToCart={addToCart} />)}
@@ -298,7 +298,7 @@ export default function Home() {
               <div className="mb-8 px-4">
                 <div className="flex items-center gap-2 mb-4">
                   <RefreshCw size={18} className="text-blue-500 animate-spin-slow" />
-                  <h2 className="text-sm font-black uppercase text-gray-800 tracking-tighter">Beli Lagi</h2>
+                  <h2 className="text-sm font-black text-gray-800 tracking-tighter">Beli Lagi</h2>
                 </div>
                 <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
                   {repurchaseProducts.map(p => <ProductCard key={`rep-${p.id}`} product={p} promoInfo={getDiscountedPrice(p)} isWish={wishlist.includes(p.id)} onWishlistToggle={onWishlistToggle} onAddToCart={addToCart} />)}
@@ -309,7 +309,7 @@ export default function Home() {
             <div className="mb-8 px-4">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles size={18} className="text-yellow-500" />
-                <h2 className="text-sm font-black uppercase text-gray-800 tracking-tighter">Khusus Untukmu</h2>
+                <h2 className="text-sm font-black text-gray-800 tracking-tighter">Khusus Untukmu</h2>
               </div>
               <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
                 {randomProducts.map(p => <ProductCard key={`rand-${p.id}`} product={p} promoInfo={getDiscountedPrice(p)} isWish={wishlist.includes(p.id)} onWishlistToggle={onWishlistToggle} onAddToCart={addToCart} />)}
@@ -324,7 +324,7 @@ export default function Home() {
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-lg bg-green-100 text-green-600"><Package size={18} /></div>
-                      <h2 className="text-sm font-black uppercase text-gray-800 tracking-tighter">{cat.name}</h2>
+                      <h2 className="text-sm font-black text-gray-800 tracking-tighter">{cat.name}</h2>
                     </div>
                     <Link href={`/kategori/${cat.slug}`} className="text-[10px] font-bold text-gray-400">SEMUA <ArrowRight size={12} className="inline" /></Link>
                   </div>

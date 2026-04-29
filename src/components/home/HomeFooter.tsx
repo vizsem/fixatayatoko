@@ -26,7 +26,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Kontak & Lokasi */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Hubungi Kami</h3>
+            <h3 className="text-[10px] md:text-xs font-black tracking-widest text-gray-500 mb-2 md:mb-4">Hubungi Kami</h3>
             <div className="space-y-2 md:space-y-3">
               <a href="https://wa.me/6285853161174" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-gray-300 hover:text-green-400 transition-colors">
                 <div className="p-1.5 bg-gray-800 rounded-lg"><Phone size={14} /></div>
@@ -41,7 +41,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Jam Operasional & Kebijakan */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Layanan Pelanggan</h3>
+            <h3 className="text-[10px] md:text-xs font-black tracking-widest text-gray-500 mb-2 md:mb-4">Layanan Pelanggan</h3>
             <ul className="space-y-2 md:space-y-3 text-[13px] md:text-sm text-gray-300">
               <li className="flex items-center gap-2"><Clock size={12} className="text-gray-500" /> Buka Setiap Hari (08:00 - 21:00)</li>
               <li className="flex items-center gap-2"><Truck size={12} className="text-gray-500" /> Gratis Ongkir (S&K Berlaku)</li>
@@ -51,7 +51,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Tautan Internal */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 mb-2 md:mb-4">Internal</h3>
+            <h3 className="text-[10px] md:text-xs font-black tracking-widest text-gray-500 mb-2 md:mb-4">Internal</h3>
             <ul className="space-y-2 md:space-y-3">
               <li>
                 <Link href="/profil/login" className="text-[13px] md:text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
@@ -79,23 +79,23 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
       {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50">
         <Link href="/" className="flex flex-col items-center gap-1 text-green-600">
-          <HomeIcon size={20} /><span className="text-[8px] font-black uppercase">Beranda</span>
+          <HomeIcon size={20} /><span className="text-[8px] font-black">Beranda</span>
         </Link>
         <Link href="/semua-kategori" className="flex flex-col items-center gap-1 text-gray-400">
-          <Grid size={20} /><span className="text-[8px] font-black uppercase">Katalog</span>
+          <Grid size={20} /><span className="text-[8px] font-black">Katalog</span>
         </Link>
         <Link href="/cart" className="flex flex-col items-center gap-1 text-gray-400 relative">
           <div className="relative">
             <ShoppingCart size={20} />
             {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold rounded-full h-4 w-4 flex items-center justify-center animate-bounce">{cartCount}</span>}
           </div>
-          <span className="text-[8px] font-black uppercase">Keranjang</span>
+          <span className="text-[8px] font-black">Keranjang</span>
         </Link>
         <Link href="/orders" className="flex flex-col items-center gap-1 text-gray-400">
-          <FileText size={20} /><span className="text-[8px] font-black uppercase">Pesanan</span>
+          <FileText size={20} /><span className="text-[8px] font-black">Pesanan</span>
         </Link>
         <Link href="/profil" className="flex flex-col items-center gap-1 text-gray-400">
-          <User size={20} /><span className="text-[8px] font-black uppercase">Akun</span>
+          <User size={20} /><span className="text-[8px] font-black">Akun</span>
         </Link>
       </nav>
     </>
