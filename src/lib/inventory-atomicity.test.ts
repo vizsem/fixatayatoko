@@ -10,7 +10,8 @@ vi.mock('@/lib/firebase', () => ({
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((db, collection, id) => ({ path: `${collection}/${id}` })),
   collection: vi.fn((db, path) => ({ path })),
-  serverTimestamp: vi.fn(() => 'mocked-timestamp')
+  serverTimestamp: vi.fn(() => 'mocked-timestamp'),
+  increment: vi.fn((n) => `incremented-${n}`)
 }));
 
 describe('Inventory Atomicity (Unit & Logic Check)', () => {
@@ -57,13 +58,22 @@ describe('Inventory Atomicity (Unit & Logic Check)', () => {
     // Verify update was called with correct new distribution
     expect(mockTx.update).toHaveBeenCalledWith(
       expect.anything(), // product ref
-      {
+      expect.objectContaining({
         stockByWarehouse: {
           'gudang-A': 45, // 60 - 15
           'gudang-B': 55  // 40 + 15
         }
-        // Total stock is NOT updated, it remains 100 implicitly
-      }
+      })
+    );
+
+    // Verify warehouse capacity updates
+    expect(mockTx.update).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'warehouses/gudang-A' }),
+      { usedCapacity: 'incremented--15' }
+    );
+    expect(mockTx.update).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'warehouses/gudang-B' }),
+      { usedCapacity: 'incremented-15' }
     );
 
     // Verify log was written correctly
@@ -136,12 +146,18 @@ describe('Inventory Atomicity (Unit & Logic Check)', () => {
     // Assert
     expect(mockTx.update).toHaveBeenCalledWith(
       expect.anything(),
-      {
+      expect.objectContaining({
         stock: 95, // Total stock updated
         stockByWarehouse: {
           'gudang-A': 95
         }
-      }
+      })
+    );
+
+    // Verify warehouse capacity update
+    expect(mockTx.update).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'warehouses/gudang-A' }),
+      { usedCapacity: 'incremented--5' }
     );
 
     // Verify log

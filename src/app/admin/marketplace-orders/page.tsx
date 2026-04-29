@@ -133,17 +133,25 @@ export default function MarketplaceOrdersPage() {
           adminId: auth.currentUser?.uid
         };
 
-        transaction.set(orderRef, orderData);
+        // FIX: Pre-fetch ALL product snapshots BEFORE any writes to satisfy Firestore transaction requirements
+        const productRefs = cart.map(item => doc(db, 'products', item.id));
+        const pSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
-        for (const item of cart) {
+        for (let i = 0; i < cart.length; i++) {
+          const item = cart[i];
+          const pSnap = pSnaps[i];
+
           await deductStockTx(transaction, {
             productId: item.id,
             amount: item.quantity,
             adminId: auth.currentUser?.uid || 'system',
             source: 'MARKETPLACE',
-            note: `Marketplace Order: ${channel} - ${externalOrderId}`
+            note: `Marketplace Order: ${channel} - ${externalOrderId}`,
+            prefetchedSnap: pSnap // Pass pre-fetched snapshot
           });
         }
+
+        transaction.set(orderRef, orderData);
       });
 
       notify.success("Pesanan marketplace berhasil disimpan");

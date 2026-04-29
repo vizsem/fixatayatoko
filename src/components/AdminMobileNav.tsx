@@ -330,10 +330,11 @@ export default function AdminMobileNav() {
 
             <div className="space-y-6">
               <div className="relative">
-                <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Nama Produk</label>
+                <label htmlFor="mp-product-name" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Nama Produk</label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input 
+                    id="mp-product-name"
                     type="text" 
                     value={mpProductName}
                     onChange={(e) => setMpProductName(e.target.value)}
@@ -367,10 +368,11 @@ export default function AdminMobileNav() {
 
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">QTY</label>
+                  <label htmlFor="mp-qty" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">QTY</label>
                   <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
                     <button onClick={() => { setMpQty(Math.max(1, mpQty - 1)); triggerHaptic(5); }} className="w-10 h-10 flex items-center justify-center text-gray-400 font-bold text-lg">-</button>
                     <input 
+                      id="mp-qty"
                       type="number" 
                       value={mpQty}
                       onChange={(e) => setMpQty(Number(e.target.value))}
@@ -381,8 +383,9 @@ export default function AdminMobileNav() {
                 </div>
                 
                 <div className="flex-1">
-                  <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Source</label>
+                  <label htmlFor="mp-source" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Source</label>
                   <select 
+                    id="mp-source"
                     value={mpSource}
                     onChange={(e) => setMpSource(e.target.value)}
                     className="w-full h-11 bg-gray-50 border-none rounded-xl px-4 text-xs font-bold outline-none font-black"
@@ -441,9 +444,9 @@ export default function AdminMobileNav() {
                 </div>
               </div>
               <div className="mt-8">
-                <label className="text-[10px] font-black text-gray-500 tracking-widest uppercase mb-2 block">Atau Input SKU Manual</label>
+                <label htmlFor="manual-sku" className="text-[10px] font-black text-gray-500 tracking-widest uppercase mb-2 block">Atau Input SKU Manual</label>
                 <div className="flex gap-2">
-                  <input className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs font-bold outline-none" placeholder="Ketik SKU..." />
+                  <input id="manual-sku" className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs font-bold outline-none" placeholder="Ketik SKU..." />
                   <button className="bg-white text-black px-6 rounded-2xl font-black text-[10px]">CARI</button>
                 </div>
               </div>
@@ -542,8 +545,9 @@ export default function AdminMobileNav() {
 
             <div className="space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">NAMA PRODUK</label>
+                <label htmlFor="new-product-name" className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">NAMA PRODUK</label>
                 <input 
+                  id="new-product-name"
                   type="text" 
                   value={newProductName}
                   onChange={(e) => setNewProductName(e.target.value)}
@@ -553,10 +557,11 @@ export default function AdminMobileNav() {
               </div>
               
               <div>
-                <label className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">HARGA DASAR (MODAL)</label>
+                <label htmlFor="new-product-price" className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">HARGA DASAR (MODAL)</label>
                 <div className="relative">
                   <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Rp</span>
                   <input 
+                    id="new-product-price"
                     type="number" 
                     value={newProductPrice}
                     onChange={(e) => setNewProductPrice(e.target.value)}

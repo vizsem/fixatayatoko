@@ -119,7 +119,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
 
     try {
       await runTransaction(db, async (tx) => {
-        // 1. Simpan transaksi stok masuk (Purchase Record)
+        // 1. Persiapkan data transaksi stok masuk (Purchase Record)
         const transactionRef = doc(collection(db, 'inventory_transactions'));
         const transactionData = {
           type: 'STOCK_IN',
@@ -132,9 +132,9 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           expiredDate: formData.expiredDate,
           createdAt: serverTimestamp()
         };
-        tx.set(transactionRef, transactionData);
 
         // 2. Update stok produk & Log Inventory secara atomik
+        // FIX: addStockTx melakukan tx.get(), jadi harus dijalankan SEBELUM tx.set/tx.update apa pun
         await addStockTx(tx, {
           productId: formData.productId,
           amount: formData.quantity,
@@ -143,6 +143,9 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           note: `Pembelian dari ${transactionData.supplierName}`,
           source: 'PURCHASE'
         });
+
+        // 3. Simpan record transaksi setelah read selesai
+        tx.set(transactionRef, transactionData);
       });
 
       notify.admin.success('Stok berhasil ditambahkan!');

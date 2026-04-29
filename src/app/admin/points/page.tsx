@@ -282,8 +282,9 @@ export default function AdminPointsDashboard() {
               <h2 className="text-xl font-black uppercase italic mb-6">Point Adjustment</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400">Target User ID</label>
+                  <label htmlFor="target-user-id" className="text-[10px] font-black uppercase text-gray-400">Target User ID</label>
                   <input
+                    id="target-user-id"
                     type="text"
                     className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none border-2 border-transparent focus:border-black"
                     placeholder="Masukkan UID Pelanggan..."
@@ -301,13 +302,13 @@ export default function AdminPointsDashboard() {
                   </button>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400">Nominal Poin</label>
-                  <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-black outline-none" placeholder="0"
+                  <label htmlFor="nominal-points" className="text-[10px] font-black uppercase text-gray-400">Nominal Poin</label>
+                  <input id="nominal-points" type="number" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-black outline-none" placeholder="0"
                     onChange={(e) => setAdjustData({ ...adjustData, amount: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400">Alasan Penyesuaian</label>
-                  <textarea className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none resize-none" rows={3}
+                  <label htmlFor="adjustment-reason" className="text-[10px] font-black uppercase text-gray-400">Alasan Penyesuaian</label>
+                  <textarea id="adjustment-reason" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none resize-none" rows={3}
                     placeholder="Contoh: Temuan transaksi fiktif..."
                     onChange={(e) => setAdjustData({ ...adjustData, reason: e.target.value })} />
                 </div>

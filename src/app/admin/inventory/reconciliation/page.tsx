@@ -137,9 +137,14 @@ export default function StockReconciliationPage() {
       const timestamp = new Date().toISOString();
 
       await runTransaction(db, async (tx) => {
-        for (const item of mismatchedItems) {
-          const productRef = doc(db, 'products', item.product.id);
-          const pSnap = await tx.get(productRef);
+        // FIX: Read ALL necessary snapshots BEFORE any writes to satisfy Firestore transaction requirements
+        const productRefs = mismatchedItems.map(item => doc(db, 'products', item.product.id));
+        const pSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
+
+        for (let i = 0; i < mismatchedItems.length; i++) {
+          const item = mismatchedItems[i];
+          const productRef = productRefs[i];
+          const pSnap = pSnaps[i];
           
           if (!pSnap.exists()) {
             throw new Error(`Produk ${item.product.name} tidak ditemukan`);
@@ -158,13 +163,22 @@ export default function StockReconciliationPage() {
           if (newWarehouseStock < 0) newWarehouseStock = 0;
 
           // Adjust stock in the selected warehouse
+          // Note: adjustStockTx usually does a tx.get(), but since we are in a loop, 
+          // we should ensure it doesn't violate rules. Actually, adjustStockTx's tx.get 
+          // will be called here. If we've already done writes in a previous iteration, it will fail.
+          // TO BE SAFE: We should perform all writes at the very end or modify adjustStockTx.
+          // However, since we are doing Promise.all for all gets above, as long as adjustStockTx 
+          // only does gets for the same document or gets that were already called, it might be OK?
+          // NO, any get after any write fails. So we MUST do all gets for all items first.
+          
           await adjustStockTx(tx, {
             productId: item.product.id,
             newStock: newWarehouseStock,
             warehouseId: selectedWarehouse,
             adminId,
             source: 'RECONCILIATION',
-            note: reconciliationNote || `Rekonsiliasi stok: selisih ${totalDiff} ${item.product.unit || 'pcs'}`
+            note: reconciliationNote || `Rekonsiliasi stok: selisih ${totalDiff} ${item.product.unit || 'pcs'}`,
+            prefetchedSnap: pSnap // Pass pre-fetched snapshot
           });
 
           // Post to ledger if there's a difference
@@ -182,7 +196,7 @@ export default function StockReconciliationPage() {
                   memo: `Rekonsiliasi (Kurang ${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${reconciliationNote}`,
                   referenceId: `RECON-${timestamp}-${item.product.id}`,
                   postedBy: adminId
-                });
+                }, tx);
               } else {
                 // Gain
                 await postJournal({
@@ -192,7 +206,7 @@ export default function StockReconciliationPage() {
                   memo: `Rekonsiliasi (Lebih ${totalDiff} ${data.unit || 'pcs'}): ${reconciliationNote}`,
                   referenceId: `RECON-${timestamp}-${item.product.id}`,
                   postedBy: adminId
-                });
+                }, tx);
               }
             }
           }

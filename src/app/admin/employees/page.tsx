@@ -2416,8 +2416,9 @@ export default function EmployeesPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <label htmlFor="staff-name" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                   <input 
+                    id="staff-name"
                     required 
                     value={formData.name} 
                     onChange={e => setFormData({ ...formData, name: e.target.value })} 
@@ -2426,8 +2427,9 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile (WA)</label>
+                  <label htmlFor="staff-phone" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile (WA)</label>
                   <input 
+                    id="staff-phone"
                     value={formData.phone} 
                     onChange={e => setFormData({ ...formData, phone: e.target.value })} 
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
@@ -2438,8 +2440,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Position</label>
+                  <label htmlFor="staff-role" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Position</label>
                   <select 
+                    id="staff-role"
                     value={formData.role} 
                     onChange={e => setFormData({ ...formData, role: e.target.value })} 
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2451,8 +2454,9 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
+                  <label htmlFor="staff-status" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
                   <select 
+                    id="staff-status"
                     value={formData.status} 
                     onChange={e => setFormData({ ...formData, status: e.target.value as 'AKTIF' | 'NON-AKTIF' })} 
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2465,10 +2469,11 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Salary</label>
+                   <label htmlFor="staff-salary" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Salary</label>
                    <div className="relative">
                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
                      <input 
+                       id="staff-salary"
                        type="number" 
                        required 
                        value={formData.manualSalary} 
@@ -2478,10 +2483,11 @@ export default function EmployeesPage() {
                    </div>
                 </div>
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Daily Rate</label>
+                   <label htmlFor="staff-daily-rate" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Daily Rate</label>
                    <div className="relative">
                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
                      <input 
+                       id="staff-daily-rate"
                        type="number" 
                        value={formData.dailySalary} 
                        onChange={e => setFormData({ ...formData, dailySalary: Number(e.target.value) })} 
@@ -2493,10 +2499,11 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Work Shift</label>
+                <label htmlFor="staff-work-schedule" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Work Shift</label>
                 <div className="relative">
                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                    <input 
+                     id="staff-work-schedule"
                      required 
                      value={formData.workSchedule} 
                      onChange={e => setFormData({ ...formData, workSchedule: e.target.value })} 
@@ -2508,8 +2515,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Bank</label>
+                  <label htmlFor="staff-bank" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Bank</label>
                   <input
+                    id="staff-bank"
                     value={formData.bankName}
                     onChange={e => setFormData({ ...formData, bankName: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
@@ -2517,8 +2525,9 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">A/C Number</label>
+                  <label htmlFor="staff-account" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">A/C Number</label>
                   <input
+                    id="staff-account"
                     value={formData.bankAccount}
                     onChange={e => setFormData({ ...formData, bankAccount: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
@@ -2529,8 +2538,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Contract</label>
+                  <label htmlFor="staff-contract-type" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Contract</label>
                   <select
+                    id="staff-contract-type"
                     value={formData.contractType}
                     onChange={e => setFormData({ ...formData, contractType: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2541,15 +2551,18 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Term</label>
+                  <label htmlFor="staff-contract-start" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Term</label>
                   <div className="grid grid-cols-2 gap-1">
                     <input
+                      id="staff-contract-start"
                       type="date"
                       value={formData.contractStart}
                       onChange={e => setFormData({ ...formData, contractStart: e.target.value })}
                       className="px-2 py-2 bg-gray-50 border-none rounded-lg text-[9px] font-black text-gray-700 outline-none"
                     />
                     <input
+                      id="staff-contract-end"
+                      aria-label="Contract End Date"
                       type="date"
                       value={formData.contractEnd}
                       onChange={e => setFormData({ ...formData, contractEnd: e.target.value })}
@@ -2582,8 +2595,9 @@ export default function EmployeesPage() {
 
             <form onSubmit={submitLeave} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
+                <label htmlFor="leave-staff" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
                 <select
+                  id="leave-staff"
                   value={leaveForm.employeeId}
                   onChange={(e) => setLeaveForm((p) => ({ ...p, employeeId: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2599,8 +2613,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
+                  <label htmlFor="leave-category" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
                   <select
+                    id="leave-category"
                     value={leaveForm.type}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, type: e.target.value as LeaveRequestType }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2611,8 +2626,9 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Remuneration</label>
+                  <label htmlFor="leave-paid" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Remuneration</label>
                   <select
+                    id="leave-paid"
                     value={leaveForm.paid ? 'YA' : 'TIDAK'}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, paid: e.target.value === 'YA' }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2625,8 +2641,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Date</label>
+                  <label htmlFor="leave-start" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Date</label>
                   <input
+                    id="leave-start"
                     type="date"
                     value={leaveForm.startDate}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, startDate: e.target.value }))}
@@ -2634,8 +2651,9 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">End Date</label>
+                  <label htmlFor="leave-end" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">End Date</label>
                   <input
+                    id="leave-end"
                     type="date"
                     value={leaveForm.endDate}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, endDate: e.target.value }))}
@@ -2645,8 +2663,9 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason (Internal)</label>
+                <label htmlFor="leave-reason" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason (Internal)</label>
                 <input
+                  id="leave-reason"
                   value={leaveForm.reason}
                   onChange={(e) => setLeaveForm((p) => ({ ...p, reason: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
@@ -2677,8 +2696,9 @@ export default function EmployeesPage() {
 
             <form onSubmit={createCandidate} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <label htmlFor="candidate-name" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                 <input
+                  id="candidate-name"
                   required
                   value={candidateForm.name}
                   onChange={(e) => setCandidateForm((p) => ({ ...p, name: e.target.value }))}
@@ -2689,8 +2709,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile</label>
+                  <label htmlFor="candidate-phone" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile</label>
                   <input
+                    id="candidate-phone"
                     value={candidateForm.phone}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, phone: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
@@ -2698,8 +2719,9 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Addr.</label>
+                  <label htmlFor="candidate-email" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Addr.</label>
                   <input
+                    id="candidate-email"
                     value={candidateForm.email}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, email: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
@@ -2710,8 +2732,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Role</label>
+                  <label htmlFor="candidate-role" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Role</label>
                   <input
+                    id="candidate-role"
                     value={candidateForm.position}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, position: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
@@ -2719,10 +2742,11 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Exp. Salary</label>
+                  <label htmlFor="candidate-expected-salary" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Exp. Salary</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
                     <input
+                      id="candidate-expected-salary"
                       type="number"
                       value={candidateForm.expectedSalary}
                       onChange={(e) => setCandidateForm((p) => ({ ...p, expectedSalary: Number(e.target.value || 0) }))}
@@ -2734,8 +2758,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stage</label>
+                  <label htmlFor="candidate-stage" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stage</label>
                   <select
+                    id="candidate-stage"
                     value={candidateForm.stage}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, stage: e.target.value as CandidateStage }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2748,8 +2773,9 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Discovery Source</label>
+                  <label htmlFor="candidate-source" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Discovery Source</label>
                   <input
+                    id="candidate-source"
                     value={candidateForm.source}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, source: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
@@ -2781,8 +2807,9 @@ export default function EmployeesPage() {
 
             <form onSubmit={savePettyCashTx} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
+                <label htmlFor="petty-staff" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
                 <select
+                  id="petty-staff"
                   value={pettyForm.employeeId}
                   onChange={(e) => setPettyForm((p) => ({ ...p, employeeId: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2798,8 +2825,9 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Effective Date</label>
+                  <label htmlFor="petty-date" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Effective Date</label>
                   <input
+                    id="petty-date"
                     type="date"
                     value={pettyForm.date}
                     onChange={(e) => setPettyForm((p) => ({ ...p, date: e.target.value }))}
@@ -2807,8 +2835,9 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Tx Type</label>
+                  <label htmlFor="petty-type" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Tx Type</label>
                   <select
+                    id="petty-type"
                     value={pettyForm.type}
                     onChange={(e) => setPettyForm((p) => ({ ...p, type: e.target.value as PettyCashTxType }))}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
@@ -2821,10 +2850,11 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Nominal (Amount)</label>
+                <label htmlFor="petty-amount" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Nominal (Amount)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
                   <input
+                    id="petty-amount"
                     type="number"
                     min={0}
                     value={pettyForm.amount}
@@ -2835,8 +2865,9 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                <label htmlFor="petty-desc" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
                 <input
+                  id="petty-desc"
                   value={pettyForm.description}
                   onChange={(e) => setPettyForm((p) => ({ ...p, description: e.target.value }))}
                   className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"

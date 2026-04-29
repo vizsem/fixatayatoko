@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp, WriteBatch, doc, Transaction, getDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, WriteBatch, doc, Transaction, getDoc, DocumentSnapshot, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export type InventoryLogType = 'MASUK' | 'KELUAR' | 'MUTASI';
@@ -55,11 +55,12 @@ export const deductStockTx = async (tx: Transaction, params: {
   note?: string;
   source: InventorySource;
   mainWarehouseId?: string; // default 'gudang-utama'
+  prefetchedSnap?: DocumentSnapshot;
 }) => {
-  const { productId, amount, adminId, note, source, mainWarehouseId = 'gudang-utama' } = params;
+  const { productId, amount, adminId, note, source, mainWarehouseId = 'gudang-utama', prefetchedSnap } = params;
   if (amount <= 0) return;
   const pRef = doc(db, 'products', productId);
-  const snap = await tx.get(pRef);
+  const snap = prefetchedSnap || await tx.get(pRef);
   if (!snap.exists()) throw new Error('Produk tidak ditemukan');
   const data: any = snap.data() || {};
   const currentStock = Number(data.stock || 0);
@@ -74,6 +75,9 @@ export const deductStockTx = async (tx: Transaction, params: {
     const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
     nextByWarehouse[mainWarehouseId] -= cut;
     remaining -= cut;
+    
+    // Sync warehouse capacity
+    tx.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-cut) });
   }
   // Gudang lainnya
   if (remaining > 0) {
@@ -83,6 +87,9 @@ export const deductStockTx = async (tx: Transaction, params: {
       const cut = Math.min(Number(qty || 0), remaining);
       nextByWarehouse[whId] = Number(qty || 0) - cut;
       remaining -= cut;
+
+      // Sync warehouse capacity
+      tx.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-cut) });
     }
   }
   const nextStock = currentStock - amount;
@@ -112,17 +119,21 @@ export const addStockTx = async (tx: Transaction, params: {
   adminId: string;
   note?: string;
   source: InventorySource;
+  prefetchedSnap?: DocumentSnapshot;
 }) => {
-  const { productId, amount, warehouseId = 'gudang-utama', adminId, note, source } = params;
+  const { productId, amount, warehouseId = 'gudang-utama', adminId, note, source, prefetchedSnap } = params;
   if (amount <= 0) return;
   const pRef = doc(db, 'products', productId);
-  const snap = await tx.get(pRef);
+  const snap = prefetchedSnap || await tx.get(pRef);
   if (!snap.exists()) throw new Error('Produk tidak ditemukan');
   const data: any = snap.data() || {};
   const currentStock = Number(data.stock || 0);
   const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
   const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
   nextByWarehouse[warehouseId] = Number(nextByWarehouse[warehouseId] || 0) + amount;
+  
+  // Sync warehouse capacity
+  tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(amount) });
   const nextStock = currentStock + amount;
   tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
   const logRef = doc(collection(db, 'inventory_logs'));
@@ -153,13 +164,14 @@ export const transferStockTx = async (tx: Transaction, params: {
   adminId: string;
   note?: string;
   source: InventorySource;
+  prefetchedSnap?: DocumentSnapshot;
 }) => {
-  const { productId, amount, fromWarehouseId, toWarehouseId, adminId, note, source } = params;
+  const { productId, amount, fromWarehouseId, toWarehouseId, adminId, note, source, prefetchedSnap } = params;
   if (amount <= 0) return;
   if (fromWarehouseId === toWarehouseId) throw new Error('Gudang asal dan tujuan sama');
 
   const pRef = doc(db, 'products', productId);
-  const snap = await tx.get(pRef);
+  const snap = prefetchedSnap || await tx.get(pRef);
   if (!snap.exists()) throw new Error('Produk tidak ditemukan');
   
   const data: any = snap.data() || {};
@@ -173,6 +185,10 @@ export const transferStockTx = async (tx: Transaction, params: {
 
   nextByWarehouse[fromWarehouseId] = currentSourceStock - amount;
   nextByWarehouse[toWarehouseId] = Number(nextByWarehouse[toWarehouseId] || 0) + amount;
+
+  // Sync warehouse capacity
+  tx.update(doc(db, 'warehouses', fromWarehouseId), { usedCapacity: increment(-amount) });
+  tx.update(doc(db, 'warehouses', toWarehouseId), { usedCapacity: increment(amount) });
 
   // Total stock does not change in a transfer
   tx.update(pRef, { stockByWarehouse: nextByWarehouse });
@@ -205,12 +221,13 @@ export const adjustStockTx = async (tx: Transaction, params: {
   adminId: string;
   note?: string;
   source: InventorySource; // Usually 'OPNAME'
+  prefetchedSnap?: DocumentSnapshot;
 }) => {
-  const { productId, newStock, warehouseId, adminId, note, source } = params;
+  const { productId, newStock, warehouseId, adminId, note, source, prefetchedSnap } = params;
   if (newStock < 0) throw new Error('Stok tidak boleh negatif');
 
   const pRef = doc(db, 'products', productId);
-  const snap = await tx.get(pRef);
+  const snap = prefetchedSnap || await tx.get(pRef);
   if (!snap.exists()) throw new Error('Produk tidak ditemukan');
 
   const data: any = snap.data() || {};
@@ -224,6 +241,11 @@ export const adjustStockTx = async (tx: Transaction, params: {
   if (diff === 0) return; // No change
 
   nextByWarehouse[warehouseId] = newStock;
+  
+  // Sync warehouse capacity
+  if (diff !== 0) {
+    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(diff) });
+  }
   const nextTotalStock = currentTotalStock + diff;
 
   tx.update(pRef, { 

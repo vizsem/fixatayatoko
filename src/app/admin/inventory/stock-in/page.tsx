@@ -192,7 +192,8 @@ function StockInContent() {
           warehouseId: 'gudang-utama',
           adminId: auth.currentUser?.uid || 'system',
           note: `Stock-In manual (${formData.unitCode} x ${formData.quantity})`,
-          source: 'MANUAL'
+          source: 'MANUAL',
+          prefetchedSnap: snap
         });
         tx.update(productRef, {
           purchasePrice: nextAvgCost,

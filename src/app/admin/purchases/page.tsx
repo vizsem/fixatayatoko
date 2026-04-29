@@ -5,7 +5,7 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
-  collection, doc, updateDoc, addDoc, query, orderBy, Timestamp, serverTimestamp, getDocs, limit, startAfter, runTransaction, arrayUnion, getDoc
+  collection, doc, updateDoc, addDoc, query, orderBy, Timestamp, serverTimestamp, getDocs, limit, startAfter, runTransaction, arrayUnion, getDoc, increment
 } from 'firebase/firestore';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -101,10 +101,16 @@ export default function AdminPurchases() {
         if (pData.status !== 'MENUNGGU') throw new Error('Status bukan MENUNGGU');
 
         if (newStatus === 'DITERIMA') {
-          for (const item of pData.items) {
-            const productRef = doc(db, 'products', item.id);
-            const prodSnap = await tx.get(productRef);
+          // FIX: Read all product snapshots BEFORE any writes to satisfy Firestore transaction requirements
+          const productRefs = pData.items.map(item => doc(db, 'products', item.id));
+          const prodSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
+
+          for (let i = 0; i < pData.items.length; i++) {
+            const item = pData.items[i];
+            const prodSnap = prodSnaps[i];
+
             if (prodSnap.exists()) {
+              const productRef = productRefs[i];
               const curData = prodSnap.data();
               const currentStock = Number(curData.stock || 0);
               const conv = Number(item.conversion || 1);
@@ -133,6 +139,9 @@ export default function AdminPurchases() {
                   warehouseId: whKey
                 })
               });
+
+              // Sync warehouse capacity
+              tx.update(doc(db, 'warehouses', whKey), { usedCapacity: increment(incomingPcs) });
 
               tx.set(doc(collection(db, 'inventory_logs')), {
                 productId: item.id,
@@ -306,17 +315,17 @@ export default function AdminPurchases() {
            <table className="w-full text-left">
               <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                  <tr>
-                    <th className="px-8 py-5">Reference & Date</th>
-                    <th className="px-8 py-5">Supplier & Wh</th>
-                    <th className="px-8 py-5">Financials</th>
-                    <th className="px-8 py-5">Status</th>
-                    <th className="px-8 py-5 text-right pr-12">Actions</th>
+                    <th className="px-4 py-3">Reference & Date</th>
+                    <th className="px-4 py-3">Supplier & Wh</th>
+                    <th className="px-4 py-3">Financials</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                  {filteredPurchases.map(p => (
                    <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
-                      <td className="px-8 py-5">
+                      <td className="px-4 py-3">
                          <div className="flex items-center gap-3">
                             <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-colors"><Package size={16}/></div>
                             <div>
@@ -325,22 +334,22 @@ export default function AdminPurchases() {
                             </div>
                          </div>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 py-3">
                          <p className="text-[11px] font-black text-slate-700 uppercase tracking-tight">{p.supplierName}</p>
                          <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{p.warehouseName}</p>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 py-3">
                          <p className="text-[11px] font-black text-slate-900 leading-none">Rp {p.total.toLocaleString()}</p>
                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg w-fit mt-1.5 inline-block ${p.paymentStatus === 'LUNAS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                             {p.paymentStatus}
                          </span>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 py-3">
                          <span className={`text-[9px] font-black uppercase px-4 py-1.5 rounded-xl border ${p.status === 'DITERIMA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : p.status === 'MENUNGGU' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                             {p.status}
                          </span>
                       </td>
-                      <td className="px-8 py-5 text-right pr-12">
+                      <td className="px-4 py-3 text-right">
                          <div className="flex items-center justify-end gap-2">
                             {p.status === 'MENUNGGU' && (
                               <>

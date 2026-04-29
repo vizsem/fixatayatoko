@@ -124,12 +124,24 @@ export default function AdminOrders() {
           const orderData = orderSnap.data() as Order;
           if (orderData.status === 'DIBATALKAN') throw new Error("Sudah dibatalkan");
 
+          // FIX: Pre-fetch all product snapshots and user snapshot BEFORE any writes
+          const itemProductRefs = (orderData.items || []).filter(item => item.productId).map(item => doc(db, 'products', item.productId!));
+          const pSnaps = await Promise.all(itemProductRefs.map(ref => transaction.get(ref)));
+          
+          let userSnap = null;
+          if (orderData.userId && orderData.userId !== 'guest') {
+            userSnap = await transaction.get(doc(db, 'users', orderData.userId));
+          }
+
+          // NOW perform all writes
           if (orderData.items) {
-            for (const item of orderData.items) {
+            for (let i = 0; i < orderData.items.length; i++) {
+              const item = orderData.items[i];
               if (!item.productId) continue;
-              const pRef = doc(db, 'products', item.productId);
-              const pSnap = await transaction.get(pRef);
-              if (pSnap.exists()) {
+              
+              const pSnap = pSnaps.find(s => s.id === item.productId);
+              if (pSnap && pSnap.exists()) {
+                const pRef = doc(db, 'products', item.productId);
                 const pData = pSnap.data();
                 const stockByWh = pData.stockByWarehouse || {};
                 const whId = item.warehouseId || 'gudang-utama';
@@ -139,6 +151,9 @@ export default function AdminOrders() {
                   stock: increment(item.quantity),
                   stockByWarehouse: stockByWh
                 });
+
+                // Sync warehouse capacity
+                transaction.update(doc(db, 'warehouses', whId), { usedCapacity: increment(item.quantity) });
 
                 transaction.set(doc(collection(db, 'inventory_logs')), {
                   productId: item.productId,
@@ -155,19 +170,15 @@ export default function AdminOrders() {
             }
           }
 
-          if (orderData.userId && orderData.userId !== 'guest') {
-             const userRef = doc(db, 'users', orderData.userId);
-             const userSnap = await transaction.get(userRef);
-             if (userSnap.exists()) {
-                const refundW = orderData.walletUsed || 0;
-                const refundP = orderData.pointsUsed || 0;
-                if (refundW > 0 || refundP > 0) {
-                   transaction.update(userRef, {
-                      walletBalance: increment(refundW),
-                      points: increment(refundP)
-                   });
-                }
-             }
+          if (userSnap && userSnap.exists()) {
+            const refundW = orderData.walletUsed || 0;
+            const refundP = orderData.pointsUsed || 0;
+            if (refundW > 0 || refundP > 0) {
+               transaction.update(userSnap.ref, {
+                  walletBalance: increment(refundW),
+                  points: increment(refundP)
+               });
+            }
           }
 
           transaction.update(orderRef, { status: 'DIBATALKAN', updatedAt: serverTimestamp() });
