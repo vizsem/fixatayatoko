@@ -8,6 +8,7 @@ interface CartItem {
   price: number;
   quantity: number;
   unit: string;
+  stock: number;
 }
 
 interface CartTableProps {
@@ -44,7 +45,12 @@ export const CartTable = ({ cart, onUpdateQty, onUpdatePrice, onRemove }: CartTa
               <tr key={item.id} className="group hover:bg-gray-50/50 transition-all">
                 <td className="px-4 py-2.5">
                   <p className="text-[11px] font-black text-gray-800 uppercase">{item.name}</p>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase">{item.unit}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase">{item.unit}</p>
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${item.stock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                      Stok: {item.stock}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1">

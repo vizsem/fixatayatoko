@@ -33,6 +33,7 @@ interface CartItem {
   price: number;
   quantity: number;
   unit: string;
+  stock: number;
 }
 
 export default function MarketplaceOrdersPage() {
@@ -78,7 +79,7 @@ export default function MarketplaceOrdersPage() {
         : channel === 'TIKTOK' 
           ? (p.priceTiktok || p.price || p.priceEcer || 0) 
           : (p.priceEcer || p.price || 0);
-      return { ...item, price: newPrice };
+      return { ...item, price: newPrice, stock: p.stock || 0 };
     }));
   }, [channel, products]);
 
@@ -106,7 +107,8 @@ export default function MarketplaceOrdersPage() {
         name: p.name || '',
         price: price || 0,
         quantity: 1,
-        unit: p.unit || 'Pcs'
+        unit: p.unit || 'Pcs',
+        stock: p.stock || 0
       }];
     });
     setSearchTerm('');
