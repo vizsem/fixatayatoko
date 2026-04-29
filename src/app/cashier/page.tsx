@@ -1327,31 +1327,48 @@ export default function CashierPOS() {
           </div>
         </div>
       )}
-      <nav className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
-        <div className="flex items-center gap-6">
+      <nav className="bg-white border-b px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between shadow-sm sticky top-0 z-30 gap-3 md:gap-0">
+        <div className="flex items-center justify-between w-full md:w-auto">
           <h1 className="text-xl font-black italic text-green-600">ATAYATOKO <span className="text-gray-400 not-italic font-medium text-sm">POS</span></h1>
+          
+          {/* Mobile Notifications */}
+          <div className="flex md:hidden items-center gap-3">
+            <button onClick={() => setShowChatModal(true)} className="relative p-1.5 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
+              <MessageSquare size={18} className="group-hover:text-green-600" />
+              {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
+            </button>
+            <button onClick={() => setIsDrawerOpen(true)} className="relative p-1.5 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
+              <Bell size={18} className="group-hover:text-blue-600" />
+              {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pb-1 md:pb-0 w-full md:w-auto">
           {isOffline && (
-            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2">
+            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-bold animate-pulse flex items-center gap-2 shrink-0">
               <span className="w-2 h-2 bg-red-600 rounded-full"></span> OFFLINE MODE
             </div>
           )}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button onClick={() => setActiveTab('pos')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
-            <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
+          <div className="flex bg-gray-100 rounded-lg p-1 shrink-0">
+            <button onClick={() => setActiveTab('pos')} className={`px-3 md:px-4 py-1.5 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
+            <button onClick={() => setActiveTab('orders')} className={`px-3 md:px-4 py-1.5 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
           {currentShift && (
-            <div className="flex items-center gap-2 ml-4 border-l pl-4">
-              <div className="flex flex-col text-right">
+            <div className="flex items-center gap-2 shrink-0 md:ml-4 md:border-l md:pl-4">
+              <div className="hidden md:flex flex-col text-right">
                 <span className="text-[10px] font-bold text-gray-400 uppercase">Shift Aktif</span>
                 <span className="text-xs font-black text-gray-700">{currentShift.cashierName}</span>
               </div>
-              <button onClick={prepareCloseShift} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-100 border border-red-100 uppercase">
+              <button onClick={prepareCloseShift} className="px-3 py-1.5 md:py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-100 border border-red-100 uppercase shrink-0">
                 Tutup Shift
               </button>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        
+        {/* Desktop Notifications */}
+        <div className="hidden md:flex items-center gap-4">
           <button onClick={() => setShowChatModal(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
             <MessageSquare size={20} className="group-hover:text-green-600" />
             {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
