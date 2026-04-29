@@ -34,6 +34,7 @@ interface CartItem {
   quantity: number;
   unit: string;
   stock: number;
+  units?: any[];
 }
 
 export default function MarketplaceOrdersPage() {
@@ -108,7 +109,8 @@ export default function MarketplaceOrdersPage() {
         price: price || 0,
         quantity: 1,
         unit: p.unit || 'Pcs',
-        stock: p.stock || 0
+        stock: p.stock || 0,
+        units: p.units || []
       }];
     });
     setSearchTerm('');

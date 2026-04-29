@@ -9,6 +9,7 @@ interface CartItem {
   quantity: number;
   unit: string;
   stock: number;
+  units?: any[];
 }
 
 interface CartTableProps {
@@ -53,13 +54,16 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                       value={item.unit}
                       onChange={(e) => onUpdateUnit(item.id, e.target.value)}
                     >
-                      <option value="PCS">PCS</option>
-                      <option value="BOX">BOX</option>
-                      <option value="STRIP">STRIP</option>
-                      <option value="TUBE">TUBE</option>
-                      <option value="BOTOL">BOTOL</option>
-                      {/* Ensure current unit is an option even if not in the list above */}
-                      {!['PCS', 'BOX', 'STRIP', 'TUBE', 'BOTOL'].includes(item.unit.toUpperCase()) && (
+                      {item.units && item.units.length > 0 ? (
+                        item.units.map((u: any) => (
+                          <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
+                        ))
+                      ) : (
+                        <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                      )}
+                      
+                      {/* Ensure current unit is an option even if not in item.units */}
+                      {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
                         <option value={item.unit}>{item.unit.toUpperCase()}</option>
                       )}
                     </select>
