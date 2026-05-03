@@ -243,13 +243,68 @@ export default function AuditPage() {
                   )}
                </thead>
                <tbody className="divide-y divide-slate-50">
+                  {activeTab === 'stock' && stockLogs.filter(l => l.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(l => {
+                    const refIdMatch = l.note?.match(/#([A-Za-z0-9]+)/);
+                    const refId = refIdMatch ? refIdMatch[1] : null;
+                    const isReturn = l.note?.toLowerCase().includes('retur');
+                    const refUrl = isReturn ? `/admin/returns` : (refId ? `/admin/orders/${refId}` : null);
+
+                    return (
+                      <tr key={l.id} className="hover:bg-slate-50/50 transition-all group">
+                        <td className="px-8 py-5">
+                            <p className="text-[11px] font-black text-slate-800">{l.date && format(l.date.toDate(), 'HH:mm')}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{l.date && format(l.date.toDate(), 'd MMM yyyy')}</p>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-colors">
+                              <Package size={16} />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-black text-slate-800 uppercase line-clamp-1">{l.productName}</p>
+                              {refId ? (
+                                <Link href={refUrl || '#'} className="text-[9px] font-black text-blue-600 hover:underline flex items-center gap-1 mt-1 uppercase italic leading-none">
+                                  #{refId} <ChevronRight size={8} />
+                                </Link>
+                              ) : (
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 italic">{l.source}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${l.type === 'MASUK' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                              {l.type === 'MASUK' ? '+' : '-'}{l.amount}
+                            </span>
+                        </td>
+                        <td className="px-8 py-5 text-xs font-black text-slate-500">{l.prevStock} &rarr; <span className="text-slate-900">{l.nextStock}</span></td>
+                        <td className="px-8 py-5 text-right">
+                            <div className="flex items-center justify-end gap-2 text-slate-400">
+                              <User size={12}/> <span className="text-[10px] font-black uppercase">{l.adminId?.substring(0,8)}</span>
+                            </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {activeTab === 'transaction' && transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
                     <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
                           <p className="text-[11px] font-black text-slate-800">{t.createdAt && format(t.createdAt.toDate(), 'HH:mm')}</p>
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.createdAt && format(t.createdAt.toDate(), 'd MMM yyyy')}</p>
                        </td>
-                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">#{t.id?.substring(0,8)}</td>
+                       <td className="px-8 py-5">
+                          <Link href={`/admin/orders/${t.id}`} className="flex items-center gap-3 group/ref">
+                            <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover/ref:text-blue-600 transition-colors">
+                              <Package size={16} />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{t.id?.substring(0,8)}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
+                                View Detail <ChevronRight size={10} />
+                              </p>
+                            </div>
+                          </Link>
+                       </td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-600">{t.customerName || 'Walk-in'}</td>
                        <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {t.total?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right">

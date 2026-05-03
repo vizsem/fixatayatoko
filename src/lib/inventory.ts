@@ -77,7 +77,10 @@ export const deductStockTx = async (tx: Transaction, params: {
     remaining -= cut;
     
     // Sync warehouse capacity
-    tx.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-cut) });
+    const volChange = cut * (data.volumeInCtn || 0);
+    if (volChange > 0) {
+      tx.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-volChange) });
+    }
   }
   // Gudang lainnya
   if (remaining > 0) {
@@ -89,7 +92,10 @@ export const deductStockTx = async (tx: Transaction, params: {
       remaining -= cut;
 
       // Sync warehouse capacity
-      tx.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-cut) });
+      const volChange = cut * (data.volumeInCtn || 0);
+      if (volChange > 0) {
+        tx.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
+      }
     }
   }
   const nextStock = currentStock - amount;
@@ -133,7 +139,10 @@ export const addStockTx = async (tx: Transaction, params: {
   nextByWarehouse[warehouseId] = Number(nextByWarehouse[warehouseId] || 0) + amount;
   
   // Sync warehouse capacity
-  tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(amount) });
+  const volChange = amount * (data.volumeInCtn || 0);
+  if (volChange > 0) {
+    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(volChange) });
+  }
   const nextStock = currentStock + amount;
   tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
   const logRef = doc(collection(db, 'inventory_logs'));
@@ -187,8 +196,11 @@ export const transferStockTx = async (tx: Transaction, params: {
   nextByWarehouse[toWarehouseId] = Number(nextByWarehouse[toWarehouseId] || 0) + amount;
 
   // Sync warehouse capacity
-  tx.update(doc(db, 'warehouses', fromWarehouseId), { usedCapacity: increment(-amount) });
-  tx.update(doc(db, 'warehouses', toWarehouseId), { usedCapacity: increment(amount) });
+  const volChange = amount * (data.volumeInCtn || 0);
+  if (volChange > 0) {
+    tx.update(doc(db, 'warehouses', fromWarehouseId), { usedCapacity: increment(-volChange) });
+    tx.update(doc(db, 'warehouses', toWarehouseId), { usedCapacity: increment(volChange) });
+  }
 
   // Total stock does not change in a transfer
   tx.update(pRef, { stockByWarehouse: nextByWarehouse });
@@ -243,8 +255,9 @@ export const adjustStockTx = async (tx: Transaction, params: {
   nextByWarehouse[warehouseId] = newStock;
   
   // Sync warehouse capacity
-  if (diff !== 0) {
-    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(diff) });
+  const volChange = diff * (data.volumeInCtn || 0);
+  if (volChange !== 0) {
+    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(volChange) });
   }
   const nextTotalStock = currentTotalStock + diff;
 

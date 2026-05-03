@@ -355,7 +355,9 @@ export default function ReturnsPage() {
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${ret.type === 'SALES_RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                       {ret.type === 'SALES_RETURN' ? 'RETUR JUAL' : 'RETUR BELI'}
                     </span>
-                    <div className="mt-0.5 text-[10px] font-mono font-bold text-slate-500">#{ret.refId.slice(-6)}</div>
+                    <Link href={`/admin/orders/${ret.refId}`} className="mt-0.5 text-[10px] font-mono font-bold text-blue-600 block hover:underline">
+                      #{ret.refId.slice(-8)}
+                    </Link>
                   </td>
                   <td className="px-3 py-2 text-[11px] font-black text-slate-800">{ret.customerOrSupplierName}</td>
                   <td className="px-3 py-2 text-[10px] font-medium text-slate-600 max-w-xs">{ret.reason}</td>

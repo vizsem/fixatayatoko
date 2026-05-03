@@ -278,7 +278,7 @@ export default function WarehousesPage() {
                         <div className="max-w-[200px]">
                           <div className="flex justify-between items-end mb-1">
                             <span className="text-[10px] font-black text-gray-800 leading-none">
-                              {warehouse.usedCapacity.toLocaleString()} <span className="text-gray-300 text-[8px]">/ {warehouse.capacity.toLocaleString()}</span>
+                              {warehouse.usedCapacity.toLocaleString()} <span className="text-gray-300 text-[8px]">/ {warehouse.capacity.toLocaleString()} CTN</span>
                             </span>
                             <span className={`text-[9px] font-black ${isCritical ? 'text-red-600' : 'text-green-600'}`}>
                               {rate}%
@@ -375,8 +375,8 @@ export default function WarehousesPage() {
                        ></div>
                     </div>
                     <div className="flex justify-between text-[9px] font-bold text-gray-600">
-                       <span className="tracking-tight">{warehouse.usedCapacity.toLocaleString()} Unit</span>
-                       <span className="text-gray-300">/ {warehouse.capacity.toLocaleString()}</span>
+                       <span className="tracking-tight">{warehouse.usedCapacity.toLocaleString()} CTN</span>
+                       <span className="text-gray-300">/ {warehouse.capacity.toLocaleString()} CTN</span>
                     </div>
                  </div>
 
@@ -421,9 +421,15 @@ export default function WarehousesPage() {
       </div>
 
       {/* Footer Info */}
-      <div className="mt-8 flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] px-4">
-        <Activity size={14} className="text-green-500" />
-        Live System Status: All warehouses synchronized with global inventory
+      <div className="mt-8 flex flex-col gap-2 px-4">
+        <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">
+          <Activity size={14} className="text-green-500" />
+          Live System Status: All warehouses synchronized with global inventory
+        </div>
+        <div className="flex items-center gap-2 text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">
+          <Package size={14} />
+          Standard Capacity: 1 CTN = 34 x 20 x 24 cm
+        </div>
       </div>
     </div>
   );

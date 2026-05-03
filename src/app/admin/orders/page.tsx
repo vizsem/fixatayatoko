@@ -153,7 +153,10 @@ export default function AdminOrders() {
                 });
 
                 // Sync warehouse capacity
-                transaction.update(doc(db, 'warehouses', whId), { usedCapacity: increment(item.quantity) });
+                const volChange = item.quantity * (pData.volumeInCtn || 0);
+                if (volChange > 0) {
+                  transaction.update(doc(db, 'warehouses', whId), { usedCapacity: increment(volChange) });
+                }
 
                 transaction.set(doc(collection(db, 'inventory_logs')), {
                   productId: item.productId,
@@ -354,7 +357,7 @@ export default function AdminOrders() {
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-black text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">#{order.id.substring(0, 8)}</span>
+                    <Link href={`/admin/orders/${order.id}`} className="font-black text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-colors">#{order.id.substring(0, 8)}</Link>
                     <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(order.status)}`}>{order.status}</span>
                   </div>
                   <h3 className="font-black text-slate-800 text-sm uppercase truncate">{order.customerName || 'Walk-in Customer'}</h3>

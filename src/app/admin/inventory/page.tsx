@@ -173,8 +173,18 @@ export default function InventoryDashboard() {
         return;
       }
       const ref = doc(db, 'products', id);
-      await updateDoc(ref, { stock: tempStock, updatedAt: serverTimestamp() });
-      await addInventoryLog({
+      const whId = (product as any).warehouseId || 'gudang-utama';
+      const volChange = diff * (product.volumeInCtn || 0);
+
+      const batch = writeBatch(db);
+      batch.update(ref, { stock: tempStock, updatedAt: serverTimestamp() });
+      
+      if (volChange !== 0) {
+        batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(volChange) });
+      }
+
+      const logRef = doc(collection(db, 'inventory_logs'));
+      batch.set(logRef, {
         productId: id,
         productName: product.name,
         type: diff > 0 ? 'MASUK' : 'KELUAR',
@@ -182,9 +192,12 @@ export default function InventoryDashboard() {
         adminId: auth.currentUser?.uid || 'system',
         source: 'MANUAL',
         note: `Quick Update via Dashboard. Prev: ${product.stock}, New: ${tempStock}`,
-        toWarehouseId: diff > 0 ? 'gudang-utama' : undefined,
-        fromWarehouseId: diff < 0 ? 'gudang-utama' : undefined
+        toWarehouseId: diff > 0 ? whId : undefined,
+        fromWarehouseId: diff < 0 ? whId : undefined,
+        date: serverTimestamp()
       });
+
+      await batch.commit();
       setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: tempStock } : p));
       setEditingId(null);
       notify.admin.success('Stok diperbarui');

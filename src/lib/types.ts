@@ -30,6 +30,12 @@ export interface Product {
     units?: UnitOption[];
     minPurchase?: number;
     maxPurchase?: number;
+    dimensions?: {
+        length: number;
+        width: number;
+        height: number;
+    };
+    volumeInCtn?: number; // Volume per unit relative to standard CTN (34x20x24)
     
     // Optional / Legacy Fields (Mapping from Excel)
     ID?: string;        // Internal ID

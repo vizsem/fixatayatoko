@@ -36,7 +36,8 @@ describe('Inventory Atomicity (Unit & Logic Check)', () => {
           'gudang-A': 60,
           'gudang-B': 40
         },
-        name: 'Produk A'
+        name: 'Produk A',
+        volumeInCtn: 1
       })
     };
     mockTx.get.mockResolvedValue(mockDocSnap);
@@ -129,7 +130,8 @@ describe('Inventory Atomicity (Unit & Logic Check)', () => {
         stock: 100,
         stockByWarehouse: {
           'gudang-A': 100
-        }
+        },
+        volumeInCtn: 1
       })
     };
     mockTx.get.mockResolvedValue(mockDocSnap);

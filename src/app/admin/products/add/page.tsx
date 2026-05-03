@@ -58,7 +58,11 @@ export default function AddProductPage() {
     Lokasi: '',
     warehouseId: '',
     minPurchase: 1,
-    maxPurchase: 0
+    maxPurchase: 0,
+    dimLength: 0,
+    dimWidth: 0,
+    dimHeight: 0,
+    volumeInCtn: 0
   });
 
   const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
@@ -256,6 +260,12 @@ export default function AddProductPage() {
         pricingStrategy,
         minPurchase: Number(formData.minPurchase || 1),
         maxPurchase: Number(formData.maxPurchase || 0),
+        dimensions: {
+          length: Number(formData.dimLength || 0),
+          width: Number(formData.dimWidth || 0),
+          height: Number(formData.dimHeight || 0)
+        },
+        volumeInCtn: Number(formData.volumeInCtn || 0),
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -481,6 +491,45 @@ export default function AddProductPage() {
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
                 <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
                 <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* BAGIAN 2.5: DIMENSI & VOLUME */}
+          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-6 text-blue-600">
+              <Package size={18} />
+              <h3 className="text-xs font-black uppercase tracking-widest">Dimensi & Volume (Kapasitas Gudang)</h3>
+            </div>
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
+                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
+                  const l = Number(e.target.value);
+                  const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
+                  setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
+                }} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
+                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
+                  const w = Number(e.target.value);
+                  const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
+                  setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
+                }} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
+                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
+                  const h = Number(e.target.value);
+                  const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
+                  setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
+                }} />
+              </div>
+              <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
+                <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Volume Setara</p>
+                <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-[10px] uppercase">CTN</span></p>
+                <p className="text-[7px] font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
               </div>
             </div>
           </div>

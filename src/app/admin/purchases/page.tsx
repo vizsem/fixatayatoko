@@ -141,7 +141,10 @@ export default function AdminPurchases() {
               });
 
               // Sync warehouse capacity
-              tx.update(doc(db, 'warehouses', whKey), { usedCapacity: increment(incomingPcs) });
+              const volChange = incomingPcs * (curData.volumeInCtn || 0);
+              if (volChange > 0) {
+                tx.update(doc(db, 'warehouses', whKey), { usedCapacity: increment(volChange) });
+              }
 
               tx.set(doc(collection(db, 'inventory_logs')), {
                 productId: item.id,
@@ -328,10 +331,10 @@ export default function AdminPurchases() {
                       <td className="px-4 py-3">
                          <div className="flex items-center gap-3">
                             <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-colors"><Package size={16}/></div>
-                            <div>
-                               <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none">#{p.id.slice(-8)}</p>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1"><Calendar size={10}/> {new Date(p.createdAt).toLocaleDateString('id-ID')}</p>
-                            </div>
+                            <Link href={`/admin/purchases/${p.id}`} className="block group/ref">
+                               <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{p.id.slice(-8)}</p>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1 group-hover/ref:text-blue-600 transition-colors"><Calendar size={10}/> {new Date(p.createdAt).toLocaleDateString('id-ID')}</p>
+                            </Link>
                          </div>
                       </td>
                       <td className="px-4 py-3">

@@ -35,6 +35,7 @@ function WarehouseFormContent() {
     capacity: 1000,
     isActive: true
   });
+  const [ctnInput, setCtnInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   // Proteksi admin
@@ -164,21 +165,48 @@ function WarehouseFormContent() {
         </div>
 
         {/* Kapasitas */}
-        <div className="mb-6">
-          <label className="block text-black text-sm font-medium mb-2">
-            Kapasitas Maksimal (unit) *
-          </label>
-          <input
-            type="number"
-            required
-            min="1"
-            value={formData.capacity}
-            onChange={(e) => setFormData({...formData, capacity: Number(e.target.value)})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-black"
-            placeholder="1000"
-          />
-          <p className="text-xs text-black mt-1">
-            Jumlah maksimal item yang bisa disimpan di gudang ini
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-black text-xs font-black uppercase tracking-widest mb-2 px-1">
+                Kapasitas Maksimal (Unit/Pcs) *
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={formData.capacity}
+                onChange={(e) => setFormData({...formData, capacity: Number(e.target.value)})}
+                className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-green-500 transition-all text-black"
+                placeholder="1000"
+              />
+            </div>
+            <div className="flex-1 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+              <label className="block text-blue-600 text-[10px] font-black uppercase tracking-widest mb-2">
+                CTN Calculator (34x20x24 cm)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  placeholder="Input CTN..."
+                  value={ctnInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCtnInput(val);
+                    if (val) {
+                      setFormData({...formData, capacity: Number(val)});
+                    }
+                  }}
+                  className="w-full bg-white px-3 py-2 rounded-xl text-xs font-black outline-none border border-blue-200 text-blue-700"
+                />
+                <span className="text-[10px] font-black text-blue-400 uppercase">CTN</span>
+              </div>
+              <p className="text-[8px] font-bold text-blue-400 mt-2 uppercase tracking-tight">
+                * 1 CTN dihitung sebagai 1 unit kapasitas volume standar (34x20x24 cm)
+              </p>
+            </div>
+          </div>
+          <p className="text-[9px] font-bold text-gray-400 mt-2 uppercase tracking-widest px-1">
+            Jumlah maksimal item yang bisa disimpan di gudang ini (berdasarkan unit/box)
           </p>
         </div>
 

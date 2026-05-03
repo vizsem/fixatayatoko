@@ -1024,6 +1024,12 @@ export default function CashierPOS() {
             const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
             newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
             remainingToDeduct -= deduct;
+            
+            // Sync warehouse capacity
+            const volChange = deduct * (productData.volumeInCtn || 0);
+            if (volChange > 0) {
+              batch.update(doc(db, 'warehouses', MAIN_WAREHOUSE_ID), { usedCapacity: increment(-volChange) });
+            }
           }
           
           // 2. Gudang Lainnya (Jika masih ada sisa yang harus dikurangi)
@@ -1035,6 +1041,12 @@ export default function CashierPOS() {
               const deduct = Math.min(qty as number, remainingToDeduct);
               newStockByWarehouse[whId] = (qty as number) - deduct;
               remainingToDeduct -= deduct;
+
+              // Sync warehouse capacity
+              const volChange = deduct * (productData.volumeInCtn || 0);
+              if (volChange > 0) {
+                batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
+              }
             }
           }
 
