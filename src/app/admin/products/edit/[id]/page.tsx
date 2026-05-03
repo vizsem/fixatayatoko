@@ -10,7 +10,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
-  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X
+  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';

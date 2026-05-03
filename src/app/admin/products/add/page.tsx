@@ -7,7 +7,7 @@ import { db, storage } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
-  Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X
+  Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
