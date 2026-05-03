@@ -7,6 +7,9 @@ import { RefreshCcw, CheckCircle, XCircle } from 'lucide-react';
 import { addStockTx, deductStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 import notify from '@/lib/notify';
+import { Search, Plus, Trash2 } from 'lucide-react';
+import { Product } from '@/lib/types';
+import { getDocs } from 'firebase/firestore';
 
 type ReturnReq = {
   id: string;
@@ -23,6 +26,20 @@ type ReturnReq = {
 export default function ReturnsPage() {
   const [returns, setReturns] = useState<ReturnReq[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchProduct, setSearchProduct] = useState('');
+
+  // Form State
+  const [newReturn, setNewReturn] = useState<Partial<ReturnReq>>({
+    type: 'SALES_RETURN',
+    refId: '',
+    customerOrSupplierName: '',
+    items: [],
+    reason: '',
+    status: 'PENDING',
+    totalValue: 0
+  });
 
   useEffect(() => {
     const q = query(collection(db, 'returns'), orderBy('createdAt', 'desc'));
@@ -30,8 +47,57 @@ export default function ReturnsPage() {
       setReturns(snap.docs.map(d => ({ id: d.id, ...d.data() } as ReturnReq)));
       setLoading(false);
     });
+
+    const fetchProducts = async () => {
+      const pSnap = await getDocs(collection(db, 'products'));
+      setProducts(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+    };
+    fetchProducts();
+
     return unsub;
   }, []);
+
+  const filteredProducts = products.filter(p => 
+    p.name?.toLowerCase().includes(searchProduct.toLowerCase())
+  ).slice(0, 5);
+
+  const addItem = (p: Product) => {
+    const existing = newReturn.items?.find(i => i.productId === p.id);
+    if (existing) return;
+    
+    const newItem = { productId: p.id, productName: p.name, quantity: 1, price: p.price || 0 };
+    setNewReturn({
+      ...newReturn,
+      items: [...(newReturn.items || []), newItem],
+      totalValue: (newReturn.totalValue || 0) + newItem.price
+    });
+    setSearchProduct('');
+  };
+
+  const removeItem = (productId: string) => {
+    const updatedItems = (newReturn.items || []).filter(i => i.productId !== productId);
+    const newVal = updatedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+    setNewReturn({ ...newReturn, items: updatedItems, totalValue: newVal });
+  };
+
+  const handleSaveReturn = async () => {
+    if (!newReturn.refId || !newReturn.customerOrSupplierName || (newReturn.items || []).length === 0) {
+      return notify.error("Lengkapi data retur");
+    }
+
+    try {
+      await addDoc(collection(db, 'returns'), {
+        ...newReturn,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      notify.admin.success("Request retur berhasil dibuat");
+      setIsModalOpen(false);
+      setNewReturn({ type: 'SALES_RETURN', refId: '', customerOrSupplierName: '', items: [], reason: '', status: 'PENDING', totalValue: 0 });
+    } catch (e) {
+      notify.admin.error("Gagal membuat retur");
+    }
+  };
 
   const handleProcess = async (ret: ReturnReq, action: 'APPROVE' | 'REJECT') => {
     if (!confirm(`Yakin ingin ${action === 'APPROVE' ? 'menyetujui' : 'menolak'} retur ini?`)) return;
@@ -118,8 +184,153 @@ export default function ReturnsPage() {
             </h1>
             <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Kelola pengembalian barang dari Penjualan dan ke Pembelian.</p>
           </div>
-          {/* Untuk demo, bisa ditambah tombol buat retur manual di sini */}
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            <Plus size={16} /> Buat Retur Manual
+          </button>
         </div>
+
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">Buat Permintaan Retur</h2>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Input manual barang kembali</p>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><XCircle size={24} className="text-slate-300" /></button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tipe Retur</label>
+                    <select 
+                      value={newReturn.type}
+                      onChange={e => setNewReturn({...newReturn, type: e.target.value as any})}
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all"
+                    >
+                      <option value="SALES_RETURN">RETUR PENJUALAN (Dari Customer)</option>
+                      <option value="PURCHASE_RETURN">RETUR PEMBELIAN (Ke Supplier)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">No. Referensi (ID Order/Beli)</label>
+                    <input 
+                      type="text"
+                      placeholder="Contoh: ORD-123..."
+                      value={newReturn.refId}
+                      onChange={e => setNewReturn({...newReturn, refId: e.target.value})}
+                      className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nama Customer / Supplier</label>
+                  <input 
+                    type="text"
+                    placeholder="Nama lengkap..."
+                    value={newReturn.customerOrSupplierName}
+                    onChange={e => setNewReturn({...newReturn, customerOrSupplierName: e.target.value})}
+                    className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Produk</label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Cari nama produk..."
+                      value={searchProduct}
+                      onChange={e => setSearchProduct(e.target.value)}
+                      className="w-full bg-slate-50 p-4 pl-12 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all"
+                    />
+                    {searchProduct && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-10 overflow-hidden divide-y divide-slate-50">
+                        {filteredProducts.map(p => (
+                          <button 
+                            key={p.id}
+                            onClick={() => addItem(p)}
+                            className="w-full p-4 text-left hover:bg-slate-50 transition-all flex justify-between items-center"
+                          >
+                            <span className="text-xs font-black text-slate-800 uppercase">{p.name}</span>
+                            <span className="text-[10px] font-bold text-slate-400">Rp {p.price?.toLocaleString()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-[10px]">
+                      <thead className="bg-slate-100/50">
+                        <tr>
+                          <th className="px-4 py-3 font-black text-slate-400 uppercase">Produk</th>
+                          <th className="px-4 py-3 font-black text-slate-400 uppercase text-center w-20">Qty</th>
+                          <th className="px-4 py-3 font-black text-slate-400 uppercase text-right">Subtotal</th>
+                          <th className="px-4 py-3"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(newReturn.items || []).map((item, idx) => (
+                          <tr key={idx} className="bg-white/50">
+                            <td className="px-4 py-3 font-black text-slate-700 uppercase">{item.productName}</td>
+                            <td className="px-4 py-3">
+                              <input 
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={e => {
+                                  const qty = Math.max(1, Number(e.target.value));
+                                  const updated = (newReturn.items || []).map((it, i) => i === idx ? {...it, quantity: qty} : it);
+                                  const newVal = updated.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+                                  setNewReturn({...newReturn, items: updated, totalValue: newVal});
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 font-black text-center outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right font-black text-slate-900">Rp {(item.price * item.quantity).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button onClick={() => removeItem(item.productId)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Retur</label>
+                  <textarea 
+                    placeholder="Contoh: Barang cacat produksi / Salah kirim..."
+                    value={newReturn.reason}
+                    onChange={e => setNewReturn({...newReturn, reason: e.target.value})}
+                    className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all h-20 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai Retur</p>
+                  <p className="text-xl font-black text-slate-900">Rp {newReturn.totalValue?.toLocaleString()}</p>
+                </div>
+                <button 
+                  onClick={handleSaveReturn}
+                  className="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 active:scale-95 transition-all"
+                >
+                  Simpan Request
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
           <table className="w-full text-left text-sm">

@@ -235,6 +235,66 @@ export default function AdminSettings() {
     reader.readAsBinaryString(file);
   };
 
+  // --- HANDLERS FOR NEW TABS ---
+  const handleAddDelivery = () => {
+    if (!newDelivery.name || !newDelivery.id) return notify.error("Nama & ID wajib diisi");
+    setSettings({ ...settings, deliveryMethods: [...settings.deliveryMethods, newDelivery] });
+    setNewDelivery({ id: '', name: '', enabled: true, cost: 0, description: '' });
+  };
+
+  const handleDeleteDelivery = (id: string) => {
+    setSettings({ ...settings, deliveryMethods: settings.deliveryMethods.filter(d => d.id !== id) });
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCat) return;
+    const slug = newCat.toLowerCase().replace(/ /g, '-');
+    const docRef = await addDoc(collection(db, 'categories'), { name: newCat, slug });
+    setCategories([...categories, { id: docRef.id, name: newCat, slug }]);
+    setNewCat('');
+    notify.success("Kategori ditambahkan");
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("Hapus kategori ini?")) return;
+    await deleteDoc(doc(db, 'categories', id));
+    setCategories(categories.filter(c => c.id !== id));
+    notify.success("Kategori dihapus");
+  };
+
+  const handleAddEmployee = async () => {
+    if (!newEmp.name || !newEmp.email) return notify.error("Nama & Email wajib");
+    const docRef = await addDoc(collection(db, 'employees'), newEmp);
+    setEmployees([...employees, { id: docRef.id, ...newEmp }]);
+    setNewEmp({ name: '', role: 'kasir', phone: '', email: '', isActive: true });
+    notify.success("Staff ditambahkan");
+  };
+
+  const handleToggleEmployee = async (emp: Employee) => {
+    const updated = { ...emp, isActive: !emp.isActive };
+    await updateDoc(doc(db, 'employees', emp.id!), { isActive: !emp.isActive });
+    setEmployees(employees.map(e => e.id === emp.id ? updated : e));
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (!confirm("Hapus staff?")) return;
+    await deleteDoc(doc(db, 'employees', id));
+    setEmployees(employees.filter(e => e.id !== id));
+  };
+
+  const handleAddBanner = async () => {
+    if (!newBanner.title || !newBanner.imageUrl) return notify.error("Title & Image URL wajib");
+    const docRef = await addDoc(collection(db, 'banners'), newBanner);
+    setBanners([...banners, { id: docRef.id, ...newBanner }]);
+    setNewBanner({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
+    notify.success("Banner ditambahkan");
+  };
+
+  const handleDeleteBanner = async (id: string) => {
+    await deleteDoc(doc(db, 'banners', id));
+    setBanners(banners.filter(b => b.id !== id));
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-xs tracking-widest animate-pulse">Initializing system...</div>;
 
   return (
@@ -364,8 +424,211 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Categories, Employees, Banners, Points, Shipping - remain similar but with standardized paddings and logActivity */}
-      {/* (Skipping repetitive logic for brevity in this replace_file_content call, but ensuring the core requested features are implemented) */}
+      {activeTab === 'shipping' && (
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+          <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-xl font-black flex items-center gap-2"><Truck className="text-slate-900" /> Metode Pengiriman</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atur kurir dan biaya antar</p>
+              </div>
+              <button onClick={handleSaveSystem} className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Simpan Perubahan</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              {settings.deliveryMethods.map((method) => (
+                <div key={method.id} className="p-5 rounded-[2rem] bg-slate-50 border border-slate-100 relative group">
+                  <button onClick={() => handleDeleteDelivery(method.id)} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 bg-white rounded-2xl shadow-sm text-slate-900"><Truck size={20} /></div>
+                    <div>
+                      <p className="text-xs font-black">{method.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">{method.id}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between bg-white px-4 py-2 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Biaya</span>
+                      <input type="number" value={method.cost} onChange={e => {
+                        const updated = settings.deliveryMethods.map(m => m.id === method.id ? { ...m, cost: Number(e.target.value) } : m);
+                        setSettings({ ...settings, deliveryMethods: updated });
+                      }} className="bg-transparent text-right font-black text-xs outline-none w-24" />
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-4 py-2 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Aktif</span>
+                      <input type="checkbox" checked={method.enabled} onChange={e => {
+                        const updated = settings.deliveryMethods.map(m => m.id === method.id ? { ...m, enabled: e.target.checked } : m);
+                        setSettings({ ...settings, deliveryMethods: updated });
+                      }} className="w-4 h-4 rounded accent-slate-900" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Tambah Metode Baru</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="text" placeholder="ID (ex: JNE)" value={newDelivery.id} onChange={e => setNewDelivery({...newDelivery, id: e.target.value.toUpperCase()})} className="bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none placeholder:text-white/20" />
+                <input type="text" placeholder="Nama Layanan" value={newDelivery.name} onChange={e => setNewDelivery({...newDelivery, name: e.target.value})} className="bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none placeholder:text-white/20" />
+                <button onClick={handleAddDelivery} className="bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest py-4 hover:bg-slate-100 transition-all">Tambah</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'points' && (
+        <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
+          <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="p-4 bg-amber-50 text-amber-600 rounded-[1.5rem]"><Coins size={32} /></div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">Loyalty Points</h2>
+                <p className="text-xs font-bold text-slate-500">Atur sistem poin hadiah pelanggan</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div>
+                  <p className="text-xs font-black">Status Loyalty</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Aktifkan sistem poin</p>
+                </div>
+                <input type="checkbox" checked={pointConfig.isActive} onChange={e => setPointConfig({...pointConfig, isActive: e.target.checked})} className="w-6 h-6 rounded-lg accent-amber-500" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase px-2">1 Poin per Belanja</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
+                    <input type="number" value={pointConfig.earningRate} onChange={e => setPointConfig({...pointConfig, earningRate: Number(e.target.value)})} className="w-full bg-slate-50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase px-2">Nilai Tukar 1 Poin</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
+                    <input type="number" value={pointConfig.redemptionValue} onChange={e => setPointConfig({...pointConfig, redemptionValue: Number(e.target.value)})} className="w-full bg-slate-50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase px-2">Minimal Tukar Poin</label>
+                <input type="number" value={pointConfig.minRedeem} onChange={e => setPointConfig({...pointConfig, minRedeem: Number(e.target.value)})} className="w-full bg-slate-50 p-4 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
+              </div>
+
+              <button onClick={handleSavePoints} disabled={saving} className="w-full bg-amber-500 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-100 hover:bg-amber-600 active:scale-95 transition-all">
+                {saving ? 'Menyimpan...' : 'Simpan Konfigurasi Poin'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'categories' && (
+        <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
+          <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h2 className="text-xl font-black mb-6 flex items-center gap-2"><Tag className="text-slate-900" /> Kelola Kategori</h2>
+            
+            <div className="flex gap-2 mb-8">
+              <input type="text" placeholder="Nama Kategori Baru..." value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-slate-900 transition-all" />
+              <button onClick={handleAddCategory} className="px-8 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">Tambah</button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {categories.map(cat => (
+                <div key={cat.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-tight">{cat.name}</p>
+                    <p className="text-[9px] font-bold text-slate-400">slug: {cat.slug}</p>
+                  </div>
+                  <button onClick={() => handleDeleteCategory(cat.id!)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'employees' && (
+        <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
+          <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h2 className="text-xl font-black mb-8 flex items-center gap-2"><Users className="text-slate-900" /> Kelola Staff</h2>
+
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-8">
+              <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 px-2">Tambah Staff Baru</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <input type="text" placeholder="Nama Lengkap" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
+                <input type="email" placeholder="Email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
+                <select value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value as any})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none">
+                  <option value="kasir">Kasir</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button onClick={handleAddEmployee} className="bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest py-4">Tambah</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {employees.map(emp => (
+                <div key={emp.id} className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100"><Users size={20} /></div>
+                    <div>
+                      <p className="text-xs font-black uppercase">{emp.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{emp.role} • {emp.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleToggleEmployee(emp)} className={`p-2 rounded-xl transition-all ${emp.isActive ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 bg-white'}`}><CheckCircle2 size={18} /></button>
+                    <button onClick={() => handleDeleteEmployee(emp.id!)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'banners' && (
+        <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
+          <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h2 className="text-xl font-black mb-8 flex items-center gap-2"><Sparkles className="text-slate-900" /> Homepage Banners</h2>
+
+            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white mb-12 shadow-2xl">
+              <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest">Desain Banner Baru</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Judul</label><input type="text" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Subjudul</label><input type="text" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Link URL</label><input type="text" value={newBanner.linkUrl} onChange={e => setNewBanner({...newBanner, linkUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="md:col-span-2 space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Image URL</label><input type="text" value={newBanner.imageUrl} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="flex items-end"><button onClick={handleAddBanner} className="w-full bg-white text-slate-900 h-[52px] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all">Publish Banner</button></div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {banners.map(banner => (
+                <div key={banner.id} className={`relative p-8 rounded-[2.5rem] bg-gradient-to-br ${banner.gradient} text-white shadow-lg overflow-hidden group`}>
+                  {banner.imageUrl && <img src={banner.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:scale-110 transition-transform duration-700" alt="" />}
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${banner.isActive ? 'bg-emerald-500' : 'bg-slate-700'}`}>{banner.isActive ? 'Active' : 'Draft'}</span>
+                      <button onClick={() => handleDeleteBanner(banner.id!)} className="p-2 bg-white/10 rounded-xl hover:bg-rose-500 transition-colors"><Trash2 size={16} /></button>
+                    </div>
+                    <h3 className="text-xl font-black mb-1">{banner.title}</h3>
+                    <p className="text-xs font-bold opacity-80 mb-6">{banner.subtitle}</p>
+                    <button className="px-6 py-2.5 bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest">{banner.buttonText}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

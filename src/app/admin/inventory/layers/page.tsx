@@ -22,6 +22,7 @@ export default function InventoryLayersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
   const itemsPerPage = 100;
   const [summary, setSummary] = useState<{ oldQty: number; oldValue: number; newQty: number; newValue: number }>({ oldQty: 0, oldValue: 0, newQty: 0, newValue: 0 });
   const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string }>(() => {
@@ -54,7 +55,7 @@ export default function InventoryLayersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, dateRange]);
+  }, [search, dateRange, showOnlyActive]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -63,7 +64,7 @@ export default function InventoryLayersPage() {
     end.setHours(23,59,59,999);
     
     return products
-      .filter(p => p.isActive !== false) // Only active products
+      .filter(p => !showOnlyActive || p.isActive !== false)
       .map(p => ({
         ...p,
         inventoryLayers: (p.inventoryLayers || []).filter(l => {
@@ -72,7 +73,7 @@ export default function InventoryLayersPage() {
         })
       }))
       .filter(p => (p.name || '').toLowerCase().includes(q));
-  }, [products, search, dateRange]);
+  }, [products, search, dateRange, showOnlyActive]);
 
   const currentItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -190,15 +191,27 @@ export default function InventoryLayersPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nama produk..."
-              className="w-full pl-10 pr-3 py-2.5 bg-gray-50 rounded-xl text-xs font-bold outline-none"
-            />
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama produk..."
+                className="w-full pl-10 pr-3 py-2.5 bg-gray-50 rounded-xl text-xs font-bold outline-none"
+              />
+            </div>
+            <button 
+              onClick={() => setShowOnlyActive(!showOnlyActive)}
+              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                showOnlyActive 
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                : 'bg-gray-50 text-gray-400 border-gray-100'
+              }`}
+            >
+              {showOnlyActive ? 'Hanya Produk Aktif' : 'Semua Produk'}
+            </button>
           </div>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -285,6 +298,9 @@ export default function InventoryLayersPage() {
                           <div className="text-xs font-black uppercase">{p.name}</div>
                           <div className="text-[10px] font-bold text-gray-400">{p.unit}</div>
                         </div>
+                        {!p.isActive && (
+                          <span className="text-[8px] font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full uppercase">Non-Aktif</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">

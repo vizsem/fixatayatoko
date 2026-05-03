@@ -81,7 +81,9 @@ export default function EditProductPage() {
     No_WA_Supplier: '',
     Lokasi: '',
     warehouseId: '',
-    stockByWarehouse: {} as Record<string, number>
+    stockByWarehouse: {} as Record<string, number>,
+    minPurchase: 1,
+    maxPurchase: 0
   });
 
   const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
@@ -244,7 +246,9 @@ export default function EditProductPage() {
         No_WA_Supplier: data.No_WA_Supplier || '',
         Lokasi: data.Lokasi || '',
         warehouseId: data.warehouseId || '',
-        stockByWarehouse: data.stockByWarehouse || {}
+        stockByWarehouse: data.stockByWarehouse || {},
+        minPurchase: Number(data.minPurchase || 1),
+        maxPurchase: Number(data.maxPurchase || 0)
       }));
 
       const ps = (data as any).pricingStrategy as PricingStrategy | undefined;
@@ -503,6 +507,8 @@ export default function EditProductPage() {
         Lokasi: formData.Lokasi || '',
         units: ensuredBase,
         channelPricing,
+        minPurchase: Number(formData.minPurchase || 1),
+        maxPurchase: Number(formData.maxPurchase || 0),
         pricingStrategy:
           pricingMode === 'RECOMMENDED' && pricingRec
             ? {
@@ -709,6 +715,18 @@ export default function EditProductPage() {
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
                 <p className="text-[9px] text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-5 mt-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
+                <input type="number" min="1" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700" value={formData.minPurchase} onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} />
+                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
+                <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
+                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
               </div>
             </div>
 

@@ -23,7 +23,9 @@ import {
   ArrowLeft,
   Truck,
   MessageSquare,
-  Receipt
+  Receipt,
+  RefreshCcw,
+  XCircle
 } from 'lucide-react';
 
 import notify from '@/lib/notify';
@@ -91,6 +93,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [isUpdating, setIsUpdating] = useState(false);
   const [editableItems, setEditableItems] = useState<EditableOrderItem[]>([]);
   const [isConfirmingItems, setIsConfirmingItems] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnItems, setReturnItems] = useState<{ productId: string; name: string; quantity: number; price: number; selected: boolean }[]>([]);
+  const [returnReason, setReturnReason] = useState('');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -138,6 +144,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     };
     fetchOrder();
   }, [id, authChecked]);
+
+  useEffect(() => {
+    if (order && order.items) {
+      setReturnItems(order.items.map(item => ({
+        productId: item.productId || '',
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        selected: false
+      })));
+    }
+  }, [order]);
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
@@ -419,6 +437,35 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  const handleCreateReturn = async () => {
+    const itemsToReturn = returnItems.filter(i => i.selected && i.quantity > 0);
+    if (itemsToReturn.length === 0) return notify.error("Pilih minimal satu barang");
+    if (!returnReason) return notify.error("Alasan retur wajib diisi");
+
+    setIsSubmittingReturn(true);
+    try {
+      const totalValue = itemsToReturn.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      await addDoc(collection(db, 'returns'), {
+        type: 'SALES_RETURN',
+        refId: order?.id,
+        customerOrSupplierName: order?.customerName,
+        items: itemsToReturn.map(i => ({ productId: i.productId, productName: i.name, quantity: i.quantity, price: i.price })),
+        reason: returnReason,
+        status: 'PENDING',
+        totalValue,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      notify.admin.success("Request retur berhasil dibuat");
+      setIsReturnModalOpen(false);
+    } catch (e) {
+      notify.admin.error("Gagal membuat request retur");
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
+
   if (loading || !authChecked) {
     return (
       <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse">
@@ -472,8 +519,97 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             >
               <Printer size={14} /> Cetak
             </button>
+            {order.status === 'SELESAI' && (
+              <button
+                onClick={() => setIsReturnModalOpen(true)}
+                className="flex items-center gap-2 text-[10px] font-black uppercase bg-purple-600 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-purple-700 transition-all"
+              >
+                <RefreshCcw size={14} /> Retur
+              </button>
+            )}
           </div>
         </div>
+
+        {isReturnModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">Retur Barang</h2>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order #{order.id.slice(-8)}</p>
+                </div>
+                <button onClick={() => setIsReturnModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><XCircle size={24} className="text-slate-300" /></button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-6">
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</p>
+                  {returnItems.map((item, idx) => (
+                    <div key={idx} className={`p-4 rounded-2xl border transition-all ${item.selected ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          checked={item.selected} 
+                          onChange={e => {
+                            const updated = [...returnItems];
+                            updated[idx].selected = e.target.checked;
+                            setReturnItems(updated);
+                          }}
+                          className="w-5 h-5 rounded-lg accent-purple-600"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-black uppercase">{item.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400">Rp {item.price.toLocaleString()}</p>
+                        </div>
+                        {item.selected && (
+                          <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-purple-100">
+                            <span className="text-[9px] font-black text-slate-400 px-2 uppercase">Qty</span>
+                            <input 
+                              type="number" 
+                              max={order.items.find(i => i.productId === item.productId)?.quantity || 1}
+                              min={1}
+                              value={item.quantity}
+                              onChange={e => {
+                                const updated = [...returnItems];
+                                updated[idx].quantity = Math.max(1, Number(e.target.value));
+                                setReturnItems(updated);
+                              }}
+                              className="w-12 text-center font-black text-xs outline-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Pengembalian</label>
+                  <textarea 
+                    value={returnReason}
+                    onChange={e => setReturnReason(e.target.value)}
+                    placeholder="Contoh: Barang rusak saat diterima..."
+                    className="w-full bg-slate-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-500 transition-all h-24 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div className="text-right flex-1 px-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai</p>
+                  <p className="text-lg font-black text-slate-900">Rp {returnItems.filter(i => i.selected).reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()}</p>
+                </div>
+                <button 
+                  onClick={handleCreateReturn}
+                  disabled={isSubmittingReturn}
+                  className="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 active:scale-95 transition-all"
+                >
+                  {isSubmittingReturn ? 'Mengirim...' : 'Kirim Request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-5 md:p-6">
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b-2 border-slate-100 pb-12">

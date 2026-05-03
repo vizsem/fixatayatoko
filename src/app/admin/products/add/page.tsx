@@ -55,7 +55,9 @@ export default function AddProductPage() {
     Supplier: '',
     No_WA_Supplier: '',
     Lokasi: '',
-    warehouseId: ''
+    warehouseId: '',
+    minPurchase: 1,
+    maxPurchase: 0
   });
 
   const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
@@ -251,6 +253,8 @@ export default function AddProductPage() {
         Lokasi: formData.Lokasi || '',
         units: ensuredBase,
         pricingStrategy,
+        minPurchase: Number(formData.minPurchase || 1),
+        maxPurchase: Number(formData.maxPurchase || 0),
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -447,6 +451,18 @@ export default function AddProductPage() {
                   <option value="">Pilih Gudang</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-5 mt-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
+                <input type="number" min="1" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700" value={formData.minPurchase} onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} />
+                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
+                <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
+                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
               </div>
             </div>
           </div>

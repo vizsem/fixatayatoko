@@ -28,6 +28,8 @@ export interface Product {
     imageUrl?: string;
     minWholesaleQty?: number;
     units?: UnitOption[];
+    minPurchase?: number;
+    maxPurchase?: number;
     
     // Optional / Legacy Fields (Mapping from Excel)
     ID?: string;        // Internal ID

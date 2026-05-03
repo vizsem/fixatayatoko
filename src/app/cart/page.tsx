@@ -122,6 +122,16 @@ export default function CartPage() {
     if (!customer.name.trim()) return { ok: false, msg: "Recipient name required" };
     if (!customer.phone.trim()) return { ok: false, msg: "WhatsApp number required" };
     if (deliveryMethod === 'delivery' && !customer.address.trim()) return { ok: false, msg: "Delivery address required" };
+    
+    // Check purchase limits
+    for (const item of cart) {
+      const min = Number(item.minPurchase || 1);
+      const max = Number(item.maxPurchase || 0);
+      const qty = Number(item.quantity || 1);
+      if (qty < min) return { ok: false, msg: `Min purchase for ${item.name} is ${min}` };
+      if (max > 0 && qty > max) return { ok: false, msg: `Max purchase for ${item.name} is ${max}` };
+    }
+
     return { ok: true, msg: "" };
   }, [cart, customer, deliveryMethod]);
 

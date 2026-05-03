@@ -38,84 +38,117 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
             <tr>
               <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">Produk</th>
               <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">Harga</th>
+              <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">CTN</th>
               <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">QTY</th>
               <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Subtotal</th>
               <th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {cart.map((item) => (
-              <tr key={item.id} className="group hover:bg-gray-50/50 transition-all">
-                <td className="px-4 py-2.5 sm:w-2/5">
-                  <p className="text-[11px] font-black text-gray-800">{item.name}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                    <select 
-                      className="text-[9px] font-bold text-gray-400 uppercase bg-gray-50 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500"
-                      value={item.unit}
-                      onChange={(e) => onUpdateUnit(item.id, e.target.value)}
-                    >
-                      {item.units && item.units.length > 0 ? (
-                        item.units.map((u: any) => (
-                          <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
-                        ))
+            {cart.map((item) => {
+              const ctnUnit = item.units?.find((u: any) => 
+                ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
+              );
+              const conversion = ctnUnit?.contains || 0;
+              const ctnQty = conversion > 0 ? Math.floor(item.quantity / conversion) : 0;
+              const pcsQty = conversion > 0 ? item.quantity % conversion : item.quantity;
+
+              return (
+                <tr key={item.id} className="group hover:bg-gray-50/50 transition-all">
+                  <td className="px-4 py-2.5 sm:w-2/5">
+                    <p className="text-[11px] font-black text-gray-800">{item.name}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <select 
+                        className="text-[9px] font-bold text-gray-400 uppercase bg-gray-50 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500"
+                        value={item.unit}
+                        onChange={(e) => onUpdateUnit(item.id, e.target.value)}
+                      >
+                        {item.units && item.units.length > 0 ? (
+                          item.units.map((u: any) => (
+                            <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
+                          ))
+                        ) : (
+                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                        )}
+                        
+                        {/* Ensure current unit is an option even if not in item.units */}
+                        {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
+                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                        )}
+                      </select>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${item.stock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                        Stok: {item.stock}
+                      </span>
+                      {conversion > 0 && (
+                        <span className="text-[8px] font-black text-gray-300 uppercase">
+                          1 {ctnUnit.code} = {conversion}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-gray-400">Rp</span>
+                      <input 
+                        type="number"
+                        value={item.price}
+                        onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
+                        className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[11px] font-black outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center justify-center">
+                      {conversion > 0 ? (
+                        <input 
+                          type="number"
+                          min={0}
+                          value={ctnQty}
+                          onChange={(e) => {
+                            const val = Math.max(0, Number(e.target.value));
+                            onSetQty(item.id, (val * conversion) + pcsQty);
+                          }}
+                          className="w-12 text-center text-[11px] font-black bg-gray-50 rounded-lg border-none p-1 outline-none focus:ring-1 focus:ring-orange-500"
+                        />
                       ) : (
-                        <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                        <span className="text-[10px] font-black text-gray-300">-</span>
                       )}
-                      
-                      {/* Ensure current unit is an option even if not in item.units */}
-                      {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
-                        <option value={item.unit}>{item.unit.toUpperCase()}</option>
-                      )}
-                    </select>
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${item.stock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
-                      Stok: {item.stock}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-black text-gray-400">Rp</span>
-                    <input 
-                      type="number"
-                      value={item.price}
-                      onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
-                      className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[11px] font-black outline-none focus:ring-1 focus:ring-orange-500"
-                    />
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 sm:w-1/5">
-                  <div className="flex items-center justify-center gap-2">
-                    <button 
-                      onClick={() => onUpdateQty(item.id, -1)} 
-                      className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
-                    >
-                      <Minus size={12} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 sm:w-1/5">
+                    <div className="flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => onUpdateQty(item.id, -1)} 
+                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <input 
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => onSetQty(item.id, Math.max(1, Number(e.target.value)))}
+                        className="w-10 text-center text-[11px] font-black bg-gray-50 rounded-lg border-none p-1 outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                      <button 
+                        onClick={() => onUpdateQty(item.id, 1)} 
+                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-black text-[11px] text-gray-900">
+                    Rp{(item.price * item.quantity).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button onClick={() => onRemove(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                      <Trash2 size={16} />
                     </button>
-                    <input 
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => onSetQty(item.id, Math.max(1, Number(e.target.value)))}
-                      className="w-10 text-center text-[11px] font-black bg-gray-50 rounded-lg border-none p-1 outline-none focus:ring-1 focus:ring-orange-500"
-                    />
-                    <button 
-                      onClick={() => onUpdateQty(item.id, 1)} 
-                      className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 text-right font-black text-[11px] text-gray-900">
-                  Rp{(item.price * item.quantity).toLocaleString()}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <button onClick={() => onRemove(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -15,7 +15,23 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
   const itemId = item.id || (item as any).ID || (item as any).productId || '';
   const unit = String(item.unit || item.baseUnit || 'PCS').toUpperCase();
   const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
-  const maxUnits = contains > 0 ? Math.max(1, Math.floor(Number(item.stock || 0) / contains)) : item.quantity;
+  const stockQty = Number(item.stock || 0);
+  const maxStockUnits = contains > 0 ? Math.floor(stockQty / contains) : item.quantity;
+  
+  const minPurchase = Number(item.minPurchase || 1);
+  const maxPurchase = Number(item.maxPurchase || 0);
+  const quantity = Number(item.quantity || 1);
+
+  const handleUpdate = (newQty: number) => {
+    let finalQty = newQty;
+    if (finalQty < minPurchase) finalQty = minPurchase;
+    if (maxPurchase > 0 && finalQty > maxPurchase) finalQty = maxPurchase;
+    if (finalQty > maxStockUnits) finalQty = maxStockUnits;
+    
+    if (finalQty !== quantity) {
+      onUpdateQty(itemId, finalQty);
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-3 md:p-4 shadow-sm hover:shadow-md transition-all group">
@@ -64,21 +80,31 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                 </div>
 
                 {/* Qty Counter */}
-                <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl p-1">
-                   <button
-                     onClick={() => onUpdateQty(itemId, Number(item.quantity || 1) - 1)}
-                     className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors"
-                   >
-                     <Minus size={12} />
-                   </button>
-                   <span className="w-8 text-center text-[10px] font-black text-slate-900">{item.quantity}</span>
-                   <button
-                     onClick={() => onUpdateQty(itemId, Number(item.quantity || 1) + 1)}
-                     className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors"
-                   >
-                     <Plus size={12} />
-                   </button>
-                </div>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl p-1">
+                       <button
+                         disabled={quantity <= minPurchase}
+                         onClick={() => handleUpdate(quantity - 1)}
+                         className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors disabled:opacity-20"
+                       >
+                         <Minus size={12} />
+                       </button>
+                       <span className="w-8 text-center text-[10px] font-black text-slate-900">{quantity}</span>
+                       <button
+                         disabled={(maxPurchase > 0 && quantity >= maxPurchase) || quantity >= maxStockUnits}
+                         onClick={() => handleUpdate(quantity + 1)}
+                         className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors disabled:opacity-20"
+                       >
+                         <Plus size={12} />
+                       </button>
+                    </div>
+                    {minPurchase > 1 && (
+                      <p className="text-[7px] font-black text-blue-500 uppercase px-1">Min: {minPurchase}</p>
+                    )}
+                    {maxPurchase > 0 && (
+                      <p className="text-[7px] font-black text-rose-500 uppercase px-1">Max: {maxPurchase}</p>
+                    )}
+                 </div>
              </div>
 
              <div className="text-right">
