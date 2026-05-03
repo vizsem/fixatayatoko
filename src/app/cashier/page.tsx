@@ -164,6 +164,11 @@ export default function CashierPOS() {
   const [shiftInput, setShiftInput] = useState({ initialCash: '', actualCash: '', notes: '' });
   const [shiftSummary, setShiftSummary] = useState<{ totalCash: number, totalNonCash: number, expected: number } | null>(null);
 
+  // Filter States
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('SEMUA');
+  const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'outstock'>('all');
+
   // Chat State
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -641,12 +646,17 @@ export default function CashierPOS() {
             barcode: data.barcode || '',
             image: data.image || data.imageUrl || data.photo || null,
             units,
+            Kategori: data.Kategori || data.kategori || 'UMUM',
             stockByWarehouse: data.stockByWarehouse || {},
             channelPricing: data.channelPricing
           } as Product;
         }); // REMOVE FILTER HERE TO SHOW EMPTY STOCK
         setProducts(p);
         setFilteredProducts(p);
+
+        // Extract Categories
+        const cats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || 'UMUM'))).filter(Boolean) as string[];
+        setCategories(cats.sort());
       } catch (error: unknown) {
         const err = error as { code?: string; message?: string };
         const needsIndex =
@@ -733,10 +743,13 @@ export default function CashierPOS() {
   }, [activeTab]);
 
   useEffect(() => {
-    const filtered = products.filter(p =>
-      (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      p.barcode === searchQuery
-    );
+    const filtered = products.filter(p => {
+      const matchSearch = (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || p.barcode === searchQuery;
+      const matchCategory = selectedCategory === 'SEMUA' || (p.Kategori || p.kategori || 'UMUM') === selectedCategory;
+      const matchStock = stockFilter === 'all' ? true : (stockFilter === 'instock' ? (p.stock || 0) > 0 : (p.stock || 0) <= 0);
+      
+      return matchSearch && matchCategory && matchStock;
+    });
     setFilteredProducts(filtered);
 
     const exactMatch = products.find(p => p.barcode === searchQuery);
@@ -744,7 +757,7 @@ export default function CashierPOS() {
       addToCart(exactMatch);
       setSearchQuery('');
     }
-  }, [searchQuery, products, addToCart]);
+  }, [searchQuery, products, addToCart, selectedCategory, stockFilter]);
 
   useEffect(() => {
     if (loading) return;
@@ -1384,30 +1397,81 @@ export default function CashierPOS() {
         <main className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
           <div className="col-span-12 xl:col-span-8 flex flex-col gap-4">
 
-            <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-3 md:gap-4">
-              <div className="flex items-center gap-3 w-full flex-1">
-                <div className="bg-green-50 p-2 rounded-xl text-green-600 shrink-0"><Search size={18} className="md:w-5 md:h-5" /></div>
-                <input
-                  ref={searchInputRef}
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Cari Produk atau Scan Barcode [F1]..."
-                  className="flex-1 outline-none text-sm md:text-base font-medium text-gray-700 min-w-0"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-gray-50 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowScanner(!showScanner)}
-                  className="px-4 py-2 flex-1 md:flex-none justify-center bg-black text-white rounded-xl text-[10px] md:text-xs font-black uppercase flex items-center gap-2"
-                >
-                  <Camera size={14} /> Scan
-                </button>
-                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                  <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={16} className="md:w-[18px] md:h-[18px]" /></button>
-                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={16} className="md:w-[18px] md:h-[18px]" /></button>
+            <div className="flex flex-col gap-3">
+              <div className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-3 md:gap-4">
+                <div className="flex items-center gap-3 w-full flex-1">
+                  <div className="bg-green-50 p-2 rounded-xl text-green-600 shrink-0"><Search size={18} className="md:w-5 md:h-5" /></div>
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Cari Produk atau Scan Barcode [F1]..."
+                    className="flex-1 outline-none text-sm md:text-base font-medium text-gray-700 min-w-0"
+                  />
                 </div>
+                
+                <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-gray-50 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowScanner(!showScanner)}
+                    className="px-4 py-2 flex-1 md:flex-none justify-center bg-black text-white rounded-xl text-[10px] md:text-xs font-black uppercase flex items-center gap-2"
+                  >
+                    <Camera size={14} /> Scan
+                  </button>
+                  <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Filters */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                <select 
+                  value={selectedCategory} 
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-white border border-gray-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:ring-2 focus:ring-green-500 shadow-sm min-w-[120px]"
+                >
+                  <option value="SEMUA">SEMUA KATEGORI</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat.toUpperCase()}</option>
+                  ))}
+                </select>
+
+                <div className="flex bg-gray-100 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setStockFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    SEMUA STOK
+                  </button>
+                  <button 
+                    onClick={() => setStockFilter('instock')}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'instock' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    READY
+                  </button>
+                  <button 
+                    onClick={() => setStockFilter('outstock')}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'outstock' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    HABIS
+                  </button>
+                </div>
+
+                {(selectedCategory !== 'SEMUA' || stockFilter !== 'all' || searchQuery) && (
+                  <button 
+                    onClick={() => {
+                      setSelectedCategory('SEMUA');
+                      setStockFilter('all');
+                      setSearchQuery('');
+                    }}
+                    className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                    title="Reset Filter"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
             {showScanner && <div id="pos-scanner" className="p-2 bg-white rounded-2xl border border-gray-100" />}

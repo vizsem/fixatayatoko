@@ -248,7 +248,7 @@ export default function AdminSettings() {
 
   const handleAddCategory = async () => {
     if (!newCat) return;
-    const slug = newCat.toLowerCase().replace(/ /g, '-');
+    const slug = newCat.toLowerCase().replace(/\s+/g, '-');
     const docRef = await addDoc(collection(db, 'categories'), { name: newCat, slug });
     setCategories([...categories, { id: docRef.id, name: newCat, slug }]);
     setNewCat('');

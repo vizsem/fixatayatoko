@@ -21,6 +21,7 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([
     { code: 'PCS', contains: 1, price: 0, label: '' },
     { code: 'BOX', contains: 0, price: 0, label: '' },
@@ -299,14 +300,17 @@ export default function AddProductPage() {
 
   // Load warehouses
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'warehouses'), (s) => {
+    const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => {
       setWarehouses(s.docs.map(d => {
         const data = d.data() as Record<string, unknown>;
         const name = (typeof data.name === 'string' && data.name) ? data.name : d.id;
         return { id: d.id, name };
       }));
     });
-    return () => unsub();
+    const unsubC = onSnapshot(collection(db, 'categories'), (s) => {
+      setCategories(s.docs.map(d => ({ id: d.id, name: d.data().name })));
+    });
+    return () => { unsubW(); unsubC(); };
   }, []);
   return (
     <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-24 text-black font-sans">
@@ -373,7 +377,21 @@ export default function AddProductPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
-                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
+                <div className="relative">
+                  <input 
+                    list="category-suggestions"
+                    className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all" 
+                    type="text" 
+                    placeholder="Pilih atau ketik kategori..."
+                    value={formData.Kategori} 
+                    onChange={e => setFormData({ ...formData, Kategori: e.target.value })} 
+                  />
+                  <datalist id="category-suggestions">
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>

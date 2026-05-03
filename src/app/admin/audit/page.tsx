@@ -205,30 +205,129 @@ export default function AuditPage() {
                       <th className="px-8 py-5 text-right">Status</th>
                     </tr>
                   )}
-                  {/* Additional headers for other tabs can be added here */}
+                  {activeTab === 'finance' && (
+                    <tr>
+                      <th className="px-8 py-5">Opened</th>
+                      <th className="px-8 py-5">Closed</th>
+                      <th className="px-8 py-5">Cashier</th>
+                      <th className="px-8 py-5">Expected</th>
+                      <th className="px-8 py-5 text-right">Diff</th>
+                    </tr>
+                  )}
+                  {activeTab === 'capital' && (
+                    <tr>
+                      <th className="px-8 py-5">Date</th>
+                      <th className="px-8 py-5">Reference</th>
+                      <th className="px-8 py-5">Type</th>
+                      <th className="px-8 py-5">Amount</th>
+                      <th className="px-8 py-5 text-right">Executor</th>
+                    </tr>
+                  )}
+                  {activeTab === 'cost' && (
+                    <tr>
+                      <th className="px-8 py-5">Date</th>
+                      <th className="px-8 py-5">Product</th>
+                      <th className="px-8 py-5">Previous Cost</th>
+                      <th className="px-8 py-5">New Cost</th>
+                      <th className="px-8 py-5 text-right">Change</th>
+                    </tr>
+                  )}
+                  {activeTab === 'profit' && (
+                    <tr>
+                      <th className="px-8 py-5">Date</th>
+                      <th className="px-8 py-5">Order ID</th>
+                      <th className="px-8 py-5">Revenue</th>
+                      <th className="px-8 py-5">Total Cost</th>
+                      <th className="px-8 py-5 text-right">Profit</th>
+                    </tr>
+                  )}
                </thead>
                <tbody className="divide-y divide-slate-50">
-                  {activeTab === 'stock' && stockLogs.filter(l => l.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(l => (
-                    <tr key={l.id} className="hover:bg-slate-50/50 transition-all group">
+                  {activeTab === 'transaction' && transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+                    <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{format(l.date.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(l.date.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-[11px] font-black text-slate-800">{t.createdAt && format(t.createdAt.toDate(), 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.createdAt && format(t.createdAt.toDate(), 'd MMM yyyy')}</p>
                        </td>
-                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase max-w-[200px] truncate">{l.productName}</td>
-                       <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${l.type === 'MASUK' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                             {l.type === 'MASUK' ? '+' : '-'}{l.amount}
-                          </span>
-                       </td>
-                       <td className="px-8 py-5 text-xs font-black text-slate-500">{l.prevStock} &rarr; <span className="text-slate-900">{l.nextStock}</span></td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">#{t.id?.substring(0,8)}</td>
+                       <td className="px-8 py-5 text-xs font-bold text-slate-600">{t.customerName || 'Walk-in'}</td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {t.total?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 text-slate-400">
-                             <User size={12}/> <span className="text-[10px] font-black uppercase">{l.adminId?.substring(0,8)}</span>
-                          </div>
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${['SELESAI', 'SUCCESS'].includes(String(t.status).toUpperCase()) ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                             {t.status}
+                          </span>
                        </td>
                     </tr>
                   ))}
-                  {/* Additional rows for other tabs */}
+                  {activeTab === 'finance' && shifts.map(s => (
+                    <tr key={s.id} className="hover:bg-slate-50/50 transition-all group">
+                       <td className="px-8 py-5">
+                          <p className="text-[11px] font-black text-slate-800">{s.openedAt && format(s.openedAt.toDate(), 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.openedAt && format(s.openedAt.toDate(), 'd MMM yyyy')}</p>
+                       </td>
+                       <td className="px-8 py-5">
+                          {s.closedAt ? (
+                            <>
+                              <p className="text-[11px] font-black text-slate-800">{format(s.closedAt.toDate(), 'HH:mm')}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(s.closedAt.toDate(), 'd MMM yyyy')}</p>
+                            </>
+                          ) : <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">ACTIVE</span>}
+                       </td>
+                       <td className="px-8 py-5 text-xs font-bold text-slate-600 uppercase">{s.cashierName}</td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {s.expectedCash?.toLocaleString()}</td>
+                       <td className="px-8 py-5 text-right">
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.difference === 0 ? 'bg-slate-50 text-slate-400' : s.difference > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                             {s.difference > 0 ? '+' : ''}{s.difference?.toLocaleString()}
+                          </span>
+                       </td>
+                    </tr>
+                  ))}
+                  {activeTab === 'capital' && capitalLogs.map(c => (
+                    <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
+                       <td className="px-8 py-5">
+                          <p className="text-[11px] font-black text-slate-800">{c.date && format(c.date.toDate(), 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.date && format(c.date.toDate(), 'd MMM yyyy')}</p>
+                       </td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.referenceId || '-'}</td>
+                       <td className="px-8 py-5">
+                          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{c.type}</span>
+                       </td>
+                       <td className={`px-8 py-5 font-black text-xs ${c.transactionType === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {c.transactionType === 'IN' ? '+' : '-'}Rp {c.amount?.toLocaleString()}
+                       </td>
+                       <td className="px-8 py-5 text-right font-bold text-[10px] text-slate-400 uppercase">{c.executorName || 'Admin'}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'cost' && costLogs.filter(c => c.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(c => (
+                    <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
+                       <td className="px-8 py-5">
+                          <p className="text-[11px] font-black text-slate-800">{c.changeDate && format(c.changeDate.toDate(), 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.changeDate && format(c.changeDate.toDate(), 'd MMM yyyy')}</p>
+                       </td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.productName}</td>
+                       <td className="px-8 py-5 text-xs font-bold text-slate-400">Rp {c.oldCost?.toLocaleString()}</td>
+                       <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {c.newCost?.toLocaleString()}</td>
+                       <td className="px-8 py-5 text-right">
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${(c.newCost - c.oldCost) >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                             {(c.newCost - c.oldCost) > 0 ? '+' : ''}{(c.newCost - c.oldCost)?.toLocaleString()}
+                          </span>
+                       </td>
+                    </tr>
+                  ))}
+                  {activeTab === 'profit' && profitLogs.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
+                       <td className="px-8 py-5">
+                          <p className="text-[11px] font-black text-slate-800">{p.date && format(p.date.toDate(), 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.date && format(p.date.toDate(), 'd MMM yyyy')}</p>
+                       </td>
+                       <td className="px-8 py-5 font-black text-[10px] text-slate-500 uppercase">#{p.id?.substring(0,8)}</td>
+                       <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {p.sales?.toLocaleString()}</td>
+                       <td className="px-8 py-5 text-xs font-bold text-rose-500">-Rp {p.cost?.toLocaleString()}</td>
+                       <td className="px-8 py-5 text-right font-black text-emerald-600">
+                          +Rp {p.profit?.toLocaleString()}
+                       </td>
+                    </tr>
+                  ))}
                </tbody>
             </table>
           </div>

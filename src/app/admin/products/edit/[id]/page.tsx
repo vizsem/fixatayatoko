@@ -48,6 +48,7 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   
   // State from Add Page structure
   const [units, setUnits] = useState<UnitOption[]>([]);
@@ -316,12 +317,17 @@ export default function EditProductPage() {
     setWarehouses(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
   }, []);
 
+  const fetchCategories = useCallback(async () => {
+    const snapshot = await getDocs(collection(db, 'categories'));
+    setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') return router.push('/profil');
-      await Promise.all([fetchProductData(), fetchWarehouses(), fetchCostHistory()]);
+      await Promise.all([fetchProductData(), fetchWarehouses(), fetchCategories(), fetchCostHistory()]);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -372,6 +378,22 @@ export default function EditProductPage() {
     const loadingToast = toast.loading("Menyimpan perubahan...");
 
     try {
+      // 0. Ensure Category exists for consistency
+      const categoryName = String(formData.Kategori || 'UMUM').trim();
+      const existingCat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+      if (!existingCat && categoryName) {
+        try {
+          await addDoc(collection(db, 'categories'), {
+            name: categoryName,
+            slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
+            description: 'Auto-generated from product edit',
+            createdAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.error("Failed to auto-create category:", err);
+        }
+      }
+
       // 1. Ambil data stok lama untuk dibandingkan (Logika Audit)
       const oldDoc = await getDoc(doc(db, 'products', id));
       const oldData = oldDoc.data();
@@ -646,7 +668,21 @@ export default function EditProductPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
-                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Kategori} onChange={e => setFormData({ ...formData, Kategori: e.target.value })} />
+                <div className="relative">
+                  <input 
+                    list="edit-category-suggestions"
+                    className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all" 
+                    type="text" 
+                    placeholder="Pilih atau ketik kategori..."
+                    value={formData.Kategori} 
+                    onChange={e => setFormData({ ...formData, Kategori: e.target.value })} 
+                  />
+                  <datalist id="edit-category-suggestions">
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
