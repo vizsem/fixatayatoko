@@ -165,6 +165,7 @@ function WarehouseFormContent() {
         </div>
 
         {/* Kapasitas */}
+        <div className="mb-8">
           <div className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1">
               <label className="block text-black text-xs font-black uppercase tracking-widest mb-2 px-1">
