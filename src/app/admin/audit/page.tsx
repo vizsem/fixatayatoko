@@ -122,12 +122,12 @@ export default function AuditPage() {
   };
 
   const tabs = [
-    { id: 'stock', label: 'Stock Logs', icon: Package },
-    { id: 'transaction', label: 'Orders', icon: ArrowLeftRight },
-    { id: 'finance', label: 'Cashier Shifts', icon: Wallet },
-    { id: 'capital', label: 'Capital', icon: Landmark },
-    { id: 'profit', label: 'Profit & Loss', icon: TrendingUp },
-    { id: 'cost', label: 'HPP / Costs', icon: BarChart3 },
+    { id: 'stock', label: 'Riwayat Stok', icon: Package },
+    { id: 'transaction', label: 'Transaksi Pesanan', icon: ArrowLeftRight },
+    { id: 'finance', label: 'Sesi Kasir', icon: Wallet },
+    { id: 'capital', label: 'Arus Modal', icon: Landmark },
+    { id: 'profit', label: 'Laba Rugi', icon: TrendingUp },
+    { id: 'cost', label: 'Perubahan HPP', icon: BarChart3 },
   ];
 
   return (
@@ -137,9 +137,9 @@ export default function AuditPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <History className="text-blue-600" size={32} /> Centralized Audit
+            <History className="text-blue-600" size={32} /> Audit Terpusat
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Institutional record keeping</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Pencatatan & Riwayat Sistem</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
@@ -157,7 +157,7 @@ export default function AuditPage() {
         <div className="flex items-center gap-2 w-full lg:w-auto">
            <div className="relative flex-1 lg:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-              <input type="text" placeholder="Search entries..." className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="Cari data..." className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
            </div>
            <div className="flex bg-slate-50 rounded-2xl p-1 gap-1">
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black p-2 outline-none" />
@@ -167,17 +167,17 @@ export default function AuditPage() {
         </div>
         <div className="flex-1" />
         <button onClick={handleExport} className="px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-all">
-           <Download size={14}/> EXPORT ASSET
+           <Download size={14}/> EXPORT DATA
         </button>
       </div>
 
       {activeTab === 'profit' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-in fade-in slide-in-from-top-4">
-           <Stat label="Gross Sales" val={profitSummary.sales} color="text-slate-900" />
-           <Stat label="Total COGS" val={profitSummary.cost} color="text-rose-600" prefix="-" />
-           <Stat label="Operational" val={profitSummary.expenses} color="text-amber-600" prefix="-" />
+           <Stat label="Penjualan Kotor" val={profitSummary.sales} color="text-slate-900" />
+           <Stat label="Total HPP" val={profitSummary.cost} color="text-rose-600" prefix="-" />
+           <Stat label="Biaya Operasional" val={profitSummary.expenses} color="text-amber-600" prefix="-" />
            <div className={`p-6 rounded-[2rem] border ${profitSummary.netProfit >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'} shadow-xl`}>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Net Income</p>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Laba Bersih</p>
               <p className="text-2xl font-black">Rp {profitSummary.netProfit.toLocaleString()}</p>
            </div>
         </div>
@@ -190,56 +190,56 @@ export default function AuditPage() {
                <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                   {activeTab === 'stock' && (
                     <tr>
-                      <th className="px-8 py-5">Timestamp</th>
-                      <th className="px-8 py-5">Product Name</th>
-                      <th className="px-8 py-5">Movement</th>
-                      <th className="px-8 py-5">Balance</th>
-                      <th className="px-8 py-5 text-right">Executor</th>
+                      <th className="px-8 py-5">Waktu</th>
+                      <th className="px-8 py-5">Nama Produk</th>
+                      <th className="px-8 py-5">Mutasi</th>
+                      <th className="px-8 py-5">Sisa Saldo</th>
+                      <th className="px-8 py-5 text-right">Oleh</th>
                     </tr>
                   )}
                   {activeTab === 'transaction' && (
                     <tr>
-                      <th className="px-8 py-5">Created At</th>
-                      <th className="px-8 py-5">Order Reference</th>
-                      <th className="px-8 py-5">Customer</th>
-                      <th className="px-8 py-5">Revenue</th>
+                      <th className="px-8 py-5">Dibuat Pada</th>
+                      <th className="px-8 py-5">Referensi Pesanan</th>
+                      <th className="px-8 py-5">Pelanggan</th>
+                      <th className="px-8 py-5">Pendapatan</th>
                       <th className="px-8 py-5 text-right">Status</th>
                     </tr>
                   )}
                   {activeTab === 'finance' && (
                     <tr>
-                      <th className="px-8 py-5">Opened</th>
-                      <th className="px-8 py-5">Closed</th>
-                      <th className="px-8 py-5">Cashier</th>
-                      <th className="px-8 py-5">Expected</th>
-                      <th className="px-8 py-5 text-right">Diff</th>
+                      <th className="px-8 py-5">Dibuka</th>
+                      <th className="px-8 py-5">Ditutup</th>
+                      <th className="px-8 py-5">Kasir</th>
+                      <th className="px-8 py-5">Estimasi Saldo</th>
+                      <th className="px-8 py-5 text-right">Selisih</th>
                     </tr>
                   )}
                   {activeTab === 'capital' && (
                     <tr>
-                      <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Reference</th>
-                      <th className="px-8 py-5">Type</th>
-                      <th className="px-8 py-5">Amount</th>
-                      <th className="px-8 py-5 text-right">Executor</th>
+                      <th className="px-8 py-5">Tanggal</th>
+                      <th className="px-8 py-5">Referensi</th>
+                      <th className="px-8 py-5">Tipe</th>
+                      <th className="px-8 py-5">Nominal</th>
+                      <th className="px-8 py-5 text-right">Oleh</th>
                     </tr>
                   )}
                   {activeTab === 'cost' && (
                     <tr>
-                      <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Product</th>
-                      <th className="px-8 py-5">Previous Cost</th>
-                      <th className="px-8 py-5">New Cost</th>
-                      <th className="px-8 py-5 text-right">Change</th>
+                      <th className="px-8 py-5">Tanggal</th>
+                      <th className="px-8 py-5">Produk</th>
+                      <th className="px-8 py-5">HPP Lama</th>
+                      <th className="px-8 py-5">HPP Baru</th>
+                      <th className="px-8 py-5 text-right">Perubahan</th>
                     </tr>
                   )}
                   {activeTab === 'profit' && (
                     <tr>
-                      <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Order ID</th>
-                      <th className="px-8 py-5">Revenue</th>
-                      <th className="px-8 py-5">Total Cost</th>
-                      <th className="px-8 py-5 text-right">Profit</th>
+                      <th className="px-8 py-5">Tanggal</th>
+                      <th className="px-8 py-5">ID Pesanan</th>
+                      <th className="px-8 py-5">Pendapatan</th>
+                      <th className="px-8 py-5">Total Modal</th>
+                      <th className="px-8 py-5 text-right">Laba</th>
                     </tr>
                   )}
                </thead>
@@ -301,7 +301,7 @@ export default function AuditPage() {
                             <div>
                               <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{t.id?.substring(0,8)}</p>
                               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
-                                View Detail <ChevronRight size={10} />
+                                Lihat Detail <ChevronRight size={10} />
                               </p>
                             </div>
                           </Link>
@@ -327,7 +327,7 @@ export default function AuditPage() {
                               <p className="text-[11px] font-black text-slate-800">{format(s.closedAt.toDate(), 'HH:mm')}</p>
                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(s.closedAt.toDate(), 'd MMM yyyy')}</p>
                             </>
-                          ) : <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">ACTIVE</span>}
+                          ) : <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">AKTIF</span>}
                        </td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-600 uppercase">{s.cashierName}</td>
                        <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {s.expectedCash?.toLocaleString()}</td>

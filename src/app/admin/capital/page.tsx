@@ -206,6 +206,30 @@ export default function CapitalPage() {
           setIsRepayModalOpen(false);
           break;
 
+        case 'ADD_MARKETPLACE_ACCOUNT':
+          await addDoc(collection(db, 'marketplace_accounts'), {
+            name: formData.newPlatform,
+            storeName: formData.newStoreName,
+            activeBalance: 0,
+            pendingBalance: 0,
+            lastUpdated: serverTimestamp()
+          });
+          notify.success('Account added');
+          setIsAddAccountModalOpen(false);
+          break;
+
+        case 'UPDATE_MARKETPLACE_ACCOUNT':
+          if (!selectedAccount) return;
+          await setDoc(doc(db, 'marketplace_accounts', selectedAccount.id), {
+            storeName: formData.storeName,
+            activeBalance: Number(formData.activeBalance),
+            pendingBalance: Number(formData.pendingBalance),
+            lastUpdated: serverTimestamp()
+          }, { merge: true });
+          notify.success('Account updated');
+          setIsAccountModalOpen(false);
+          break;
+
         case 'WITHDRAW_MARKETPLACE':
           const acc = payload as MarketplaceAccount;
           const amount = Number(prompt(`Withdraw from ${acc.name}:`, acc.activeBalance.toString())?.replace(/\D/g, '') || 0);
@@ -240,16 +264,16 @@ export default function CapitalPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Landmark className="text-blue-600" size={32} /> Equity & Assets
+            <Landmark className="text-blue-600" size={32} /> Aset & Permodalan
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Net worth & capital flow monitoring</p>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Pemantauan arus modal & aset bersih</p>
         </div>
         <div className="flex gap-3">
            <button onClick={() => setIsLoanModalOpen(true)} className="px-6 py-4 bg-white text-rose-600 border border-rose-100 rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-rose-50 shadow-sm transition-all">
-              <CreditCard size={18} /> DEBT RECORD
+              <CreditCard size={18} /> CATAT HUTANG
            </button>
            <button onClick={() => { setFormData({ ...formData, type: 'INJECTION' }); setIsCapitalModalOpen(true); }} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl transition-all">
-              <Plus size={18} /> INJECT EQUITY
+              <Plus size={18} /> SUNTIKAN MODAL
            </button>
         </div>
       </div>
@@ -289,20 +313,143 @@ export default function CapitalPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="flex justify-between items-center mb-8">
-                 <h2 className="text-xl font-black text-slate-900">Inject Equity</h2>
+                 <h2 className="text-xl font-black text-slate-900">Suntikan Modal</h2>
                  <button onClick={() => setIsCapitalModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><X size={20}/></button>
               </div>
               <div className="space-y-6">
                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Value (IDR)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Nilai (Rp)</label>
                     <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                  </div>
                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Internal Note</label>
-                    <textarea className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 h-32" placeholder="Describe this capital movement..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Catatan</label>
+                    <textarea className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 h-32" placeholder="Jelaskan penambahan modal ini..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                  </div>
                  <button onClick={() => handleAction('ADD_CAPITAL')} disabled={isSubmitting} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all">
-                    {isSubmitting ? 'PROCESSING...' : 'COMMIT TRANSACTION'}
+                    {isSubmitting ? 'MEMPROSES...' : 'SIMPAN TRANSAKSI'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isLoanModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-8">
+                 <h2 className="text-xl font-black text-slate-900">Catat Pinjaman Baru</h2>
+                 <button onClick={() => setIsLoanModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><X size={20}/></button>
+              </div>
+              <div className="space-y-4">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nama Pemberi Pinjaman</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-50" placeholder="Bank, Individu, dll." value={formData.lenderName} onChange={e => setFormData({...formData, lenderName: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pokok Pinjaman (Rp)</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-50" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Suku Bunga (%)</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-50" placeholder="0" value={formData.interestRate} onChange={e => setFormData({...formData, interestRate: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tipe Pinjaman</label>
+                    <select className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-50" value={formData.loanType} onChange={e => setFormData({...formData, loanType: e.target.value as 'STANDARD' | 'REKENING_KORAN'})}>
+                      <option value="STANDARD">STANDARD</option>
+                      <option value="REKENING_KORAN">REKENING KORAN</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Keterangan</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-50" placeholder="Catatan..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                 </div>
+                 <button onClick={() => handleAction('RECORD_LOAN')} disabled={isSubmitting} className="w-full py-4 mt-2 bg-rose-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 shadow-xl transition-all">
+                    {isSubmitting ? 'MEMPROSES...' : 'SIMPAN PINJAMAN'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isRepayModalOpen && selectedLoan && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-8">
+                 <div>
+                   <h2 className="text-xl font-black text-slate-900">Bayar Cicilan</h2>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedLoan.lenderName}</p>
+                 </div>
+                 <button onClick={() => setIsRepayModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><X size={20}/></button>
+              </div>
+              <div className="space-y-4">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Bayar Pokok Pinjaman (Rp)</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-slate-100" placeholder="0" value={formData.repayAmount} onChange={e => setFormData({...formData, repayAmount: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Bayar Bunga / Biaya (Rp)</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-slate-100" placeholder="0" value={formData.interestExpense} onChange={e => setFormData({...formData, interestExpense: e.target.value})} />
+                 </div>
+                 <button onClick={() => handleAction('REPAY_LOAN')} disabled={isSubmitting} className="w-full py-4 mt-2 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black shadow-xl transition-all">
+                    {isSubmitting ? 'MEMPROSES...' : 'KONFIRMASI PEMBAYARAN'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isAddAccountModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-8">
+                 <h2 className="text-xl font-black text-slate-900">Tambah Akun</h2>
+                 <button onClick={() => setIsAddAccountModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><X size={20}/></button>
+              </div>
+              <div className="space-y-4">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Platform</label>
+                    <select className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-50" value={formData.newPlatform} onChange={e => setFormData({...formData, newPlatform: e.target.value})}>
+                      <option value="Shopee">Shopee</option>
+                      <option value="Tokopedia">Tokopedia</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="Lazada">Lazada</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nama Toko</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-50" placeholder="Nama Toko" value={formData.newStoreName} onChange={e => setFormData({...formData, newStoreName: e.target.value})} />
+                 </div>
+                 <button onClick={() => handleAction('ADD_MARKETPLACE_ACCOUNT')} disabled={isSubmitting} className="w-full py-4 mt-2 bg-orange-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 shadow-xl transition-all">
+                    {isSubmitting ? 'MEMPROSES...' : 'SIMPAN AKUN'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {isAccountModalOpen && selectedAccount && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-8">
+                 <h2 className="text-xl font-black text-slate-900">Edit {selectedAccount.name}</h2>
+                 <button onClick={() => setIsAccountModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><X size={20}/></button>
+              </div>
+              <div className="space-y-4">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nama Toko</label>
+                    <input type="text" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-50" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Saldo Aktif</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-50" value={formData.activeBalance} onChange={e => setFormData({...formData, activeBalance: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Saldo Tertahan</label>
+                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-50" value={formData.pendingBalance} onChange={e => setFormData({...formData, pendingBalance: e.target.value})} />
+                 </div>
+                 <button onClick={() => handleAction('UPDATE_MARKETPLACE_ACCOUNT')} disabled={isSubmitting} className="w-full py-4 mt-2 bg-orange-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 shadow-xl transition-all">
+                    {isSubmitting ? 'MEMPROSES...' : 'UPDATE AKUN'}
                  </button>
               </div>
            </div>

@@ -52,7 +52,7 @@ export function CapitalSummaryCards({ currentCapital, stockValue, receivables, t
         <h3 className="text-2xl font-black text-white tracking-tight relative z-10">
           {growth >= 0 ? '+' : ''}Rp {growth.toLocaleString('id-ID')}
         </h3>
-        <p className="text-[10px] font-medium text-white/80 mt-1 relative z-10 uppercase tracking-widest">Net Worth - Modal</p>
+        <p className="text-[10px] font-medium text-white/80 mt-1 relative z-10 uppercase tracking-widest">Total Aset - Modal</p>
       </div>
     </div>
   );

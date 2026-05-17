@@ -22,7 +22,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
           <div className="p-2 bg-white text-slate-600 rounded-xl shadow-sm border border-slate-100">
             <History size={18} />
           </div>
-          <h3 className="text-lg font-black text-slate-800 tracking-tight">Equity Movement Log</h3>
+          <h3 className="text-lg font-black text-slate-800 tracking-tight">Log Mutasi Modal</h3>
         </div>
       </div>
       
@@ -32,16 +32,16 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <History className="text-slate-200" size={32} />
              </div>
-             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No equity transactions found</p>
+             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tidak ada transaksi modal</p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-xl border-b border-slate-100">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Timestamp</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Classification</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Value</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Description</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Waktu</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Klasifikasi</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nilai</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Keterangan</th>
                 <th className="px-8 py-5 text-center"></th>
               </tr>
             </thead>
@@ -65,7 +65,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
                           <ArrowDownCircle className="text-rose-500" size={14} />
                         )}
                         <span className={`text-[10px] font-black uppercase tracking-widest ${isInjection ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {t.type}
+                          {t.type === 'INJECTION' ? 'MASUK' : 'KELUAR'}
                         </span>
                       </div>
                     </td>

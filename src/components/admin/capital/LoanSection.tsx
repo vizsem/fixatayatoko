@@ -16,12 +16,12 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
             <CreditCard size={28} />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">Debt & Liabilities</h3>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Loan commitments & repayment status</p>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">Hutang & Kewajiban</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Status pinjaman dan pembayaran</p>
           </div>
         </div>
         <button onClick={onRecord} className="px-6 py-3 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 flex items-center gap-2">
-          Record New Loan
+          Catat Pinjaman Baru
         </button>
       </div>
 
@@ -41,23 +41,23 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
              <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-end">
                    <div>
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Principal Amount</p>
-                      <p className="text-lg font-black text-slate-900">Rp {loan.amount.toLocaleString()}</p>
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Pokok Pinjaman</p>
+                      <p className="text-lg font-black text-slate-900">Rp {loan.amount.toLocaleString('id-ID')}</p>
                    </div>
                    <div className="text-right">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Interest</p>
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Bunga</p>
                       <p className="text-sm font-black text-slate-600">{loan.interestRate}%</p>
                    </div>
                 </div>
 
                 <div className="bg-slate-50 p-4 rounded-2xl">
-                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Remaining Debt</p>
-                   <p className="text-xl font-black text-rose-600">Rp {(loan.remainingAmount || 0).toLocaleString()}</p>
+                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Sisa Hutang</p>
+                   <p className="text-xl font-black text-rose-600">Rp {(loan.remainingAmount || 0).toLocaleString('id-ID')}</p>
                 </div>
              </div>
 
              <button onClick={() => onRepay(loan)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 group">
-                MAKE REPAYMENT <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                BAYAR CICILAN <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
              </button>
           </div>
         ))}
@@ -66,7 +66,7 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 size={32} />
              </div>
-             <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">No outstanding liabilities detected</p>
+             <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Tidak ada hutang aktif</p>
           </div>
         )}
       </div>
