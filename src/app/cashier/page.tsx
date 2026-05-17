@@ -18,7 +18,8 @@ import {
   getDocs,
   limit,
   writeBatch,
-  addDoc
+  addDoc,
+  increment
 } from 'firebase/firestore';
 import {
   ref,
@@ -60,6 +61,8 @@ type Product = {
   image?: string;
   units?: UnitOption[];
   stockByWarehouse?: Record<string, number>;
+  Kategori?: string;
+  kategori?: string;
   channelPricing?: ChannelPricing | {
     offline?: { price?: number };
     website?: { price?: number };

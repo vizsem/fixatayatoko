@@ -9,7 +9,8 @@ import { postJournal } from '@/lib/ledger';
 import notify from '@/lib/notify';
 import { Search, Plus, Trash2 } from 'lucide-react';
 import { Product } from '@/lib/types';
-import { getDocs } from 'firebase/firestore';
+import { getDocs, addDoc } from 'firebase/firestore';
+import Link from 'next/link';
 
 type ReturnReq = {
   id: string;

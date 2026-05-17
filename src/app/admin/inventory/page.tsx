@@ -20,7 +20,8 @@ import {
   doc,
   updateDoc,
   writeBatch,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
 import {
   Box, Search, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw,

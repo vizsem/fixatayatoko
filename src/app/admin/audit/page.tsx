@@ -13,6 +13,7 @@ import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
