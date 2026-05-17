@@ -9,10 +9,10 @@ import {
   Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3,
   TrendingUp, Users, ShoppingCart, ArrowUpRight, ArrowRight, MoreHorizontal, Calendar
 } from 'lucide-react';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { LucideIcon } from 'lucide-react';
 import {
-  collection, doc, getDoc, getDocs, query, orderBy, limit, where, Timestamp
+  collection, doc, getDoc, getDocs, query, orderBy, limit, where, Timestamp, getAggregateFromServer, sum, count
 } from 'firebase/firestore';
 
 interface Order {
@@ -112,21 +112,29 @@ export default function AdminDashboard() {
       
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
-      // Fetch Orders (Last 30 days for broader analysis)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      const qOrders = query(
+      // Aggregation for Weekly and Monthly Sales
+      const qMonthly = query(collection(db, 'orders'), where('createdAt', '>=', startOfMonth));
+      const monthlyAgg = await getAggregateFromServer(qMonthly, { totalSales: sum('total') });
+      let salesMonthly = monthlyAgg.data().totalSales || 0;
+
+      const qWeekly = query(collection(db, 'orders'), where('createdAt', '>=', sevenDaysAgo));
+      const weeklyAgg = await getAggregateFromServer(qWeekly, { totalSales: sum('total') });
+      let salesWeekly = weeklyAgg.data().totalSales || 0;
+
+      // Aggregation for Today's Sales
+      const qToday = query(collection(db, 'orders'), where('createdAt', '>=', todayStart));
+      const todayAgg = await getAggregateFromServer(qToday, { totalSales: sum('total') });
+      let salesToday = todayAgg.data().totalSales || 0;
+
+      // Only fetch the last 7 days of orders for the chart to save reads
+      const qOrdersChart = query(
         collection(db, 'orders'), 
-        where('createdAt', '>=', thirtyDaysAgo),
+        where('createdAt', '>=', sevenDaysAgo),
         orderBy('createdAt', 'desc')
       );
       
-      const ordersSnap = await getDocs(qOrders);
+      const ordersSnap = await getDocs(qOrdersChart);
       
-      let salesToday = 0;
-      let salesWeekly = 0;
-      let salesMonthly = 0;
       const dailyMap = new Map<string, number>();
       const productSalesMap = new Map<string, number>();
 
@@ -144,17 +152,12 @@ export default function AdminDashboard() {
         const dateStr = created.toISOString().split('T')[0];
         const amount = Number(data.total) || 0;
 
-        // Calculate Totals
-        if (created >= new Date(todayStart)) salesToday += amount;
-        if (created >= sevenDaysAgo) salesWeekly += amount;
-        if (data.createdAt >= startOfMonth) salesMonthly += amount;
-
         // Daily Chart Data (Last 7 Days)
         if (dailyMap.has(dateStr)) {
           dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + amount);
         }
 
-        // Product Sales Analysis
+        // Product Sales Analysis (Last 7 Days)
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach((item: any) => {
             const pid = item.productId || item.id;
@@ -205,28 +208,27 @@ export default function AdminDashboard() {
         topProductsData.sort((a, b) => (b.sales || 0) - (a.sales || 0));
       }
 
-      // Other Stats
-      const productsActiveSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)));
-      const lowStockSnap = await getDocs(query(collection(db, 'products'), where('stock', '<=', 10)));
+      // Other Stats (using getAggregateFromServer to save reads!)
+      const productsActiveAgg = await getAggregateFromServer(query(collection(db, 'products'), where('isActive', '==', true)), { count: count() });
+      const lowStockAgg = await getAggregateFromServer(query(collection(db, 'products'), where('stock', '<=', 10)), { count: count() });
       const unreadSnap = await getDocs(query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']), limit(5)));
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const whSnap = await getDocs(collection(db, 'warehouses'));
+      const unreadAgg = await getAggregateFromServer(query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING'])), { count: count() });
+      
+      const usersAgg = await getAggregateFromServer(collection(db, 'users'), { count: count(), totalPoints: sum('points') });
+      const whAgg = await getAggregateFromServer(collection(db, 'warehouses'), { count: count() });
       const promSnap = await getDocs(collection(db, 'promotions'));
-
-      let totalPoints = 0;
-      usersSnap.forEach(d => totalPoints += (d.data().points || 0));
 
       setStats({
         dailySales: salesToday,
         weeklySales: salesWeekly,
         monthlySales: salesMonthly,
-        totalProducts: productsActiveSnap.size,
-        lowStock: lowStockSnap.size,
-        unreadOrders: unreadSnap.size,
-        warehouses: whSnap.size,
+        totalProducts: productsActiveAgg.data().count,
+        lowStock: lowStockAgg.data().count,
+        unreadOrders: unreadAgg.data().count,
+        warehouses: whAgg.data().count,
         promotions: promSnap.size,
-        users: usersSnap.size,
-        totalPointsIssued: totalPoints,
+        users: usersAgg.data().count,
+        totalPointsIssued: usersAgg.data().totalPoints || 0,
         activeVouchers: promSnap.docs.filter(d => d.data()?.isActive === true).length
       });
 
@@ -247,22 +249,13 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const { authLoading } = useAdminAuth();
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        router.push('/profil');
-        return;
-      }
-      await fetchDashboardData();
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router, fetchDashboardData]);
+    if (!authLoading) {
+      fetchDashboardData().then(() => setLoading(false));
+    }
+  }, [authLoading, fetchDashboardData]);
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">

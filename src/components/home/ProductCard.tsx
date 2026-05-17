@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { Heart, Sparkles } from 'lucide-react';
 import { Product } from '@/lib/types';
 
@@ -64,14 +63,11 @@ export const ProductCard = ({
       </button>
 
       <Link href={`/produk/${product.id}`} className="relative aspect-square bg-gray-50 overflow-hidden block z-10">
-        <Image 
+        <img 
           src={product.image || '/logo-atayatoko.png'} 
           alt={product.name} 
-          fill 
-          className={`object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
-          sizes="(max-width: 768px) 165px, 210px"
-          placeholder="blur"
-          blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
+          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
+          loading="lazy"
         />
         {isOut && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">

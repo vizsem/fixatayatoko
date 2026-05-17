@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { auth, db } from '@/lib/firebase';
 import {
   collection, doc, getDoc, getDocs, getCountFromServer, addDoc, updateDoc, deleteDoc, serverTimestamp, query, where, limit
@@ -75,18 +75,14 @@ export default function AdminCategories() {
     }
   }, []);
 
+  const { authLoading, adminId } = useAdminAuth({ allowedRoles: ['admin'] as any });
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        return router.push('/profil');
-      }
+    if (authLoading) return;
+    if (adminId) {
       fetchData();
-    });
-    return () => unsub();
-  }, [router, fetchData]);
+    }
+  }, [authLoading, adminId, fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

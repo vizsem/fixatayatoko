@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import Image from 'next/image';
 import type { MessagePayload } from 'firebase/messaging';
 import { requestForToken, onMessageListener } from '@/lib/fcm';
 import notify from '@/lib/notify';
@@ -21,13 +20,12 @@ export default function FCMManager() {
       notify.custom((t: { id: string }) => (
         <div className="flex items-start gap-3 cursor-pointer" onClick={() => notify.dismiss(t.id)}>
           {p.notification?.icon && (
-            <Image
+            <img
               src={p.notification.icon}
               alt=""
               width={40}
               height={40}
               className="rounded-lg object-cover"
-              unoptimized
             />
           )}
           <div>

@@ -14,7 +14,7 @@ import {
   DollarSign, AlertTriangle
 } from 'lucide-react';
 
-import { collection, onSnapshot, orderBy, limit, query, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, limit, query, Timestamp, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import AdminMobileHeader from '@/components/AdminMobileHeader';
 import AdminMobileNav from '@/components/AdminMobileNav';
 
@@ -43,46 +43,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   });
 
   useEffect(() => {
-    // Listen to new orders
-    const qOrders = query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']));
-    const unsubOrders = onSnapshot(qOrders, (snap) => {
-      setMobileStats(prev => ({ ...prev, newOrders: snap.size }));
-    });
+    const fetchStats = async () => {
+      try {
+        // Fetch pending orders count
+        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']));
+        const ordersCount = await getCountFromServer(qOrders);
+        
+        // Fetch low stock products count
+        const qStock = query(collection(db, 'products'), where('stock', '<=', 10), where('isActive', '==', true));
+        const stockCount = await getCountFromServer(qStock);
 
-    // Listen to low stock
-    const qStock = query(collection(db, 'products'), where('stock', '<=', 10), where('isActive', '==', true));
-    const unsubStock = onSnapshot(qStock, (snap) => {
-      setMobileStats(prev => ({ ...prev, lowStock: snap.size }));
-    });
+        // Fetch today sales
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const qSales = query(collection(db, 'orders'), where('createdAt', '>=', today));
+        const salesSnap = await getDocs(qSales);
+        let total = 0;
+        salesSnap.forEach(d => total += (Number(d.data().total) || 0));
 
-    // Fetch today sales
-    const fetchTodaySales = async () => {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const qSales = query(collection(db, 'orders'), where('createdAt', '>=', today));
-      const snap = await getDocs(qSales);
-      let total = 0;
-      snap.forEach(d => total += (Number(d.data().total) || 0));
-      setMobileStats(prev => ({ ...prev, todaySales: total }));
+        setMobileStats({
+          newOrders: ordersCount.data().count,
+          lowStock: stockCount.data().count,
+          todaySales: total
+        });
+      } catch (err) {
+        console.error('Error fetching admin layout stats', err);
+      }
     };
-    fetchTodaySales();
-
-    return () => {
-      unsubOrders();
-      unsubStock();
-    };
+    
+    fetchStats();
   }, []);
 
-  // Listen to unread messages count
+  // Fetch unread messages count once
   useEffect(() => {
-    const q = query(
-      collection(db, 'messages'),
-      where('status', '==', 'unread')
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setUnreadMessages(snap.size);
-    });
-    return () => unsub();
+    const fetchUnread = async () => {
+      const q = query(
+        collection(db, 'messages'),
+        where('status', '==', 'unread')
+      );
+      const snap = await getCountFromServer(q);
+      setUnreadMessages(snap.data().count);
+    };
+    fetchUnread();
   }, []);
 
   useEffect(() => {

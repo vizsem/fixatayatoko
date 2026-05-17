@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
-import Image from 'next/image';
 import { User, Lock, Mail, MapPin, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { auth, db } from '@/lib/firebase';
@@ -70,7 +69,7 @@ export default function RegisterPage() {
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4 relative h-12">
-            <Image 
+            <img 
               src="/logo-atayatoko.png" 
               alt="ATAYATOKO" 
               width={100}

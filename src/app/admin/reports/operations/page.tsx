@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDoc, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
+import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Download, Users, Warehouse, Package, Activity, Clock, AlertTriangle, ShoppingCart, Database, DollarSign, Info, ArrowRight, ShieldCheck } from 'lucide-react';
 import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
@@ -32,33 +32,39 @@ export default function OperationsReport() {
   const [inventoryData, setInventoryData] = useState<any[]>([]);
   const [expensesData, setExpensesData] = useState<any[]>([]);
 
+  const { authLoading } = useAdminAuth();
+
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        return router.push('/profil');
+    if (loading || authLoading) return;
+
+    const fetchData = async () => {
+      try {
+        const empSnap = await getDocs(query(collection(db, 'employees'), limit(100)));
+        setEmployeesData(empSnap.docs.map(d => d.data()));
+
+        const userSnap = await getDocs(query(collection(db, 'users'), limit(100)));
+        setUsersData(userSnap.docs.map(d => d.data()));
+
+        const whSnap = await getDocs(query(collection(db, 'warehouses'), limit(50)));
+        setWarehousesData(whSnap.docs.map(d => d.data()));
+
+        const prodSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true), limit(100)));
+        setProductsData(prodSnap.docs.map(d => d.data()));
+
+        const ordSnap = await getDocs(query(collection(db, 'orders'), limit(100)));
+        setOrdersData(ordSnap.docs.map(d => d.data()));
+
+        const invSnap = await getDocs(query(collection(db, 'inventory_transactions'), limit(100)));
+        setInventoryData(invSnap.docs.map(d => d.data()));
+
+        const expSnap = await getDocs(query(collection(db, 'operational_expenses'), limit(100)));
+        setExpensesData(expSnap.docs.map(d => d.data()));
+      } catch (error) {
+        console.error("Error fetching ops data", error);
       }
-      setLoading(false);
-    });
-    return () => unsubAuth();
-  }, [router]);
-
-  useEffect(() => {
-    if (loading) return;
-
-    const unsubEmployees = onSnapshot(collection(db, 'employees'), (s) => setEmployeesData(s.docs.map(d => d.data())));
-    const unsubUsers = onSnapshot(collection(db, 'users'), (s) => setUsersData(s.docs.map(d => d.data())));
-    const unsubWarehouses = onSnapshot(collection(db, 'warehouses'), (s) => setWarehousesData(s.docs.map(d => d.data())));
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), where('isActive', '==', true)), (s) => setProductsData(s.docs.map(d => d.data())));
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (s) => setOrdersData(s.docs.map(d => d.data())));
-    const unsubInventory = onSnapshot(collection(db, 'inventory_transactions'), (s) => setInventoryData(s.docs.map(d => d.data())));
-    const unsubExpenses = onSnapshot(collection(db, 'operational_expenses'), (s) => setExpensesData(s.docs.map(d => d.data())));
-
-    return () => {
-      unsubEmployees(); unsubUsers(); unsubWarehouses(); unsubProducts(); unsubOrders(); unsubInventory(); unsubExpenses();
     };
+
+    fetchData();
   }, [loading]);
 
   const [activeUserCutoff, setActiveUserCutoff] = useState(0);
@@ -68,7 +74,7 @@ export default function OperationsReport() {
   }, []);
 
   const metrics = useMemo(() => {
-    if (loading) return [];
+    if (loading || authLoading) return [];
 
     const activeEmployees = employeesData.filter(e => String(e.status).toUpperCase() === 'AKTIF').length;
     const totalPayroll = employeesData.filter(e => String(e.status).toUpperCase() === 'AKTIF').reduce((s, e) => s + Number(e.manualSalary || 0), 0);
@@ -98,7 +104,7 @@ export default function OperationsReport() {
     XLSX.writeFile(wb, `Ops_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
-  if (loading) return <div className="p-6"><TableSkeleton rows={10} /></div>;
+  if (loading || authLoading) return <div className="p-6"><TableSkeleton rows={10} /></div>;
 
   return (
     <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">

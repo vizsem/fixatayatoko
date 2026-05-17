@@ -3,7 +3,6 @@
 import { useEffect, useState, Suspense, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { 
   ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
   ChevronLeft, ChevronRight, Sparkles, Package 
@@ -256,14 +255,13 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                   href={`/produk/${product.id}`} 
                   className={`${viewMode === 'grid' ? 'aspect-square w-full mb-3' : 'w-24 h-24'} block overflow-hidden rounded-[1.5rem] bg-gray-50 relative flex-shrink-0`}
                 >
-                  <Image 
+                  <img 
                     src={getProxiedImage(product.image)} 
                     alt={product.name}
-                    fill
                     className="object-cover"
                     sizes={viewMode === 'grid' ? "50vw" : "100px"}
-                    placeholder="blur"
-                    blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkqAcAAIUAgUW0RjgAAAAASUVORK5CYII="
+                    
+                    
                   />
                   {product.wholesalePrice > 0 && (
                     <div className="absolute top-2 left-2 bg-blue-600 text-[7px] text-white font-black px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">

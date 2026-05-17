@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -526,12 +525,10 @@ export default function AdminMobileNav() {
               ) : (
                 <>
                   <div className="relative w-full h-full">
-                    <Image 
+                    <img 
                       src={capturedImage} 
                       alt="Captured product" 
-                      fill 
-                      className="object-cover"
-                      unoptimized // Since it's a base64 data URL
+                      className="object-cover" // Since it's a base64 data URL
                     />
                   </div>
                   <div className="absolute top-4 right-4">

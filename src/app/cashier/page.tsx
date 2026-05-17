@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -1503,12 +1502,11 @@ export default function CashierPOS() {
                   )}
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
                   {p.image ? (
-                    <Image 
+                    <img 
                       src={p.image} 
                       alt={p.name}
-                      fill
-                      className={`object-cover ${(p.stock || 0) <= 0 ? 'grayscale' : ''}`}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className={`w-full h-full object-cover ${(p.stock || 0) <= 0 ? 'grayscale' : ''}`}
+                      loading="lazy"
                     />
                   ) : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
                 </div>
@@ -1816,11 +1814,10 @@ export default function CashierPOS() {
                   <div className="space-y-1">
                     <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl h-24 bg-gray-50 cursor-pointer overflow-hidden relative">
                       {proofPreview ? (
-                        <Image 
+                        <img 
                           src={proofPreview} 
                           alt="Bukti Transfer"
-                          fill
-                          className="object-cover"
+                          className="w-full h-full object-cover"
                         />
                       ) : <><Upload size={20} className="text-gray-300" /><span className="text-[10px] font-black text-gray-400 mt-1 uppercase">Upload Bukti</span></>}
                       <input type="file" className="hidden" accept="image/*" onChange={e => {

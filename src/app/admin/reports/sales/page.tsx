@@ -4,16 +4,14 @@
 import { useEffect, useState, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   query,
   where
 } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import * as XLSX from 'xlsx';
 import {
   TrendingUp,
@@ -68,23 +66,7 @@ export default function SalesReport() {
   }, [sales, sortBy, sortOrder]);
 
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        router.push('/profil');
-        return;
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
+  const { authLoading } = useAdminAuth();
 
   useEffect(() => {
     const fetchSalesData = async () => {

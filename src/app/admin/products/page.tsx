@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -613,7 +612,7 @@ export default function AdminProducts() {
                     </button>
                     <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
-                        <Image src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" />
+                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" />
                       ) : (
                         <Camera size={16} className="text-gray-300" />
                       )}
@@ -733,11 +732,9 @@ export default function AdminProducts() {
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
                           {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
-                            <Image
+                            <img
                               src={p.imageUrl}
                               alt={p.name}
-                              fill
-                              sizes="40px"
                               className="object-cover"
                             />
                           ) : (

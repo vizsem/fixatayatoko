@@ -18,7 +18,6 @@ import {
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Send, Paperclip, X, Image as ImageIcon, MessageCircle } from 'lucide-react';
-import Image from 'next/image';
 import toast from 'react-hot-toast';
 
 interface ChatMessage {
@@ -285,7 +284,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
                 }`}>
                   {msg.type === 'image' && msg.imageUrl && (
                     <div className="mb-2 rounded-lg overflow-hidden">
-                      <Image src={msg.imageUrl} alt="Attachment" width={200} height={200} className="w-full h-auto" />
+                      <img src={msg.imageUrl} alt="Attachment" className="w-full h-auto max-w-[200px]" loading="lazy" />
                     </div>
                   )}
                   <p className="text-sm whitespace-pre-wrap">{msg.text}</p>

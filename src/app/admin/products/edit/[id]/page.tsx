@@ -12,7 +12,6 @@ import {
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
   Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
@@ -1246,7 +1245,7 @@ export default function EditProductPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
                     {imagePreview ? (
-                      <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                      <img src={imagePreview} alt="Preview" className="object-cover" />
                     ) : (
                       <ImageIcon size={20} className="text-gray-300" />
                     )}

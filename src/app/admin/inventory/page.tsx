@@ -9,7 +9,6 @@ import * as Sentry from '@sentry/nextjs';
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { Toaster } from 'react-hot-toast';
@@ -333,7 +332,7 @@ export default function InventoryDashboard() {
                   {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={18} /> : <Square size={18} />}
                 </button>
                 <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-200 overflow-hidden relative shrink-0">
-                  {product.image ? <Image src={product.image} fill className="object-cover" alt={product.name} sizes="56px" /> : <ImageIcon size={18} />}
+                  {product.image ? <img src={product.image} className="object-cover" alt={product.name} /> : <ImageIcon size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -400,7 +399,7 @@ export default function InventoryDashboard() {
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-xl relative overflow-hidden">
-                        {product.image ? <Image src={product.image} fill className="object-cover" alt={product.name} /> : <ImageIcon size={16} className="m-3 text-gray-300" />}
+                        {product.image ? <img src={product.image} className="object-cover" alt={product.name} /> : <ImageIcon size={16} className="m-3 text-gray-300" />}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] font-black text-gray-800">{product.name}</span>

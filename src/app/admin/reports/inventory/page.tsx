@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
-import Image from 'next/image';
 import { Package, Download, AlertTriangle, TrendingDown, TrendingUp, Search, Filter, ChevronLeft, ChevronRight, Info, Layers } from 'lucide-react';
 import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
@@ -40,18 +39,7 @@ export default function InventoryReport() {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('ALL');
 
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
-        notify.admin.error('Akses ditolak!');
-        return router.push('/profil');
-      }
-      setLoading(false);
-    });
-    return () => unsubAuth();
-  }, [router]);
+  const { authLoading } = useAdminAuth();
 
   useEffect(() => {
     const build = async () => {
@@ -170,7 +158,7 @@ export default function InventoryReport() {
                       <td className="px-8 py-5">
                          <div className="flex items-center gap-4">
                             <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 shadow-sm">
-                               <Image src={i.imageUrl || 'https://placehold.co/100x100?text=SKU'} alt={i.name} fill className="object-cover" />
+                               <img src={i.imageUrl || '/logo-atayatoko.png'} alt={i.name} className="w-full h-full object-cover" loading="lazy" />
                             </div>
                             <div>
                                <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{i.name}</p>

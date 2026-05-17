@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, doc, getDoc, getDocs, serverTimestamp, runTransaction, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, writeBatch, query, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
-import { deductStockTx } from '@/lib/inventory';
+import { deductStockBatch } from '@/lib/inventory';
 import { Toaster } from 'react-hot-toast';
 import {
   ChevronLeft,
@@ -156,43 +156,45 @@ export default function MarketplaceOrdersPage() {
     
     setLoading(true);
     try {
-      await runTransaction(db, async (transaction) => {
-        const orderRef = doc(collection(db, 'orders'));
-        const orderData = {
-          orderId: `MKT-${Date.now()}`,
-          externalOrderId,
-          customerName: customerName || `Customer ${channel}`,
-          items: cart,
-          subtotal,
-          shippingCost,
-          total,
-          channel,
-          paymentMethod,
-          status: 'SELESAI',
-          createdAt: serverTimestamp(),
-          adminId: auth.currentUser?.uid
-        };
+      const batch = writeBatch(db);
+      const orderRef = doc(collection(db, 'orders'));
+      const orderData = {
+        orderId: `MKT-${Date.now()}`,
+        externalOrderId,
+        customerName: customerName || `Customer ${channel}`,
+        items: cart,
+        subtotal,
+        shippingCost,
+        total,
+        channel,
+        paymentMethod,
+        status: 'SELESAI',
+        createdAt: serverTimestamp(),
+        adminId: auth.currentUser?.uid
+      };
 
-        // FIX: Pre-fetch ALL product snapshots BEFORE any writes to satisfy Firestore transaction requirements
-        const productRefs = cart.map(item => doc(db, 'products', item.id));
-        const pSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+      // FIX: Pre-fetch ALL product snapshots BEFORE batch writes
+      const productRefs = cart.map(item => doc(db, 'products', item.id));
+      const pSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
 
-        for (let i = 0; i < cart.length; i++) {
-          const item = cart[i];
-          const pSnap = pSnaps[i];
+      for (let i = 0; i < cart.length; i++) {
+        const item = cart[i];
+        const pSnap = pSnaps[i];
 
-          await deductStockTx(transaction, {
-            productId: item.id,
-            amount: item.quantity,
-            adminId: auth.currentUser?.uid || 'system',
-            source: 'MARKETPLACE',
-            note: `Marketplace Order: ${channel} - ${externalOrderId}`,
-            prefetchedSnap: pSnap // Pass pre-fetched snapshot
-          });
-        }
+        await deductStockBatch(batch, {
+          productId: item.id,
+          amount: item.quantity,
+          adminId: auth.currentUser?.uid || 'system',
+          source: 'MARKETPLACE',
+          note: `Marketplace Order: ${channel} - ${externalOrderId}`,
+          prefetchedSnap: pSnap
+        });
+      }
 
-        transaction.set(orderRef, orderData);
-      });
+      batch.set(orderRef, orderData);
+      
+      // Do not await batch.commit() to support offline queueing
+      batch.commit().catch(err => console.log('Offline commit queued for Marketplace:', err));
 
       notify.success("Pesanan marketplace berhasil disimpan");
       setCart([]);

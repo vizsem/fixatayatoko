@@ -24,7 +24,6 @@ import {
   Barcode,
   Warehouse
 } from 'lucide-react';
-import Image from 'next/image';
 import toast from 'react-hot-toast';
 
 type Product = {
@@ -288,10 +287,9 @@ export default function EditProductPage() {
           <div className="flex items-center gap-6">
             <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
               {imagePreview ? (
-                <Image 
+                <img 
                   src={imagePreview} 
-                  alt="Preview" 
-                  fill
+                  alt="Preview"
                   className="object-cover"
                 />
               ) : (

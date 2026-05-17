@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, where, documentId, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -117,7 +116,7 @@ export default function WishlistPage() {
             </Link>
             <h1 className="text-sm font-black text-gray-800 uppercase tracking-tighter">Wishlist Saya</h1>
           </div>
-          <Image src="/logo-atayatoko.png" alt="Logo" width={100} height={24} className="h-6 w-auto" />
+          <img src="/logo-atayatoko.png" alt="Logo" width={100} height={24} className="h-6 w-auto" />
         </div>
       </header>
 
@@ -177,10 +176,9 @@ function ProductCard({
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
       <div className="relative">
         <Link href={`/produk/${product.id}`} className="block relative aspect-square">
-          <Image
+          <img
             src={imgFallback}
             alt={product.name || 'Produk'}
-            fill
             className="object-cover"
           />
         </Link>

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { 
   Search, Filter, User, ChevronDown, 
   ClipboardList, Bell, ShoppingCart, 
@@ -93,7 +92,7 @@ export const HomeHeader = ({
       <div className="px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
+            <img src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
             <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYAMARKET</h1>
           </Link>
           <form 
@@ -133,7 +132,7 @@ export const HomeHeader = ({
                 >
                   <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
                     {currentUserPhotoUrl ? (
-                      <Image src={currentUserPhotoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
+                      <img src={currentUserPhotoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
                     ) : (
                       <User size={20} className="text-gray-500" />
                     )}
@@ -149,7 +148,7 @@ export const HomeHeader = ({
                     <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-2">
                       <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
                          {currentUserPhotoUrl ? (
-                           <Image src={currentUserPhotoUrl} alt="User" width={48} height={48} className="h-full w-full object-cover" />
+                           <img src={currentUserPhotoUrl} alt="User" width={48} height={48} className="h-full w-full object-cover" />
                          ) : (
                            <User size={24} className="text-gray-400" />
                          )}

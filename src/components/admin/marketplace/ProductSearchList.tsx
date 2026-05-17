@@ -2,7 +2,7 @@
 
 import { Product } from '@/lib/types';
 import { Search, ShoppingBag, Plus, ImageIcon } from 'lucide-react';
-import Image from 'next/image';
+
 
 interface ProductSearchProps {
   searchTerm: string;
@@ -45,7 +45,7 @@ export const ProductSearchList = ({ searchTerm, onSearchChange, products, onAddT
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all group">
                 <div className="w-12 h-12 bg-gray-50 rounded-xl relative overflow-hidden shrink-0 border border-gray-100">
                   {p.imageUrl ? (
-                    <Image src={p.imageUrl} fill alt={p.name} className="object-cover" />
+                    <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-200">
                       <ImageIcon size={18} />

@@ -17,7 +17,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { useRouter } from 'next/navigation';
 import jsPDF from 'jspdf';
 
@@ -332,34 +332,20 @@ export default function EmployeesPage() {
     description: '',
   });
 
+  const { authLoading, adminId, role } = useAdminAuth({ allowedRoles: ['admin', 'hr', 'supervisor'] as any });
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        setAuthorized(false);
-        router.push('/profil/login');
-        return;
-      }
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const role = snap.exists() ? (String(snap.data()?.role || '') as UserRole) : '';
-        const name = snap.exists() ? String(snap.data()?.name || snap.data()?.email || '') : '';
-        if (!['admin', 'hr', 'supervisor'].includes(role)) {
-          setAuthorized(false);
-          setCurrentUser(null);
-          router.push('/profil');
-          return;
-        }
-        setAuthorized(true);
-        setCurrentUser({ uid: user.uid, role, name });
-        fetchEmployees();
-      } catch {
-        setAuthorized(false);
-        setCurrentUser(null);
-        router.push('/profil');
-      }
-    });
-    return () => unsub();
-  }, [router]);
+    if (authLoading) return;
+    if (adminId && role) {
+      setAuthorized(true);
+      setCurrentUser({ 
+        uid: adminId, 
+        role: role as UserRole, 
+        name: '' // or fetch from somewhere if needed, or update useAdminAuth to return name
+      });
+      fetchEmployees();
+    }
+  }, [authLoading, adminId, role]);
 
   const canManageStaff = currentUser?.role === 'admin' || currentUser?.role === 'hr';
   const canManagePayroll = currentUser?.role === 'admin' || currentUser?.role === 'hr';

@@ -5,14 +5,13 @@ import { db, auth } from '@/lib/firebase';
 import {
   collection, query, orderBy, onSnapshot,
   doc, updateDoc, addDoc, serverTimestamp,
-  setDoc, getDoc
+  setDoc, getDoc, where, getDocs
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
   MessageCircle, X, Send, Image as ImageIcon, 
   Minimize2, Maximize2
 } from 'lucide-react';
-import Image from 'next/image';
 import type { ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
 
@@ -49,27 +48,36 @@ export default function CustomerChatWidget() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, 'chats', user.uid, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    if (isOpen) {
+      const q = query(
+        collection(db, 'chats', user.uid, 'messages'),
+        orderBy('createdAt', 'asc')
+      );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatMessage[];
-      
-      setMessages(msgs);
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as ChatMessage[];
+        
+        setMessages(msgs);
+      });
 
-      // Count unread messages from admin
-      if (!isOpen) {
-        const unread = msgs.filter(m => m.senderId === 'admin' && !m.isRead).length;
-        setUnreadCount(unread);
-      }
-    });
+      return () => unsubscribe();
+    } else {
+      // When closed, just do a one-time check for unread admin messages
+      let isMounted = true;
+      const qUnread = query(
+        collection(db, 'chats', user.uid, 'messages'),
+        where('senderId', '==', 'admin'),
+        where('isRead', '==', false)
+      );
+      getDocs(qUnread).then((snap: any) => {
+        if (isMounted) setUnreadCount(snap.docs.length);
+      }).catch(() => {});
 
-    return () => unsubscribe();
+      return () => { isMounted = false; };
+    }
   }, [user, isOpen]);
 
   // 3. Auto-scroll & Mark as Read

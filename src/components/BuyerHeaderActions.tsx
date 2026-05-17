@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
@@ -152,7 +151,7 @@ export default function BuyerHeaderActions() {
           >
             <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
               {photoUrl ? (
-                <Image src={photoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
+                <img src={photoUrl} alt="User" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
               ) : (
                 <User size={20} className="text-gray-500" />
               )}
@@ -168,7 +167,7 @@ export default function BuyerHeaderActions() {
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-2">
                 <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
                   {photoUrl ? (
-                    <Image src={photoUrl} alt="User" width={48} height={48} className="h-full w-full object-cover" />
+                    <img src={photoUrl} alt="User" width={48} height={48} className="h-full w-full object-cover" />
                   ) : (
                     <User size={24} className="text-gray-400" />
                   )}

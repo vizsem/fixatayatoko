@@ -116,6 +116,76 @@ export const deductStockTx = async (tx: Transaction, params: {
 };
 
 /**
+ * Mengurangi stok produk (BATCH) untuk offline mode
+ */
+export const deductStockBatch = async (batch: WriteBatch, params: {
+  productId: string;
+  amount: number;
+  adminId: string;
+  note?: string;
+  source: InventorySource;
+  mainWarehouseId?: string; // default 'gudang-utama'
+  prefetchedSnap?: DocumentSnapshot;
+}) => {
+  const { productId, amount, adminId, note, source, mainWarehouseId = 'gudang-utama', prefetchedSnap } = params;
+  if (amount <= 0) return;
+  const pRef = doc(db, 'products', productId);
+  const snap = prefetchedSnap || await getDoc(pRef);
+  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
+  const data: any = snap.data() || {};
+  const currentStock = Number(data.stock || 0);
+  if (currentStock < amount) {
+    throw new Error(`Stok tidak cukup. Tersedia ${currentStock}, dibutuhkan ${amount}`);
+  }
+  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
+  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
+  let remaining = amount;
+  // Prioritas gudang utama
+  if (nextByWarehouse[mainWarehouseId] && nextByWarehouse[mainWarehouseId] > 0) {
+    const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
+    nextByWarehouse[mainWarehouseId] -= cut;
+    remaining -= cut;
+    
+    // Sync warehouse capacity
+    const volChange = cut * (data.volumeInCtn || 0);
+    if (volChange > 0) {
+      batch.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-volChange) });
+    }
+  }
+  // Gudang lainnya
+  if (remaining > 0) {
+    for (const [whId, qty] of Object.entries(nextByWarehouse)) {
+      if (whId === mainWarehouseId) continue;
+      if (remaining <= 0) break;
+      const cut = Math.min(Number(qty || 0), remaining);
+      nextByWarehouse[whId] = Number(qty || 0) - cut;
+      remaining -= cut;
+
+      // Sync warehouse capacity
+      const volChange = cut * (data.volumeInCtn || 0);
+      if (volChange > 0) {
+        batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
+      }
+    }
+  }
+  const nextStock = currentStock - amount;
+  batch.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
+  const logRef = doc(collection(db, 'inventory_logs'));
+  batch.set(logRef, {
+    productId,
+    productName: data.name || data.Nama || 'Produk',
+    type: 'KELUAR',
+    amount,
+    adminId,
+    source,
+    note: note || '',
+    prevStock: currentStock,
+    nextStock,
+    date: serverTimestamp()
+  });
+};
+
+/**
  * Menambah stok produk secara atomik dalam transaksi pada gudang tertentu dan menulis inventory_log (type: MASUK).
  */
 export const addStockTx = async (tx: Transaction, params: {

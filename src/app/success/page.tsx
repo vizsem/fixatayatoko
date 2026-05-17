@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2, Download } from 'lucide-react';
 import Link from 'next/link';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -298,7 +298,7 @@ function SuccessContent() {
               disabled={isDownloading}
               className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg active:scale-95 disabled:bg-gray-400"
             >
-              {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <><ImageIcon size={18} /> <span>Simpan Gambar Nota</span></>}
+              {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <><Download size={18} /> <span>Simpan Gambar Nota</span></>}
             </button>
             <button onClick={printThermal} className="flex items-center justify-center space-x-2 bg-gray-800 text-white py-3.5 rounded-xl font-bold hover:bg-black shadow-lg active:scale-95">
               <Printer size={18} />

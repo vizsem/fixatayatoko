@@ -8,7 +8,6 @@ import {
   Star, MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { doc, getDoc, collection, getDocs, query, orderBy, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
@@ -317,12 +316,10 @@ export default function ProductDetailClient({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           <div className="relative">
             <div className="aspect-square rounded-[2.5rem] md:rounded-[4rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-2xl relative">
-              <Image 
+              <img 
                 src={getProxiedImage(product.image)} 
                 alt={product.name} 
-                fill 
-                className={`object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
-                priority
+                className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
               />
               {isOutOfStock && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
@@ -544,7 +541,7 @@ export default function ProductDetailClient({
                 <div key={item.id} className="min-w-[160px] md:min-w-[180px] snap-start group cursor-pointer">
                   <Link href={`/produk/${item.id}`}>
                     <div className="aspect-square rounded-[2rem] overflow-hidden bg-white border border-gray-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-300 mb-3 relative">
-                      <Image src={getProxiedImage(item.image)} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="200px" />
+                      <img src={getProxiedImage(item.image)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                     </div>
                     <div className="px-1">
                       <h3 className="text-[11px] font-black uppercase text-gray-800 line-clamp-2 leading-tight group-hover:text-green-600 transition-colors">{item.name}</h3>

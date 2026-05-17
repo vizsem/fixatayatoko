@@ -1,7 +1,6 @@
 // src/app/tentang/page.tsx
 'use client';
 
-import Image from 'next/image';
 
 
 export default function TentangPage() {
@@ -35,7 +34,7 @@ export default function TentangPage() {
 
           <div>
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <Image src="/logo-atayatoko.png" alt="ATAYATOKO" width={200} height={80} className="h-20 w-auto mx-auto mb-4" />
+              <img src="/logo-atayatoko.png" alt="ATAYATOKO" width={200} height={80} className="h-20 w-auto mx-auto mb-4" />
 
               <h3 className="text-xl font-bold text-gray-900 mb-2">Visi</h3>
               <p className="text-gray-600 mb-4">

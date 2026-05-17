@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, onSnapshot, updateDoc, doc, getDoc, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { collection, writeBatch, serverTimestamp, onSnapshot, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -193,7 +193,10 @@ export default function AddPurchase() {
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      const purchaseRef = await addDoc(collection(db, 'purchases'), {
+      const batch = writeBatch(db);
+      const purchaseRef = doc(collection(db, 'purchases'));
+
+      batch.set(purchaseRef, {
         supplierId: selectedSupplier,
         supplierName,
         warehouseId: selectedWarehouse,
@@ -205,72 +208,25 @@ export default function AddPurchase() {
         paymentStatus,
         paymentMethod,
         notes,
-        status: 'MENUNGGU', // Default status awal
+        status: 'MENUNGGU',
         createdAt: serverTimestamp(),
       });
 
-      // Update Product Cost (Average Cost Method) & Log Changes
-      for (const item of cart) {
-        const productRef = doc(db, 'products', item.id);
-        const productSnap = await getDoc(productRef);
-        
-        if (productSnap.exists()) {
-          const productData = productSnap.data();
-          const currentStock = productData.stock || 0; // Stok saat ini (sebelum tambah)
-          const currentCost = productData.cost || productData.Modal || 0; // HPP lama
-          
-          const newQty = item.quantity * (item.conversion || 1); // Qty beli dalam satuan dasar
-          const newCostTotal = item.purchasePrice * item.quantity; // Total harga beli item ini
-          const unitCostNew = newCostTotal / newQty; // Harga beli per satuan dasar baru
-
-          // Rumus Average Cost: ((Stok Lama * HPP Lama) + (Qty Baru * HPP Baru)) / (Stok Lama + Qty Baru)
-          let newAverageCost = currentCost;
-          if (currentStock + newQty > 0) {
-             newAverageCost = ((currentStock * currentCost) + (newQty * unitCostNew)) / (currentStock + newQty);
-          } else {
-             newAverageCost = unitCostNew;
-          }
-          
-          // Bulatkan
-          newAverageCost = Math.round(newAverageCost);
-
-          // Update Stok per Gudang (Jika ada)
-          const stockByWarehouse = productData.stockByWarehouse || {};
-          const newStockByWarehouse = { ...stockByWarehouse };
-          if (selectedWarehouse) {
-            newStockByWarehouse[selectedWarehouse] = (newStockByWarehouse[selectedWarehouse] || 0) + newQty;
-          }
-
-          const updateData: any = {
-            // REMOVED: Do not update stock here! Stock should only update when status changes to 'DITERIMA'
-            // stock: currentStock + newQty,
-            // stockByWarehouse: newStockByWarehouse
-          };
-
-          // We only want to log the intent or keep it minimal here.
-          // The actual cost and stock update logic is already handled in /admin/purchases/page.tsx 
-          // when the user clicks 'Terima' (handleReceive -> updatePurchaseStatus).
-          
-          // Therefore, we shouldn't update product cost OR stock right now when status is just 'MENUNGGU'.
-          // Let's remove the updateDoc and inventory logging from here completely to prevent early stock additions.
-        }
-      }
-
-
-
-      // Catat Pengeluaran Modal (Capital Withdrawal) untuk Pembelian Tunai & Transfer
-      // Agar sinkron dengan "Modal & Aset"
       if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
-         await addDoc(collection(db, 'capital_transactions'), {
+         const capitalRef = doc(collection(db, 'capital_transactions'));
+         batch.set(capitalRef, {
            date: serverTimestamp(),
-           type: 'WITHDRAWAL', // Pengurangan modal
-           amount: total, // Total Pembelian (bukan per item)
+           type: 'WITHDRAWAL',
+           amount: total,
            description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
            recordedBy: 'system',
            referenceId: purchaseRef.id
          });
       }
 
+      batch.commit().catch(err => console.log('Offline commit queued for PO:', err));
+
+      notify.admin.success("Purchase Order berhasil disimpan!");
       router.push('/admin/purchases');
     } catch (err: any) {
       console.error(err);

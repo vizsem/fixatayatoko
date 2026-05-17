@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
-  collection, query, orderBy, limit, getDocs, where, Timestamp, onSnapshot, getDoc, doc
+  collection, query, orderBy, limit, getDocs, where, Timestamp, getDoc, doc
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { 
@@ -62,13 +62,19 @@ export default function AuditPage() {
 
       if (activeTab === 'stock') {
         const q = query(collection(db, 'inventory_logs'), where('date', '>=', startT), where('date', '<=', endT), orderBy('date', 'desc'), limit(limitCount));
-        unsub = onSnapshot(q, (s) => { setStockLogs(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
+        const snap = await getDocs(q);
+        setStockLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       } else if (activeTab === 'transaction') {
         const q = query(collection(db, 'orders'), where('createdAt', '>=', startT), where('createdAt', '<=', endT), orderBy('createdAt', 'desc'), limit(limitCount));
-        unsub = onSnapshot(q, (s) => { setTransactions(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
+        const snap = await getDocs(q);
+        setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       } else if (activeTab === 'finance') {
         const q = query(collection(db, 'cashier_shifts'), where('openedAt', '>=', startT), where('openedAt', '<=', endT), orderBy('openedAt', 'desc'), limit(limitCount));
-        unsub = onSnapshot(q, (s) => { setShifts(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
+        const snap = await getDocs(q);
+        setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       } else if (activeTab === 'profit') {
         const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']), where('createdAt', '>=', startT), where('createdAt', '<=', endT));
         const qExp = query(collection(db, 'operational_expenses'), where('date', '>=', startT), where('date', '<=', endT));
@@ -91,23 +97,24 @@ export default function AuditPage() {
         setLoading(false);
       } else if (activeTab === 'cost') {
         const q = query(collection(db, 'product_cost_logs'), where('changeDate', '>=', startT), where('changeDate', '<=', endT), orderBy('changeDate', 'desc'), limit(limitCount));
-        unsub = onSnapshot(q, (s) => { setCostLogs(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
+        const snap = await getDocs(q);
+        setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       } else if (activeTab === 'capital') {
         const q = query(collection(db, 'capital_transactions'), where('date', '>=', startT), where('date', '<=', endT), orderBy('date', 'desc'), limit(limitCount));
-        unsub = onSnapshot(q, (s) => { setCapitalLogs(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
+        const snap = await getDocs(q);
+        setCapitalLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       }
     } catch (err) {
       Sentry.captureException(err);
       notify.error("Gagal memuat data");
       setLoading(false);
     }
-    return unsub;
   }, [activeTab, startDate, endDate, limitCount]);
 
   useEffect(() => {
-    let unsub: any;
-    fetchData().then(u => unsub = u);
-    return () => unsub && unsub();
+    fetchData();
   }, [fetchData]);
 
   const handleExport = () => {

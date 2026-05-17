@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import {
   collection,
   doc,
@@ -52,23 +52,14 @@ export default function PromotionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Proteksi admin
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+  const { authLoading, adminId } = useAdminAuth({ allowedRoles: ['admin'] as any });
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        router.push('/profil');
-        return;
-      }
+  useEffect(() => {
+    if (authLoading) return;
+    if (adminId) {
       setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
+    }
+  }, [authLoading, adminId]);
 
   // Fetch promosi real-time dengan urutan terbaru
   useEffect(() => {

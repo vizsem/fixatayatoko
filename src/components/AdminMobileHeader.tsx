@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { 
   Menu, 
@@ -36,7 +35,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import notify from '@/lib/notify';
 
 interface NavItem {
@@ -111,17 +110,21 @@ export default function AdminMobileHeader() {
   useEffect(() => {
     if (!auth.currentUser) return;
     
-    const q = query(
-      collection(db, 'messages'),
-      where('read', '==', false),
-      where('recipientId', '==', auth.currentUser.uid)
-    );
-    
-    const unsub = onSnapshot(q, (snapshot) => {
-      setUnreadCount(snapshot.size);
-    });
+    const fetchUnread = async () => {
+      try {
+        const q = query(
+          collection(db, 'messages'),
+          where('read', '==', false),
+          where('recipientId', '==', auth.currentUser!.uid)
+        );
+        const snap = await getCountFromServer(q);
+        setUnreadCount(snap.data().count);
+      } catch (e) {
+        console.error('Failed to get unread count', e);
+      }
+    };
 
-    return () => unsub();
+    fetchUnread();
   }, []);
 
   // Filter items based on search

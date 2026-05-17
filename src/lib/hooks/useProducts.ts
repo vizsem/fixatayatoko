@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, orderBy, query, where, type QueryConstraint } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, orderBy, query, where, type QueryConstraint } from 'firebase/firestore';
 import { normalizeProduct, type NormalizedProduct } from '@/lib/normalize';
 
 export type ProductQueryOptions = {
@@ -9,6 +9,7 @@ export type ProductQueryOptions = {
   warehouseId?: string;
   orderByField?: 'name' | 'updatedAt' | 'sku' | 'createdAt';
   orderDirection?: 'asc' | 'desc';
+  realtime?: boolean;
 };
 
 export default function useProducts(options?: ProductQueryOptions) {
@@ -21,6 +22,8 @@ export default function useProducts(options?: ProductQueryOptions) {
   const orderByField = options?.orderByField;
   const orderDirection = options?.orderDirection;
 
+  const realtime = options?.realtime ?? false;
+
   const qRef = useMemo(() => {
     const constraints: QueryConstraint[] = [];
     if (category) constraints.push(where('category', '==', category));
@@ -32,19 +35,29 @@ export default function useProducts(options?: ProductQueryOptions) {
   }, [category, warehouseId, orderByField, orderDirection]);
 
   useEffect(() => {
-    const unsub = onSnapshot(qRef, (snap) => {
-      let data = snap.docs.map((d) => normalizeProduct(d.id, d.data() as Record<string, unknown>));
-      
-      // Filter isActive client-side untuk menangani mixed schema (Status vs isActive)
-      if (isActive === true) {
-        data = data.filter(p => p.isActive);
-      }
-      
-      setProducts(data);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [qRef, isActive]);
+    if (realtime) {
+      const unsub = onSnapshot(qRef, (snap) => {
+        let data = snap.docs.map((d) => normalizeProduct(d.id, d.data() as Record<string, unknown>));
+        if (isActive === true) data = data.filter(p => p.isActive);
+        setProducts(data);
+        setLoading(false);
+      });
+      return () => unsub();
+    } else {
+      let isMounted = true;
+      getDocs(qRef).then((snap) => {
+        if (!isMounted) return;
+        let data = snap.docs.map((d) => normalizeProduct(d.id, d.data() as Record<string, unknown>));
+        if (isActive === true) data = data.filter(p => p.isActive);
+        setProducts(data);
+        setLoading(false);
+      }).catch(err => {
+        console.error("useProducts getDocs error:", err);
+        if (isMounted) setLoading(false);
+      });
+      return () => { isMounted = false; };
+    }
+  }, [qRef, isActive, realtime]);
 
   return { products, loading };
 }

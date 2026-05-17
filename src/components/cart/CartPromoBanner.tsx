@@ -1,4 +1,4 @@
-import NextImage from 'next/image';
+
 import { Package, Sparkles } from 'lucide-react';
 
 interface PromoProps {
@@ -33,11 +33,11 @@ export function CartPromoBanner({ product, onTake }: PromoProps) {
           <div className="relative w-40 h-40 md:w-56 md:h-56">
              <div className="absolute inset-0 bg-white/10 rounded-full blur-3xl animate-pulse" />
              <div className="relative w-full h-full bg-white rounded-[2.5rem] p-3 shadow-2xl rotate-6 group-hover:rotate-0 transition-transform duration-500">
-                <NextImage 
+                <img 
                   src={product.Link_Foto || product.image || '/logo-atayatoko.png'} 
                   alt="Promo" 
-                  fill
-                  className="object-cover rounded-[1.5rem]" 
+                  className="w-full h-full object-cover rounded-[1.5rem]" 
+                  loading="lazy"
                 />
              </div>
           </div>

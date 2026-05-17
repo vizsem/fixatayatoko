@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import {
   collection,
   doc,
@@ -71,27 +71,15 @@ export default function AdminUsers() {
     }
   }, []);
 
-  // Proteksi: hanya admin yang bisa akses
+  const { authLoading, adminId } = useAdminAuth({ allowedRoles: ['admin'] as any });
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        // alert('Akses ditolak! Anda bukan admin.');
-        router.push('/profil');
-        return;
-      }
-
-      setCurrentUser(user.uid);
-      await fetchUsers();
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router, fetchUsers]);
+    if (authLoading) return;
+    if (adminId) {
+      setCurrentUser(adminId);
+      fetchUsers().then(() => setLoading(false));
+    }
+  }, [authLoading, adminId, fetchUsers]);
 
 
   const handleUpdateRole = async (userId: string, newRole: UserDoc['role']) => {

@@ -1,4 +1,4 @@
-import NextImage from 'next/image';
+
 import { Trash2, Plus, Minus } from 'lucide-react';
 import { CartItem } from '@/lib/types';
 
@@ -37,11 +37,11 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
     <div className="bg-white rounded-2xl border border-slate-100 p-3 md:p-4 shadow-sm hover:shadow-md transition-all group">
       <div className="flex gap-4">
         <div className="w-16 h-16 md:w-20 md:h-20 flex-shrink-0 relative">
-          <NextImage
+          <img
             src={item.Link_Foto || item.image || '/logo-atayatoko.png'}
             alt={item.name || 'Produk'}
-            fill
-            className="rounded-xl object-cover border border-slate-100"
+            className="w-full h-full rounded-xl object-cover border border-slate-100"
+            loading="lazy"
           />
         </div>
 

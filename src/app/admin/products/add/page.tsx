@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
-import Image from 'next/image';
 import imageCompression from 'browser-image-compression';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -768,7 +767,7 @@ export default function AddProductPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
                     {imagePreview ? (
-                      <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                      <img src={imagePreview} alt="Preview" className="object-cover" />
                     ) : (
                       <ImageIcon size={20} className="text-gray-300" />
                     )}

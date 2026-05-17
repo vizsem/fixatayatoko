@@ -13,7 +13,6 @@ import {
   MoreVertical, ArrowLeft, Check, CheckCheck,
   User, X
 } from 'lucide-react';
-import Image from 'next/image';
 import type { ChatThread, ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
 
@@ -227,7 +226,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
                       {thread.userInfo.photoURL ? (
-                        <Image src={thread.userInfo.photoURL} alt={thread.userInfo.name} width={40} height={40} className="object-cover w-full h-full" />
+                        <img src={thread.userInfo.photoURL} alt={thread.userInfo.name} width={40} height={40} className="object-cover w-full h-full" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-slate-300 text-slate-500">
                           <User size={20} />
@@ -270,7 +269,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                 </button>
                 <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
                   {selectedThread.userInfo.photoURL ? (
-                    <Image src={selectedThread.userInfo.photoURL} alt={selectedThread.userInfo.name} width={40} height={40} className="object-cover w-full h-full" />
+                    <img src={selectedThread.userInfo.photoURL} alt={selectedThread.userInfo.name} width={40} height={40} className="object-cover w-full h-full" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-slate-300 text-slate-500">
                       <User size={20} />
@@ -304,7 +303,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                     }`}>
                       {msg.type === 'image' && msg.imageUrl && (
                         <div className="mb-2 rounded-lg overflow-hidden">
-                          <Image src={msg.imageUrl} alt="Attachment" width={200} height={200} className="w-full h-auto" />
+                          <img src={msg.imageUrl} alt="Attachment" width={200} height={200} className="w-full h-auto" />
                         </div>
                       )}
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
@@ -329,7 +328,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
             <div className="bg-white p-4 border-t border-slate-200">
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 {/* <button type="button" className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors">
-                  <ImageIcon size={20} />
+                  <imgIcon size={20} />
                 </button> */}
                 <input 
                   type="text" 

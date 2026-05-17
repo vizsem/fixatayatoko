@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import {
-  collection, query, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs, runTransaction, increment, serverTimestamp
+  collection, query, doc, getDoc, onSnapshot, writeBatch, Timestamp, where, getDocs, runTransaction, increment, serverTimestamp, orderBy, limit
 } from 'firebase/firestore';
 import {
   ShoppingCart, Search, Truck, Printer, XCircle,
@@ -33,30 +33,14 @@ export default function AdminOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const role = userDoc.data()?.role;
-      if (role !== 'admin' && role !== 'cashier') {
-        notify.aksesDitolakAdmin();
-        return router.push('/profil');
-      }
-    });
-    return () => unsubAuth();
-  }, [router]);
+  const { adminId, authLoading } = useAdminAuth({ allowedRoles: ['admin', 'cashier'] });
 
   useEffect(() => {
-    const q = query(collection(db, 'orders'));
+    // Hanya memuat 200 pesanan terbaru untuk menghemat kuota Firestore
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(200));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       
-      list.sort((a, b) => {
-          const dateA = a.createdAt ? (a.createdAt as any).toMillis() : 0;
-          const dateB = b.createdAt ? (b.createdAt as any).toMillis() : 0;
-          return dateB - dateA;
-      });
-
       setOrders(list);
       setLoading(false);
     }, (error) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+
 import { Package, Gift } from 'lucide-react';
 import { Promotion } from '@/lib/types';
 
@@ -48,12 +48,11 @@ export const HomeBanners = ({ banners, activePromos }: HomeBannersProps) => {
             </div>
             {bn.imageUrl ? (
               <div className="absolute -right-6 -bottom-6 w-40 h-40 opacity-20 rotate-12">
-                <Image 
+                <img 
                   src={bn.imageUrl} 
                   alt="Banner" 
-                  fill
-                  priority
-                  className="object-cover rounded-2xl" 
+                  className="w-full h-full object-cover rounded-2xl" 
+                  loading="eager"
                 />
               </div>
             ) : null}
