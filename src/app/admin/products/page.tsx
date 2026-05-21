@@ -182,7 +182,12 @@ export default function AdminProducts() {
         const chunk = selectedIds.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(db);
         chunk.forEach(id => {
-          batch.update(doc(db, 'products', id), { Status: newStatus, updatedAt: serverTimestamp() });
+          batch.update(doc(db, 'products', id), { 
+            Status: newStatus, 
+            isActive: newStatus !== 0,
+            status: newStatus === 0 ? 'ARCHIVED' : 'ACTIVE',
+            updatedAt: serverTimestamp() 
+          });
         });
         await batch.commit();
       }
@@ -206,6 +211,7 @@ export default function AdminProducts() {
           batch.update(doc(db, 'products', id), { 
             isActive: false, 
             status: 'ARCHIVED',
+            Status: 0,
             updatedAt: serverTimestamp() 
           });
         });
