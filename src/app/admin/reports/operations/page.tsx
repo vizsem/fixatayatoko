@@ -35,7 +35,7 @@ export default function OperationsReport() {
   const { authLoading } = useAdminAuth();
 
   useEffect(() => {
-    if (loading || authLoading) return;
+    if (authLoading) return;
 
     const fetchData = async () => {
       try {
@@ -61,11 +61,13 @@ export default function OperationsReport() {
         setExpensesData(expSnap.docs.map(d => d.data()));
       } catch (error) {
         console.error("Error fetching ops data", error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchData();
-  }, [loading]);
+  }, [authLoading]);
 
   const [activeUserCutoff, setActiveUserCutoff] = useState(0);
 

@@ -69,6 +69,8 @@ export default function SalesReport() {
   const { authLoading } = useAdminAuth();
 
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchSalesData = async () => {
       try {
         const startDate = new Date(dateRange.startDate);
@@ -106,11 +108,13 @@ export default function SalesReport() {
         setSales(salesList);
       } catch (err) {
         console.error('Gagal memuat laporan penjualan:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchSalesData();
-  }, [dateRange]);
+  }, [dateRange, authLoading]);
 
 
 

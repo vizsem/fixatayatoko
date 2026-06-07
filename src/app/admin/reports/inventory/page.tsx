@@ -73,10 +73,17 @@ export default function InventoryReport() {
         Sentry.captureException(err);
       } finally {
         setBuilding(false);
+        setLoading(false);
       }
     };
-    if (!productsLoading && products.length > 0) build();
-  }, [productsLoading, products]);
+    if (!productsLoading && !authLoading) {
+      if (products.length > 0) {
+        build();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [productsLoading, products, authLoading]);
 
   const filtered = useMemo(() => {
     return inventory.filter(it => {
