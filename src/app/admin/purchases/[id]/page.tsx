@@ -10,7 +10,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
-  History, Receipt, Edit, Save, X, Trash2
+  History, Receipt, Edit, Save, X, Trash2,
+  RefreshCw
 } from 'lucide-react';
 
  
@@ -159,7 +160,13 @@ export default function PurchaseDetail() {
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => router.push(`/admin/purchases/add?duplicateFrom=${purchase.id}`)}
+            className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all"
+          >
+            <RefreshCw size={16} /> Order Lagi
+          </button>
           <button
             onClick={handleEditClick}
             className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"

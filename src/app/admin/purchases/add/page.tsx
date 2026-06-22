@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { collection, writeBatch, serverTimestamp, onSnapshot, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { collection, writeBatch, serverTimestamp, onSnapshot, doc, getDocs, query, orderBy, where, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -26,10 +26,15 @@ interface CartItem {
   availableUnits?: UnitOption[]; 
 }
 
-export default function AddPurchase() {
+function AddPurchaseFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const duplicateFrom = searchParams.get('duplicateFrom');
+
   const [loading, setLoading] = useState(false);
-  const { products: liveProducts } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [duplicateLoaded, setDuplicateLoaded] = useState(false);
+  const { products: liveProducts, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
 
   // Data References
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -52,6 +57,55 @@ export default function AddPurchase() {
   useEffect(() => {
     setProducts(liveProducts);
   }, [liveProducts]);
+
+  useEffect(() => {
+    if (!duplicateFrom || productsLoading || duplicateLoaded) return;
+
+    const fetchDuplicateData = async () => {
+      setIsDuplicating(true);
+      try {
+        const docRef = doc(db, 'purchases', duplicateFrom);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setSelectedSupplier(data.supplierId || '');
+          setSelectedWarehouse(data.warehouseId || '');
+          setPaymentStatus(data.paymentStatus || 'LUNAS');
+          setPaymentMethod(data.paymentMethod || 'CASH');
+          setShippingCost(data.shippingCost || 0);
+          setNotes(data.notes || '');
+
+          // Map items to cart
+          if (data.items && Array.isArray(data.items)) {
+            const mappedCart = data.items.map((item: any) => {
+              const matchedProduct = liveProducts.find(p => p.id === item.id);
+              return {
+                id: item.id,
+                name: item.name,
+                purchasePrice: item.purchasePrice || 0,
+                quantity: item.quantity || 1,
+                unit: item.unit || 'PCS',
+                conversion: item.conversion || 1,
+                availableUnits: matchedProduct?.units || item.availableUnits || [{ code: item.unit || 'PCS', contains: item.conversion || 1 }]
+              };
+            });
+            setCart(mappedCart);
+          }
+          setDuplicateLoaded(true);
+          notify.admin.success('Detail order berhasil disalin!');
+        } else {
+          notify.admin.error('Data order yang disalin tidak ditemukan.');
+        }
+      } catch (err) {
+        console.error('Gagal memuat data order duplikat:', err);
+        notify.admin.error('Gagal memuat data order yang disalin.');
+      } finally {
+        setIsDuplicating(false);
+      }
+    };
+
+    fetchDuplicateData();
+  }, [duplicateFrom, productsLoading, liveProducts, duplicateLoaded]);
 
   useEffect(() => {
     const unsubSup = onSnapshot(collection(db, 'suppliers'), (s) => {
@@ -240,6 +294,17 @@ export default function AddPurchase() {
     p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchProduct.toLowerCase())
   ).slice(0, 5);
+
+  if (isDuplicating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs bg-[#FBFBFE] text-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p>Menyalin detail orderan...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
@@ -607,5 +672,17 @@ export default function AddPurchase() {
 
       </form>
     </div>
+  );
+}
+
+export default function AddPurchase() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs bg-[#FBFBFE] text-black">
+        Loading form pembelian...
+      </div>
+    }>
+      <AddPurchaseFormContent />
+    </Suspense>
   );
 }
