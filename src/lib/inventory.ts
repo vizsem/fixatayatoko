@@ -196,8 +196,9 @@ export const addStockTx = async (tx: Transaction, params: {
   note?: string;
   source: InventorySource;
   prefetchedSnap?: DocumentSnapshot;
+  updateFields?: Record<string, any>;
 }) => {
-  const { productId, amount, warehouseId = 'gudang-utama', adminId, note, source, prefetchedSnap } = params;
+  const { productId, amount, warehouseId = 'gudang-utama', adminId, note, source, prefetchedSnap, updateFields } = params;
   if (amount <= 0) return;
   const pRef = doc(db, 'products', productId);
   const snap = prefetchedSnap || await tx.get(pRef);
@@ -214,7 +215,7 @@ export const addStockTx = async (tx: Transaction, params: {
     tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(volChange) });
   }
   const nextStock = currentStock + amount;
-  tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
+  tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse, ...(updateFields || {}) });
   const logRef = doc(collection(db, 'inventory_logs'));
   tx.set(logRef, {
     productId,

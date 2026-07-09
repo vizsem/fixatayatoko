@@ -19,7 +19,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
 import notify from '@/lib/notify';
-import { addStockTx } from '@/lib/inventory';
+import { addStockTx, computeAverageCost } from '@/lib/inventory';
 
 
 
@@ -133,15 +133,43 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           createdAt: serverTimestamp()
         };
 
+        // Baca data produk untuk menghitung Modal (Average Cost) baru
+        const productRef = doc(db, 'products', formData.productId);
+        const productSnap = await tx.get(productRef);
+        if (!productSnap.exists()) throw new Error('Produk tidak ditemukan');
+        const productData = productSnap.data();
+
+        const oldStock = Number(productData.stock || 0);
+        const oldModal = Number(productData.Modal || 0);
+        // Hitung average cost berdasarkan pembelian baru
+        const newModal = computeAverageCost(oldStock, oldModal, formData.quantity, formData.purchasePrice, 1);
+        
+        const updateFields: Record<string, any> = {};
+        
+        // Cek jika modal berubah maka kita update dan simpan ke product_cost_logs
+        if (newModal !== oldModal) {
+          updateFields.Modal = newModal;
+          
+          const costLogRef = doc(collection(db, 'product_cost_logs'));
+          tx.set(costLogRef, {
+            productId: formData.productId,
+            oldCost: oldModal,
+            newCost: newModal,
+            adminEmail: auth.currentUser?.email || 'system',
+            changeDate: serverTimestamp()
+          });
+        }
+
         // 2. Update stok produk & Log Inventory secara atomik
-        // FIX: addStockTx melakukan tx.get(), jadi harus dijalankan SEBELUM tx.set/tx.update apa pun
         await addStockTx(tx, {
           productId: formData.productId,
           amount: formData.quantity,
           warehouseId: 'gudang-utama',
           adminId: auth.currentUser?.uid || 'system',
           note: `Pembelian dari ${transactionData.supplierName}`,
-          source: 'PURCHASE'
+          source: 'PURCHASE',
+          prefetchedSnap: productSnap,
+          updateFields
         });
 
         // 3. Simpan record transaksi setelah read selesai
