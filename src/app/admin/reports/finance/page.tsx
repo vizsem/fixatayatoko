@@ -24,9 +24,22 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard
+  LayoutDashboard,
+  Printer,
+  Calendar,
+  Filter
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 
 
 type FinancialRecord = {
@@ -65,6 +78,82 @@ export default function FinanceReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
+
+  const setQuickPeriod = (period: 'today' | '7days' | '30days' | 'thisMonth') => {
+    const now = new Date();
+    const toLocal = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    let start = new Date();
+    let end = new Date();
+
+    if (period === 'today') {
+      start = now;
+      end = now;
+    } else if (period === '7days') {
+      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      end = now;
+    } else if (period === '30days') {
+      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+      end = now;
+    } else if (period === 'thisMonth') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = now;
+    }
+
+    setDateRange({
+      startDate: toLocal(start),
+      endDate: toLocal(end)
+    });
+    setCurrentPage(1);
+  };
+
+  const filteredRecords = useMemo(() => {
+    if (selectedChannel === 'ALL') return records;
+    return records.filter(r => {
+      if (r.type === 'profit') {
+        return (r.channel || 'OFFLINE').toUpperCase() === selectedChannel.toUpperCase();
+      }
+      if (r.type === 'income' && r.category === 'Ongkir') {
+        return (r.channel || 'OFFLINE').toUpperCase() === selectedChannel.toUpperCase();
+      }
+      return false; // hide store-wide expenses when filtering specific channel
+    });
+  }, [records, selectedChannel]);
+
+  const dailyChartData = useMemo(() => {
+    const dailyMap = new Map<string, { dateLabel: string; Pendapatan: number; Laba: number; Pengeluaran: number }>();
+    
+    // Chronological order for chart
+    const chronRecords = [...filteredRecords].reverse();
+    
+    chronRecords.forEach(r => {
+      const dateObj = new Date(r.date);
+      const label = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+      
+      let entry = dailyMap.get(label);
+      if (!entry) {
+        entry = { dateLabel: label, Pendapatan: 0, Laba: 0, Pengeluaran: 0 };
+        dailyMap.set(label, entry);
+      }
+      
+      if (r.type === 'profit') {
+        entry.Pendapatan += r.amount;
+        entry.Laba += r.profit || 0;
+      } else if (r.type === 'income' && r.category === 'Ongkir') {
+        entry.Pendapatan += r.amount;
+      } else if (r.type === 'expense') {
+        entry.Pengeluaran += r.amount;
+      }
+    });
+    
+    return Array.from(dailyMap.values());
+  }, [filteredRecords]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -344,7 +433,7 @@ export default function FinanceReport() {
   }, [dateRange]);
 
   const handleExport = () => {
-    const exportData = records.map(record => ({
+    const exportData = filteredRecords.map(record => ({
       Tanggal: new Date(record.date).toLocaleDateString('id-ID'),
       Deskripsi: record.description,
       Kategori: record.category,
@@ -352,22 +441,27 @@ export default function FinanceReport() {
       'Biaya Pokok': record.cost || 0,
       Laba: record.profit || 0,
       Pengeluaran: record.type === 'expense' ? record.amount : 0,
-      'Metode Bayar': record.paymentMethod
+      'Metode Bayar': record.paymentMethod,
+      Channel: record.channel || 'OFFLINE'
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Laporan Keuangan');
-    XLSX.writeFile(wb, `laporan-keuangan-${dateRange.startDate}-sampai-${dateRange.endDate}.xlsx`);
+    XLSX.writeFile(wb, `laporan-keuangan-${selectedChannel}-${dateRange.startDate}-sampai-${dateRange.endDate}.xlsx`);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   // Pagination logic - moved before conditional return
   const paginatedRecords = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return records.slice(startIndex, startIndex + itemsPerPage);
-  }, [records, currentPage]);
+    return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredRecords, currentPage]);
 
-  const totalPages = Math.ceil(records.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -381,22 +475,22 @@ export default function FinanceReport() {
   }
 
   // Hitung total berdasarkan tipe record
-  const totalIncome = records
+  const totalIncome = filteredRecords
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + r.amount, 0);
-  const shippingIncome = records
+  const shippingIncome = filteredRecords
     .filter(r => r.type === 'income' && r.category === 'Ongkir')
     .reduce((sum, r) => sum + r.amount, 0);
 
-  const totalCost = records
+  const totalCost = filteredRecords
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + (r.cost || 0), 0);
 
-  const totalProfit = records
+  const totalProfit = filteredRecords
     .filter(r => r.type === 'profit')
     .reduce((sum, r) => sum + (r.profit || 0), 0);
 
-  const totalExpense = records
+  const totalExpense = filteredRecords
     .filter(r => r.type === 'expense')
     .reduce((sum, r) => sum + r.amount, 0);
 
@@ -424,9 +518,9 @@ export default function FinanceReport() {
   const goodsRevenue = totalIncome;
   const grossMarginPct = goodsRevenue > 0 ? Math.max(0, (totalProfit / goodsRevenue) * 100) : 0;
   const netMarginPct = goodsRevenue > 0 ? (netProfit / goodsRevenue) * 100 : 0;
-  const fifoCount = records.filter(r => r.type === 'profit' && r.hppSource === 'FIFO').length;
-  const fallbackCount = records.filter(r => r.type === 'profit' && r.hppSource === 'Fallback').length;
-  const estimateCount = records.filter(r => r.type === 'profit' && r.hppSource === 'Estimate (85%)').length;
+  const fifoCount = filteredRecords.filter(r => r.type === 'profit' && r.hppSource === 'FIFO').length;
+  const fallbackCount = filteredRecords.filter(r => r.type === 'profit' && r.hppSource === 'Fallback').length;
+  const estimateCount = filteredRecords.filter(r => r.type === 'profit' && r.hppSource === 'Estimate (85%)').length;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -458,31 +552,92 @@ export default function FinanceReport() {
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-2">Laporan Keuangan</h1>
             <p className="text-slate-500 font-medium text-sm">Monitor performa bisnis, arus kas, dan profitabilitas real-time.</p>
+            
+            {/* Quick Period Buttons */}
+            <div className="flex flex-wrap items-center gap-2 mt-4 no-print">
+              <button
+                onClick={() => setQuickPeriod('today')}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white border border-slate-250 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+              >
+                Hari Ini
+              </button>
+              <button
+                onClick={() => setQuickPeriod('7days')}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white border border-slate-250 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+              >
+                7 Hari terakhir
+              </button>
+              <button
+                onClick={() => setQuickPeriod('30days')}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white border border-slate-250 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+              >
+                30 Hari terakhir
+              </button>
+              <button
+                onClick={() => setQuickPeriod('thisMonth')}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-emerald-50 border border-emerald-100 text-emerald-700 hover:bg-emerald-100 active:scale-95 transition-all shadow-sm"
+              >
+                Bulan Ini
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-2 w-full sm:w-auto px-2">
+          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm no-print">
+            {/* Channel Filter */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+              <Filter size={14} className="text-slate-400" />
+              <select
+                value={selectedChannel}
+                onChange={(e) => { setSelectedChannel(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-none outline-none cursor-pointer uppercase"
+              >
+                <option value="ALL">Semua Channel</option>
+                <option value="OFFLINE">Offline</option>
+                <option value="WEBSITE">Website</option>
+                <option value="SHOPEE">Shopee</option>
+                <option value="TIKTOK">TikTok</option>
+                <option value="TOKOPEDIA">Tokopedia</option>
+                <option value="LAZADA">Lazada</option>
+              </select>
+            </div>
+
+            <div className="h-8 w-[1px] bg-slate-100 hidden sm:block"></div>
+
+            {/* Date Pickers */}
+            <div className="flex items-center gap-2 px-2">
               <input
                 type="date"
                 value={dateRange.startDate}
-                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                onChange={(e) => { setDateRange({ ...dateRange, startDate: e.target.value }); setCurrentPage(1); }}
                 className="bg-slate-50 border-none text-xs font-bold text-slate-700 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <span className="text-slate-300 font-bold">-</span>
               <input
                 type="date"
                 value={dateRange.endDate}
-                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                onChange={(e) => { setDateRange({ ...dateRange, endDate: e.target.value }); setCurrentPage(1); }}
                 className="bg-slate-50 border-none text-xs font-bold text-slate-700 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
+
             <div className="h-8 w-[1px] bg-slate-100 hidden sm:block"></div>
-            <button
-              onClick={handleExport}
-              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
-            >
-              <Download size={16} /> Export
-            </button>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrint}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2.5 rounded-xl transition-all shadow-sm"
+                title="Cetak Laporan"
+              >
+                <Printer size={16} />
+              </button>
+              <button
+                onClick={handleExport}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-200 flex items-center gap-2"
+              >
+                <Download size={16} /> Export
+              </button>
+            </div>
           </div>
         </div>
 
@@ -585,6 +740,52 @@ export default function FinanceReport() {
           </div>
         </div>
 
+        {/* Daily Financial Trend Chart */}
+        <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100 mb-8 no-print">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="text-slate-900 font-extrabold text-lg">Tren Keuangan Harian</h3>
+              <p className="text-slate-400 text-xs font-medium mt-0.5">Grafik perbandingan pendapatan & laba kotor harian</p>
+            </div>
+            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          
+          <div className="h-72 w-full">
+            {dailyChartData.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold text-sm">
+                Tidak ada data untuk grafik pada periode ini
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorPendapatan" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorLaba" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="dateLabel" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} tickFormatter={(val) => `Rp${(val/1000).toLocaleString('id-ID')}k`} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                    formatter={(val: any) => [`Rp${Number(val || 0).toLocaleString('id-ID')}`]}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
+                  <Area type="monotone" name="Pendapatan" dataKey="Pendapatan" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorPendapatan)" />
+                  <Area type="monotone" name="Laba Kotor" dataKey="Laba" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorLaba)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
            {/* Channel Summary */}
            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm lg:col-span-1 h-full">
@@ -641,20 +842,22 @@ export default function FinanceReport() {
                   <tr>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Keterangan</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Pendapatan</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">HPP</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Laba Kotor</th>
                     <th className="hidden md:table-cell px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Tipe</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {records.length === 0 ? (
+                  {filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-20 text-center">
+                      <td colSpan={6} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                              <CreditCard size={24} className="text-slate-300" />
                           </div>
                           <p className="text-slate-500 font-bold text-sm">Belum ada data transaksi</p>
-                          <p className="text-slate-400 text-xs mt-1">Coba sesuaikan filter tanggal</p>
+                          <p className="text-slate-400 text-xs mt-1">Coba sesuaikan filter tanggal atau channel</p>
                         </div>
                       </td>
                     </tr>
@@ -689,24 +892,37 @@ export default function FinanceReport() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">
-                           <div className="flex flex-col items-end gap-1">
-                              <span className={`text-xs font-black ${record.type === 'profit' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {record.type === 'profit' ? '+' : '-'} Rp{record.amount.toLocaleString('id-ID')}
-                              </span>
-                              {record.profit !== undefined && (
-                                <span className={`text-[10px] font-bold ${record.profit >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
-                                  Laba: Rp{record.profit.toLocaleString('id-ID')}
-                                </span>
-                              )}
-                           </div>
+                          <span className={`text-xs font-black ${record.type === 'expense' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {record.type === 'expense' ? '-' : '+'} Rp{record.amount.toLocaleString('id-ID')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {record.cost !== undefined ? (
+                            <span className="text-xs font-bold text-slate-500">
+                              Rp{record.cost.toLocaleString('id-ID')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-300">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {record.profit !== undefined ? (
+                            <span className={`text-xs font-black ${record.profit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                              Rp{record.profit.toLocaleString('id-ID')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-300">-</span>
+                          )}
                         </td>
                         <td className="hidden md:table-cell px-6 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${
                              record.type === 'profit' 
                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                               : 'bg-rose-50 text-rose-600 border border-rose-100'
+                               : record.type === 'income'
+                                 ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                 : 'bg-rose-50 text-rose-600 border border-rose-100'
                           }`}>
-                            {record.type === 'profit' ? 'Pemasukan' : 'Pengeluaran'}
+                            {record.type === 'profit' ? 'Penjualan' : record.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}
                           </span>
                         </td>
                       </tr>
@@ -779,6 +995,43 @@ export default function FinanceReport() {
         onChangeEnd={(v) => setDateRange({ ...dateRange, endDate: v })}
         onExport={handleExport}
       />
+
+      <style jsx global>{`
+        @media print {
+          .no-print,
+          header,
+          aside,
+          nav,
+          footer,
+          .sidebar-container {
+            display: none !important;
+          }
+          body {
+            background: white !important;
+            color: #0f172a !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .max-w-7xl {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          /* Ensure table prints nicely without truncation */
+          .overflow-auto {
+            overflow: visible !important;
+          }
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          th, td {
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
