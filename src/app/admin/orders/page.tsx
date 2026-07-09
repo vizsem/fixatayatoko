@@ -264,16 +264,16 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
         {[
           { label: 'Pending', count: orders.filter(o => o.status === 'MENUNGGU').length, color: 'text-rose-600', bg: 'bg-rose-50' },
           { label: 'Processing', count: orders.filter(o => o.status === 'DIPROSES').length, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Shipping', count: orders.filter(o => o.status === 'DIKIRIM').length, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Finished', count: orders.filter(o => o.status === 'SELESAI').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-             <span className={`text-2xl font-black ${stat.color}`}>{stat.count}</span>
-             <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">{stat.label}</span>
+          <div key={stat.label} className="bg-white p-2 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+             <span className={`text-lg md:text-2xl font-black ${stat.color}`}>{stat.count}</span>
+             <span className="text-[8px] md:text-[9px] font-black uppercase text-slate-400 tracking-wider md:tracking-widest mt-0.5 md:mt-1 text-center select-none">{stat.label}</span>
           </div>
         ))}
       </div>

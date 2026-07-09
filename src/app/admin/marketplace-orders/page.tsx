@@ -37,6 +37,39 @@ interface CartItem {
   units?: any[];
 }
 
+function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCode: string): number {
+  const code = unitCode.toUpperCase();
+  const baseUnit = (p.unit || 'Pcs').toUpperCase();
+  
+  // 1. Check channelPricing: channelPricing[shopee/tiktok][unitCode].price
+  const channelKey = channel.toLowerCase() as 'shopee' | 'tiktok';
+  const channelPrice = (p as any).channelPricing?.[channelKey]?.[code]?.price;
+  if (typeof channelPrice === 'number' && channelPrice > 0) {
+    return channelPrice;
+  }
+
+  const unitOpt = p.units?.find(u => u.code.toUpperCase() === code);
+
+  // 2. Check general unit price in units list if it's not the base unit
+  if (code !== baseUnit && unitOpt && typeof unitOpt.price === 'number' && unitOpt.price > 0) {
+    return unitOpt.price;
+  }
+
+  // 3. Fallback to base price * contains
+  const basePrice = channel === 'SHOPEE' 
+    ? (p.priceShopee || p.price || p.priceEcer || 0) 
+    : channel === 'TIKTOK' 
+      ? (p.priceTiktok || p.price || p.priceEcer || 0) 
+      : (p.priceEcer || p.price || 0);
+
+  if (code === baseUnit) {
+    return basePrice;
+  }
+
+  const contains = unitOpt?.contains || 1;
+  return basePrice * contains;
+}
+
 export default function MarketplaceOrdersPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -75,11 +108,7 @@ export default function MarketplaceOrdersPage() {
     setCart(prev => prev.map(item => {
       const p = products.find(prod => prod.id === item.id);
       if (!p) return item;
-      const newPrice = channel === 'SHOPEE' 
-        ? (p.priceShopee || p.price || p.priceEcer || 0) 
-        : channel === 'TIKTOK' 
-          ? (p.priceTiktok || p.price || p.priceEcer || 0) 
-          : (p.priceEcer || p.price || 0);
+      const newPrice = getProductPriceForUnit(p, channel, item.unit);
       return { ...item, price: newPrice, stock: p.stock || 0 };
     }));
   }, [channel, products]);
@@ -93,11 +122,8 @@ export default function MarketplaceOrdersPage() {
   }, [products, searchTerm]);
 
   const handleAddToCart = (p: Product) => {
-    const price = channel === 'SHOPEE' 
-      ? (p.priceShopee || p.price || p.priceEcer || 0) 
-      : channel === 'TIKTOK' 
-        ? (p.priceTiktok || p.price || p.priceEcer || 0) 
-        : (p.priceEcer || p.price || 0);
+    const initialUnit = p.unit || 'Pcs';
+    const price = getProductPriceForUnit(p, channel, initialUnit);
     setCart(prev => {
       const existing = prev.find(item => item.id === p.id);
       if (existing) {
@@ -108,7 +134,7 @@ export default function MarketplaceOrdersPage() {
         name: p.name || '',
         price: price || 0,
         quantity: 1,
-        unit: p.unit || 'Pcs',
+        unit: initialUnit,
         stock: p.stock || 0,
         units: p.units || []
       }];
@@ -140,7 +166,13 @@ export default function MarketplaceOrdersPage() {
   };
 
   const updateUnit = (id: string, unit: string) => {
-    setCart(prev => prev.map(item => item.id === id ? { ...item, unit } : item));
+    setCart(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const p = products.find(prod => prod.id === id);
+      if (!p) return { ...item, unit };
+      const newPrice = getProductPriceForUnit(p, channel, unit);
+      return { ...item, unit, price: newPrice };
+    }));
   };
 
   const removeFromCart = (id: string) => {
