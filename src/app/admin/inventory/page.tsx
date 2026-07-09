@@ -163,6 +163,28 @@ export default function InventoryDashboard() {
     return Math.floor(p.stock / (found.contains as number));
   };
 
+  const stockBreakdown = (p: Product) => {
+    const ctnUnit = p.units?.find((u: any) => 
+      ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
+    );
+    if (!ctnUnit || typeof ctnUnit.contains !== 'number' || ctnUnit.contains <= 1) return null;
+    
+    const conversion = ctnUnit.contains;
+    const ctnQty = Math.floor(p.stock / conversion);
+    const pcsQty = p.stock % conversion;
+    
+    const baseLabel = (p.unit || 'Pcs').toUpperCase();
+    const ctnLabel = ctnUnit.code.toUpperCase() === 'DUS' ? 'CTN' : ctnUnit.code.toUpperCase();
+    
+    if (ctnQty > 0) {
+      if (pcsQty > 0) {
+        return `${ctnQty} ${ctnLabel} + ${pcsQty} ${baseLabel}`;
+      }
+      return `${ctnQty} ${ctnLabel}`;
+    }
+    return `${pcsQty} ${baseLabel}`;
+  };
+
   const handleQuickUpdate = async (id: string) => {
     try {
       const product = products.find(p => p.id === id);
@@ -354,19 +376,43 @@ export default function InventoryDashboard() {
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2 px-1 border-t border-gray-50/50">
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-1 w-full">
                   <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Available Stock</p>
-                  {editingId === product.id ? (
-                    <div className="flex items-center gap-2">
-                      <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-[11px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
-                      <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={12} /></button>
-                      <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={12} /></button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-[11px] font-black px-2.5 py-1.5 rounded-xl transition-all w-fit ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
-                      {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5 font-bold">{(unitSelection[product.id] || product.unit || '').toUpperCase()}</span>
-                    </button>
-                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {editingId === product.id ? (
+                      <div className="flex items-center gap-2">
+                        <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-[11px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
+                        <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={12} /></button>
+                        <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={12} /></button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-[11px] font-black px-2.5 py-1.5 rounded-xl transition-all w-fit ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
+                          {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5 font-bold">{(unitSelection[product.id] || product.unit || '').toUpperCase() === 'DUS' ? 'CTN' : (unitSelection[product.id] || product.unit || '').toUpperCase()}</span>
+                        </button>
+                        
+                        {/* Stock Breakdown */}
+                        {stockBreakdown(product) && (
+                          <span className="text-[9px] font-bold text-slate-400 mt-0.5">
+                            (= {stockBreakdown(product)})
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Unit Selector */}
+                    {unitCodes(product).length > 1 && (
+                      <select
+                        value={unitSelection[product.id] || product.unit || ''}
+                        onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
+                        className="text-[9px] font-black text-gray-400 uppercase bg-gray-50 hover:bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                      >
+                        {unitCodes(product).map(u => (
+                          <option key={u} value={u}>{u === 'DUS' ? 'CTN' : u}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -411,9 +457,51 @@ export default function InventoryDashboard() {
                     {displayWarehouses.find(w => w.id === (product as any).warehouseId)?.name || 'Central'}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
-                      {displayedStock(product).toLocaleString()} {(unitSelection[product.id] || product.unit || '').toUpperCase()}
-                    </span>
+                    <div className="flex flex-col items-center gap-1">
+                      {editingId === product.id ? (
+                        <div className="flex items-center gap-1 justify-center">
+                          <input 
+                            autoFocus 
+                            type="number" 
+                            className="w-16 p-1.5 bg-gray-100 rounded-lg text-[10px] font-black outline-none text-center" 
+                            value={tempStock} 
+                            onChange={(e) => setTempStock(Number(e.target.value))} 
+                          />
+                          <button onClick={() => handleQuickUpdate(product.id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"><Check size={10} /></button>
+                          <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-100 text-gray-400 hover:bg-gray-200 rounded-lg"><X size={10} /></button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span 
+                            onClick={() => { setEditingId(product.id); setTempStock(product.stock); }}
+                            className={`text-[10px] font-black px-2 py-1 rounded-lg cursor-pointer hover:opacity-80 transition-all ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}
+                            title="Klik untuk quick edit stok dasar"
+                          >
+                            {displayedStock(product).toLocaleString()} {(unitSelection[product.id] || product.unit || '').toUpperCase() === 'DUS' ? 'CTN' : (unitSelection[product.id] || product.unit || '').toUpperCase()}
+                          </span>
+                          
+                          {/* Stock Breakdown */}
+                          {stockBreakdown(product) && (
+                            <span className="text-[9px] font-bold text-slate-400 mt-0.5 whitespace-nowrap">
+                              (= {stockBreakdown(product)})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Unit Selector */}
+                      {unitCodes(product).length > 1 && (
+                        <select
+                          value={unitSelection[product.id] || product.unit || ''}
+                          onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
+                          className="text-[8px] font-black text-gray-400 uppercase bg-gray-50 hover:bg-gray-100 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                        >
+                          {unitCodes(product).map(u => (
+                            <option key={u} value={u}>{u === 'DUS' ? 'CTN' : u}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-2 text-right">
                     <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 border rounded-lg inline-block"><ChevronRight size={14} /></Link>
