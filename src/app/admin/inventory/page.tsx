@@ -381,9 +381,12 @@ export default function InventoryDashboard() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     {editingId === product.id ? (
                       <div className="flex items-center gap-2">
-                        <input autoFocus type="number" className="w-16 p-2 bg-gray-100 rounded-lg text-[11px] font-black outline-none" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
+                        <div className="flex items-center bg-gray-100 rounded-lg">
+                          <input autoFocus type="number" className="w-16 p-2 bg-transparent text-[11px] font-black outline-none text-right" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
+                          <span className="pr-2 text-[10px] font-bold text-gray-400 uppercase">{product.unit || 'PCS'}</span>
+                        </div>
                         <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={12} /></button>
-                        <button onClick={() => setEditingId(null)} className="p-2 bg-gray-100 text-gray-400 rounded-lg"><X size={12} /></button>
+                        <button onClick={() => setEditingId(null)} className="p-2 bg-gray-200 text-gray-500 rounded-lg"><X size={12} /></button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-0.5">
@@ -460,15 +463,18 @@ export default function InventoryDashboard() {
                     <div className="flex flex-col items-center gap-1">
                       {editingId === product.id ? (
                         <div className="flex items-center gap-1 justify-center">
-                          <input 
-                            autoFocus 
-                            type="number" 
-                            className="w-16 p-1.5 bg-gray-100 rounded-lg text-[10px] font-black outline-none text-center" 
-                            value={tempStock} 
-                            onChange={(e) => setTempStock(Number(e.target.value))} 
-                          />
+                          <div className="flex items-center bg-gray-100 rounded-lg">
+                            <input 
+                              autoFocus 
+                              type="number" 
+                              className="w-16 p-1.5 bg-transparent text-[10px] font-black outline-none text-right" 
+                              value={tempStock} 
+                              onChange={(e) => setTempStock(Number(e.target.value))} 
+                            />
+                            <span className="pr-1.5 text-[9px] font-bold text-gray-400 uppercase">{product.unit || 'PCS'}</span>
+                          </div>
                           <button onClick={() => handleQuickUpdate(product.id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"><Check size={10} /></button>
-                          <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-100 text-gray-400 hover:bg-gray-200 rounded-lg"><X size={10} /></button>
+                          <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-200 text-gray-500 hover:bg-gray-300 rounded-lg"><X size={10} /></button>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center">
