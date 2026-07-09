@@ -45,11 +45,20 @@ type OrderStatus =
   | 'BELUM_LUNAS'
   | 'PENDING';
 
+type StoreSettings = {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  footerMsg?: string;
+};
+
 type OrderItem = {
   productId?: string;
   name: string;
   quantity: number;
   price: number;
+  unit?: string;
   originalQuantity?: number;
   status?: 'fulfilled' | 'unfulfilled' | 'partial';
   note?: string;
@@ -73,6 +82,12 @@ type Order = {
   notes?: string;
   dueDate?: string;
   userId?: string;
+  discount?: number;
+  voucher?: number;
+  pointsUsed?: number;
+  walletUsed?: number;
+  channel?: string;
+  externalOrderId?: string;
 };
 
 type EditableOrderItem = OrderItem & {
@@ -97,6 +112,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [returnItems, setReturnItems] = useState<{ productId: string; name: string; quantity: number; price: number; selected: boolean }[]>([]);
   const [returnReason, setReturnReason] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    name: 'Ataya Toko',
+    address: 'Jl. Pandan 98, Semen, Kediri',
+    phone: '0858-5316-1174',
+    email: 'atayatoko2@gmail.com',
+    footerMsg: 'Terima kasih telah berbelanja!'
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -116,9 +138,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     if (!authChecked || !id) return;
-    const fetchOrder = async () => {
+    const fetchAll = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'orders', id));
+        const [docSnap, settingsSnap] = await Promise.all([
+          getDoc(doc(db, 'orders', id)),
+          getDoc(doc(db, 'settings', 'system'))
+        ]);
         if (!docSnap.exists()) {
           setError('Pesanan tidak ditemukan.');
           return;
@@ -136,13 +161,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             }))
           );
         }
+        if (settingsSnap.exists()) {
+          const s = settingsSnap.data() as any;
+          setStoreSettings(prev => ({ ...prev, ...(s.store || {}) }));
+        }
       } catch {
         setError('Gagal memuat pesanan.');
       } finally {
         setLoading(false);
       }
     };
-    fetchOrder();
+    fetchAll();
   }, [id, authChecked]);
 
   useEffect(() => {
@@ -615,8 +644,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b-2 border-slate-100 pb-12">
             <div>
               <h1 className="text-6xl font-black tracking-tighter italic mb-2">INVOICE.</h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-green-600">
-                Ataya Toko Official
+              <p className="text-xs font-bold text-green-600 uppercase tracking-widest mb-1">
+                {storeSettings.name}
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">
+                {storeSettings.address}
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium">
+                ☎ {storeSettings.phone} &nbsp;|&nbsp; ✉ {storeSettings.email}
               </p>
             </div>
             <div className="text-left md:text-right">
@@ -631,9 +666,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-xl font-black tracking-tight text-slate-800">
                 #ORD-{order.id.substring(0, 12).toUpperCase()}
               </p>
+              {order.externalOrderId && (
+                <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
+                  {order.channel && `${order.channel} • `}{order.externalOrderId}
+                </p>
+              )}
               <p className="text-xs font-bold text-slate-400 uppercase">
                 {order.createdAt?.toDate
-                  ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID')
+                  ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
                   : '-'}
               </p>
             </div>
@@ -890,6 +930,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       {item.name}
                       <p className="text-xs font-mono text-slate-400 font-medium normal-case">
                         Rp{item.price.toLocaleString()}
+                        {item.unit && (
+                          <span className="ml-1 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase">
+                            / {item.unit.toUpperCase() === 'DUS' ? 'CTN' : item.unit.toUpperCase()}
+                          </span>
+                        )}
                       </p>
                     </td>
                     <td className="px-3 md:px-0 py-3 md:py-4 text-center font-bold text-slate-400">
@@ -1009,15 +1054,36 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
                         <div className="flex justify-between text-[11px] font-bold text-slate-500">
                           <span>Subtotal Produk</span>
-                          <span>
-                            Rp
-                            {(order.subtotal || 0).toLocaleString()}
-                          </span>
+                          <span>Rp{(order.subtotal || 0).toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between text-[11px] font-bold text-slate-500">
                           <span>Ongkos Kirim</span>
                           <span>Rp{(order.shippingCost || 0).toLocaleString()}</span>
                         </div>
+                        {(order.discount || 0) > 0 && (
+                          <div className="flex justify-between text-[11px] font-bold text-rose-500">
+                            <span>Diskon</span>
+                            <span>- Rp{(order.discount || 0).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {(order.voucher || 0) > 0 && (
+                          <div className="flex justify-between text-[11px] font-bold text-rose-500">
+                            <span>Voucher</span>
+                            <span>- Rp{(order.voucher || 0).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {(order.pointsUsed || 0) > 0 && (
+                          <div className="flex justify-between text-[11px] font-bold text-violet-500">
+                            <span>Poin Digunakan</span>
+                            <span>- Rp{(order.pointsUsed || 0).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {(order.walletUsed || 0) > 0 && (
+                          <div className="flex justify-between text-[11px] font-bold text-blue-500">
+                            <span>Saldo Dompet</span>
+                            <span>- Rp{(order.walletUsed || 0).toLocaleString()}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100 border-dashed">
                           <span>Total Pembayaran</span>
                           <span>Rp{(order.total || 0).toLocaleString()}</span>
@@ -1031,6 +1097,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
 
+          {/* Signature Box – visible only on print */}
+          <div className="mt-12 grid grid-cols-2 gap-16 print-only">
+            <div className="text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-16">Penerima / Customer</p>
+              <div className="border-t-2 border-slate-300 pt-2">
+                <p className="text-[9px] font-bold text-slate-400">(Tanda Tangan &amp; Nama Jelas)</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-16">Hormat Kami / Kasir</p>
+              <div className="border-t-2 border-slate-300 pt-2">
+                <p className="text-[9px] font-bold text-slate-400">{storeSettings.name}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer message */}
+          <div className="mt-8 pt-6 border-t border-dashed border-slate-200 text-center print-only-block">
+            <p className="text-[10px] font-bold text-slate-400 italic">{storeSettings.footerMsg || 'Terima kasih telah berbelanja!'}</p>
+          </div>
           {(order.status === 'MENUNGGU' || order.status === 'PENDING') && editableItems.length > 0 && (
             <div className="mt-8 p-6 bg-slate-50 rounded-[2rem] border border-slate-100 no-print">
               <div className="flex items-center justify-between mb-4">
@@ -1127,6 +1213,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         @media print {
           .no-print {
             display: none !important;
+          }
+          .print-only {
+            display: grid !important;
+          }
+          .print-only-block {
+            display: block !important;
           }
           body {
             background: white !important;

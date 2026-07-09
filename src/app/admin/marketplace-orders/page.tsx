@@ -41,6 +41,10 @@ function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCo
   const code = unitCode.toUpperCase();
   const baseUnit = (p.unit || 'Pcs').toUpperCase();
   
+  // CTN is the canonical name for DUS/KARTON/BOX (highest unit)
+  const CTN_ALIASES = ['CTN', 'DUS', 'KARTON', 'BOX'];
+  const isCtnFamily = CTN_ALIASES.includes(code);
+
   // 1. Check channelPricing: channelPricing[shopee/tiktok][unitCode].price
   const channelKey = channel.toLowerCase() as 'shopee' | 'tiktok';
   const channelPrice = (p as any).channelPricing?.[channelKey]?.[code]?.price;
@@ -48,11 +52,26 @@ function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCo
     return channelPrice;
   }
 
-  const unitOpt = p.units?.find(u => u.code.toUpperCase() === code);
+  // If CTN family, also try aliases in channelPricing (e.g. product stored as DUS, user selects CTN)
+  if (isCtnFamily) {
+    for (const alias of CTN_ALIASES) {
+      if (alias === code) continue;
+      const aliasPrice = (p as any).channelPricing?.[channelKey]?.[alias]?.price;
+      if (typeof aliasPrice === 'number' && aliasPrice > 0) return aliasPrice;
+    }
+  }
 
-  // 2. Check general unit price in units list if it's not the base unit
-  if (code !== baseUnit && unitOpt && typeof unitOpt.price === 'number' && unitOpt.price > 0) {
-    return unitOpt.price;
+  // Find unit option (try exact code first, then aliases for CTN family)
+  let unitOpt = p.units?.find((u: any) => u.code.toUpperCase() === code);
+  if (!unitOpt && isCtnFamily) {
+    unitOpt = p.units?.find((u: any) => CTN_ALIASES.includes(u.code.toUpperCase()));
+  }
+
+  // 2. Check general unit price in units list if available
+  if (unitOpt && typeof unitOpt.price === 'number' && unitOpt.price > 0) {
+    // Only return unit price if it's not the base unit (unless CTN family override)
+    const isBaseUnit = code === baseUnit || (isCtnFamily && CTN_ALIASES.includes(baseUnit));
+    if (!isBaseUnit) return unitOpt.price;
   }
 
   // 3. Fallback to base price * contains
@@ -62,9 +81,8 @@ function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCo
       ? (p.priceTiktok || p.price || p.priceEcer || 0) 
       : (p.priceEcer || p.price || 0);
 
-  if (code === baseUnit) {
-    return basePrice;
-  }
+  const isBaseUnit = code === baseUnit || (isCtnFamily && CTN_ALIASES.includes(baseUnit));
+  if (isBaseUnit) return basePrice;
 
   const contains = unitOpt?.contains || 1;
   return basePrice * contains;
