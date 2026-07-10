@@ -27,7 +27,8 @@ import {
   LayoutDashboard,
   Printer,
   Calendar,
-  Filter
+  Filter,
+  Lightbulb
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import {
@@ -496,6 +497,14 @@ export default function FinanceReport() {
 
   const netProfit = totalProfit - totalExpense;
 
+  const stockPurchases = filteredRecords
+    .filter(r => r.type === 'expense' && r.category === 'Pembelian Stok')
+    .reduce((sum, r) => sum + r.amount, 0);
+
+  const operationalCosts = filteredRecords
+    .filter(r => r.type === 'expense' && r.category === 'Operasional')
+    .reduce((sum, r) => sum + r.amount, 0);
+
   const channels: string[] = ['OFFLINE', 'WEBSITE', 'SHOPEE', 'TIKTOK', 'TOKOPEDIA', 'LAZADA'];
 
   const channelSummary = channels.map(channel => {
@@ -783,6 +792,85 @@ export default function FinanceReport() {
                 </AreaChart>
               </ResponsiveContainer>
             )}
+          </div>
+        </div>
+
+        {/* Financial Analysis & Recommendations */}
+        <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100 mb-8 no-print">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl">
+               <Lightbulb size={20} />
+            </div>
+            <div>
+              <h3 className="text-slate-900 font-extrabold text-lg">Analisis & Rekomendasi Keuangan</h3>
+              <p className="text-slate-400 text-xs font-medium mt-0.5">Analisis performa bisnis otomatis berdasarkan data periode ini</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Gross Margin Card */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/10 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Margin Laba Kotor (GPM)</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                  grossMarginPct >= 30 ? 'bg-emerald-50 text-emerald-600' :
+                  grossMarginPct >= 15 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'
+                }`}>
+                  {grossMarginPct.toFixed(1)}%
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 mb-2">
+                {grossMarginPct >= 30 ? 'Sangat Sehat (Excellent)' :
+                 grossMarginPct >= 15 ? 'Normal & Stabil' : 'Perhatian (Margin Rendah)'}
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                {grossMarginPct >= 30 ? 'Margin keuntungan produk Anda di atas rata-rata industri ritel. Strategi harga jual Anda bekerja dengan sangat baik.' :
+                 grossMarginPct >= 15 ? 'Margin keuntungan produk berada di kisaran standar (15% - 30%). Jaga performa volume penjualan Anda agar tetap optimal.' :
+                 'Margin keuntungan produk sangat tipis. Disarankan untuk menaikkan harga jual produk, atau negosiasi ulang harga beli grosir dengan supplier.'}
+              </p>
+            </div>
+
+            {/* Net Margin Card */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/10 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Margin Laba Bersih (NPM)</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                  netMarginPct >= 15 ? 'bg-emerald-50 text-emerald-600' :
+                  netMarginPct >= 5 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'
+                }`}>
+                  {netMarginPct.toFixed(1)}%
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 mb-2">
+                {netMarginPct >= 15 ? 'Sangat Efisien' :
+                 netMarginPct >= 5 ? 'Cukup Sehat' : 
+                 netMarginPct > 0 ? 'Margin Tipis (Kritis)' : 'Kerugian Bersih'}
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                {netMarginPct >= 15 ? 'Bisnis Anda sangat efisien dalam mengonversi penjualan menjadi laba bersih setelah semua pengeluaran operasional.' :
+                 netMarginPct >= 5 ? 'Rasio keuntungan bersih stabil. Teruskan pengawasan efisiensi biaya agar profit tetap terjaga.' :
+                 netMarginPct > 0 ? 'Sebagian besar laba habis oleh biaya operasional/pembelian. Evaluasi pengeluaran operasional yang tidak mendesak.' :
+                 'Pengeluaran operasional melebihi laba kotor. Lakukan audit pengeluaran segera untuk menghentikan kerugian keuangan.'}
+              </p>
+            </div>
+
+            {/* Cash Flow / Expense Card */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-orange-200 hover:bg-orange-50/10 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Struktur Pengeluaran</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-600">
+                  {totalExpense > 0 ? ((stockPurchases / totalExpense) * 100).toFixed(0) : 0}% Stok
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 mb-2">
+                {stockPurchases > (totalIncome * 0.7) ? 'Peringatan Arus Kas' : 'Arus Kas Seimbang'}
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                {stockPurchases > (totalIncome * 0.7) ? 'Pengeluaran untuk pembelian stok sangat tinggi dibanding pendapatan. Pastikan barang cepat berputar agar kas tidak mengendap di gudang.' :
+                 totalExpense === 0 ? 'Belum ada catatan pengeluaran operasional atau pembelian stok pada periode laporan keuangan ini.' :
+                 'Rasio pembelian stok dan biaya operasional dalam batas aman. Arus kas berjalan seimbang dan sehat.'}
+              </p>
+            </div>
           </div>
         </div>
 
