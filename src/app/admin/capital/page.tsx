@@ -124,7 +124,7 @@ export default function CapitalPage() {
         let stockValue = 0;
         pSnap.forEach(d => {
           const data = d.data();
-          stockValue += (Number(data.stock || 0) * Number(data.cost || data.Modal || 0));
+          stockValue += (Number(data.stock || 0) * Number(data.purchasePrice || data.Modal || data.cost || 0));
         });
 
         let receivables = 0;
