@@ -197,7 +197,17 @@ export default function MarketplaceOrdersPage() {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const subtotal = cart.reduce((acc, item) => {
+    const ctnUnit = item.units?.find((u: any) => 
+      ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
+    );
+    const conversion = ctnUnit?.contains || 0;
+    const isCtn = ['CTN', 'KARTON', 'DUS', 'BOX'].includes(item.unit?.toUpperCase());
+    const itemSubtotal = (isCtn && conversion > 0) 
+      ? item.price * (item.quantity / conversion) 
+      : item.price * item.quantity;
+    return acc + itemSubtotal;
+  }, 0);
   const total = subtotal + shippingCost;
 
   const handleSaveOrder = async () => {

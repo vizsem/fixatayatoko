@@ -53,6 +53,8 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
               const ctnQty = conversion > 0 ? Math.floor(item.quantity / conversion) : 0;
               const pcsQty = conversion > 0 ? item.quantity % conversion : item.quantity;
 
+              const isCtn = ['CTN', 'KARTON', 'DUS', 'BOX'].includes(item.unit?.toUpperCase());
+
               return (
                 <tr key={item.id} className="group hover:bg-gray-50/50 transition-all">
                   <td className="px-4 py-2.5 sm:w-2/5">
@@ -87,7 +89,7 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black text-gray-400">Rp</span>
                       <input 
                         type="number"
@@ -95,6 +97,24 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                         onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
                         className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[11px] font-black outline-none focus:ring-1 focus:ring-orange-500"
                       />
+                      <select 
+                        className="text-[9px] font-bold text-gray-400 uppercase bg-gray-50 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500"
+                        value={item.unit}
+                        onChange={(e) => onUpdateUnit(item.id, e.target.value)}
+                      >
+                        {item.units && item.units.length > 0 ? (
+                          item.units.map((u: any) => (
+                            <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
+                          ))
+                        ) : (
+                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                        )}
+                        
+                        {/* Ensure current unit is an option even if not in item.units */}
+                        {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
+                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
+                        )}
+                      </select>
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
@@ -139,7 +159,10 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right font-black text-[11px] text-gray-900">
-                    Rp{(item.price * item.quantity).toLocaleString()}
+                    Rp{((isCtn && conversion > 0) 
+                      ? item.price * (item.quantity / conversion) 
+                      : item.price * item.quantity
+                    ).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <button onClick={() => onRemove(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
