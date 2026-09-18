@@ -30,6 +30,7 @@ vi.mock('./page', () => ({
 
 import ProductsPage from './page';
 
+import { addDoc, auth, collection, db, deleteDoc, doc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, updateDoc, writeBatch } from '@/lib/firebase';
 // Mock Firebase dependencies
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

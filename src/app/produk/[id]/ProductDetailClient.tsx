@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
 import { 
   ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2, Sparkles, Info, ShieldCheck, Truck,
   Star, MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
-import { doc, getDoc, collection, getDocs, query, orderBy, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
-import { onAuthStateChanged } from 'firebase/auth';
 import { ProductSkeleton } from '@/components/home/ProductSkeleton';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, setDoc } from '@/lib/firebase';
 export type Review = {
   id: string;
   userId: string;
@@ -237,19 +236,21 @@ export default function ProductDetailClient({
   };
 
   const handleSubmitReview = async () => {
-    if (!auth.currentUser) return toast.error('Silakan login untuk memberikan ulasan');
+    if (!(await supabase.auth.getUser()).data.user) return toast.error('Silakan login untuk memberikan ulasan');
     if (userRating === 0) return toast.error('Silakan pilih bintang rating');
     if (!userComment.trim()) return toast.error('Silakan tulis ulasan Anda');
     if (!product) return;
     
     setSubmittingReview(true);
     try {
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      if (!currentUser) return toast.error('Silakan login terlebih dahulu');
       await addDoc(collection(db, 'products', product.id, 'reviews'), {
-        userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Pengguna',
+        userId: currentUser.id,
+        userName: currentUser.user_metadata?.full_name || (currentUser as any).displayName || currentUser.email?.split('@')[0] || 'Pengguna',
         rating: userRating,
         comment: userComment,
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       });
       toast.success('Terima kasih! Ulasan berhasil dikirim.');
       setUserComment('');

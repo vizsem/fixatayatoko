@@ -29,6 +29,7 @@ vi.mock('./page', () => ({
 
 import InventoryDashboard from './page';
 
+import { auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from '@/lib/firebase';
 // Mock Firebase dependencies
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

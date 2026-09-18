@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Ticket, Save, Info, ArrowRightLeft, Coins } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { db, doc, getDoc, updateDoc } from '@/lib/firebase';
 interface PointConfig {
   earningRate: number;
   redemptionValue: number;

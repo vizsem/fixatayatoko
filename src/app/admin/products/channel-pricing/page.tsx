@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ChevronLeft, Search, Save, Tag, Upload, Download, ChevronRight } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -10,7 +8,9 @@ import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
+import { db, doc, limit, ref, updateDoc, writeBatch } from '@/lib/firebase';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
 type ChannelPricingState = {

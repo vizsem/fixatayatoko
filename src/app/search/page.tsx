@@ -10,6 +10,7 @@ import { Product } from '@/lib/types';
 import { useCart } from '@/lib/context/CartContext';
 import { getWishlist, addToWishlist } from '@/lib/wishlist';
 
+import { query } from '@/lib/firebase';
 function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

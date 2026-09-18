@@ -1,23 +1,14 @@
 'use client';
 
 import { useEffect, useState, Suspense, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
 
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
 import { Gift, Tag, Percent } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 /* ================= TYPES ================= */
 
 type Promotion = {
@@ -89,7 +80,7 @@ function AddPromotionContent() {
   /* ================= AUTH & INIT ================= */
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -175,15 +166,15 @@ function AddPromotionContent() {
       if (editId) {
         await updateDoc(doc(db, 'promotions', editId), {
           ...formData,
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         });
         notify.admin.success('Promosi berhasil diperbarui!');
       } else {
         await addDoc(collection(db, 'promotions'), {
           ...formData,
           code: formData.code || "",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         });
         notify.admin.success('Promosi berhasil ditambahkan!');
       }

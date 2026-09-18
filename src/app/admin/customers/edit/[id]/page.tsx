@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 
 import {
   User,
@@ -18,7 +15,9 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 export default function EditCustomer() {
   const router = useRouter();
   const { id } = useParams();
@@ -38,7 +37,7 @@ export default function EditCustomer() {
 
   // 1. Proteksi Admin & Fetch Data Awal
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

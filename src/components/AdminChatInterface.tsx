@@ -1,13 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { db, auth } from '@/lib/firebase';
-import {
-  collection, query, orderBy, onSnapshot,
-  doc, updateDoc, addDoc, serverTimestamp,
-  getDoc
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import { 
   Send, Image as ImageIcon, Search, 
   MoreVertical, ArrowLeft, Check, CheckCheck,
@@ -15,7 +8,9 @@ import {
 } from 'lucide-react';
 import type { ChatThread, ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, onAuthStateChanged, onSnapshot, orderBy, query, ref, updateDoc } from '@/lib/firebase';
 interface AdminChatInterfaceProps {
   onClose?: () => void;
   isModal?: boolean;
@@ -33,7 +28,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
 
   // 1. Auth Check
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         // Handle unauthenticated state if needed
         return;
@@ -154,7 +149,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
       await addDoc(collection(db, 'chats', selectedThread.id, 'messages'), {
         text,
         senderId: 'admin',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         isRead: false,
         type: 'text'
       });
@@ -162,7 +157,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
       // Update thread metadata
       await updateDoc(doc(db, 'chats', selectedThread.id), {
         lastMessage: text,
-        lastMessageTime: serverTimestamp(),
+        lastMessageTime: new Date().toISOString(),
         isReadByAdmin: true // Admin just replied, so it's read by admin
       });
 
@@ -244,7 +239,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-[10px] text-slate-400">
-                      {thread.lastMessageTime ? new Date(thread.lastMessageTime.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                      {thread.lastMessageTime ? new Date((thread.lastMessageTime as any).toDate ? (thread.lastMessageTime as any).toDate() : thread.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                     </span>
                     {!thread.isReadByAdmin && (
                       <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -309,7 +304,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                       <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isAdmin ? 'text-emerald-100' : 'text-slate-400'}`}>
                         <span>
-                          {msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
+                          {msg.createdAt ? new Date((msg.createdAt as any).toDate ? (msg.createdAt as any).toDate() : msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                         </span>
                         {isAdmin && (
                           <span>

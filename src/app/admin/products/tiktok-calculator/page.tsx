@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, doc, getDoc } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 // ── KATEGORI & KOMISI (Feb 2026) ─────────────────────────────
 const KATEGORI = [

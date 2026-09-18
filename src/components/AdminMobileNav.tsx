@@ -33,24 +33,12 @@ import {
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
-import { db, auth } from '@/lib/firebase';
-import { 
-  collection, 
-  addDoc, 
-  serverTimestamp, 
-  getDocs, 
-  query, 
-  where, 
-  limit, 
-  updateDoc, 
-  doc, 
-  increment,
-  orderBy
-} from 'firebase/firestore';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import notify from '@/lib/notify';
 import { Product } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, collection, db, doc, getDocs, limit, query, ref, updateDoc, where } from '@/lib/firebase';
 // UI Helpers
 const triggerHaptic = (duration = 15) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -158,7 +146,7 @@ export default function AdminMobileNav() {
         productName: mpProductName,
         qty: Number(mpQty),
         source: mpSource,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         status: 'pending'
       });
       
@@ -608,7 +596,7 @@ export default function AdminMobileNav() {
       const newStock = scannedProduct.stock + adjustQty;
       await updateDoc(doc(db, 'products', scannedProduct.id), {
         stock: newStock,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       });
       
       notify.admin.success(`Stok berhasil diupdate ke ${newStock}`);

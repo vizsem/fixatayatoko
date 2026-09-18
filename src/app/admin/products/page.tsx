@@ -2,26 +2,21 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
 
 
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection, doc, deleteDoc,
-  onSnapshot, serverTimestamp, writeBatch, updateDoc
-} from 'firebase/firestore';
+import { deleteProduct, archiveProducts, updateProductStatus } from '@/lib/actions/product.actions';
+
 
 import Link from 'next/link';
 import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare, Printer,
-  Square
+  CheckSquare, Printer, Square, Archive, RotateCcw
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -29,8 +24,10 @@ import notify from '@/lib/notify';
 
 // ✅ SheetJS untuk Export/Import Excel
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
 
+import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, ref, writeBatch } from '@/lib/firebase';
 type ProductRow = NormalizedProduct & {
   tgl_masuk?: string;
   expired_date?: string;
@@ -100,7 +97,7 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
         purchasePrice: simulasiHargaAvg,
         hargaBeli: simulasiHargaAvg,
         Modal: simulasiHargaAvg,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
         tgl_masuk: new Date().toISOString().split('T')[0]
       });
 
@@ -110,11 +107,11 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
         productName: product.name || product.Nama || '',
         type: 'MASUK',
         amount: stokMasuk,
-        adminId: auth.currentUser?.uid || 'system',
+        adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
         source: 'MANUAL',
         toWarehouseId: product.warehouseId || '',
         note: `Restock (Avg Price). Old: ${stokLama}@${hargaLama}, New: ${stokMasuk}@${hargaBaru}, Final Avg: ${simulasiHargaAvg}`,
-        date: serverTimestamp()
+        date: new Date().toISOString()
       });
 
       await batch.commit();
@@ -175,53 +172,35 @@ export default function AdminProducts() {
   // Fungsi Bulk Update Status
   const handleBulkStatus = async (newStatus: number) => {
     if (selectedIds.length === 0) return;
-    const t = notify.admin.loading(`Mengubah ${selectedIds.length} produk...`);
+    const isArchiving = newStatus === 1;
+    const actionLabel = isArchiving ? 'Arsipkan' : 'Pulihkan';
+    if (!confirm(`${actionLabel} ${selectedIds.length} produk yang dipilih?`)) return;
+    const t = notify.admin.loading(`${isArchiving ? 'Mengarsipkan' : 'Memulihkan'} ${selectedIds.length} produk...`);
     try {
-      const CHUNK_SIZE = 450;
-      for (let i = 0; i < selectedIds.length; i += CHUNK_SIZE) {
-        const chunk = selectedIds.slice(i, i + CHUNK_SIZE);
-        const batch = writeBatch(db);
-        chunk.forEach(id => {
-          batch.update(doc(db, 'products', id), { 
-            Status: newStatus, 
-            isActive: newStatus !== 0,
-            status: newStatus === 0 ? 'ARCHIVED' : 'ACTIVE',
-            updatedAt: serverTimestamp() 
-          });
-        });
-        await batch.commit();
-      }
+      await updateProductStatus(selectedIds, newStatus);
       setSelectedIds([]);
-      notify.admin.success("Berhasil diperbarui!", { id: t });
+      notify.admin.success(`Berhasil di-${actionLabel.toLowerCase()}!`, { id: t });
+      window.location.reload();
     } catch (err) {
       console.error(err);
       notify.admin.error("Gagal memperbarui", { id: t });
     }
   };
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Arsipkan ${selectedIds.length} produk? Produk akan dinonaktifkan (Soft Delete).`)) return;
-    const t = notify.admin.loading(`Mengarsipkan ${selectedIds.length} produk...`);
+    if (!confirm(`Hapus permanen ${selectedIds.length} produk? Tindakan ini tidak bisa dikembalikan.`)) return;
+    const t = notify.admin.loading(`Menghapus ${selectedIds.length} produk...`);
     try {
-      const CHUNK_SIZE = 450;
-      for (let i = 0; i < selectedIds.length; i += CHUNK_SIZE) {
-        const chunk = selectedIds.slice(i, i + CHUNK_SIZE);
-        const batch = writeBatch(db);
-        chunk.forEach(id => {
-          batch.update(doc(db, 'products', id), { 
-            isActive: false, 
-            status: 'ARCHIVED',
-            Status: 0,
-            updatedAt: serverTimestamp() 
-          });
-        });
-        await batch.commit();
+      for (const id of selectedIds) {
+        await deleteProduct(id);
       }
       setSelectedIds([]);
-      notify.admin.success("Produk berhasil diarsipkan", { id: t });
+      notify.admin.success("Produk berhasil dihapus permanen", { id: t });
+      window.location.reload();
     } catch (err) {
       console.error(err);
-      notify.admin.error("Gagal mengarsipkan produk", { id: t });
+      notify.admin.error("Gagal menghapus produk", { id: t });
     }
   };
   // States
@@ -379,13 +358,15 @@ export default function AdminProducts() {
         const data = (XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) as Record<string, any>[]);
 
         const CHUNK_SIZE = 400;
+        const currentAdminId = (await supabase.auth.getUser()).data.user?.id || 'system';
+
         for (let i = 0; i < data.length; i += CHUNK_SIZE) {
           const chunk = data.slice(i, i + CHUNK_SIZE);
           const batch = writeBatch(db);
 
           chunk.forEach((item) => {
             const exist = rows.find(p => p.sku === String(item.ID || ''));
-            const pData = { ...item, updatedAt: serverTimestamp() };
+            const pData = { ...item, updatedAt: new Date().toISOString() };
             // Optional: clean up ID if it's just meant for internal mapping
             delete (pData as any).ID;
 
@@ -401,15 +382,15 @@ export default function AdminProducts() {
                   productName: exist.name || '',
                   type: diff > 0 ? 'MASUK' : 'KELUAR',
                   amount: Math.abs(diff),
-                  adminId: auth.currentUser?.uid || 'system',
+                  adminId: currentAdminId,
                   source: 'MANUAL',
                   note: `Bulk Import Update. Prev: ${oldStock}, New: ${newStock}`,
-                  date: serverTimestamp()
+                  date: new Date().toISOString()
                 });
               }
             } else {
               const newRef = doc(collection(db, 'products'));
-              batch.set(newRef, { ...pData, createdAt: serverTimestamp() });
+              batch.set(newRef, { ...pData, createdAt: new Date().toISOString() });
               const stock = Number(item.Stok || 0);
               if (stock > 0) {
                 const logRef = doc(collection(db, 'inventory_logs'));
@@ -418,10 +399,10 @@ export default function AdminProducts() {
                   productName: String(item.Nama || 'New Product'),
                   type: 'MASUK',
                   amount: stock,
-                  adminId: auth.currentUser?.uid || 'system',
+                  adminId: currentAdminId,
                   source: 'MANUAL',
                   note: 'Bulk Import (New Product)',
-                  date: serverTimestamp()
+                  date: new Date().toISOString()
                 });
               }
             }
@@ -446,16 +427,31 @@ export default function AdminProducts() {
   if (loading) return <div className="p-10 text-center font-black">Loading ataya...</div>;
 
 
-  // --- HANDLE DELETE ---
   const handleDelete = async (product: ProductRow) => {
-    if (!confirm(`Hapus produk "${product.Nama}"? Tindakan ini tidak bisa dikembalikan.`)) return;
+    if (!confirm(`Hapus permanen produk "${product.Nama || product.name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
     
     try {
-      await deleteDoc(doc(db, 'products', product.id));
+      await deleteProduct(product.id);
       notify.success('Produk berhasil dihapus');
+      window.location.reload(); 
     } catch (error) {
       console.error('Gagal menghapus produk:', error);
       notify.error('Gagal menghapus produk');
+    }
+  };
+
+  const handleArchive = async (product: ProductRow, shouldArchive: boolean) => {
+    const actionLabel = shouldArchive ? 'Arsipkan' : 'Pulihkan';
+    if (!confirm(`${actionLabel} produk "${product.Nama || product.name}"?`)) return;
+    
+    const t = notify.admin.loading(`${actionLabel} produk...`);
+    try {
+      await updateProductStatus([product.id], shouldArchive ? 1 : 0);
+      notify.admin.success(`Produk berhasil di-${actionLabel.toLowerCase()}!`, { id: t });
+      window.location.reload();
+    } catch (error) {
+      console.error('Gagal mengubah status arsip produk:', error);
+      notify.admin.error(`Gagal ${actionLabel.toLowerCase()} produk`, { id: t });
     }
   };
 
@@ -588,7 +584,7 @@ export default function AdminProducts() {
                 <Printer size={12} /> LABELS ({selectedIds.length})
               </button>
               <button
-                onClick={() => handleBulkStatus(showInactive ? 1 : 0)}
+                onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
                 className="flex-1 max-w-[120px] bg-blue-600 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-blue-100 active:scale-95 transition-all"
               >
                 <CheckSquare size={12} /> {showInactive ? 'RESTORE' : 'ARCHIVE'}
@@ -690,9 +686,16 @@ export default function AdminProducts() {
                         <Edit size={12} />
                       </Link>
                       <button 
+                        onClick={() => handleArchive(p, p.isActive !== false)} 
+                        className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
+                        title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
+                      >
+                        {p.isActive === false ? <RotateCcw size={12} /> : <Archive size={12} />}
+                      </button>
+                      <button 
                         onClick={() => handleDelete(p)} 
                         className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                        title="Archive"
+                        title="Hapus Permanen"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -837,9 +840,16 @@ export default function AdminProducts() {
                           <Edit size={12} />
                         </Link>
                         <button 
+                          onClick={() => handleArchive(p, p.isActive !== false)} 
+                          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
+                          title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
+                        >
+                          {p.isActive === false ? <RotateCcw size={12} /> : <Archive size={12} />}
+                        </button>
+                        <button 
                           onClick={() => handleDelete(p)} 
                           className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                          title="Hapus"
+                          title="Hapus Permanen"
                         >
                           <Trash2 size={12} />
                         </button>

@@ -1,571 +1,269 @@
-// src/app/(admin)/suppliers/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import {
-  collection,
-  doc,
-  getDoc,
-  addDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
-
-import { auth, db } from '@/lib/firebase';
+import { useEffect, useState, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
-import {
-  Plus,
-  Edit,
-  Trash2,
-  ArrowLeft,
-  Users,
-  Phone,
-  MapPin,
-  Mail,
-  Search
-} from 'lucide-react';
-
+import { Plus, Edit, Trash2, Users, Phone, MapPin, Mail, Search, X, Building2 } from 'lucide-react';
+import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/lib/actions/supplier.actions';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 type Supplier = {
   id: string;
   name: string;
-  contactPerson: string;
-  phone: string;
-  email: string;
-  address: string;
-  category: string;
-  unit: string;
-  notes: string;
-  createdAt: string;
+  contactPerson?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  createdAt: Date;
+  _count?: { purchaseOrders: number; products: number };
 };
 
+const emptyForm = { name: '', contactPerson: '', phone: '', email: '', address: '' };
+
 export default function AdminSuppliers() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    contactPerson: '',
-    phone: '',
-    email: '',
-    address: '',
-    category: '',
-    unit: '',
-    notes: ''
-  });
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await getSuppliers();
+    setSuppliers(data as Supplier[]);
+    setLoading(false);
+  }, []);
 
-  // Verifikasi akses admin
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+  useEffect(() => { load(); }, [load]);
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        router.push('/profil');
-        return;
-      }
-
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
-
-  // Ambil data supplier secara real-time
-  useEffect(() => {
-    if (loading) return;
-
-    const suppliersRef = collection(db, 'suppliers');
-    const q = query(suppliersRef, orderBy('name', 'asc'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const supplierList: Supplier[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          supplierList.push({
-            id: doc.id,
-            name: data.name || '',
-            contactPerson: data.contactPerson || '',
-            phone: data.phone || '',
-            email: data.email || '',
-            address: data.address || '',
-            category: data.category || '',
-            unit: data.unit || '',
-            notes: data.notes || '',
-            createdAt: data.createdAt || ''
-          });
-        });
-        setSuppliers(supplierList);
-        setError(null);
-      },
-      (err) => {
-        console.error('Gagal memuat supplier:', err);
-        setError('Gagal memuat data supplier. Silakan coba lagi nanti.');
-      }
-    );
-
-    return () => unsubscribe();
-  }, [loading]);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, 'suppliers'), {
-        ...formData,
-        createdAt: new Date().toISOString()
-      });
-      notify.success('Supplier berhasil ditambahkan');
-      setShowAddModal(false);
-      setFormData({
-        name: '',
-        contactPerson: '',
-        phone: '',
-        email: '',
-        address: '',
-        category: '',
-        unit: '',
-        notes: ''
-      });
-    } catch {
-      notify.error('Gagal menambahkan supplier.');
-    }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus supplier "${name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
-    try {
-      await deleteDoc(doc(db, 'suppliers', id));
-      notify.success('Supplier dihapus');
-    } catch {
-      notify.error('Gagal menghapus supplier.');
-    }
-  };
-
-  const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.phone.includes(searchTerm) ||
-    supplier.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = suppliers.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.phone || '').includes(search) ||
+    (s.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / pageSize));
-  const startIdx = (currentPage - 1) * pageSize;
-  const endIdx = startIdx + pageSize;
-  const pageItems = filteredSuppliers.slice(startIdx, endIdx);
+  const openAdd = () => { setEditId(null); setForm(emptyForm); setModalOpen(true); };
+  const openEdit = (s: Supplier) => {
+    setEditId(s.id);
+    setForm({
+      name: s.name,
+      contactPerson: s.contactPerson || '',
+      phone: s.phone || '',
+      email: s.email || '',
+      address: s.address || '',
+    });
+    setModalOpen(true);
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Memuat data supplier...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleSave = async () => {
+    if (!form.name.trim()) { notify.error('Nama supplier wajib diisi'); return; }
+    setSaving(true);
+    const payload = {
+      name: form.name,
+      contactPerson: form.contactPerson || undefined,
+      phone: form.phone || undefined,
+      email: form.email || undefined,
+      address: form.address || undefined,
+    };
+
+    const result = editId
+      ? await updateSupplier(editId, payload)
+      : await createSupplier(payload);
+
+    if (result.success) {
+      notify.success(editId ? 'Supplier diperbarui' : 'Supplier ditambahkan');
+      setModalOpen(false);
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal menyimpan');
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const result = await deleteSupplier(id);
+    if (result.success) {
+      notify.success('Supplier dihapus');
+      setDeleteId(null);
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal menghapus');
+    }
+  };
 
   return (
     <ErrorBoundary>
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen text-black">
-      <Toaster position="top-right" />
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-2 md:p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-            <ArrowLeft size={16} />
-          </button>
+      <Toaster />
+      <div className="min-h-screen bg-gray-50 p-3 md:p-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
-            <div className="p-2 md:p-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 rounded-2xl shadow-sm md:shadow-2xl inline-flex mb-1 md:mb-0">
-              <Users size={18} />
-            </div>
-            <h1 className="text-xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">Suppliers</h1>
-            <p className="text-[9px] md:text-sm font-semibold text-gray-400 md:text-gray-500 uppercase tracking-wide">Database Pemasok</p>
+            <h1 className="text-xl font-black text-gray-900">Supplier</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{suppliers.length} total pemasok terdaftar</p>
+          </div>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Tambah Supplier
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari nama, telepon, atau email..."
+              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
           </div>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-5 py-2.5 rounded-2xl text-[10px] md:text-sm font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 transition-all hover:scale-[1.02]"
-        >
-          <Plus size={14} /> Tambah Supplier
-        </button>
-      </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
-          {error}
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-          <input
-            type="text"
-            placeholder="Cari supplier..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-black outline-none"
-          />
-        </div>
-      </div>
-
-      <div className="hidden md:block bg-white rounded-[2rem] border border-gray-100 shadow-2xl overflow-hidden transition-all hover:scale-[1.02]">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full divide-y divide-gray-200 min-w-[720px] md:min-w-0">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Supplier
-                </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Kontak
-                </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Kategori
-                </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Alamat
-                </th>
-                <th scope="col" className="hidden md:table-cell px-3 md:px-4 py-2 text-left text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Satuan
-                </th>
-                <th scope="col" className="px-3 md:px-4 py-2 text-right text-[9px] font-black text-gray-500 uppercase tracking-wide">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredSuppliers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 md:px-4 py-8 md:py-10 text-center">
-                    <Users className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-                    <p className="text-sm font-semibold text-gray-500 mb-2">Belum ada supplier terdaftar</p>
-                    <p className="text-xs text-gray-400 mb-4">Mulai dengan menambahkan supplier pertama Anda</p>
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-wide shadow-lg flex items-center gap-2 mx-auto transition-all hover:scale-[1.02]"
-                    >
-                      <Plus size={16} /> Tambah Supplier Pertama
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                pageItems.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50">
-                    <td className="px-3 md:px-4 py-2 whitespace-nowrap">
-                      <div className="font-semibold text-gray-900 text-[11px]">{supplier.name}</div>
-                      <div className="text-[10px] text-gray-600 mt-0.5">{supplier.contactPerson}</div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Phone size={12} className="text-gray-500" />
-                        <span className="text-[10px] font-medium text-gray-800">{supplier.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mail size={12} className="text-gray-500" />
-                        <span className="text-[10px] text-gray-600">{supplier.email}</span>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] font-medium text-gray-800">
-                      <span className="px-2 py-0.5 text-[9px] bg-blue-100 text-blue-800 rounded-full">
-                        {supplier.category || 'Umum'}
-                      </span>
-                    </td>
-                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] text-gray-700 max-w-xs">
-                      <div className="flex items-start gap-1.5">
-                        <MapPin size={12} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                        <span className="truncate">{supplier.address}</span>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 md:px-4 py-2 whitespace-nowrap text-[10px] font-medium text-gray-800">
-                      <span className="px-2 py-0.5 text-[9px] bg-gray-100 text-gray-700 rounded-full">
-                        {supplier.unit || '-'}
-                      </span>
-                    </td>
-                    <td className="px-3 md:px-4 py-2 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)}
-                          className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
-                          title="Edit Supplier"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(supplier.id, supplier.name)}
-                          className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors"
-                          title="Hapus Supplier"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-4">
-        {filteredSuppliers.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
-             <Users className="mx-auto text-gray-200 mb-4" size={40} />
-             <p className="text-[10px] font-black text-gray-400 tracking-widest">TIDAK ADA SUPPLIER</p>
-             <button
-                onClick={() => setShowAddModal(true)}
-                className="mt-4 bg-gradient-to-r from-orange-400 to-orange-200 text-orange-900 px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-wide shadow-lg inline-flex items-center gap-2"
-              >
-                <Plus size={14} /> Tambah Baru
-              </button>
+        {/* List */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+            <Building2 size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">Belum ada supplier</p>
+            <p className="text-xs text-gray-400 mt-1">Tambahkan supplier pertama Anda</p>
           </div>
         ) : (
-          pageItems.map(supplier => (
-            <div key={supplier.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-3">
-               <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                     <h3 className="text-sm font-black text-gray-800 tracking-tight leading-tight truncate">{supplier.name}</h3>
-                     <p className="text-[11px] text-gray-400 font-bold uppercase mt-0.5">{supplier.contactPerson}</p>
-                     <div className="flex items-center gap-1.5 mt-2">
-                        <span className="px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest bg-orange-50 text-orange-700 uppercase">
-                           {supplier.category || 'Umum'}
-                        </span>
-                        {supplier.unit && (
-                          <span className="px-2 py-0.5 text-[8px] font-black rounded-full tracking-widest bg-gray-100 text-gray-500 uppercase">
-                             {supplier.unit}
-                          </span>
-                        )}
-                     </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map(s => (
+              <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-all group">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                      <Building2 size={20} className="text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm leading-tight">{s.name}</h3>
+                      {s.contactPerson && <p className="text-xs text-gray-500 mt-0.5">{s.contactPerson}</p>}
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                     <button onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)} className="p-2 bg-blue-50 rounded-xl text-blue-600">
-                        <Edit size={14} />
-                     </button>
-                     <button onClick={() => handleDelete(supplier.id, supplier.name)} className="p-2 bg-red-50 rounded-xl text-red-500">
-                        <Trash2 size={14} />
-                     </button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(s)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                      <Edit size={13} />
+                    </button>
+                    <button onClick={() => setDeleteId(s.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-               </div>
-               
-               <div className="space-y-2 pt-2 border-t border-gray-50">
-                  <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
-                     <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
-                        <Phone size={10} />
-                     </div>
-                     <span className="font-bold">{supplier.phone}</span>
-                  </div>
-                  {supplier.email && (
-                    <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
-                       <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
-                          <Mail size={10} />
-                       </div>
-                       <span className="font-medium truncate">{supplier.email}</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {s.phone && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Phone size={12} className="text-gray-400 flex-shrink-0" />
+                      <span>{s.phone}</span>
                     </div>
                   )}
-                  {supplier.address && (
-                    <div className="flex items-center gap-2.5 text-[11px] text-gray-600">
-                       <div className="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
-                          <MapPin size={10} />
-                       </div>
-                       <span className="font-medium line-clamp-1">{supplier.address}</span>
+                  {s.email && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Mail size={12} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{s.email}</span>
                     </div>
                   )}
-               </div>
-            </div>
-          ))
+                  {s.address && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <MapPin size={12} className="text-gray-400 flex-shrink-0" />
+                      <span className="line-clamp-1">{s.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                {s._count && (
+                  <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
+                    <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
+                      {s._count.purchaseOrders} PO
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                      {s._count.products} Produk
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <p className="text-xs text-gray-500">
-          Menampilkan {filteredSuppliers.length === 0 ? 0 : startIdx + 1}–{Math.min(endIdx, filteredSuppliers.length)} dari {filteredSuppliers.length}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border ${currentPage === 1 ? 'text-gray-300 border-gray-200' : 'text-black border-gray-300 hover:bg-gray-50'}`}
-          >
-            Sebelumnya
-          </button>
-          <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border ${currentPage === totalPages ? 'text-gray-300 border-gray-200' : 'text-black border-gray-300 hover:bg-gray-50'}`}
-          >
-            Berikutnya
-          </button>
-        </div>
-      </div>
-
-      {/* Modal Tambah Supplier */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Tambah Supplier Baru</h2>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleCreate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nama Supplier *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Contoh: PT. Sembako Jaya"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Penanggung Jawab *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.contactPerson}
-                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Nama kontak"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Telepon *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="081234567890"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="supplier@email.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Kategori Produk
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Contoh: Beras, Minyak, Bumbu"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Satuan Produk
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Contoh: Kg, Pcs, Liter"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Alamat Lengkap
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Jl. Raya No. 123, Kota"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Catatan Tambahan
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="Informasi tambahan tentang supplier"
-                    />
-                  </div>
+      {/* Add/Edit Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-black text-gray-900">{editId ? 'Edit Supplier' : 'Tambah Supplier'}</h2>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: 'Nama Supplier *', key: 'name', placeholder: 'CV. Sembako Jaya' },
+                { label: 'Kontak Person', key: 'contactPerson', placeholder: 'Bpk. Ahmad' },
+                { label: 'No. Telepon', key: 'phone', placeholder: '08xxxxxxxxxx' },
+                { label: 'Email', key: 'email', placeholder: 'supplier@email.com' },
+                { label: 'Alamat', key: 'address', placeholder: 'Jl. Pasar No. 1...' },
+              ].map(field => (
+                <div key={field.key}>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">{field.label}</label>
+                  <input
+                    value={(form as any)[field.key]}
+                    onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
+                  />
                 </div>
-
-                <div className="mt-8 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Simpan Supplier
-                  </button>
-                </div>
-              </form>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                Batal
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan'}
+              </button>
             </div>
           </div>
         </div>
       )}
-      </div>
+
+      {/* Delete Confirm Modal */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} className="text-red-500" />
+            </div>
+            <h2 className="text-lg font-black text-gray-900 mb-2">Hapus Supplier?</h2>
+            <p className="text-sm text-gray-500 mb-6">Tindakan ini tidak dapat dibatalkan.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">
+                Batal
+              </button>
+              <button onClick={() => handleDelete(deleteId)} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600">
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ErrorBoundary>
   );
 }

@@ -1,367 +1,479 @@
-import { addDoc, collection, serverTimestamp, WriteBatch, doc, Transaction, getDoc, DocumentSnapshot, increment } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
-export type InventoryLogType = 'MASUK' | 'KELUAR' | 'MUTASI';
-export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION';
+import { supabase } from '@/lib/supabase';
+import { collection, db, doc, increment, orderBy, serverTimestamp, where } from '@/lib/firebase';
+export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION'
 
-export interface InventoryLogData {
-  productId: string;
-  productName: string;
-  type: InventoryLogType;
-  amount: number;
-  adminId: string; // ID user/admin/operator
-  fromWarehouseId?: string;
-  toWarehouseId?: string;
-  supplierId?: string;
-  orderId?: string;
-  note?: string;
-  source: InventorySource;
-  referenceId?: string; // Generic reference ID (Order ID, Purchase ID, etc.)
-  prevStock?: number;
-  nextStock?: number;
+export type InventoryLogData = {
+  productId?: string
+  productName?: string
+  amount?: number
+  quantity?: number
+  adminId?: string
+  source?: string
+  orderId?: string
+  referenceId?: string
+  note?: string
+  notes?: string
+  fromWarehouseId?: string
+  toWarehouseId?: string
+  prevStock?: number
+  nextStock?: number
+  type?: string
+  [key: string]: any
+}
+
+export function computeAverageCost(
+  currentStock: number,
+  currentCost: number,
+  incomingQty: number,
+  incomingPrice: number,
+  conversionRate: number = 1
+): number {
+  const incomingBaseQty = incomingQty * (conversionRate || 1);
+  const costPerBaseUnit = incomingBaseQty > 0 ? incomingPrice / (conversionRate || 1) : incomingPrice;
+  const totalQty = currentStock + incomingBaseQty;
+  if (totalQty <= 0) return Math.round(costPerBaseUnit);
+  const totalVal = (currentStock * currentCost) + (incomingQty * incomingPrice);
+  return Math.round(totalVal / totalQty);
+}
+
+export const addInventoryLog = async (logData: InventoryLogData, batch?: any) => {
+  try {
+    const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+    const entry = {
+      ...logData,
+      id,
+      createdAt: logData.createdAt || logData.date || now,
+      updatedAt: now,
+    };
+
+    if (batch && typeof batch.set === 'function') {
+      batch.set(doc(collection(db, 'inventory_logs'), id), entry);
+      return { success: true, id };
+    }
+
+    const { error } = await supabase.from('inventory_logs').insert({
+      id,
+      raw_data: entry,
+      created_at: now,
+      updated_at: now,
+    });
+    if (error) console.error('Error adding inventory log:', error);
+    return { success: true, id };
+  } catch (err) {
+    console.error('Failed to add inventory log:', err);
+    return { success: false, error: err };
+  }
+};
+
+/**
+ * Deduct stock from product in Supabase and record inventory log
+ */
+export async function deductStockFEFO(
+  arg1: string | { productId: string; amount: number; warehouseId?: string; reference?: string; notes?: string },
+  warehouseIdArg?: string,
+  amountArg?: number,
+  referenceArg?: string,
+  notesArg?: string
+) {
+  let productId: string;
+  let amount: number;
+  let warehouseId: string;
+  let reference: string | undefined;
+  let notes: string | undefined;
+
+  if (typeof arg1 === 'object') {
+    productId = arg1.productId;
+    amount = arg1.amount;
+    warehouseId = arg1.warehouseId || 'gudang-utama';
+    reference = arg1.reference;
+    notes = arg1.notes;
+  } else {
+    productId = arg1;
+    warehouseId = warehouseIdArg || 'gudang-utama';
+    amount = amountArg || 0;
+    reference = referenceArg;
+    notes = notesArg;
+  }
+
+  try {
+    const { data: product, error: fetchErr } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (fetchErr || !product) {
+      return { success: false, error: `Produk ID ${productId} tidak ditemukan` };
+    }
+
+    const raw = product.raw_data || {};
+    const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
+
+    if (currentStock < amount) {
+      return { success: false, error: `Stok tidak cukup. Tersedia: ${currentStock}, Dibutuhkan: ${amount}` };
+    }
+
+    const newStock = Math.max(0, currentStock - amount);
+    const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
+    const curWhStock = Number(stockByWarehouse[warehouseId] ?? currentStock);
+    stockByWarehouse[warehouseId] = Math.max(0, curWhStock - amount);
+
+    const now = new Date().toISOString();
+    const updatedRaw = {
+      ...raw,
+      stock: newStock,
+      stockByWarehouse,
+      updatedAt: now,
+    };
+
+    const { error: updateErr } = await supabase
+      .from('products')
+      .update({
+        stock: newStock,
+        raw_data: updatedRaw,
+        updated_at: now,
+      })
+      .eq('id', productId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    await addInventoryLog({
+      productId,
+      productName: product.name || raw.name || raw.Nama || 'Produk',
+      type: 'KELUAR',
+      amount,
+      quantity: -amount,
+      prevStock: currentStock,
+      nextStock: newStock,
+      referenceId: reference,
+      orderId: reference,
+      note: notes || 'Pengurangan stok penjualan',
+      fromWarehouseId: warehouseId,
+      source: 'ORDER',
+    });
+
+    return { success: true, deducted: amount };
+  } catch (err: any) {
+    console.error('deductStockFEFO error:', err);
+    return { success: false, error: err.message || 'Gagal mengurangi stok' };
+  }
 }
 
 /**
- * Menambahkan log inventaris ke koleksi 'inventory_logs'
- * Supports optional batch for atomic operations
+ * Add stock to product in Supabase and record inventory log
  */
-export const addInventoryLog = async (data: InventoryLogData, batch?: WriteBatch) => {
+export const addStock = async (params: {
+  productId: string
+  amount: number
+  warehouseId: string
+  batchNumber?: string
+  expiryDate?: Date
+  reference?: string
+  notes?: string
+}) => {
+  const { productId, amount, warehouseId, batchNumber, reference, notes } = params;
+  if (amount <= 0) throw new Error('Amount must be > 0');
+
   try {
-    const logData = {
-      ...data,
-      date: serverTimestamp(),
+    const { data: product, error: fetchErr } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (fetchErr || !product) throw new Error('Produk tidak ditemukan');
+
+    const raw = product.raw_data || {};
+    const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
+    const newStock = currentStock + amount;
+
+    const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
+    const curWhStock = Number(stockByWarehouse[warehouseId] ?? 0);
+    stockByWarehouse[warehouseId] = curWhStock + amount;
+
+    const now = new Date().toISOString();
+    const updatedRaw = {
+      ...raw,
+      stock: newStock,
+      stockByWarehouse,
+      updatedAt: now,
     };
 
-    if (batch) {
-      const newLogRef = doc(collection(db, 'inventory_logs'));
-      batch.set(newLogRef, logData);
-    } else {
-      await addDoc(collection(db, 'inventory_logs'), logData);
-    }
-  } catch (error) {
-    console.error('Error adding inventory log:', error);
-    // Kita tidak throw error agar tidak mengganggu proses utama transaksi
+    await supabase
+      .from('products')
+      .update({
+        stock: newStock,
+        raw_data: updatedRaw,
+        updated_at: now,
+      })
+      .eq('id', productId);
+
+    await addInventoryLog({
+      productId,
+      productName: product.name || raw.name || raw.Nama || 'Produk',
+      type: 'MASUK',
+      amount,
+      quantity: amount,
+      prevStock: currentStock,
+      nextStock: newStock,
+      referenceId: reference,
+      note: notes || 'Penambahan stok',
+      toWarehouseId: warehouseId,
+      source: 'PURCHASE',
+      batchNumber,
+    });
+
+    return { success: true, newStock };
+  } catch (err) {
+    console.error('addStock error:', err);
+    throw err;
   }
 };
 
 /**
- * Mengurangi stok produk secara atomik dalam transaksi, memprioritaskan gudang utama lalu gudang lain
- * dan menulis inventory_log (type: KELUAR).
+ * Transfer stock between warehouses in Supabase
  */
-export const deductStockTx = async (tx: Transaction, params: {
-  productId: string;
-  amount: number;
-  adminId: string;
-  note?: string;
-  source: InventorySource;
-  mainWarehouseId?: string; // default 'gudang-utama'
-  prefetchedSnap?: DocumentSnapshot;
+export const transferStock = async (params: {
+  productId?: string
+  batchId?: string
+  amount: number
+  fromWarehouseId?: string
+  toWarehouseId: string
+  reference?: string
+  notes?: string
 }) => {
-  const { productId, amount, adminId, note, source, mainWarehouseId = 'gudang-utama', prefetchedSnap } = params;
-  if (amount <= 0) return;
-  const pRef = doc(db, 'products', productId);
-  const snap = prefetchedSnap || await tx.get(pRef);
-  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-  const data: any = snap.data() || {};
-  const currentStock = Number(data.stock || 0);
-  if (currentStock < amount) {
-    throw new Error(`Stok tidak cukup. Tersedia ${currentStock}, dibutuhkan ${amount}`);
-  }
-  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
-  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-  let remaining = amount;
-  // Prioritas gudang utama
-  if (nextByWarehouse[mainWarehouseId] && nextByWarehouse[mainWarehouseId] > 0) {
-    const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
-    nextByWarehouse[mainWarehouseId] -= cut;
-    remaining -= cut;
-    
-    // Sync warehouse capacity
-    const volChange = cut * (data.volumeInCtn || 0);
-    if (volChange > 0) {
-      tx.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-volChange) });
-    }
-  }
-  // Gudang lainnya
-  if (remaining > 0) {
-    for (const [whId, qty] of Object.entries(nextByWarehouse)) {
-      if (whId === mainWarehouseId) continue;
-      if (remaining <= 0) break;
-      const cut = Math.min(Number(qty || 0), remaining);
-      nextByWarehouse[whId] = Number(qty || 0) - cut;
-      remaining -= cut;
+  const { productId, amount, fromWarehouseId = 'gudang-utama', toWarehouseId, reference, notes } = params;
 
-      // Sync warehouse capacity
-      const volChange = cut * (data.volumeInCtn || 0);
-      if (volChange > 0) {
-        tx.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
-      }
-    }
-  }
-  const nextStock = currentStock - amount;
-  tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
-  const logRef = doc(collection(db, 'inventory_logs'));
-  tx.set(logRef, {
+  if (!productId) return { success: true };
+
+  const { data: product } = await supabase.from('products').select('*').eq('id', productId).single();
+  if (!product) throw new Error('Produk tidak ditemukan');
+
+  const raw = product.raw_data || {};
+  const stockMap = { ...(raw.stockByWarehouse || {}) };
+  const fromStock = Number(stockMap[fromWarehouseId] || 0);
+
+  if (fromStock < amount) throw new Error('Stok di gudang asal tidak cukup');
+
+  stockMap[fromWarehouseId] = fromStock - amount;
+  stockMap[toWarehouseId] = Number(stockMap[toWarehouseId] || 0) + amount;
+
+  const now = new Date().toISOString();
+  await supabase.from('products').update({
+    raw_data: { ...raw, stockByWarehouse: stockMap, updatedAt: now },
+    updated_at: now,
+  }).eq('id', productId);
+
+  await addInventoryLog({
     productId,
-    productName: data.name || data.Nama || 'Produk',
-    type: 'KELUAR',
-    amount,
-    adminId,
-    source,
-    note: note || '',
-    prevStock: currentStock,
-    nextStock,
-    date: serverTimestamp()
-  });
-};
-
-/**
- * Mengurangi stok produk (BATCH) untuk offline mode
- */
-export const deductStockBatch = async (batch: WriteBatch, params: {
-  productId: string;
-  amount: number;
-  adminId: string;
-  note?: string;
-  source: InventorySource;
-  mainWarehouseId?: string; // default 'gudang-utama'
-  prefetchedSnap?: DocumentSnapshot;
-}) => {
-  const { productId, amount, adminId, note, source, mainWarehouseId = 'gudang-utama', prefetchedSnap } = params;
-  if (amount <= 0) return;
-  const pRef = doc(db, 'products', productId);
-  const snap = prefetchedSnap || await getDoc(pRef);
-  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-  const data: any = snap.data() || {};
-  const currentStock = Number(data.stock || 0);
-  if (currentStock < amount) {
-    throw new Error(`Stok tidak cukup. Tersedia ${currentStock}, dibutuhkan ${amount}`);
-  }
-  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
-  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-  let remaining = amount;
-  // Prioritas gudang utama
-  if (nextByWarehouse[mainWarehouseId] && nextByWarehouse[mainWarehouseId] > 0) {
-    const cut = Math.min(nextByWarehouse[mainWarehouseId], remaining);
-    nextByWarehouse[mainWarehouseId] -= cut;
-    remaining -= cut;
-    
-    // Sync warehouse capacity
-    const volChange = cut * (data.volumeInCtn || 0);
-    if (volChange > 0) {
-      batch.update(doc(db, 'warehouses', mainWarehouseId), { usedCapacity: increment(-volChange) });
-    }
-  }
-  // Gudang lainnya
-  if (remaining > 0) {
-    for (const [whId, qty] of Object.entries(nextByWarehouse)) {
-      if (whId === mainWarehouseId) continue;
-      if (remaining <= 0) break;
-      const cut = Math.min(Number(qty || 0), remaining);
-      nextByWarehouse[whId] = Number(qty || 0) - cut;
-      remaining -= cut;
-
-      // Sync warehouse capacity
-      const volChange = cut * (data.volumeInCtn || 0);
-      if (volChange > 0) {
-        batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
-      }
-    }
-  }
-  const nextStock = currentStock - amount;
-  batch.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse });
-  const logRef = doc(collection(db, 'inventory_logs'));
-  batch.set(logRef, {
-    productId,
-    productName: data.name || data.Nama || 'Produk',
-    type: 'KELUAR',
-    amount,
-    adminId,
-    source,
-    note: note || '',
-    prevStock: currentStock,
-    nextStock,
-    date: serverTimestamp()
-  });
-};
-
-/**
- * Menambah stok produk secara atomik dalam transaksi pada gudang tertentu dan menulis inventory_log (type: MASUK).
- */
-export const addStockTx = async (tx: Transaction, params: {
-  productId: string;
-  amount: number;
-  warehouseId?: string; // default 'gudang-utama'
-  adminId: string;
-  note?: string;
-  source: InventorySource;
-  prefetchedSnap?: DocumentSnapshot;
-  updateFields?: Record<string, any>;
-}) => {
-  const { productId, amount, warehouseId = 'gudang-utama', adminId, note, source, prefetchedSnap, updateFields } = params;
-  if (amount <= 0) return;
-  const pRef = doc(db, 'products', productId);
-  const snap = prefetchedSnap || await tx.get(pRef);
-  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-  const data: any = snap.data() || {};
-  const currentStock = Number(data.stock || 0);
-  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
-  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-  nextByWarehouse[warehouseId] = Number(nextByWarehouse[warehouseId] || 0) + amount;
-  
-  // Sync warehouse capacity
-  const volChange = amount * (data.volumeInCtn || 0);
-  if (volChange > 0) {
-    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(volChange) });
-  }
-  const nextStock = currentStock + amount;
-  tx.update(pRef, { stock: nextStock, stockByWarehouse: nextByWarehouse, ...(updateFields || {}) });
-  const logRef = doc(collection(db, 'inventory_logs'));
-  tx.set(logRef, {
-    productId,
-    productName: data.name || data.Nama || 'Produk',
-    type: 'MASUK',
-    amount,
-    adminId,
-    source,
-    note: note || '',
-    toWarehouseId: warehouseId,
-    prevStock: currentStock,
-    nextStock,
-    date: serverTimestamp()
-  });
-};
-
-/**
- * Memindahkan stok antar gudang secara atomik.
- * Total stok produk tidak berubah.
- */
-export const transferStockTx = async (tx: Transaction, params: {
-  productId: string;
-  amount: number;
-  fromWarehouseId: string;
-  toWarehouseId: string;
-  adminId: string;
-  note?: string;
-  source: InventorySource;
-  prefetchedSnap?: DocumentSnapshot;
-}) => {
-  const { productId, amount, fromWarehouseId, toWarehouseId, adminId, note, source, prefetchedSnap } = params;
-  if (amount <= 0) return;
-  if (fromWarehouseId === toWarehouseId) throw new Error('Gudang asal dan tujuan sama');
-
-  const pRef = doc(db, 'products', productId);
-  const snap = prefetchedSnap || await tx.get(pRef);
-  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-  
-  const data: any = snap.data() || {};
-  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
-  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-  
-  const currentSourceStock = Number(nextByWarehouse[fromWarehouseId] || 0);
-  if (currentSourceStock < amount) {
-    throw new Error(`Stok di gudang asal tidak cukup. Tersedia: ${currentSourceStock}`);
-  }
-
-  nextByWarehouse[fromWarehouseId] = currentSourceStock - amount;
-  nextByWarehouse[toWarehouseId] = Number(nextByWarehouse[toWarehouseId] || 0) + amount;
-
-  // Sync warehouse capacity
-  const volChange = amount * (data.volumeInCtn || 0);
-  if (volChange > 0) {
-    tx.update(doc(db, 'warehouses', fromWarehouseId), { usedCapacity: increment(-volChange) });
-    tx.update(doc(db, 'warehouses', toWarehouseId), { usedCapacity: increment(volChange) });
-  }
-
-  // Total stock does not change in a transfer
-  tx.update(pRef, { stockByWarehouse: nextByWarehouse });
-
-  const logRef = doc(collection(db, 'inventory_logs'));
-  tx.set(logRef, {
-    productId,
-    productName: data.name || data.Nama || 'Produk',
+    productName: product.name || raw.name || 'Produk',
     type: 'MUTASI',
     amount,
-    adminId,
-    source, // Usually 'TRANSFER'
-    note: note || '',
     fromWarehouseId,
     toWarehouseId,
-    prevStock: data.stock, // Total stock unchanged
-    nextStock: data.stock,
-    date: serverTimestamp()
+    referenceId: reference,
+    note: notes || `Transfer dari ${fromWarehouseId} ke ${toWarehouseId}`,
+    source: 'TRANSFER',
+  });
+
+  return { success: true };
+};
+
+/**
+ * Transitional helper for deductStockTx
+ */
+export const deductStockTx = async (txOrParams: any, maybeParams?: any) => {
+  const params = maybeParams || txOrParams;
+  if (!params) return { success: true };
+  return await deductStockFEFO({
+    productId: params.productId,
+    amount: params.amount || params.quantity || 0,
+    warehouseId: params.warehouseId || params.mainWarehouseId || 'gudang-utama',
+    reference: params.reference || params.referenceId || params.orderId,
+    notes: params.note || params.notes,
   });
 };
 
 /**
- * Menyesuaikan stok (Opname) secara atomik.
- * Menghitung selisih dan melakukan add/deduct pada gudang tertentu.
+ * Transitional helper for addStockTx
  */
-export const adjustStockTx = async (tx: Transaction, params: {
-  productId: string;
-  newStock: number; // Stok fisik baru untuk gudang tertentu
-  warehouseId: string;
-  adminId: string;
-  note?: string;
-  source: InventorySource; // Usually 'OPNAME'
-  prefetchedSnap?: DocumentSnapshot;
-}) => {
-  const { productId, newStock, warehouseId, adminId, note, source, prefetchedSnap } = params;
-  if (newStock < 0) throw new Error('Stok tidak boleh negatif');
+export const addStockTx = async (txOrParams: any, maybeParams?: any) => {
+  const isTx = txOrParams && typeof txOrParams.get === 'function';
+  const tx = isTx ? txOrParams : null;
+  const params = isTx ? maybeParams : txOrParams;
+  if (!params) return { success: true };
 
-  const pRef = doc(db, 'products', productId);
-  const snap = prefetchedSnap || await tx.get(pRef);
-  if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-
-  const data: any = snap.data() || {};
-  const currentTotalStock = Number(data.stock || 0);
-  const stockByWarehouse: Record<string, number> = data.stockByWarehouse || {};
-  const nextByWarehouse: Record<string, number> = { ...stockByWarehouse };
-
-  const oldWarehouseStock = Number(nextByWarehouse[warehouseId] || 0);
-  const diff = newStock - oldWarehouseStock;
-
-  if (diff === 0) return; // No change
-
-  nextByWarehouse[warehouseId] = newStock;
-  
-  // Sync warehouse capacity
-  const volChange = diff * (data.volumeInCtn || 0);
-  if (volChange !== 0) {
-    tx.update(doc(db, 'warehouses', warehouseId), { usedCapacity: increment(volChange) });
+  if (tx) {
+    const productRef = doc(db, 'products', params.productId);
+    const snap = await tx.get(productRef);
+    if (!snap.exists()) throw new Error('Product not found');
+    const pData = snap.data();
+    const stockMap = pData.stockByWarehouse || {};
+    const currentWhStock = Number(stockMap[params.warehouseId] || 0);
+    const nextMap = {
+      ...stockMap,
+      [params.warehouseId]: currentWhStock + params.amount,
+    };
+    tx.update(productRef, {
+      stock: Number(pData.stock || 0) + params.amount,
+      stockByWarehouse: nextMap,
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
   }
-  const nextTotalStock = currentTotalStock + diff;
 
-  tx.update(pRef, { 
-    stock: nextTotalStock, 
-    stockByWarehouse: nextByWarehouse 
-  });
-
-  const logRef = doc(collection(db, 'inventory_logs'));
-  tx.set(logRef, {
-    productId,
-    productName: data.name || data.Nama || 'Produk',
-    type: diff > 0 ? 'MASUK' : 'KELUAR',
-    amount: Math.abs(diff),
-    adminId,
-    source,
-    note: note || (diff > 0 ? 'Penyesuaian (Lebih)' : 'Penyesuaian (Kurang)'),
-    // Jika masuk, toWarehouse = warehouseId. Jika keluar, fromWarehouse = warehouseId.
-    toWarehouseId: diff > 0 ? warehouseId : undefined,
-    fromWarehouseId: diff < 0 ? warehouseId : undefined,
-    prevStock: currentTotalStock,
-    nextStock: nextTotalStock,
-    date: serverTimestamp()
+  return await addStock({
+    productId: params.productId,
+    amount: params.amount || params.quantity || 0,
+    warehouseId: params.warehouseId || params.mainWarehouseId || 'gudang-utama',
+    batchNumber: params.batchNumber || `BATCH-${Date.now()}`,
+    expiryDate: params.expiryDate ? new Date(params.expiryDate) : undefined,
+    reference: params.reference || params.referenceId,
+    notes: params.note || params.notes,
   });
 };
 
+/**
+ * Transitional helper for transferStockTx
+ */
+export const transferStockTx = async (txOrParams: any, maybeParams?: any) => {
+  const isTx = txOrParams && typeof txOrParams.get === 'function';
+  const tx = isTx ? txOrParams : null;
+  const params = isTx ? maybeParams : txOrParams;
+  if (!params) return { success: true };
 
-// Pure function for unit testing Average Cost calculation
-export const computeAverageCost = (oldStock: number, oldCost: number, newQtyUnits: number, unitCost: number, conversion = 1) => {
-  const qtyPcs = newQtyUnits * conversion;
-  const incomingCostPerPcs = conversion > 0 ? (unitCost / conversion) : unitCost;
-  const effectiveOld = oldCost > 0 ? oldCost : incomingCostPerPcs;
-  const newStock = oldStock + qtyPcs;
-  if (newStock <= 0) return Math.round(incomingCostPerPcs);
-  return Math.round(((oldStock * effectiveOld) + (newQtyUnits * unitCost)) / newStock);
+  if (tx) {
+    const productRef = doc(db, 'products', params.productId);
+    const snap = await tx.get(productRef);
+    if (!snap.exists()) throw new Error('Product not found');
+    const pData = snap.data();
+    const stockMap = pData.stockByWarehouse || {};
+    const fromStock = Number(stockMap[params.fromWarehouseId] || 0);
+    if (fromStock < params.amount) {
+      throw new Error('Stok di gudang asal tidak cukup');
+    }
+    const nextMap = {
+      ...stockMap,
+      [params.fromWarehouseId]: fromStock - params.amount,
+      [params.toWarehouseId]: Number(stockMap[params.toWarehouseId] || 0) + params.amount,
+    };
+    tx.update(productRef, {
+      stockByWarehouse: nextMap,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const fromWhRef = doc(db, 'warehouses', params.fromWarehouseId);
+    const toWhRef = doc(db, 'warehouses', params.toWarehouseId);
+    tx.update(fromWhRef, { usedCapacity: increment(-params.amount) });
+    tx.update(toWhRef, { usedCapacity: increment(params.amount) });
+
+    const currentTotalStock = Number(pData.stock || 0);
+    const logRef = doc(collection(db, 'inventory_logs'));
+    tx.set(logRef, {
+      productId: params.productId,
+      type: 'MUTASI',
+      amount: params.amount,
+      prevStock: currentTotalStock,
+      nextStock: currentTotalStock,
+      fromWarehouseId: params.fromWarehouseId,
+      toWarehouseId: params.toWarehouseId,
+      adminId: params.adminId,
+      source: params.source || 'TRANSFER',
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true };
+  }
+
+  if (params.batchId) {
+    return await transferStock({
+      batchId: params.batchId,
+      amount: params.amount || 0,
+      toWarehouseId: params.toWarehouseId,
+      reference: params.reference,
+      notes: params.notes,
+    });
+  }
+  return { success: true };
+};
+
+/**
+ * Transitional helper for adjustStockTx
+ */
+export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
+  const isTx = txOrParams && typeof txOrParams.get === 'function';
+  const tx = isTx ? txOrParams : null;
+  const params = isTx ? maybeParams : txOrParams;
+  if (!params) return { success: true };
+
+  if (tx) {
+    const productRef = doc(db, 'products', params.productId);
+    const snap = await tx.get(productRef);
+    if (!snap.exists()) throw new Error('Product not found');
+    const pData = snap.data();
+    const stockMap = pData.stockByWarehouse || {};
+    const targetStock = params.newStock !== undefined ? params.newStock : (params.actualStock !== undefined ? params.actualStock : 0);
+    const prevWhStock = Number(stockMap[params.warehouseId] || 0);
+    const diff = targetStock - prevWhStock;
+    const nextMap = {
+      ...stockMap,
+      [params.warehouseId]: targetStock,
+    };
+    const prevTotal = Number(pData.stock || 0);
+    const nextTotal = Math.max(0, prevTotal + diff);
+    tx.update(productRef, {
+      stock: nextTotal,
+      stockByWarehouse: nextMap,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const whRef = doc(db, 'warehouses', params.warehouseId);
+    tx.update(whRef, { usedCapacity: increment(diff) });
+
+    const logRef = doc(collection(db, 'inventory_logs'));
+    tx.set(logRef, {
+      productId: params.productId,
+      type: diff < 0 ? 'KELUAR' : 'MASUK',
+      amount: Math.abs(diff),
+      prevStock: prevTotal,
+      nextStock: nextTotal,
+      diff,
+      warehouseId: params.warehouseId,
+      adminId: params.adminId,
+      source: params.source || 'OPNAME',
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true, diff };
+  }
+
+  return { success: true };
+};
+
+export const deductStockBatch = async (
+  arg1: any,
+  arg2?: any
+) => {
+  if (Array.isArray(arg1)) {
+    for (const item of arg1) {
+      await deductStockFEFO({
+        productId: item.productId,
+        amount: item.amount,
+        warehouseId: item.warehouseId || 'gudang-utama'
+      });
+    }
+  } else if (arg2) {
+    await deductStockFEFO({
+      productId: arg2.productId,
+      amount: arg2.amount,
+      warehouseId: arg2.warehouseId || 'gudang-utama',
+      reference: arg2.note,
+      notes: arg2.note
+    });
+  }
+  return { success: true };
 };

@@ -3,19 +3,11 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  addDoc,
-  updateDoc,
-  serverTimestamp
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { Package } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 type Warehouse = {
   name: string;
   location: string;
@@ -40,7 +32,7 @@ function WarehouseFormContent() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -83,8 +75,8 @@ function WarehouseFormContent() {
       const warehouseData = {
         ...formData,
         usedCapacity: 0, // Awalnya kosong
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       if (editId) {

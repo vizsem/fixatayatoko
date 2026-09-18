@@ -1,22 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
 
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithEmailAndPassword,
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Loader2, Chrome, Mail, Lock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { requestForToken } from '@/lib/fcm';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { GoogleAuthProvider, auth, db, doc, getDoc, onAuthStateChanged, setDoc, signInWithEmailAndPassword, signInWithPopup } from '@/lib/firebase';
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -42,7 +36,8 @@ export default function LoginPage() {
     try {
       // Menggunakan Popup agar tidak terputus oleh sistem redirect Vercel/Browser
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      const user = result?.user;
+      if (!user) return;
 
       // Sinkronisasi ke Firestore
       const userRef = doc(db, 'users', user.uid);
@@ -55,7 +50,7 @@ export default function LoginPage() {
           email: user.email,
           role: 'customer', // Default role
           points: 0,
-          createdAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
         });
       } else {
         // Jika admin, set cookie untuk middleware

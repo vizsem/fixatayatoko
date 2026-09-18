@@ -1,11 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection, query, where, doc, getDoc, getDocs
-} from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -16,7 +11,9 @@ import notify from '@/lib/notify';
 import { stockSyncService } from '@/lib/stockSyncService';
 import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 interface SyncStatus {
   id: string;
   productId: string;
@@ -100,7 +97,7 @@ export default function StockSyncMonitorPage() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') {

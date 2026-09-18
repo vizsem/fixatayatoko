@@ -10,14 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { EmptyState, SkeletonList } from '@/components/UIState';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, onAuthStateChanged, onSnapshot, orderBy, query, where } from '@/lib/firebase';
 type FirebaseOrder = {
   status?: string;
   createdAt?: { toDate: () => Date } | string;
@@ -55,7 +53,7 @@ export default function UserOrdersPage() {
 
   useEffect(() => {
     const setupOrdersListener = async () => {
-      const userId = auth.currentUser?.uid || localStorage.getItem('temp_user_id');
+      const userId = (await supabase.auth.getUser()).data.user?.uid || localStorage.getItem('temp_user_id');
       
       if (!userId) {
         setLoading(false);

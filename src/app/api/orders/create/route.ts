@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { adminDb, FieldValue } from '@/lib/firebaseAdmin';
+import { supabase } from '@/lib/supabase';
+import { addInventoryLog } from '@/lib/inventory';
 
 type IncomingItem = {
   id: string;
@@ -31,8 +32,8 @@ type ProductData = {
   unit?: string;
   Satuan?: string;
   units?: { code: string; contains: number; price?: number }[];
-  isActive?: boolean; // Added
-  status?: string; // Added
+  isActive?: boolean;
+  status?: string;
   channelPricing?: {
     offline?: ChannelPricing;
     website?: ChannelPricing;
@@ -40,7 +41,6 @@ type ProductData = {
     tiktok?: ChannelPricing;
   };
 };
-type UserData = { points?: number; walletBalance?: number };
 
 const generateOrderId = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -50,16 +50,9 @@ const generateOrderId = () => {
 };
 
 export async function POST(req: Request) {
-  if (!adminDb || typeof adminDb.collection !== 'function') {
-    console.error('🔥 CRITICAL ERROR: Firebase Admin SDK not initialized.');
-    return NextResponse.json({
-      error: 'Server Misconfiguration: Database connection failed.'
-    }, { status: 500 });
-  }
-
   try {
     const body = await req.json();
-    const { items, customer, delivery, payment, userId, voucherCode, usePoints, useWallet, channel } = body;
+    const { items, customer = {}, delivery, payment, userId, voucherCode, usePoints, useWallet, channel } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Keranjang kosong' }, { status: 400 });
@@ -69,37 +62,56 @@ export async function POST(req: Request) {
 
     let calculatedSubtotal = 0;
     const validatedItems: { id: string; name: string; price: number; quantity: number; baseQuantity: number; contains: number; image?: string; unit: string; total: number }[] = [];
+    const productUpdates: { id: string; newStock: number; newStockByWarehouse: Record<string, number>; name: string; currentStock: number; baseQuantity: number }[] = [];
 
     const channelKey: ChannelKey =
       ['OFFLINE', 'SHOPEE', 'TIKTOK', 'WEBSITE'].includes(channel)
         ? channel
         : 'WEBSITE';
 
-    for (const item of items) {
-      const productRef = adminDb.collection('products').doc(item.id);
-      const productSnap = await productRef.get();
+    const MAIN_WAREHOUSE_ID = 'gudang-utama';
 
-      if (!productSnap.exists) {
+    for (const item of items) {
+      const { data: pRecord, error: pError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', item.id)
+        .single();
+
+      if (pError || !pRecord) {
         return NextResponse.json({ error: `Produk dengan ID ${item.id} tidak ditemukan` }, { status: 404 });
       }
 
-      const productData = productSnap.data() as ProductData;
+      const raw = pRecord.raw_data || {};
+      const productData: ProductData = {
+        name: pRecord.name || raw.name || raw.Nama,
+        price: Number(pRecord.price ?? raw.price ?? raw.Ecer ?? 0),
+        wholesalePrice: Number(raw.wholesalePrice ?? raw.Grosir ?? 0),
+        minWholesale: Number(raw.minWholesale ?? raw.Min_Grosir ?? 10),
+        stock: Number(pRecord.stock ?? raw.stock ?? raw.Stok ?? 0),
+        stockByWarehouse: raw.stockByWarehouse || { [MAIN_WAREHOUSE_ID]: Number(pRecord.stock ?? raw.stock ?? raw.Stok ?? 0) },
+        image: pRecord.image_url || raw.image || raw.Link_Foto || '',
+        unit: pRecord.unit || raw.unit || raw.Satuan || 'pcs',
+        units: raw.units,
+        isActive: raw.isActive,
+        status: raw.status,
+        channelPricing: raw.channelPricing,
+      };
 
-      // 1. Validasi Status Aktif (Safety)
       if (productData.isActive === false || productData.status === 'ARCHIVED') {
-        return NextResponse.json({ error: `Produk ${productData.name || productData.Nama} tidak tersedia (diarsipkan).` }, { status: 400 });
+        return NextResponse.json({ error: `Produk ${productData.name} tidak tersedia (diarsipkan).` }, { status: 400 });
       }
 
       const contains = Math.max(1, Math.floor(Number(item.contains || 1)));
       const baseQuantity = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
 
       if (productData.stock < baseQuantity) {
-        return NextResponse.json({ error: `Stok ${productData.name || productData.Nama} tidak mencukupi` }, { status: 400 });
+        return NextResponse.json({ error: `Stok ${productData.name} tidak mencukupi (tersedia: ${productData.stock}, diminta: ${baseQuantity})` }, { status: 400 });
       }
 
-      let baseUnitPrice = Number(productData.price || productData.Ecer || 0);
-      const wholesalePrice = Number(productData.wholesalePrice || productData.Grosir || 0);
-      const minWholesale = Number(productData.minWholesale || productData.Min_Grosir || 10);
+      let baseUnitPrice = Number(productData.price || 0);
+      const wholesalePrice = Number(productData.wholesalePrice || 0);
+      const minWholesale = Number(productData.minWholesale || 10);
 
       if (productData.channelPricing) {
         const mapping: Record<ChannelKey, keyof NonNullable<ProductData['channelPricing']>> = {
@@ -113,7 +125,7 @@ export async function POST(req: Request) {
       if (wholesalePrice > 0 && baseQuantity >= minWholesale) baseUnitPrice = wholesalePrice;
       if (item.promoType === 'TEBUS_MURAH' && calculatedSubtotal >= 50000 && baseQuantity === 1) baseUnitPrice = 10000;
 
-      const unit = String(item.unit || productData.unit || productData.Satuan || 'pcs');
+      const unit = String(item.unit || productData.unit || 'pcs');
       let unitPrice = baseUnitPrice * contains;
       const unitConfig = Array.isArray(productData.units) ? productData.units.find((u) => String(u.code || '').toUpperCase() === unit.toUpperCase()) : undefined;
       if (unitConfig?.price != null) {
@@ -125,44 +137,87 @@ export async function POST(req: Request) {
 
       validatedItems.push({
         id: item.id,
-        name: productData.name || productData.Nama || 'Produk Tanpa Nama',
+        name: productData.name || 'Produk Tanpa Nama',
         price: unitPrice,
         quantity: Math.max(1, Math.floor(Number(item.quantity || 0))),
         baseQuantity,
         contains,
-        image: productData.image || productData.Link_Foto || '',
+        image: productData.image || '',
         unit,
         total: lineTotal
+      });
+
+      // Calculate stock deductions
+      const currentStock = productData.stock || 0;
+      const stockByWarehouse = productData.stockByWarehouse || {};
+      const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
+      let remainingToDeduct = baseQuantity;
+
+      if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
+        const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
+        newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
+        remainingToDeduct -= deduct;
+      }
+
+      if (remainingToDeduct > 0) {
+        for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
+          if (whId === MAIN_WAREHOUSE_ID) continue;
+          if (remainingToDeduct <= 0) break;
+          const deduct = Math.min(qty, remainingToDeduct);
+          newStockByWarehouse[whId] -= deduct;
+          remainingToDeduct -= deduct;
+        }
+      }
+
+      const finalTotalStock = Math.max(0, currentStock - baseQuantity);
+      productUpdates.push({
+        id: item.id,
+        newStock: finalTotalStock,
+        newStockByWarehouse,
+        name: productData.name || 'Produk',
+        currentStock,
+        baseQuantity,
       });
     }
 
     let voucherDiscount = 0;
     let appliedVoucherId = null;
     if (voucherCode && userId) {
-      const vSnap = await adminDb.collection('user_vouchers')
-        .where('userId', '==', userId)
-        .where('code', '==', voucherCode)
-        .where('status', '==', 'ACTIVE').get();
-      if (!vSnap.empty) {
-        voucherDiscount = Number(vSnap.docs[0].data().value || 0);
-        appliedVoucherId = vSnap.docs[0].id;
+      const { data: vList } = await supabase
+        .from('user_vouchers')
+        .select('*')
+        .eq('raw_data->>userId', userId)
+        .eq('raw_data->>code', voucherCode)
+        .limit(1);
+
+      if (vList && vList.length > 0) {
+        const vData = vList[0].raw_data || {};
+        if (vData.status === 'ACTIVE') {
+          voucherDiscount = Number(vData.value || 0);
+          appliedVoucherId = vList[0].id;
+        }
       }
     }
 
     let pointsUsed = 0;
     let walletUsed = 0;
+    let userData: any = null;
     if (userId && (usePoints || useWallet)) {
-      const userSnap = await adminDb.collection('users').doc(userId).get();
-      if (userSnap.exists) {
-        const userData = userSnap.data() as UserData;
-        if (usePoints) pointsUsed = Math.min(userData.points || 0, calculatedSubtotal * 0.5);
-        if (useWallet) walletUsed = Math.min(userData.walletBalance || 0, Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount));
+      const { data: userRec } = await supabase.from('users').select('*').eq('id', userId).single();
+      if (userRec) {
+        userData = userRec.raw_data || {};
+        const curPoints = Number(userRec.points ?? userData.points ?? 0);
+        const curWallet = Number(userRec.wallet_balance ?? userData.walletBalance ?? 0);
+
+        if (usePoints) pointsUsed = Math.min(curPoints, calculatedSubtotal * 0.5);
+        if (useWallet) walletUsed = Math.min(curWallet, Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount));
       }
     }
 
     const total = Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount - walletUsed);
     const orderId = generateOrderId();
-    const orderRef = adminDb.collection('orders').doc();
+    const dbOrderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
 
     const orderData = {
       orderId,
@@ -180,214 +235,123 @@ export async function POST(req: Request) {
       payment,
       status: 'PENDING',
       channel: channelKey,
-      createdAt: FieldValue.serverTimestamp()
+      createdAt: now,
     };
 
-    // --- FIX: TRANSACTION LOGIC ---
-    await adminDb.runTransaction(async (t) => {
-      // Step 1: READS (Produk, User, Voucher)
-      
-      // A. Baca Data Produk
-      const productReads = validatedItems.map(async (item) => {
-        const ref = adminDb.collection('products').doc(item.id);
-        const snap = await t.get(ref);
-        return { item, ref, snap };
-      });
-      
-      const productResults = await Promise.all(productReads);
-      
-      // B. Baca Data User (untuk Point & Wallet)
-      let userRef: FirebaseFirestore.DocumentReference | null = null;
-      let userSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-      if (userId) {
-        userRef = adminDb.collection('users').doc(userId);
-        userSnap = await t.get(userRef);
-      }
-
-      // C. Baca Data Voucher (untuk Validasi Status)
-      let voucherRef: FirebaseFirestore.DocumentReference | null = null;
-      let voucherSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-      if (appliedVoucherId) {
-        voucherRef = adminDb.collection('user_vouchers').doc(appliedVoucherId);
-        voucherSnap = await t.get(voucherRef);
-      }
-
-      // Step 2: VALIDATION & CALCULATION
-
-      // A. Validasi & Kalkulasi Stok Produk
-      const productUpdates = [];
-      const MAIN_WAREHOUSE_ID = 'gudang-utama'; // Configurable ID
-
-      for (const { item, ref, snap } of productResults) {
-        if (!snap.exists) throw new Error(`Produk ${item.id} tidak ditemukan saat transaksi`);
-        const pData = snap.data() as ProductData;
-        
-        const currentStock = pData.stock || 0;
-        if (currentStock < item.baseQuantity) {
-          throw new Error(`Stok ${pData.name || pData.Nama} tidak mencukupi`);
-        }
-
-        // Logika Pengurangan Stok Per Gudang
-        const stockByWarehouse = pData.stockByWarehouse || {};
-        const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
-        
-        let remainingToDeduct = item.baseQuantity;
-        
-        // 1. Prioritas Gudang Utama
-        if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
-          const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
-          newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
-          remainingToDeduct -= deduct;
-        }
-        
-        // 2. Gudang Lainnya
-        if (remainingToDeduct > 0) {
-          for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
-            if (whId === MAIN_WAREHOUSE_ID) continue;
-            if (remainingToDeduct <= 0) break;
-            
-            const deduct = Math.min(qty, remainingToDeduct);
-            newStockByWarehouse[whId] -= deduct;
-            remainingToDeduct -= deduct;
-          }
-        }
-        
-        const finalTotalStock = currentStock - item.baseQuantity;
-        productUpdates.push({ 
-          ref, 
-          newStock: finalTotalStock, 
-          newStockByWarehouse,
-          name: pData.name || pData.Nama || 'Produk',
-          currentStock
-        });
-      }
-
-      // B. Validasi Voucher
-      if (voucherRef && voucherSnap) {
-        if (!voucherSnap.exists || voucherSnap.data()?.status !== 'ACTIVE') {
-          throw new Error('Voucher tidak valid atau sudah digunakan');
-        }
-      }
-
-      // C. Kalkulasi Final Points & Wallet
-      let finalPointsUsed = 0;
-      let finalWalletUsed = 0;
-
-      if (userId && userSnap && userSnap.exists) {
-        const userData = userSnap.data() as UserData;
-        const currentPoints = userData.points || 0;
-        const currentWallet = userData.walletBalance || 0;
-
-        if (usePoints) {
-          finalPointsUsed = Math.min(currentPoints, calculatedSubtotal * 0.5);
-        }
-        if (useWallet) {
-          const remainingBill = Math.max(0, calculatedSubtotal - finalPointsUsed - voucherDiscount);
-          finalWalletUsed = Math.min(currentWallet, remainingBill);
-        }
-      }
-
-      const finalTotal = Math.max(0, calculatedSubtotal - finalPointsUsed - voucherDiscount - finalWalletUsed);
-
-      // Update Order Data dengan nilai final
-      const finalOrderData = {
-        ...orderData,
-        pointsUsed: finalPointsUsed,
-        walletUsed: finalWalletUsed,
-        discountTotal: finalPointsUsed + voucherDiscount,
-        total: finalTotal,
-      };
-
-      // Step 3: WRITES
-
-      // 1. Simpan Order
-      t.set(orderRef, finalOrderData);
-
-      // 2. Update Produk
-      for (const p of productUpdates) {
-        t.update(p.ref, { 
-          stock: p.newStock,
-          stockByWarehouse: p.newStockByWarehouse
-        });
-
-        // 2b. Catat Log Inventory (Agar muncul di Audit Stok)
-        const logRef = adminDb.collection('inventory_logs').doc();
-        t.set(logRef, {
-          productId: p.ref.id,
-          productName: p.name,
-          type: 'KELUAR',
-          amount: p.currentStock - p.newStock, // Selisih stok
-          adminId: userId || 'system',
-          source: 'ORDER', // Menandakan order online
-          referenceId: orderId, // ID Order yang dapat dilihat user (e.g. ATY-XXXXX)
-          orderId: orderRef.id, // ID Dokumen Order
-          note: `Order Online #${orderId}`,
-          fromWarehouseId: 'gudang-utama',
-          prevStock: p.currentStock,
-          nextStock: p.newStock,
-          date: FieldValue.serverTimestamp()
-        });
-      }
-
-      // 3. Update User & Logs
-      if (userId && userRef) {
-        if (finalPointsUsed > 0 || finalWalletUsed > 0) {
-          // Safety Net: Ensure balance/points are sufficient before updating
-          // Note: We already calculated finalWalletUsed = Math.min(currentWallet, ...), so technically safe.
-          // But explicitly checking here adds a layer of protection.
-          
-          if (finalWalletUsed > 0) {
-             const userData = userSnap?.data() as UserData;
-             if ((userData.walletBalance || 0) < finalWalletUsed) {
-                throw new Error("Safety Net Triggered: Saldo wallet tidak mencukupi saat finalisasi transaksi.");
-             }
-          }
-
-          t.update(userRef, {
-            points: FieldValue.increment(-finalPointsUsed),
-            walletBalance: FieldValue.increment(-finalWalletUsed)
-          });
-        }
-        
-        if (finalPointsUsed > 0) {
-          const logRef = adminDb.collection('point_logs').doc();
-          t.set(logRef, { 
-            userId, 
-            pointsChanged: -finalPointsUsed, 
-            type: 'REDEEM', 
-            description: `Order #${orderId}`, 
-            createdAt: FieldValue.serverTimestamp() 
-          });
-        }
-        
-        if (finalWalletUsed > 0) {
-          const logRef = adminDb.collection('wallet_logs').doc();
-          t.set(logRef, { 
-            userId, 
-            orderId, 
-            amountChanged: -finalWalletUsed, 
-            type: 'PAYMENT', 
-            description: `Order #${orderId}`, 
-            createdAt: FieldValue.serverTimestamp() 
-          });
-        }
-
-        // 4. Clear Cart
-        const cartRef = adminDb.collection('carts').doc(userId);
-        t.set(cartRef, { items: [], updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      }
-
-      // 5. Update Voucher
-      if (voucherRef) {
-        t.update(voucherRef, { status: 'USED' });
-      }
+    // 1. Insert order
+    const { error: orderError } = await supabase.from('orders').insert({
+      id: dbOrderId,
+      order_id: orderId,
+      user_id: userId || null,
+      customer_name: customer.name || 'Pelanggan Umum',
+      customer_phone: customer.phone || '-',
+      status: 'PENDING',
+      total,
+      items: validatedItems,
+      delivery,
+      payment,
+      raw_data: orderData,
+      created_at: now,
+      updated_at: now,
     });
 
-    return NextResponse.json({ success: true, orderId, firebaseId: orderRef.id });
+    if (orderError) {
+      console.error('Failed to insert order:', orderError);
+      return NextResponse.json({ error: 'Gagal menyimpan pesanan: ' + orderError.message }, { status: 500 });
+    }
 
-  } catch (error: unknown) {
+    // 2. Update products stock & write inventory logs
+    for (const p of productUpdates) {
+      const { data: existingP } = await supabase.from('products').select('raw_data').eq('id', p.id).single();
+      const pRaw = existingP?.raw_data || {};
+
+      await supabase.from('products').update({
+        stock: p.newStock,
+        raw_data: {
+          ...pRaw,
+          stock: p.newStock,
+          stockByWarehouse: p.newStockByWarehouse,
+          updatedAt: now,
+        },
+        updated_at: now,
+      }).eq('id', p.id);
+
+      await addInventoryLog({
+        productId: p.id,
+        productName: p.name,
+        type: 'KELUAR',
+        amount: p.baseQuantity,
+        quantity: -p.baseQuantity,
+        adminId: userId || 'system',
+        source: 'ORDER',
+        referenceId: orderId,
+        orderId: dbOrderId,
+        note: `Order Online #${orderId}`,
+        fromWarehouseId: MAIN_WAREHOUSE_ID,
+        prevStock: p.currentStock,
+        nextStock: p.newStock,
+        date: now,
+      });
+    }
+
+    // 3. Update points & wallet
+    if (userId && (pointsUsed > 0 || walletUsed > 0)) {
+      const curPoints = Number(userData?.points || 0);
+      const curWallet = Number(userData?.walletBalance || 0);
+      const newPoints = Math.max(0, curPoints - pointsUsed);
+      const newWallet = Math.max(0, curWallet - walletUsed);
+
+      await supabase.from('users').update({
+        wallet_balance: newWallet,
+        raw_data: {
+          ...userData,
+          points: newPoints,
+          walletBalance: newWallet,
+          updatedAt: now,
+        },
+        updated_at: now,
+      }).eq('id', userId);
+
+      if (pointsUsed > 0) {
+        await supabase.from('point_logs').insert({
+          id: `pt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          user_id: userId,
+          points: -pointsUsed,
+          description: `Order #${orderId}`,
+          created_at: now,
+        });
+      }
+
+      if (walletUsed > 0) {
+        await supabase.from('wallet_logs').insert({
+          id: `wl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          user_id: userId,
+          amount: -walletUsed,
+          description: `Order #${orderId}`,
+          created_at: now,
+        });
+      }
+    }
+
+    // 4. Update voucher if used
+    if (appliedVoucherId) {
+      const { data: vExisting } = await supabase.from('user_vouchers').select('raw_data').eq('id', appliedVoucherId).single();
+      if (vExisting) {
+        await supabase.from('user_vouchers').update({
+          raw_data: { ...(vExisting.raw_data || {}), status: 'USED', updatedAt: now },
+          updated_at: now,
+        }).eq('id', appliedVoucherId);
+      }
+    }
+
+    // 5. Clear cart
+    if (userId) {
+      await supabase.from('carts').delete().eq('user_id', userId);
+    }
+
+    return NextResponse.json({ success: true, orderId, firebaseId: dbOrderId });
+  } catch (error: any) {
     console.error('Order Creation Error:', error);
-    const message = error instanceof Error ? error.message : 'Internal Server Error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

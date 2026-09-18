@@ -3,16 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { 
   Users, 
   TrendingUp, 
@@ -24,7 +14,9 @@ import toast from 'react-hot-toast';
 
 // 🔴 PERBAIKAN 1: Import XLSX secara dinamis (SSR-safe)
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 type Order = {
   id: string;
   customerId: string;
@@ -64,7 +56,7 @@ export default function CustomerReport() {
 
   // 🔴 PERBAIKAN 2: Pisahkan autentikasi dari fetching data
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

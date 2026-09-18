@@ -3,16 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import {
-  collection,
-  doc,
-  getDoc,
-  deleteDoc,
-  query,
-  onSnapshot,
-  orderBy
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   Plus,
@@ -27,8 +17,10 @@ import {
   Clock
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
 
+import { collection, db, deleteDoc, doc, onSnapshot, orderBy, query } from '@/lib/firebase';
 // Update Tipe Data untuk Mendukung Flash Sale & Bundle
 type Promotion = {
   id: string;

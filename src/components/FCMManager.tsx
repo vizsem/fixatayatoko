@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { MessagePayload } from 'firebase/messaging';
+interface MessagePayload {
+  notification?: {
+    title?: string;
+    body?: string;
+    icon?: string;
+  };
+  data?: Record<string, string>;
+}
 import { requestForToken, onMessageListener } from '@/lib/fcm';
 import notify from '@/lib/notify';
 
@@ -16,8 +23,7 @@ export default function FCMManager() {
       // Listen for foreground messages
       onMessageListener().then((payload) => {
         const p = payload as MessagePayload;
-      console.log('Foreground notification:', p);
-      notify.custom((t: { id: string }) => (
+        notify.custom((t: { id: string }) => (
         <div className="flex items-start gap-3 cursor-pointer" onClick={() => notify.dismiss(t.id)}>
           {p.notification?.icon && (
             <img

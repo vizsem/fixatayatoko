@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import notify from '@/lib/notify';
 
+import { auth, getDoc, onAuthStateChanged } from '@/lib/firebase';
 type AllowedRole = 'admin' | 'cashier' | 'employee';
 
 interface UseAdminAuthOptions {
@@ -23,7 +22,7 @@ interface AdminAuthState {
 }
 
 /**
- * Shared hook that verifies Firebase auth and Firestore role.
+ * Shared hook that verifies Supabase auth and role from app_metadata.
  * Replaces the duplicated onAuthStateChanged + getDoc(users) pattern
  * found in every admin page.
  *
@@ -40,16 +39,17 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push(redirectOnFail);
-        setAuthLoading(false);
-        return;
-      }
-
+    const checkAuth = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userRole = userDoc.data()?.role as string | undefined;
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.push(redirectOnFail);
+          setAuthLoading(false);
+          return;
+        }
+
+        const userRole = user.app_metadata?.role as string | undefined;
 
         if (!userRole || !allowedRoles.includes(userRole as AllowedRole)) {
           notify.aksesDitolakAdmin();
@@ -58,7 +58,7 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
           return;
         }
 
-        setAdminId(user.uid);
+        setAdminId(user.id);
         setRole(userRole);
       } catch (err) {
         console.error('[useAdminAuth] Error verifying role:', err);
@@ -66,9 +66,28 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
       } finally {
         setAuthLoading(false);
       }
+    };
+
+    // Check on mount
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push(redirectOnFail);
+        return;
+      }
+      const userRole = session.user.app_metadata?.role as string | undefined;
+      if (!userRole || !allowedRoles.includes(userRole as AllowedRole)) {
+        notify.aksesDitolakAdmin();
+        router.push('/profil');
+        return;
+      }
+      setAdminId(session.user.id);
+      setRole(userRole);
     });
 
-    return () => unsub();
+    return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

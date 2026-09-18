@@ -1,12 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { auth, db, storage } from '@/lib/firebase';
 import { addInventoryLog } from '@/lib/inventory';
 import { useParams, useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp, Timestamp, addDoc, query, where, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
@@ -15,9 +11,10 @@ import {
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
-import { deleteDoc } from 'firebase/firestore';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
 type ChannelPrices = {
   offline?: number;
   website?: number;
@@ -330,7 +327,7 @@ export default function EditProductPage() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') return router.push('/profil');
@@ -394,7 +391,7 @@ export default function EditProductPage() {
             name: categoryName,
             slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
             description: 'Auto-generated from product edit',
-            createdAt: serverTimestamp()
+            createdAt: new Date().toISOString()
           });
         } catch (err) {
           console.error("Failed to auto-create category:", err);
@@ -492,8 +489,8 @@ export default function EditProductPage() {
             newStock: newVal,
             change: newVal - oldVal,
             type: stockReason,
-            adminEmail: auth.currentUser?.email || 'system',
-            createdAt: serverTimestamp(),
+            adminEmail: (await supabase.auth.getUser()).data.user?.email || 'system',
+            createdAt: new Date().toISOString(),
           });
         }
       }
@@ -553,7 +550,7 @@ export default function EditProductPage() {
                 roundingStep: pricingRec.roundingStep,
               }
             : { mode: 'manual' },
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       };
 
       await updateDoc(doc(db, 'products', id), updatePayload);
@@ -608,8 +605,8 @@ export default function EditProductPage() {
           newStock: 0,
           change: -formData.Stok,
           type: 'DELETE_PRODUCT',
-          adminEmail: auth.currentUser?.email,
-          createdAt: serverTimestamp(),
+          adminEmail: (await supabase.auth.getUser()).data.user?.email,
+          createdAt: new Date().toISOString(),
       });
 
       toast.success('Produk berhasil dihapus');

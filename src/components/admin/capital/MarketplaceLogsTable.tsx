@@ -1,6 +1,6 @@
-import { Timestamp } from 'firebase/firestore';
 import { Store } from 'lucide-react';
 
+import { Timestamp } from '@/lib/firebase';
 interface MarketplaceLog {
   id: string;
   accountId: string;

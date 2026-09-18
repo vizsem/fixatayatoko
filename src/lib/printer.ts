@@ -1,3 +1,4 @@
+import { limit } from '@/lib/firebase';
 export const printToThermal = async (dataInput: string | Uint8Array) => {
   const nav = navigator as any;
   if (!nav.bluetooth) {

@@ -3,9 +3,6 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { 
   Package, 
   User, 
@@ -20,6 +17,8 @@ import toast from 'react-hot-toast';
 
 // Dynamic import OrderMap agar aman untuk SSR
 import dynamic from 'next/dynamic';
+import { supabase } from '@/lib/supabase';
+import { auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 // Tipe data pesanan
@@ -56,7 +55,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
 
   // 🔐 Cek autentikasi & role (hanya cashier atau admin)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

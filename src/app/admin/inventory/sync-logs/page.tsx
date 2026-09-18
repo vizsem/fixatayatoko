@@ -6,19 +6,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  Timestamp,
-  doc,
-  getDoc,
-  getDocs
-} from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -35,7 +22,9 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 
 import { StockSyncLog } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, where } from '@/lib/firebase';
 export default function SyncLogsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -79,7 +68,7 @@ export default function SyncLogsPage() {
     };
 
     // Proteksi admin
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

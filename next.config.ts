@@ -96,9 +96,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // NOTE: TypeScript build errors must be fixed — ignoreBuildErrors removed for production safety
+  // typescript: { ignoreBuildErrors: true }, // DO NOT re-enable this
+
 };
 
 export default withBundleAnalyzer(withPWA(nextConfig));

@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { transferStockTx } from '@/lib/inventory';
-import { collection, getDocs, doc, query, orderBy, runTransaction, getDoc } from 'firebase/firestore';
 import { ArrowRightLeft, Search, AlertCircle, CheckCircle2, Package, ArrowRight, X, Warehouse } from 'lucide-react';
-import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction } from '@/lib/firebase';
 type WarehouseType = { id: string; name: string; };
 
 export default function StockTransferPage() {
@@ -26,7 +25,7 @@ export default function StockTransferPage() {
   const [qty, setQty] = useState<number>(0);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') {
@@ -69,7 +68,7 @@ export default function StockTransferPage() {
           amount: qty,
           fromWarehouseId: fromWarehouse,
           toWarehouseId: toWarehouse,
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           source: 'TRANSFER',
           note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
         });

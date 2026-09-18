@@ -3,18 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChanged } from 'firebase/auth';
-import { 
-  doc, 
-  onSnapshot,
-  updateDoc,
-  arrayRemove,
-  arrayUnion,
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { Loader2, Mail, MapPin, Phone, Save, Trash2, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { arrayRemove, arrayUnion, auth, db, doc, onAuthStateChanged, onSnapshot, updateDoc } from '@/lib/firebase';
 type Address = {
   id: string;
   label: string;
@@ -83,8 +76,8 @@ export default function EditProfilePage() {
   };
 
   const addAddress = async () => {
-    const user = auth.currentUser;
-    if (!user || user.isAnonymous) return;
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user || (user as any).isAnonymous) return;
     if (!newAddress.trim() || !newReceiverName.trim()) {
       toast.error('Lengkapi nama penerima dan alamat!');
       return;
@@ -100,7 +93,7 @@ export default function EditProfilePage() {
     };
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(doc(db, 'users', user.id), {
         addresses: arrayUnion(addressObj),
         address: addressObj.address,
         updatedAt: new Date().toISOString(),
@@ -117,8 +110,8 @@ export default function EditProfilePage() {
   };
 
   const deleteAddress = async (addrId: string) => {
-    const user = auth.currentUser;
-    if (!user || user.isAnonymous) return;
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user || (user as any).isAnonymous) return;
     if (!window.confirm('Hapus alamat ini?')) return;
     const addrToDelete = addresses.find((a) => a.id === addrId);
     if (!addrToDelete) return;
@@ -126,7 +119,7 @@ export default function EditProfilePage() {
     try {
       const patch: Record<string, unknown> = { addresses: arrayRemove(addrToDelete), updatedAt: new Date().toISOString() };
       if (addresses.length === 1) patch.address = '';
-      await updateDoc(doc(db, 'users', user.uid), patch);
+      await updateDoc(doc(db, 'users', user.id), patch);
     } catch {
       toast.error('Gagal menghapus alamat');
     }
@@ -136,14 +129,14 @@ export default function EditProfilePage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const user = auth.currentUser;
+      const user = (await supabase.auth.getUser()).data.user;
       if (!user) throw new Error('User not authenticated');
-      if (user.isAnonymous) {
+      if ((user as any).isAnonymous) {
         router.push('/profil/login');
         return;
       }
       
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(doc(db, 'users', user.id), {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),

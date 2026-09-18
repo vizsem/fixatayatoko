@@ -1,20 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { db, auth } from '@/lib/firebase';
-import {
-  collection, query, orderBy, onSnapshot,
-  doc, updateDoc, addDoc, serverTimestamp,
-  setDoc, getDoc, where, getDocs
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import { 
   MessageCircle, X, Send, Image as ImageIcon, 
   Minimize2, Maximize2
 } from 'lucide-react';
 import type { ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, ref, setDoc, updateDoc, where } from '@/lib/firebase';
 export default function CustomerChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -115,7 +110,7 @@ export default function CustomerChatWidget() {
             email: user.email,
             photoURL: user.photoURL
           },
-          createdAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
           unreadCount: 0,
           isReadByAdmin: false
         });
@@ -125,7 +120,7 @@ export default function CustomerChatWidget() {
       await addDoc(collection(db, 'chats', user.uid, 'messages'), {
         text,
         senderId: user.uid,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         isRead: false,
         type: 'text'
       });
@@ -133,7 +128,7 @@ export default function CustomerChatWidget() {
       // 3. Update Thread Metadata
       await updateDoc(chatRef, {
         lastMessage: text,
-        lastMessageTime: serverTimestamp(),
+        lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,
         unreadCount: (chatSnap.data()?.unreadCount || 0) + 1
       });
@@ -192,7 +187,7 @@ export default function CustomerChatWidget() {
                 >
                   <p>{msg.text}</p>
                   <span className={`text-[9px] block mt-1 text-right ${isMe ? 'text-emerald-100' : 'text-slate-400'}`}>
-                    {msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
+                    {msg.createdAt ? new Date((msg.createdAt as any).toDate ? (msg.createdAt as any).toDate() : msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                   </span>
                 </div>
               </div>

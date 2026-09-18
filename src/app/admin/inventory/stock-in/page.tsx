@@ -5,27 +5,15 @@ import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  query,
-  where,
-  orderBy,
-  runTransaction
-} from 'firebase/firestore';
 import { ArrowDown, Plus, Calendar } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { addStockTx } from '@/lib/inventory';
 import { stockSyncService } from '@/lib/stockSyncService';
+import { supabase } from '@/lib/supabase';
 
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction, where } from '@/lib/firebase';
 type Product = {
   id: string;
   name: string;
@@ -116,7 +104,7 @@ function StockInContent() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -167,7 +155,7 @@ function StockInContent() {
         purchasePrice: formData.purchasePrice,
         purchasePricePerPcs: incomingCostPerPcs,
         expiredDate: formData.expiredDate,
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       };
 
       await addDoc(collection(db, 'inventory_transactions'), transactionData);
@@ -190,7 +178,7 @@ function StockInContent() {
           productId: formData.productId,
           amount: pcsToAdd,
           warehouseId: 'gudang-utama',
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           note: `Stock-In manual (${formData.unitCode} x ${formData.quantity})`,
           source: 'MANUAL',
           prefetchedSnap: snap
@@ -199,14 +187,13 @@ function StockInContent() {
           purchasePrice: nextAvgCost,
           Modal: nextAvgCost,
           hargaBeli: nextAvgCost,
-          updatedAt: serverTimestamp()
+          updatedAt: new Date().toISOString()
         });
       });
 
       // 3. Trigger sinkronisasi otomatis
       try {
         await stockSyncService.syncWarehouseToProduct(formData.productId, 'gudang-utama');
-        console.log('Sinkronisasi stok otomatis berhasil');
       } catch (syncError) {
         console.error('Gagal sinkronisasi otomatis:', syncError);
         // Tidak menghentikan proses utama, hanya log error

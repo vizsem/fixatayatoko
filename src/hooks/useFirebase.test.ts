@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useFirebaseAuth, useFirestore, useFirebaseStorage, useFirebase } from './useFirebase';
-
 // Mock the firebase module
 vi.mock('@/lib/firebase', () => ({
   auth: {},
   db: {},
   storage: {}
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    auth: {},
+    storage: {}
+  }
 }));
 
 describe('Firebase Hooks', () => {

@@ -9,32 +9,31 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('firebase/auth', () => ({
-  onAuthStateChanged: (_auth: unknown, callback: (user: { uid: string } | null) => void) => {
-    callback({ uid: 'admin-user' });
-    return () => {};
-  },
-}));
-
-vi.mock('firebase/firestore', () => {
+vi.mock('@/lib/firebase', () => {
   const fakeDocData = {
     role: 'admin',
   };
 
   return {
-    collection: vi.fn(),
-    doc: vi.fn(),
+    auth: { currentUser: { uid: 'admin-user' } },
+    db: {},
+    collection: vi.fn((_db, name) => name),
+    doc: vi.fn((_db, name, id) => ({ _path: { segments: [name, id] } })),
+    onAuthStateChanged: (_auth: unknown, callback: (user: { uid: string } | null) => void) => {
+      callback({ uid: 'admin-user' });
+      return () => {};
+    },
     getDoc: vi.fn(() =>
       Promise.resolve({
         exists: () => true,
         data: () => fakeDocData,
       }),
     ),
-    getDocs: vi.fn((colRef: { _path?: { segments?: string[] } } | string) => {
+    getDocs: vi.fn((colRef: any) => {
       const colName =
         typeof colRef === 'string'
           ? colRef
-          : colRef?._path?.segments?.[colRef._path.segments.length - 1] ?? '';
+          : colRef?._path?.segments?.[colRef._path.segments.length - 1] ?? colRef ?? '';
 
       switch (colName) {
         case 'users':
@@ -102,9 +101,8 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
-vi.mock('@/lib/firebase', () => ({
-  auth: {},
-  db: {},
+vi.mock('@/lib/supabase', () => ({
+  supabase: { storage: {}, auth: {} },
 }));
 
 vi.mock('react-hot-toast', () => ({

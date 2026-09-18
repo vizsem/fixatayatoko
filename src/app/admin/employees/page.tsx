@@ -9,18 +9,14 @@ import {
 } from 'lucide-react';
 
 // import Link from 'next/link';
-import {
-  collection, getDocs, updateDoc, doc, query, orderBy,
-  increment, addDoc, deleteDoc, serverTimestamp,
-  arrayUnion, setDoc, getDoc, runTransaction, where
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { useRouter } from 'next/navigation';
 import jsPDF from 'jspdf';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, arrayUnion, collection, db, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, ref, runTransaction, setDoc, updateDoc, where } from '@/lib/firebase';
 type Employee = {
   id: string;
   name: string;
@@ -473,7 +469,7 @@ export default function EmployeesPage() {
         actorId: currentUser.uid,
         actorName: currentUser.name || '',
         actorRole: currentUser.role || '',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
     } catch {}
   };
@@ -537,7 +533,7 @@ export default function EmployeesPage() {
         endTime,
         graceMinutes,
         overtimeRules,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       }, { merge: true });
       await logAudit('SHIFT_ASSIGN', 'employee', employee.id, { date, shiftId: template?.id || 'DEFAULT', startTime, endTime, graceMinutes });
       notify.admin.success('Shift tersimpan');
@@ -631,17 +627,17 @@ export default function EmployeesPage() {
     }
     try {
       const ref = doc(db, 'payroll_runs', payrollRun.month);
-      const base: any = { month: payrollRun.month, status, updatedAt: serverTimestamp() };
+      const base: any = { month: payrollRun.month, status, updatedAt: new Date().toISOString() };
       if (status === 'SUBMITTED' && !payrollRun.createdAt) {
-        base.createdAt = serverTimestamp();
+        base.createdAt = new Date().toISOString();
         base.createdBy = currentUser?.uid || '';
       }
       if (status === 'APPROVED') {
-        base.approvedAt = serverTimestamp();
+        base.approvedAt = new Date().toISOString();
         base.approvedBy = currentUser?.uid || '';
       }
       if (status === 'PAID') {
-        base.paidAt = serverTimestamp();
+        base.paidAt = new Date().toISOString();
         base.paidBy = currentUser?.uid || '';
       }
       base.includeTHR = includeTHR;
@@ -702,7 +698,7 @@ export default function EmployeesPage() {
         score: Number(row.score || 0),
         bonusAmount: Number(row.bonusAmount || 0),
         notes: String(row.notes || ''),
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       }, { merge: true });
       await logAudit('KPI_SAVE', 'employee', employee.id, { month: kpiMonth, score: row.score, bonusAmount: row.bonusAmount });
       notify.admin.success('KPI tersimpan');
@@ -733,7 +729,7 @@ export default function EmployeesPage() {
       const ref = await addDoc(collection(db, 'candidates'), {
         ...candidateForm,
         expectedSalary: Number(candidateForm.expectedSalary || 0),
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
       await logAudit('CANDIDATE_CREATE', 'candidate', ref.id, { name: candidateForm.name, stage: candidateForm.stage });
       notify.admin.success('Kandidat ditambahkan');
@@ -751,7 +747,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await updateDoc(doc(db, 'candidates', candidate.id), { stage, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, 'candidates', candidate.id), { stage, updatedAt: new Date().toISOString() });
       await logAudit('CANDIDATE_STAGE', 'candidate', candidate.id, { stage });
       fetchCandidates();
     } catch {
@@ -774,9 +770,9 @@ export default function EmployeesPage() {
         manualSalary: Number(candidate.expectedSalary || 0),
         workSchedule: '07:00 - 14:00',
         totalAttendance: 0,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
-      await updateDoc(doc(db, 'candidates', candidate.id), { stage: 'HIRED', hiredEmployeeId: empRef.id, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, 'candidates', candidate.id), { stage: 'HIRED', hiredEmployeeId: empRef.id, updatedAt: new Date().toISOString() });
       await logAudit('CANDIDATE_HIRED', 'candidate', candidate.id, { employeeId: empRef.id });
       notify.admin.success('Kandidat dikonversi jadi karyawan');
       fetchEmployees();
@@ -835,7 +831,7 @@ export default function EmployeesPage() {
         const current = balSnap.exists() ? Number((balSnap.data() as any).balance || 0) : 0;
         const next = current + delta;
         if (next < 0) throw new Error('Saldo tidak cukup');
-        tx.set(balRef, { employeeId: emp.id, employeeName: emp.name, balance: next, updatedAt: serverTimestamp() }, { merge: true });
+        tx.set(balRef, { employeeId: emp.id, employeeName: emp.name, balance: next, updatedAt: new Date().toISOString() }, { merge: true });
         const txRef = doc(collection(db, 'employee_petty_cash_transactions'));
         tx.set(txRef, {
           employeeId: emp.id,
@@ -844,7 +840,7 @@ export default function EmployeesPage() {
           type: txType,
           amount,
           description: String(pettyForm.description || ''),
-          createdAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
         });
       });
       await logAudit('PETTY_CASH_TX', 'employee', emp.id, { type: txType, amount, date: pettyForm.date });
@@ -905,7 +901,7 @@ export default function EmployeesPage() {
           shiftStartTime: shift.startTime,
           shiftEndTime: shift.endTime,
           graceMinutes: shift.graceMinutes,
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         };
 
         if (status === 'HADIR') {
@@ -913,7 +909,7 @@ export default function EmployeesPage() {
           base.minutesLate = minutesLate;
         }
 
-        if (!recSnap.exists()) base.createdAt = serverTimestamp();
+        if (!recSnap.exists()) base.createdAt = new Date().toISOString();
         tx.set(recRef, base, { merge: true });
 
         if (status === 'HADIR') {
@@ -932,7 +928,7 @@ export default function EmployeesPage() {
               employeeId: employee.id,
               employeeName: employee.name,
               date,
-              createdAt: serverTimestamp(),
+              createdAt: new Date().toISOString(),
             });
             tx.set(recRef, { expenseLogged: true }, { merge: true });
           }
@@ -945,7 +941,7 @@ export default function EmployeesPage() {
             employeeId: employee.id,
             employeeName: employee.name,
             date,
-            createdAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
           });
         }
       });
@@ -975,7 +971,7 @@ export default function EmployeesPage() {
         const overtimeMinutes = shiftEnd !== null ? Math.max(0, nowMinutes - shiftEnd) : 0;
         const rules = Array.isArray(shift.overtimeRules) && shift.overtimeRules.length > 0 ? shift.overtimeRules : defaultShiftRules();
         const overtimePay = computeOvertimePay(overtimeMinutes, hourlyRate, rules);
-        tx.set(recRef, { checkOutAt: nowIso(), overtimeMinutes, overtimePay, updatedAt: serverTimestamp() }, { merge: true });
+        tx.set(recRef, { checkOutAt: nowIso(), overtimeMinutes, overtimePay, updatedAt: new Date().toISOString() }, { merge: true });
       });
       notify.admin.success('Check-out tersimpan');
       await logAudit('ATTENDANCE_CHECKOUT', 'employee', employee.id, { date });
@@ -995,7 +991,7 @@ export default function EmployeesPage() {
         await addDoc(collection(db, 'employees'), {
           ...formData,
           totalAttendance: 0,
-          createdAt: serverTimestamp()
+          createdAt: new Date().toISOString()
         });
         notify.admin.success("Karyawan baru ditambahkan");
       }
@@ -1213,7 +1209,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await setDoc(doc(db, 'payroll_runs', payrollMonth), { month: payrollMonth, includeTHR, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, 'payroll_runs', payrollMonth), { month: payrollMonth, includeTHR, updatedAt: new Date().toISOString() }, { merge: true });
       notify.admin.success('Setting payroll tersimpan');
       fetchPayrollRun(payrollMonth);
     } catch {
@@ -1272,7 +1268,7 @@ export default function EmployeesPage() {
         overtimeMinutes: Number(next.overtimeMinutes || 0),
         bpjsEmployee: next.bpjsEmployee !== undefined ? Number(next.bpjsEmployee) : null,
         pph21: next.pph21 !== undefined ? Number(next.pph21) : null,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       }, { merge: true });
     } catch {
       notify.admin.error('Gagal menyimpan adjustment');
@@ -1305,7 +1301,7 @@ export default function EmployeesPage() {
         deductions: row.deductions,
         allowances: row.allowances,
         takeHomePay: row.takeHomePay,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       };
       await setDoc(doc(db, 'payroll_slips', row.slipId), payload, { merge: true });
       notify.admin.success('Slip tersimpan');
@@ -1393,7 +1389,7 @@ export default function EmployeesPage() {
         paid: Boolean(leaveForm.paid),
         reason: String(leaveForm.reason || ''),
         status: 'PENDING',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
       notify.admin.success('Pengajuan dibuat');
       setLeaveModalOpen(false);
@@ -1406,7 +1402,7 @@ export default function EmployeesPage() {
 
   const setLeaveStatus = async (req: LeaveRequest, status: LeaveRequestStatus) => {
     try {
-      await updateDoc(doc(db, 'leave_requests', req.id), { status, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, 'leave_requests', req.id), { status, updatedAt: new Date().toISOString() });
       notify.admin.success('Status diperbarui');
       fetchLeaveRequests();
     } catch {

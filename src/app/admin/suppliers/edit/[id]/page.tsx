@@ -2,13 +2,12 @@
  
  import { useEffect, useState, useCallback } from 'react';
  import { useRouter, useParams } from 'next/navigation';
- import { onAuthStateChanged } from 'firebase/auth';
- import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import Link from 'next/link';
+  import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
+import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
  import { ArrowLeft, Save, Users, Phone, Mail, MapPin } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
 
  
  interface SupplierData {
@@ -40,7 +39,7 @@ import { auth, db } from '@/lib/firebase';
    });
  
    useEffect(() => {
-     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
        if (!user) {
          router.push('/profil/login');
          return;

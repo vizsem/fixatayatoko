@@ -5,10 +5,10 @@ import { useState, useEffect } from 'react';
 import { Store, Phone, Mail, MapPin, MessageCircle, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
-import { collection, addDoc, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, collection, db, doc, getDoc } from '@/lib/firebase';
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: '',
@@ -79,7 +79,7 @@ export default function ContactPage() {
     try {
       await addDoc(collection(db, 'messages'), {
         ...formData,
-        createdAt: Timestamp.now(),
+        createdAt: new Date().toISOString(),
         status: 'unread',
         type: 'contact_form'
       });

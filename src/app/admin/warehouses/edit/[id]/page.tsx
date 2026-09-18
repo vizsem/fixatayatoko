@@ -2,9 +2,6 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
 
 import {
   ArrowLeft, Save, Warehouse, MapPin,
@@ -12,7 +9,9 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 type WarehouseData = {
   id: string;
   name: string;
@@ -35,7 +34,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
   // 1. Proteksi Admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -87,7 +86,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
       const docRef = doc(db, 'warehouses', id);
       await updateDoc(docRef, {
         ...formData,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
       });
       notify.admin.success('Data gudang berhasil diperbarui');
       setTimeout(() => router.push('/admin/warehouses'), 1500);

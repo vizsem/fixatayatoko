@@ -3,8 +3,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
@@ -12,7 +10,9 @@ import { Package, Download, AlertTriangle, TrendingDown, TrendingUp, Search, Fil
 import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import * as Sentry from '@sentry/nextjs';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, getDocs } from '@/lib/firebase';
 type InventoryItem = {
   id: string;
   name: string;

@@ -3,14 +3,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Download, Users, Warehouse, Package, Activity, Clock, AlertTriangle, ShoppingCart, Database, DollarSign, Info, ArrowRight, ShieldCheck } from 'lucide-react';
 import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import * as Sentry from '@sentry/nextjs';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, getDocs, limit, query, where } from '@/lib/firebase';
 type OperationalMetric = {
   id: string;
   name: string;

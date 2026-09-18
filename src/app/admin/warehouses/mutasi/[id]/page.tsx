@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
 import useProducts from '@/lib/hooks/useProducts';
 
-import {
-  collection, doc, getDoc, getDocs,
-  runTransaction, serverTimestamp
-} from 'firebase/firestore';
 import {
   ArrowRightLeft, Warehouse as WarehouseIcon, Package,
   Loader2, AlertTriangle, Search
@@ -16,7 +11,9 @@ import {
 
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, runTransaction } from '@/lib/firebase';
 interface Warehouse {
   id: string;
   name: string;
@@ -95,7 +92,7 @@ export default function MutasiGudangPage() {
         // Jika 1 produk bisa di banyak gudang, maka logika ini akan membuat dokumen baru
         transaction.update(productRef, {
           warehouseId: targetWarehouseId,
-          updatedAt: serverTimestamp()
+          updatedAt: new Date().toISOString()
         });
 
         // Simpan Log Mutasi untuk History Inventory
@@ -106,8 +103,8 @@ export default function MutasiGudangPage() {
           toWarehouseId: targetWarehouseId,
           amount: amount,
           type: 'MUTASI',
-          date: serverTimestamp(),
-          adminId: auth.currentUser?.uid || 'system'
+          date: new Date().toISOString(),
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system'
         });
       });
 

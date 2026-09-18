@@ -4,17 +4,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import { auth, db } from '@/lib/firebase';
-import {
-  collection, doc, getDoc, getDocs, getCountFromServer, addDoc, updateDoc, deleteDoc, serverTimestamp, query, where, limit
-} from 'firebase/firestore';
 import { Grid, Plus, Search, Edit, Trash2, Package, ChevronRight, X, Download, Layers, Save, Activity } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, collection, db, deleteDoc, doc, getDocs, limit, query, updateDoc, where, getCountFromServer } from '@/lib/firebase';
 type Category = {
   id: string;
   name: string;
@@ -91,9 +89,9 @@ export default function AdminCategories() {
 
     try {
       if (editId) {
-        await updateDoc(doc(db, 'categories', editId), { ...formData, slug, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'categories', editId), { ...formData, slug, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'categories'), { ...formData, slug, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'categories'), { ...formData, slug, createdAt: new Date().toISOString() });
       }
       setFormData({ name: '', description: '' });
       setEditId(null);

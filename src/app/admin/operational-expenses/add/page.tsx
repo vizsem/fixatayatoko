@@ -3,17 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  collection, 
-  addDoc, 
-  Timestamp 
-} from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
-} from 'firebase/storage';
-import { db, storage, auth } from '@/lib/firebase';
-import { 
   ArrowLeft, 
   Save, 
   Upload, 
@@ -21,7 +10,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { auth, storage } from '@/lib/firebase';
 export default function AddOperationalExpensePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -47,21 +38,35 @@ export default function AddOperationalExpensePage() {
 
       // Upload file if exists
       if (file) {
-        const storageRef = ref(storage, `operational_expenses_proofs/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        proofUrl = await getDownloadURL(snapshot.ref);
+        const filePath = `operational_expenses_proofs/${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('operational_expenses_proofs')
+          .upload(filePath, file);
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('operational_expenses_proofs')
+            .getPublicUrl(filePath);
+          proofUrl = publicUrl;
+        } else {
+          console.warn('Storage upload warning:', uploadError.message);
+        }
       }
 
-      // Add document to Firestore
-      await addDoc(collection(db, 'operational_expenses'), {
+      // Add document to Supabase
+      const { error: insertError } = await supabase.from('operational_expenses').insert({
         category,
         amount: Number(amount),
-        date: Timestamp.fromDate(new Date(date)),
+        date: new Date(date).toISOString(),
         description,
         proofOfPayment: proofUrl || null,
-        recordedBy: auth.currentUser?.uid || 'unknown',
-        createdAt: Timestamp.now()
+        recordedBy: (await supabase.auth.getUser()).data.user?.id || 'unknown',
+        createdAt: new Date().toISOString()
       });
+
+      if (insertError) {
+        throw insertError;
+      }
 
       notify.success('Pengeluaran berhasil dicatat');
       router.push('/admin/operational-expenses');

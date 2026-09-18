@@ -2,23 +2,20 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
-  collection, query, orderBy, limit, getDocs, where, Timestamp, getDoc, doc
-} from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { 
   History, ArrowLeftRight, Wallet, Search, Download, AlertCircle, CheckCircle, Clock, User, Package, ArrowUpCircle, ArrowDownCircle, Landmark, ChevronRight, BarChart3, TrendingUp, Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, ref, where } from '@/lib/firebase';
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital';
 
 export default function AuditPage() {
@@ -40,7 +37,7 @@ export default function AuditPage() {
   const [profitSummary, setProfitSummary] = useState({ sales: 0, cost: 0, profit: 0, discount: 0, expenses: 0, netProfit: 0 });
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') {

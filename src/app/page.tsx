@@ -1,9 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, query, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 import useProducts from '@/lib/hooks/useProducts';
@@ -21,7 +18,9 @@ import { HomeFooter } from '@/components/home/HomeFooter';
 import { ProductCard } from '@/components/home/ProductCard';
 import { SkeletonCard } from '@/components/home/SkeletonCard';
 import { HomeSkeleton } from '@/components/home/HomeSkeleton';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, signOut, where } from '@/lib/firebase';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +117,7 @@ export default function Home() {
     updateCartCount();
     window.addEventListener('cart-updated', updateCartCount);
     
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         setCurrentUserName(null);
         setCurrentUserPhotoUrl(null);

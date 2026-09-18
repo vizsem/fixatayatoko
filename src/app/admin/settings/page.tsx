@@ -2,12 +2,6 @@
 
 import { useEffect, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  doc, getDoc, setDoc, collection, getDocs,
-  deleteDoc, addDoc, updateDoc, writeBatch
-} from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import {
   Settings, CreditCard, Printer, Store,
@@ -18,7 +12,9 @@ import {
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { logActivity } from '@/lib/activity';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, onAuthStateChanged, ref, setDoc, updateDoc, writeBatch } from '@/lib/firebase';
 // --- TYPES ---
 type PaymentMethod = { id: string; name: string; enabled: boolean; requiresProof?: boolean; description?: string };
 type DeliveryMethod = { id: string; name: string; enabled: boolean; cost: number; description: string; };
@@ -106,7 +102,7 @@ export default function AdminSettings() {
   const [newDelivery, setNewDelivery] = useState<DeliveryMethod>({ id: '', name: '', enabled: true, cost: 0, description: '' });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
@@ -207,7 +203,7 @@ export default function AdminSettings() {
             const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]) as Record<string, unknown>[];
             const oldSnap = await getDocs(collection(db, sheetName));
             const deleteBatch = writeBatch(db);
-            oldSnap.docs.forEach(d => deleteBatch.delete(d.ref));
+            oldSnap.docs.forEach(d => deleteBatch.delete((d as any).ref || doc(db, sheetName, d.id)));
             await deleteBatch.commit();
             for (let i = 0; i < data.length; i += 500) {
               const batch = writeBatch(db);

@@ -1,6 +1,7 @@
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+// lib/activity.ts - Rewritten for Supabase
+import { supabase } from '@/lib/supabase';
 
+import { auth, limit } from '@/lib/firebase';
 export type ActivityType = 
   | 'LOGIN' 
   | 'LOGOUT' 
@@ -27,7 +28,7 @@ export interface ActivityLog {
 }
 
 /**
- * Log an administrative action to Firestore
+ * Log an administrative action to Supabase activity_logs table
  */
 export const logActivity = async (params: {
   type: ActivityType;
@@ -37,21 +38,18 @@ export const logActivity = async (params: {
   metadata?: Record<string, any>;
 }) => {
   try {
-    const user = auth.currentUser;
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const log: Omit<ActivityLog, 'id'> = {
+    await supabase.from('activity_logs').insert({
       type: params.type,
-      adminId: user.uid,
-      adminName: user.displayName || 'Admin',
-      targetId: params.targetId,
-      targetName: params.targetName,
+      admin_id: user.id,
+      admin_name: user.user_metadata?.full_name || 'Admin',
+      target_id: params.targetId,
+      target_name: params.targetName,
       description: params.description,
       metadata: params.metadata,
-      timestamp: serverTimestamp(),
-    };
-
-    await addDoc(collection(db, 'activity_logs'), log);
+    });
   } catch (error) {
     console.error('Error logging activity:', error);
   }
@@ -62,15 +60,23 @@ export const logActivity = async (params: {
  */
 export const getRecentActivities = async (n = 20) => {
   try {
-    const q = query(
-      collection(db, 'activity_logs'),
-      orderBy('timestamp', 'desc'),
-      limit(n)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(n);
+
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      type: row.type,
+      adminId: row.admin_id,
+      adminName: row.admin_name,
+      targetId: row.target_id,
+      targetName: row.target_name,
+      description: row.description,
+      metadata: row.metadata,
+      timestamp: row.created_at,
     })) as ActivityLog[];
   } catch (error) {
     console.error('Error fetching activities:', error);

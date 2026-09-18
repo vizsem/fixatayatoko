@@ -4,22 +4,17 @@ import Script from 'next/script';
 import './globals.css';
 import MobileNav from '@/components/MobileNav';
 import { Toaster } from 'react-hot-toast';
-import FCMManager from '@/components/FCMManager';
 import CustomerChatWidget from '@/components/CustomerChatWidget';
 import AuthBootstrap from '@/components/AuthBootstrap';
 import BuyerHeaderActions from '@/components/BuyerHeaderActions';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { CartProvider } from '@/lib/context/CartContext';
+import FCMManagerLoader from '@/components/FCMManagerLoader';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-declare global {
-  interface Window {
-    XLSX: typeof import('xlsx');
-  }
-}
-export {};
+// XLSX is dynamically imported via @/lib/xlsx-utils — no global window.XLSX needed.
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -118,7 +113,7 @@ export default function RootLayout({
           <CartProvider>
             <Toaster position="top-center" />
             <AuthBootstrap />
-            <FCMManager />
+            <FCMManagerLoader />
             <CustomerChatWidget />
             <FloatingChatButton />
             <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
@@ -126,7 +121,6 @@ export default function RootLayout({
             </div>
             {children}
             <MobileNav />
-            <Script src="/xlsx.full.min.js" strategy="afterInteractive" />
           </CartProvider>
         </ErrorBoundary>
       </body>

@@ -1,25 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp, 
-  doc, 
-  getDoc,
-  updateDoc,
-  where,
-  limit,
-  getDocs
-} from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Send, Paperclip, X, Image as ImageIcon, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
 interface ChatMessage {
   id: string;
   text: string;
@@ -88,10 +74,10 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
               photoURL: userData?.photoURL || user.photoURL,
             },
             lastMessage: '',
-            lastMessageTime: serverTimestamp(),
+            lastMessageTime: new Date().toISOString(),
             isReadByAdmin: false,
             unreadCount: 0,
-            createdAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
           });
 
           threadId = newThread.id;
@@ -148,7 +134,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text,
         senderId: user?.uid || 'customer',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         isRead: false,
         type: 'text'
       });
@@ -156,7 +142,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
       // Update thread metadata
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: text,
-        lastMessageTime: serverTimestamp(),
+        lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,
         unreadCount: (await getDoc(doc(db, 'chats', chatId))).data()?.unreadCount || 0 + 1
       });
@@ -204,7 +190,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text: 'Mengirim gambar...',
         senderId: user?.uid || 'customer',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         isRead: false,
         type: 'image',
         imageUrl: downloadURL

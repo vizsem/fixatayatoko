@@ -1,465 +1,472 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection, doc, updateDoc, addDoc, query, orderBy, Timestamp, serverTimestamp, getDocs, limit, startAfter, runTransaction, arrayUnion, getDoc, increment
-} from 'firebase/firestore';
-import Link from 'next/link';
-import notify from '@/lib/notify';
-import { postJournal } from '@/lib/ledger';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { ShoppingBag, Plus, CreditCard, Package, Search, ChevronRight, Calendar, Clock, CheckCircle2, XCircle, Filter, Download, User, ArrowRight, X, Info } from 'lucide-react';
-import * as Sentry from '@sentry/nextjs';
-import { TableSkeleton } from '@/components/admin/InventorySkeleton';
-import { Purchase, ProductItem } from '@/lib/types';
+import notify from '@/lib/notify';
+import {
+  ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
+  ChevronRight, Download, Filter, Truck, ClipboardList
+} from 'lucide-react';
+import {
+  getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
+  updatePurchaseStatus, deletePurchaseOrder
+} from '@/lib/actions/purchase.actions';
+import { getSuppliers } from '@/lib/actions/supplier.actions';
+import { getProducts } from '@/lib/actions/product.actions';
+import { getWarehouses } from '@/lib/actions/inventory.actions';
 import * as XLSX from 'xlsx';
 
+type PO = {
+  id: string;
+  poNumber: string;
+  status: string;
+  totalAmount: number;
+  notes?: string | null;
+  createdAt: Date;
+  supplier: { name: string };
+  items: { id: string; quantity: number; unitPrice: number; totalPrice: number; product: { name: string; unit: string } }[];
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  DRAFT: 'bg-gray-100 text-gray-600',
+  PENDING_APPROVAL: 'bg-yellow-100 text-yellow-700',
+  APPROVED: 'bg-blue-100 text-blue-700',
+  RECEIVED: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-red-100 text-red-600',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft',
+  PENDING_APPROVAL: 'Menunggu Approval',
+  APPROVED: 'Disetujui',
+  RECEIVED: 'Diterima',
+  CANCELLED: 'Dibatalkan',
+};
+
+type POItem = { productId: string; quantity: number; unitPrice: number };
+
 export default function AdminPurchases() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [paymentFilter, setPaymentFilter] = useState<string>('all');
-  const [lastDoc, setLastDoc] = useState<any>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+  const [pos, setPos] = useState<PO[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [receiveModal, setReceiveModal] = useState<PO | null>(null);
+  const [detailModal, setDetailModal] = useState<PO | null>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [form, setForm] = useState({ supplierId: '', notes: '' });
+  const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0 }]);
+  const [receiveForm, setReceiveForm] = useState({ warehouseId: '', batchNumber: '', expiryDate: '' });
+  const [saving, setSaving] = useState(false);
 
-  const fetchPurchases = useCallback(async (isMore = false) => {
-    try {
-      if (isMore) setLoadingMore(true);
-      else setLoading(true);
-
-      const q = isMore && lastDoc 
-        ? query(collection(db, 'purchases'), orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(20))
-        : query(collection(db, 'purchases'), orderBy('createdAt', 'desc'), limit(20));
-
-      const snapshot = await getDocs(q);
-      const list = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
-      } as Purchase));
-
-      if (isMore) setPurchases(prev => [...prev, ...list]);
-      else setPurchases(list);
-
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1] ?? null);
-    } catch (err) {
-      Sentry.captureException(err);
-      notify.error("Gagal memuat data pembelian");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [lastDoc]); // Keep lastDoc here if needed for isMore logic
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await getPurchaseOrders();
+    setPos(data as PO[]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin' && userDoc.data()?.role !== 'owner') {
-        notify.aksesDitolakAdmin();
-        return router.push('/profil');
-      }
-      // Only call once after auth is verified
-      fetchPurchases();
+    load();
+    Promise.all([getSuppliers(), getProducts(), getWarehouses()]).then(([s, p, w]) => {
+      setSuppliers(s);
+      setProducts(p);
+      setWarehouses(w);
     });
-    return () => unsubAuth();
-    // Remove fetchPurchases from dependencies to prevent infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [load]);
 
-  const filteredPurchases = useMemo(() => {
-    return purchases.filter(p => {
-      const matchesSearch = p.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-      const matchesPayment = paymentFilter === 'all' || p.paymentStatus === paymentFilter;
-      return matchesSearch && matchesStatus && matchesPayment;
-    });
-  }, [purchases, searchTerm, statusFilter, paymentFilter]);
+  const filtered = useMemo(() => pos.filter(p => {
+    const matchSearch = p.poNumber.toLowerCase().includes(search.toLowerCase()) ||
+      (p.supplier?.name || '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+    return matchSearch && matchStatus;
+  }), [pos, search, statusFilter]);
 
-  const updatePurchaseStatus = async (id: string, newStatus: Purchase['status']) => {
-    const confirmMsg = newStatus === 'DITERIMA' ? 'Konfirmasi barang diterima? Stok akan bertambah.' : 'Batalkan transaksi ini?';
-    if (!confirm(confirmMsg)) return;
-
-    const t = notify.admin.loading(newStatus === 'DITERIMA' ? 'Memproses konfirmasi...' : 'Membatalkan...');
-    try {
-      await runTransaction(db, async (tx) => {
-        const keyRef = doc(db, 'action_keys', `purchase:${id}:${newStatus}`);
-        if ((await tx.get(keyRef)).exists()) throw new Error('Sudah diproses');
-
-        const pRef = doc(db, 'purchases', id);
-        const pSnap = await tx.get(pRef);
-        if (!pSnap.exists()) throw new Error('Not found');
-        const pData = pSnap.data() as Purchase;
-
-        if (pData.status !== 'MENUNGGU') throw new Error('Status bukan MENUNGGU');
-
-        if (newStatus === 'DITERIMA') {
-          // FIX: Read all product snapshots BEFORE any writes to satisfy Firestore transaction requirements
-          const productRefs = pData.items.map(item => doc(db, 'products', item.id));
-          const prodSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
-
-          for (let i = 0; i < pData.items.length; i++) {
-            const item = pData.items[i];
-            const prodSnap = prodSnaps[i];
-
-            if (prodSnap.exists()) {
-              const productRef = productRefs[i];
-              const curData = prodSnap.data();
-              const currentStock = Number(curData.stock || 0);
-              const conv = Number(item.conversion || 1);
-              const incomingPcs = item.quantity * conv;
-              const newStock = currentStock + incomingPcs;
-              
-              const currentCost = Number(curData.Modal || curData.purchasePrice || 0);
-              const incomingCost = conv > 0 ? (item.purchasePrice / conv) : item.purchasePrice;
-              const nextAvgCost = currentStock === 0 ? Math.round(incomingCost) : Math.round(((currentStock * currentCost) + (item.quantity * item.purchasePrice)) / newStock);
-
-              const whKey = pData.warehouseId || 'gudang-utama';
-              const nextWH = { ...(curData.stockByWarehouse || {}) };
-              nextWH[whKey] = (nextWH[whKey] || 0) + incomingPcs;
-
-              tx.update(productRef, {
-                stock: newStock,
-                stockByWarehouse: nextWH,
-                Modal: nextAvgCost,
-                updatedAt: serverTimestamp(),
-                inventoryLayers: arrayUnion({
-                  qty: incomingPcs,
-                  costPerPcs: incomingCost,
-                  ts: Timestamp.now(),
-                  purchaseId: id,
-                  supplierName: pData.supplierName,
-                  warehouseId: whKey
-                })
-              });
-
-              // Sync warehouse capacity
-              const volChange = incomingPcs * (curData.volumeInCtn || 0);
-              if (volChange > 0) {
-                tx.update(doc(db, 'warehouses', whKey), { usedCapacity: increment(volChange) });
-              }
-
-              tx.set(doc(collection(db, 'inventory_logs')), {
-                productId: item.id,
-                productName: curData.name || 'Produk',
-                type: 'MASUK',
-                amount: incomingPcs,
-                adminId: auth.currentUser?.uid,
-                source: 'PURCHASE',
-                note: `PO #${id}`,
-                toWarehouseId: whKey,
-                prevStock: currentStock,
-                nextStock: newStock,
-                date: serverTimestamp()
-              });
-            }
-          }
-
-          await postJournal({
-            debitAccount: 'Inventory',
-            creditAccount: pData.paymentStatus === 'LUNAS' ? 'Cash' : 'AccountsPayable',
-            amount: pData.total,
-            memo: `Penerimaan Barang PO #${id}`,
-            refType: 'PURCHASE',
-            refId: id
-          }, tx);
-        } else if (newStatus === 'DIBATALKAN' && pData.paymentStatus === 'LUNAS') {
-            tx.set(doc(collection(db, 'capital_transactions')), {
-              date: serverTimestamp(),
-              type: 'INJECTION',
-              amount: pData.total,
-              description: `Refund PO #${id}`,
-              recordedBy: auth.currentUser?.uid,
-              referenceId: id,
-              source: 'PURCHASE_CANCEL'
-            });
-        }
-
-        tx.update(pRef, { status: newStatus, updatedAt: serverTimestamp() });
-        tx.set(keyRef, { createdAt: serverTimestamp(), by: auth.currentUser?.uid });
-      });
-
-      notify.admin.success('Berhasil diperbarui!', { id: t });
-      fetchPurchases();
-    } catch (err: any) {
-      Sentry.captureException(err);
-      notify.admin.error(err.message || 'Gagal update status', { id: t });
-    }
+  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0 }]);
+  const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+  const updateItem = (idx: number, key: keyof POItem, value: any) => {
+    setItems(prev => prev.map((item, i) => i === idx ? { ...item, [key]: value } : item));
   };
 
-  const handlePayment = async (purchaseId: string, amount: number) => {
-    const t = notify.admin.loading("Memproses pembayaran...");
-    try {
-      await runTransaction(db, async (tx) => {
-        const pRef = doc(db, 'purchases', purchaseId);
-        const pSnap = await tx.get(pRef);
-        if (!pSnap.exists()) throw new Error('Not found');
-        const pData = pSnap.data() as Purchase;
-        const newPaid = (pData.paidAmount || 0) + amount;
-        const lunas = newPaid >= pData.total;
+  const totalAmount = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
-        tx.update(pRef, {
-          paymentStatus: lunas ? 'LUNAS' : 'HUTANG',
-          paidAmount: newPaid,
-          updatedAt: serverTimestamp()
-        });
-
-        await postJournal({
-          debitAccount: 'AccountsPayable',
-          creditAccount: 'Cash',
-          amount,
-          memo: `Bayar PO #${purchaseId}`,
-          refType: 'PURCHASE_PAYMENT',
-          refId: purchaseId
-        }, tx);
-      });
-      notify.admin.success("Pembayaran berhasil!", { id: t });
-      setPaymentModalOpen(false);
-      fetchPurchases();
-    } catch (err: any) {
-      Sentry.captureException(err);
-      notify.admin.error("Gagal bayar", { id: t });
+  const handleCreate = async () => {
+    if (!form.supplierId) { notify.error('Pilih supplier terlebih dahulu'); return; }
+    if (items.some(i => !i.productId)) { notify.error('Pilih produk untuk semua item'); return; }
+    setSaving(true);
+    // We need a createdById - use a placeholder for now
+    const result = await createPurchaseOrder({
+      supplierId: form.supplierId,
+      createdById: 'system', // TODO: get from session
+      notes: form.notes || undefined,
+      items: items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
+    });
+    if (result.success) {
+      notify.success('Purchase Order dibuat');
+      setModalOpen(false);
+      setForm({ supplierId: '', notes: '' });
+      setItems([{ productId: '', quantity: 1, unitPrice: 0 }]);
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal membuat PO');
     }
+    setSaving(false);
   };
 
-  const handleExport = () => {
-    const data = filteredPurchases.map(p => ({
-      ID: p.id,
-      Tanggal: format(new Date(p.createdAt), 'Pp'),
-      Supplier: p.supplierName,
-      Total: p.total,
-      Status: p.status,
-      Pembayaran: p.paymentStatus
+  const handleReceive = async () => {
+    if (!receiveModal || !receiveForm.warehouseId) { notify.error('Pilih gudang tujuan'); return; }
+    setSaving(true);
+    const result = await receivePurchaseOrder(
+      receiveModal.id,
+      receiveForm.warehouseId,
+      receiveForm.batchNumber || undefined,
+      receiveForm.expiryDate || undefined,
+    );
+    if (result.success) {
+      notify.success('Barang berhasil diterima & stok diperbarui (FEFO)');
+      setReceiveModal(null);
+      setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' });
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal menerima PO');
+    }
+    setSaving(false);
+  };
+
+  const exportExcel = () => {
+    const rows = filtered.map(p => ({
+      'No. PO': p.poNumber,
+      'Supplier': p.supplier.name,
+      'Status': STATUS_LABEL[p.status] || p.status,
+      'Total (Rp)': p.totalAmount,
+      'Tanggal': new Date(p.createdAt).toLocaleDateString('id-ID'),
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Purchases");
-    XLSX.writeFile(wb, `Purchases_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Purchase Orders');
+    XLSX.writeFile(wb, `PO_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
-
-  if (loading) return <div className="p-6"><TableSkeleton rows={10} /></div>;
 
   return (
-    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
-      <Toaster position="top-right" />
-
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <ShoppingBag className="text-blue-600" size={32} /> Supply Chain
-          </h1>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em] mt-1">Purchase order management</p>
+    <>
+      <Toaster />
+      <div className="min-h-screen bg-gray-50 p-3 md:p-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-xl font-black text-gray-900">Purchase Orders</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{pos.length} total PO</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={exportExcel} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm">
+              <Download size={15} /> Export
+            </button>
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm">
+              <Plus size={16} /> Buat PO
+            </button>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3">
-           <button onClick={handleExport} className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all shadow-sm">
-             <Download size={20} />
-           </button>
-           <Link href="/admin/purchases/add" className="bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl active:scale-95 transition-all">
-             <Plus size={18} /> NEW PURCHASE
-           </Link>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat label="Pending PO" val={purchases.filter(p => p.status === 'MENUNGGU').length} color="text-amber-600" bg="bg-amber-50" />
-        <Stat label="Received" val={purchases.filter(p => p.status === 'DITERIMA').length} color="text-emerald-600" bg="bg-emerald-50" />
-        <Stat label="Accounts Payable" val={`Rp ${purchases.filter(p => p.paymentStatus === 'HUTANG').reduce((s, p) => s + (p.total - (p.paidAmount || 0)), 0).toLocaleString()}`} color="text-rose-600" bg="bg-rose-50" span={2} />
-      </div>
-
-      <div className="bg-white p-3 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8 flex flex-col lg:flex-row items-center gap-4">
-        <div className="relative flex-1 w-full">
-           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-           <input 
-             id="purchase-search" 
-             name="purchase-search" 
-             type="text" 
-             placeholder="Search supplier or PO ID..." 
-             className="w-full pl-16 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" 
-             value={searchTerm} 
-             onChange={e => setSearchTerm(e.target.value)} 
-           />
+        {/* Filters */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari nomor PO atau supplier..."
+              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="all">Semua Status</option>
+            {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
         </div>
-        <div className="flex gap-2 w-full lg:w-auto">
-           <select 
-             id="status-filter" 
-             name="status-filter" 
-             value={statusFilter} 
-             onChange={e => setStatusFilter(e.target.value)} 
-             className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none"
-           >
-              <option value="all">Status</option>
-              <option value="MENUNGGU">Pending</option>
-              <option value="DITERIMA">Received</option>
-           </select>
-           <select 
-             id="payment-filter" 
-             name="payment-filter" 
-             value={paymentFilter} 
-             onChange={e => setPaymentFilter(e.target.value)} 
-             className="flex-1 lg:flex-none bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none"
-           >
-              <option value="all">Payment</option>
-              <option value="LUNAS">Paid</option>
-              <option value="HUTANG">Debt</option>
-           </select>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-           <table className="w-full text-left">
-              <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
-                 <tr>
-                    <th className="px-4 py-3">Reference & Date</th>
-                    <th className="px-4 py-3">Supplier & Wh</th>
-                    <th className="px-4 py-3">Financials</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                 {filteredPurchases.map(p => (
-                   <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
+        {/* Stats bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          {['DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED'].map(st => (
+            <div key={st} className={`rounded-xl p-3 ${STATUS_COLOR[st]} border border-opacity-20`}>
+              <p className="text-xs font-bold">{STATUS_LABEL[st]}</p>
+              <p className="text-xl font-black">{pos.filter(p => p.status === st).length}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+            <ClipboardList size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">Belum ada purchase order</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">No. PO</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.map(po => (
+                    <tr key={po.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-4 py-3">
-                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover:text-blue-600 transition-colors"><Package size={16}/></div>
-                            <Link href={`/admin/purchases/${p.id}`} className="block group/ref">
-                               <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{p.id.slice(-8)}</p>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1 group-hover/ref:text-blue-600 transition-colors"><Calendar size={10}/> {new Date(p.createdAt).toLocaleDateString('id-ID')}</p>
-                            </Link>
-                         </div>
+                        <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
                       </td>
                       <td className="px-4 py-3">
-                         <p className="text-[11px] font-black text-slate-700 uppercase tracking-tight">{p.supplierName}</p>
-                         <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{p.warehouseName}</p>
+                        <p className="font-medium text-gray-800">{po.supplier.name}</p>
+                        <p className="text-xs text-gray-400">{po.items.length} item</p>
                       </td>
                       <td className="px-4 py-3">
-                         <p className="text-[11px] font-black text-slate-900 leading-none">Rp {p.total.toLocaleString()}</p>
-                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg w-fit mt-1.5 inline-block ${p.paymentStatus === 'LUNAS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                            {p.paymentStatus}
-                         </span>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${STATUS_COLOR[po.status]}`}>
+                          {STATUS_LABEL[po.status] || po.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">
+                        Rp{po.totalAmount.toLocaleString('id-ID')}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {new Date(po.createdAt).toLocaleDateString('id-ID')}
                       </td>
                       <td className="px-4 py-3">
-                         <span className={`text-[9px] font-black uppercase px-4 py-1.5 rounded-xl border ${p.status === 'DITERIMA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : p.status === 'MENUNGGU' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                            {p.status}
-                         </span>
+                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setDetailModal(po)} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">
+                            Detail
+                          </button>
+                          {po.status === 'APPROVED' && (
+                            <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
+                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1">
+                              <Truck size={12} /> Terima
+                            </button>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                         <div className="flex items-center justify-end gap-2">
-                            {p.status === 'MENUNGGU' && (
-                              <>
-                                 <button onClick={() => updatePurchaseStatus(p.id, 'DITERIMA')} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><CheckCircle2 size={16}/></button>
-                                 <button onClick={() => updatePurchaseStatus(p.id, 'DIBATALKAN')} className="p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all"><XCircle size={16}/></button>
-                              </>
-                            )}
-                            {p.paymentStatus === 'HUTANG' && (
-                              <button onClick={() => { setSelectedPurchase(p); setPaymentModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><CreditCard size={16}/></button>
-                            )}
-                            <Link href={`/admin/purchases/${p.id}`} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><ChevronRight size={16}/></Link>
-                         </div>
-                      </td>
-                   </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-        
-        {lastDoc && (
-          <div className="p-8 flex justify-center border-t border-slate-50">
-             <button onClick={() => fetchPurchases(true)} disabled={loadingMore} className="px-10 py-4 bg-slate-50 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all disabled:opacity-50">
-                {loadingMore ? 'Loading...' : 'Load More Purchases'}
-             </button>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="mt-8 bg-blue-600 rounded-[3rem] p-10 text-white flex flex-col md:flex-row items-center justify-between overflow-hidden relative group">
-         <div className="relative z-10 max-w-xl">
-            <div className="flex items-center gap-3 mb-4">
-               <div className="p-2 bg-white/20 rounded-xl"><Info size={20}/></div>
-               <h3 className="text-xl font-black uppercase tracking-tighter">Automated Stock Control</h3>
+      {/* Create PO Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 my-4">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-black text-gray-900">Buat Purchase Order</h2>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
-            <p className="text-xs font-medium opacity-80 leading-relaxed">
-               Confirming a purchase as &quot;Received&quot; will automatically increment warehouse inventory and recalculate the Average Cost (HPP) for all included SKUs based on the latest purchase price.
-            </p>
-         </div>
-         <div className="mt-8 md:mt-0 relative z-10">
-            <Link href="/admin/inventory" className="px-8 py-4 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all inline-block">Review Inventory</Link>
-         </div>
-         <Package size={200} className="absolute -right-10 -bottom-10 opacity-10 group-hover:rotate-12 transition-all duration-700 pointer-events-none" />
-      </div>
 
-      {paymentModalOpen && selectedPurchase && (
-        <PaymentModal purchase={selectedPurchase} onClose={() => setPaymentModalOpen(false)} onConfirm={(amt) => handlePayment(selectedPurchase.id, amt)} />
-      )}
-    </div>
-  );
-}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Supplier *</label>
+                <select
+                  value={form.supplierId}
+                  onChange={e => setForm(p => ({ ...p, supplierId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Pilih Supplier</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
 
-function Stat({ label, val, color, bg, span = 1 }: any) {
-  return (
-    <div className={`${bg} p-6 rounded-[2rem] border border-slate-50 shadow-sm flex flex-col justify-center ${span > 1 ? `lg:col-span-${span}` : ''}`}>
-       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
-       <p className={`text-2xl font-black ${color}`}>{val}</p>
-    </div>
-  );
-}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-700">Item Pembelian *</label>
+                  <button onClick={addItem} className="text-xs font-bold text-emerald-600 hover:text-emerald-700">+ Tambah Item</button>
+                </div>
+                <div className="space-y-2">
+                  {items.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-5">
+                        <select
+                          value={item.productId}
+                          onChange={e => updateItem(idx, 'productId', e.target.value)}
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="">Pilih Produk</option>
+                          {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number" min="1" value={item.quantity}
+                          onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
+                          placeholder="Qty"
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <input
+                          type="number" min="0" value={item.unitPrice}
+                          onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))}
+                          placeholder="Harga/unit"
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        {items.length > 1 && (
+                          <button onClick={() => removeItem(idx)} className="p-1 text-red-400 hover:text-red-600">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-right">
+                  <span className="text-sm font-bold text-gray-800">Total: Rp{totalAmount.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
 
-function PaymentModal({ purchase, onClose, onConfirm }: { purchase: Purchase; onClose: () => void; onConfirm: (amt: number) => void }) {
-  const remaining = purchase.total - (purchase.paidAmount || 0);
-  const [amt, setAmt] = useState(remaining);
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={onClose} />
-       <div className="bg-white max-w-md w-full rounded-[3rem] p-10 relative z-10 shadow-2xl animate-in zoom-in-95">
-          <div className="flex justify-between items-center mb-8">
-             <h2 className="text-2xl font-black tracking-tight">Record Payment</h2>
-             <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100"><X size={20}/></button>
-          </div>
-          <div className="space-y-4 mb-8">
-             <div className="p-6 bg-slate-50 rounded-3xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Payable</p>
-                <p className="text-2xl font-black text-slate-900">Rp {purchase.total.toLocaleString()}</p>
-                <div className="h-[1px] bg-slate-200 my-4" />
-                <p className="text-[10px] font-black text-rose-500 uppercase mb-1">Remaining Debt</p>
-                <p className="text-xl font-black text-rose-600">Rp {remaining.toLocaleString()}</p>
-             </div>
-             <div>
-                <label htmlFor="payment-amount" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payment Amount</label>
-                <input 
-                  id="payment-amount" 
-                  name="payment-amount" 
-                  type="number" 
-                  value={amt} 
-                  onChange={e => setAmt(Number(e.target.value))} 
-                  className="w-full bg-slate-50 mt-2 px-8 py-5 rounded-[2rem] text-2xl font-black text-center outline-none focus:ring-4 focus:ring-blue-50 transition-all" 
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Catatan</label>
+                <textarea
+                  value={form.notes}
+                  onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                  rows={2}
+                  placeholder="Catatan tambahan..."
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
-             </div>
-          </div>
-          <button onClick={() => onConfirm(amt)} disabled={amt <= 0 || amt > remaining} className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-black disabled:opacity-30 transition-all">
-             Submit Payment Record
-          </button>
-       </div>
-    </div>
-  );
-}
+              </div>
+            </div>
 
-function format(date: Date, fmt: string) {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    if (fmt === 'Pp') {
-        return `${date.toLocaleDateString('id-ID')} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    }
-    if (fmt === 'yyyyMMdd') {
-        return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
-    }
-    return date.toISOString();
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
+              <button onClick={handleCreate} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+                {saving ? 'Menyimpan...' : 'Buat PO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receive PO Modal */}
+      {receiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setReceiveModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-black text-gray-900">Terima Barang</h2>
+              <button onClick={() => setReceiveModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">PO: <strong>{receiveModal.poNumber}</strong> — {receiveModal.supplier.name}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Gudang Tujuan *</label>
+                <select
+                  value={receiveForm.warehouseId}
+                  onChange={e => setReceiveForm(p => ({ ...p, warehouseId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Pilih Gudang</option>
+                  {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">No. Batch (opsional)</label>
+                <input
+                  value={receiveForm.batchNumber}
+                  onChange={e => setReceiveForm(p => ({ ...p, batchNumber: e.target.value }))}
+                  placeholder="Contoh: BATCH-001"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Tanggal Expired (opsional)</label>
+                <input
+                  type="date"
+                  value={receiveForm.expiryDate}
+                  onChange={e => setReceiveForm(p => ({ ...p, expiryDate: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-4">
+              <p className="text-xs text-emerald-700 font-medium">
+                🔒 Sistem FEFO aktif — stok akan diurutkan berdasarkan tanggal expired terdekat saat pengurangan.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setReceiveModal(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
+              <button onClick={handleReceive} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+                {saving ? 'Memproses...' : 'Konfirmasi Terima'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {detailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDetailModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Detail PO</h2>
+                <p className="text-xs text-gray-500 mt-0.5 font-mono">{detailModal.poNumber}</p>
+              </div>
+              <button onClick={() => setDetailModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <div className="flex gap-3 mb-4">
+              <div className="flex-1 bg-gray-50 rounded-xl p-3">
+                <p className="text-xs text-gray-400 font-medium">Supplier</p>
+                <p className="font-bold text-gray-800 text-sm">{detailModal.supplier.name}</p>
+              </div>
+              <div className="flex-1 bg-gray-50 rounded-xl p-3">
+                <p className="text-xs text-gray-400 font-medium">Status</p>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLOR[detailModal.status]}`}>
+                  {STATUS_LABEL[detailModal.status]}
+                </span>
+              </div>
+            </div>
+            <table className="w-full text-sm mb-4">
+              <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                <th className="text-left p-2 rounded-tl-lg">Produk</th>
+                <th className="text-center p-2">Qty</th>
+                <th className="text-right p-2 rounded-tr-lg">Subtotal</th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {detailModal.items.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="p-2 text-gray-800 font-medium">{item.product.name}</td>
+                    <td className="p-2 text-center text-gray-600">{item.quantity} {item.product.unit}</td>
+                    <td className="p-2 text-right font-bold text-gray-900">Rp{item.totalPrice.toLocaleString('id-ID')}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200">
+                  <td colSpan={2} className="p-2 font-bold text-gray-800 text-right">Total:</td>
+                  <td className="p-2 text-right font-black text-emerald-700 text-lg">Rp{detailModal.totalAmount.toLocaleString('id-ID')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

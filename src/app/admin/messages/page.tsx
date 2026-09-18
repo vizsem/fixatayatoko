@@ -1,17 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  where 
-} from 'firebase/firestore';
 import { 
   Mail, 
   MessageCircle, 
@@ -26,7 +15,9 @@ import {
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from '@/lib/firebase';
 type Message = {
   id: string;
   name: string;

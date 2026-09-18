@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Send, Info, Tag } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, collection, db, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
@@ -53,7 +53,7 @@ export default function NotificationsPage() {
             type,
             category: category || (type === 'promo' ? 'Promo' : 'Info'),
             userId: target === 'all' ? 'all' : targetUserId,
-            createdAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
             read: false
         });
         

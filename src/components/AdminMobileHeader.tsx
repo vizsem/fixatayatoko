@@ -34,10 +34,10 @@ import {
   AlertTriangle,
   ChevronRight
 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, where, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, query, signOut, where, getCountFromServer } from '@/lib/firebase';
 interface NavItem {
   label: string;
   href: string;
@@ -88,16 +88,14 @@ export default function AdminMobileHeader() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [filteredItems, setFilteredItems] = useState<NavItem[]>([]);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log('AdminMobileHeader - isMenuOpen changed:', isMenuOpen);
-  }, [isMenuOpen]);
+
 
   // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
-      if (auth.currentUser) {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const user = (await supabase.auth.getUser()).data.user;
+      if (user) {
+        const userDoc = await getDoc(doc(db, 'users', user.id));
         if (userDoc.exists()) {
           setUserProfile(userDoc.data());
         }
@@ -108,14 +106,14 @@ export default function AdminMobileHeader() {
 
   // Listen to unread messages
   useEffect(() => {
-    if (!auth.currentUser) return;
-    
     const fetchUnread = async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
       try {
         const q = query(
           collection(db, 'messages'),
           where('read', '==', false),
-          where('recipientId', '==', auth.currentUser!.uid)
+          where('recipientId', '==', user.id)
         );
         const snap = await getCountFromServer(q);
         setUnreadCount(snap.data().count);
@@ -123,7 +121,6 @@ export default function AdminMobileHeader() {
         console.error('Failed to get unread count', e);
       }
     };
-
     fetchUnread();
   }, []);
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb, FieldValue } from '@/lib/firebaseAdmin';
+import { supabase } from '@/lib/supabase';
 import { briDeriveExternalId, briSnapRequest } from '@/lib/briSnap';
 
 const addMinutesJakartaIso = (minutes: number) => {
@@ -18,22 +18,27 @@ const addMinutesJakartaIso = (minutes: number) => {
 };
 
 export async function POST(req: Request) {
-  if (!adminDb || typeof adminDb.collection !== 'function') {
-    return NextResponse.json({ error: 'Server Misconfiguration: Database connection failed.' }, { status: 500 });
-  }
-
   try {
     const body = await req.json();
     const orderId = String(body?.orderId || '');
     if (!orderId) return NextResponse.json({ error: 'orderId wajib' }, { status: 400 });
 
-    const orderSnap = await adminDb.collection('orders').where('orderId', '==', orderId).limit(1).get();
-    if (orderSnap.empty) return NextResponse.json({ error: 'Order tidak ditemukan' }, { status: 404 });
+    const { data: orders, error: findError } = await supabase
+      .from('orders')
+      .select('*')
+      .or(`order_id.eq.${orderId},id.eq.${orderId}`)
+      .limit(1);
 
-    const orderDoc = orderSnap.docs[0];
-    const orderData = orderDoc.data() as any;
-    const amountValue = Number(orderData?.total || 0);
-    if (!Number.isFinite(amountValue) || amountValue <= 0) return NextResponse.json({ error: 'Total order tidak valid' }, { status: 400 });
+    if (findError || !orders || orders.length === 0) {
+      return NextResponse.json({ error: 'Order tidak ditemukan' }, { status: 404 });
+    }
+
+    const orderDoc = orders[0];
+    const orderData = orderDoc.raw_data || {};
+    const amountValue = Number(orderDoc.total ?? orderData.total ?? 0);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      return NextResponse.json({ error: 'Total order tidak valid' }, { status: 400 });
+    }
 
     const externalId = briDeriveExternalId(orderId);
 
@@ -59,30 +64,36 @@ export async function POST(req: Request) {
       externalId,
     });
 
+    const now = new Date().toISOString();
+
     if (!resp.ok) {
       const msg = String((resp.data as any)?.responseMessage || (resp.data as any)?.error || 'Gagal generate QRIS');
-      await orderDoc.ref.set(
-        {
+      await supabase.from('orders').update({
+        raw_data: {
+          ...orderData,
           payment: {
             ...(orderData.payment || {}),
             bri: {
               provider: 'BRI_SNAP',
               partnerReferenceNo: orderId,
               externalId,
-              lastError: { message: msg, data: resp.data, at: FieldValue.serverTimestamp() },
+              lastError: { message: msg, data: resp.data, at: now },
             },
           },
+          updatedAt: now,
         },
-        { merge: true },
-      );
+        updated_at: now,
+      }).eq('id', orderDoc.id);
+
       return NextResponse.json({ error: msg, data: resp.data }, { status: 502 });
     }
 
     const qrContent = String((resp.data as any)?.qrContent || (resp.data as any)?.qrString || '');
     const referenceNo = String((resp.data as any)?.referenceNo || (resp.data as any)?.qrReferenceNo || '');
 
-    await orderDoc.ref.set(
-      {
+    await supabase.from('orders').update({
+      raw_data: {
+        ...orderData,
         status: orderData.status || 'PENDING',
         paymentStatus: orderData.paymentStatus || 'UNPAID',
         payment: {
@@ -94,16 +105,16 @@ export async function POST(req: Request) {
             externalId,
             referenceNo,
             qrContent,
-            generatedAt: FieldValue.serverTimestamp(),
+            generatedAt: now,
           },
         },
+        updatedAt: now,
       },
-      { merge: true },
-    );
+      updated_at: now,
+    }).eq('id', orderDoc.id);
 
     return NextResponse.json({ orderId, qrContent, referenceNo });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Server error' }, { status: 500 });
   }
 }
-

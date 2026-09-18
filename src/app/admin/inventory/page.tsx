@@ -1,576 +1,344 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { auth, db } from '@/lib/firebase';
-import useProducts from '@/lib/hooks/useProducts';
-import { Product } from '@/lib/types';
-import { addInventoryLog } from '@/lib/inventory';
-import * as Sentry from '@sentry/nextjs';
-
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-
-import { onAuthStateChanged } from 'firebase/auth';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  writeBatch,
-  serverTimestamp,
-  increment
-} from 'firebase/firestore';
-import {
-  Box, Search, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw,
-  ClipboardCheck, Package, Warehouse, ChevronRight,
-  ChevronLeft, ScanBarcode, Image as ImageIcon, Trash2,
-  LucideIcon, BarChart3, CheckSquare, Square, Check, X, MapPinned, FolderInput, EyeOff, GitCompare
+  Package, Search, AlertTriangle, Warehouse, TrendingDown,
+  ArrowDown, ArrowUp, RefreshCw, Filter, BarChart2
 } from 'lucide-react';
+import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjustStock, getWarehouses } from '@/lib/actions/inventory.actions';
+import { getProducts } from '@/lib/actions/product.actions';
 
-import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
+import { limit } from '@/lib/firebase';
+type Tab = 'batches' | 'lowstock' | 'movements';
 
-export default function InventoryDashboard() {
-  const router = useRouter();
+export default function AdminInventory() {
   const [loading, setLoading] = useState(true);
-  const { products: liveProducts, loading: productsLoading } = useProducts({ isActive: true });
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
-  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
+  const [tab, setTab] = useState<Tab>('batches');
+  const [batches, setBatches] = useState<any[]>([]);
+  const [lowStock, setLowStock] = useState<any[]>([]);
+  const [movements, setMovements] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [adjustModal, setAdjustModal] = useState(false);
+  const [adjustForm, setAdjustForm] = useState({ productId: '', warehouseId: '', quantity: 0, notes: '' });
+  const [saving, setSaving] = useState(false);
 
-  // Quick Edit States
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [tempStock, setTempStock] = useState<number>(0);
-  const [unitSelection, setUnitSelection] = useState<Record<string, string>>({});
-
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedWarehouse, setSelectedWarehouse] = useState('all');
-
-  // Pagination & Selection States
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-  const [batchAction, setBatchAction] = useState<'category' | 'warehouse' | 'status' | null>(null);
-  const [batchValue, setBatchValue] = useState('');
-
-  // === GLOBAL BARCODE SCANNER LISTENER ===
-  const [barcodeBuffer, setBarcodeBuffer] = useState('');
-
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
-
-      if (e.key !== 'Enter') {
-        if (e.key.length === 1) setBarcodeBuffer((prev) => prev + e.key);
-        clearTimeout(timeout);
-        timeout = setTimeout(() => setBarcodeBuffer(''), 50); 
-      } else if (barcodeBuffer) {
-        e.preventDefault();
-        setSearchTerm(barcodeBuffer);
-        setBarcodeBuffer('');
-        notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-      clearTimeout(timeout);
-    };
-  }, [barcodeBuffer]);
-
-  useEffect(() => {
-    if (liveProducts) {
-      const sorted = [...(liveProducts as unknown as Product[])].sort((a, b) => {
-        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
-        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
-        return timeB - timeA;
-      });
-      setProducts(sorted);
-    }
-  }, [liveProducts]);
-
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      const unsubCats = onSnapshot(collection(db, 'categories'), (s) => {
-        setCategories(s.docs.map(d => ({ id: d.id, name: String(d.data().name || '') })));
-      });
-      const unsubWh = onSnapshot(collection(db, 'warehouses'), (s) => {
-        setWarehouses(s.docs.map(d => ({ id: d.id, name: String(d.data().name || '') })));
-      });
-      setLoading(false);
-      return () => {
-        unsubCats();
-        unsubWh();
-      };
-    });
-    return () => unsubAuth();
-  }, [router]);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const nameMatch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const skuMatch = ((p as any).sku || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSearch = nameMatch || skuMatch;
-      const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-      const matchesWarehouse = selectedWarehouse === 'all' || ((p as any).warehouseId || '') === selectedWarehouse;
-      return matchesSearch && matchesCategory && matchesWarehouse;
-    });
-  }, [products, searchTerm, selectedCategory, selectedWarehouse]);
-
-  const displayWarehouses = useMemo(() => {
-    const base = warehouses;
-    const knownIds = new Set(base.map(w => w.id));
-    const knownNames = new Set(base.map(w => w.name));
-    const derived = new Set<string>();
-    products.forEach((p) => {
-      const by = (p.stockByWarehouse || {});
-      Object.keys(by).forEach(k => derived.add(k));
-      const pAny = p as any;
-      if (pAny.warehouseId) derived.add(String(pAny.warehouseId));
-    });
-    const virtuals = Array.from(derived)
-      .filter(k => !knownIds.has(k) && !knownNames.has(k))
-      .map(k => ({ id: k, name: k }));
-    return [...base, ...virtuals];
-  }, [warehouses, products]);
-
-  const unitCodes = (p: Product) => {
-    const set = new Set<string>();
-    const base = (p.unit || '').toUpperCase();
-    if (base) set.add(base);
-    (p.units || []).forEach(u => {
-      const code = (u.code || '').toUpperCase();
-      if (code) set.add(code);
-    });
-    return Array.from(set);
-  };
-
-  const displayedStock = (p: Product) => {
-    const selected = (unitSelection[p.id] || p.unit || '').toUpperCase();
-    if (!selected || selected === (p.unit || '').toUpperCase()) return p.stock;
-    const found = (p.units || []).find(u => (u.code || '').toUpperCase() === selected && typeof u.contains === 'number' && u.contains > 0);
-    if (!found) return p.stock;
-    return Math.floor(p.stock / (found.contains as number));
-  };
-
-  const stockBreakdown = (p: Product) => {
-    const ctnUnit = p.units?.find((u: any) => 
-      ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
-    );
-    if (!ctnUnit || typeof ctnUnit.contains !== 'number' || ctnUnit.contains <= 1) return null;
-    
-    const conversion = ctnUnit.contains;
-    const ctnQty = Math.floor(p.stock / conversion);
-    const pcsQty = p.stock % conversion;
-    
-    const baseLabel = (p.unit || 'Pcs').toUpperCase();
-    const ctnLabel = ctnUnit.code.toUpperCase() === 'DUS' ? 'CTN' : ctnUnit.code.toUpperCase();
-    
-    if (ctnQty > 0) {
-      if (pcsQty > 0) {
-        return `${ctnQty} ${ctnLabel} + ${pcsQty} ${baseLabel}`;
-      }
-      return `${ctnQty} ${ctnLabel}`;
-    }
-    return `${pcsQty} ${baseLabel}`;
-  };
-
-  const handleQuickUpdate = async (id: string) => {
-    try {
-      const product = products.find(p => p.id === id);
-      if (!product) return;
-      const diff = tempStock - product.stock;
-      if (diff === 0) {
-        setEditingId(null);
-        return;
-      }
-      const ref = doc(db, 'products', id);
-      const whId = (product as any).warehouseId || 'gudang-utama';
-      const volChange = diff * (product.volumeInCtn || 0);
-
-      const batch = writeBatch(db);
-      batch.update(ref, { stock: tempStock, updatedAt: serverTimestamp() });
-      
-      if (volChange !== 0) {
-        batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(volChange) });
-      }
-
-      const logRef = doc(collection(db, 'inventory_logs'));
-      batch.set(logRef, {
-        productId: id,
-        productName: product.name,
-        type: diff > 0 ? 'MASUK' : 'KELUAR',
-        amount: Math.abs(diff),
-        adminId: auth.currentUser?.uid || 'system',
-        source: 'MANUAL',
-        note: `Quick Update via Dashboard. Prev: ${product.stock}, New: ${tempStock}`,
-        toWarehouseId: diff > 0 ? whId : undefined,
-        fromWarehouseId: diff < 0 ? whId : undefined,
-        date: serverTimestamp()
-      });
-
-      await batch.commit();
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: tempStock } : p));
-      setEditingId(null);
-      notify.admin.success('Stok diperbarui');
-    } catch (err) { 
-      Sentry.captureException(err, { extra: { productId: id, action: 'quickUpdate' } });
-      notify.admin.error('Gagal memperbarui stok'); 
-    }
-  };
-
-  const totalPages = useMemo(() => Math.ceil(filteredProducts.length / rowsPerPage), [filteredProducts.length, rowsPerPage]);
-  const indexOfLastItem = currentPage * rowsPerPage;
-  const indexOfFirstItem = indexOfLastItem - rowsPerPage;
-  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
-
-  const executeBatchUpdate = async () => {
-    if (!batchAction || selectedIds.length === 0) return;
+  const load = useCallback(async () => {
     setLoading(true);
-    const batch = writeBatch(db);
-    selectedIds.forEach(id => {
-      const pRef = doc(db, 'products', id);
-      const updateData: any = { updatedAt: serverTimestamp() };
-      if (batchAction === 'category') updateData.category = batchValue;
-      if (batchAction === 'warehouse') (updateData as any).warehouseId = batchValue;
-      if (batchAction === 'status') updateData.isActive = false;
-      batch.update(pRef, updateData);
+    const [b, ls, m, w, p] = await Promise.all([
+      getInventoryBatches(),
+      getLowStockProducts(10),
+      getInventoryMovements({ limit: 100 }),
+      getWarehouses(),
+      getProducts(),
+    ]);
+    setBatches(b);
+    setLowStock(ls);
+    setMovements(m);
+    setWarehouses(w);
+    setProducts(p);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filteredBatches = useMemo(() => batches.filter(b => {
+    const matchWarehouse = warehouseFilter === 'all' || b.warehouseId === warehouseFilter;
+    const matchSearch = b.product.name.toLowerCase().includes(search.toLowerCase()) ||
+      b.product.sku.toLowerCase().includes(search.toLowerCase()) ||
+      b.batchNumber.toLowerCase().includes(search.toLowerCase());
+    return matchWarehouse && matchSearch;
+  }), [batches, warehouseFilter, search]);
+
+  const handleAdjust = async () => {
+    if (!adjustForm.productId || !adjustForm.warehouseId || adjustForm.quantity === 0) {
+      notify.error('Isi semua kolom yang diperlukan');
+      return;
+    }
+    setSaving(true);
+    const result = await adjustStock({
+      productId: adjustForm.productId,
+      warehouseId: adjustForm.warehouseId,
+      quantity: adjustForm.quantity,
+      notes: adjustForm.notes || undefined,
     });
-    try {
-      await batch.commit();
-      setSelectedIds([]);
-      setIsBatchModalOpen(false);
-      notify.admin.success('Batch update berhasil');
-    } catch (err) { 
-      Sentry.captureException(err, { extra: { action: 'batchUpdate', count: selectedIds.length } });
-      notify.admin.error('Batch update gagal'); 
-    } finally { setLoading(false); }
+    if (result.success) {
+      notify.success('Stok berhasil disesuaikan');
+      setAdjustModal(false);
+      setAdjustForm({ productId: '', warehouseId: '', quantity: 0, notes: '' });
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal menyesuaikan stok');
+    }
+    setSaving(false);
   };
 
-  const executeBatchDelete = async () => {
-    if (selectedIds.length === 0) return;
-    const ok = window.confirm(`Hapus permanen ${selectedIds.length} produk?`);
-    if (!ok) return;
-    setLoading(true);
-    const batch = writeBatch(db);
-    selectedIds.forEach(id => batch.delete(doc(db, 'products', id)));
-    try {
-      await batch.commit();
-      setSelectedIds([]);
-      notify.admin.success('Produk berhasil dihapus');
-    } catch (err) {
-      Sentry.captureException(err, { extra: { action: 'batchDelete', count: selectedIds.length } });
-      notify.admin.error('Gagal menghapus produk');
-    } finally { setLoading(false); }
-  };
+  const totalBatchQty = batches.reduce((sum, b) => sum + b.quantity, 0);
+  const expiringSoon = batches.filter(b => {
+    if (!b.expiryDate) return false;
+    const diff = new Date(b.expiryDate).getTime() - Date.now();
+    return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000; // 30 hari
+  }).length;
 
-  if (loading || productsLoading) return <InventorySkeleton />;
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: 'batches', label: 'Batch Stok', count: batches.length },
+    { key: 'lowstock', label: 'Stok Rendah', count: lowStock.length },
+    { key: 'movements', label: 'Pergerakan', count: movements.length },
+  ];
 
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
-      <Toaster position="top-right" />
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4">
-        <NavCard icon={ArrowDownLeft} label="In" href={`/admin/inventory/stock-in?ids=${selectedIds.join(',')}`} color="text-green-600" bg="bg-green-50" />
-        <NavCard icon={ArrowUpRight} label="Out" href={`/admin/inventory/stock-out?ids=${selectedIds.join(',')}`} color="text-red-600" bg="bg-red-50" />
-        <NavCard icon={RefreshCw} label="TF" href={`/admin/inventory/transfer?ids=${selectedIds.join(',')}`} color="text-blue-600" bg="bg-blue-50" />
-        <NavCard icon={ClipboardCheck} label="Op" href="/admin/inventory/opname" color="text-purple-600" bg="bg-purple-50" />
-        <NavCard icon={GitCompare} label="Rec" href="/admin/inventory/reconciliation" color="text-teal-600" bg="bg-teal-50" />
-        <NavCard icon={BarChart3} label="Sync" href="/admin/inventory/sync-monitor" color="text-indigo-600" bg="bg-indigo-50" />
-        <NavCard icon={Box} label="Log" href="/admin/inventory/history" color="text-orange-600" bg="bg-orange-50" />
-      </div>
-
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
-        <div>
-          <h1 className="text-xl font-black text-gray-800 tracking-tighter flex items-center gap-2">
-            <Package className="text-green-600" size={22} /> Inventory Hub
-          </h1>
-          <p className="text-gray-400 text-[8px] font-black uppercase tracking-widest mt-0.5">Realtime SKU Monitor</p>
-        </div>
-        <div className="flex gap-1.5">
-          <Link href="/admin/products/add" className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg flex items-center gap-1.5">
-            <Plus size={14} /> NEW SKU
-          </Link>
-        </div>
-      </div>
-
-      <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-4 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-            <input 
-              id="inventory-search" 
-              name="inventory-search" 
-              className="w-full bg-gray-50 pl-9 pr-4 py-2.5 rounded-xl text-[11px] font-bold outline-none" 
-              placeholder="Search SKU, Name..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
+    <>
+      <Toaster />
+      <div className="min-h-screen bg-gray-50 p-3 md:p-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-xl font-black text-gray-900">Manajemen Inventori</h1>
+            <p className="text-xs text-gray-500 mt-0.5">FEFO (First Expired First Out) aktif</p>
           </div>
-          <select 
-            id="category-filter" 
-            name="category-filter" 
-            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" 
-            value={selectedCategory} 
-            onChange={(e) => setSelectedCategory(e.target.value)}
-          >
-            <option value="all">CAT: ALL</option>
-            {categories.map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
-          </select>
-          <select 
-            id="warehouse-filter" 
-            name="warehouse-filter" 
-            className="bg-gray-50 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight outline-none" 
-            value={selectedWarehouse} 
-            onChange={(e) => setSelectedWarehouse(e.target.value)}
-          >
-            <option value="all">WH: ALL</option>
-            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name.toUpperCase()}</option>)}
-          </select>
+          <div className="flex gap-2">
+            <button onClick={load} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 shadow-sm">
+              <RefreshCw size={15} /> Refresh
+            </button>
+            <button onClick={() => setAdjustModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm">
+              <BarChart2 size={16} /> Sesuaikan Stok
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3 pt-2 border-t border-gray-50">
-          <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">ROWS:</span>
-          {[50, 100, 300].map(val => (
-            <button key={val} onClick={() => setRowsPerPage(val)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${rowsPerPage === val ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>{val}</button>
-          ))}
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-        <div className="md:hidden">
-          {currentItems.map(product => (
-            <div key={product.id} className={`p-3.5 flex flex-col gap-3 border-b border-gray-50 ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : 'bg-white'}`}>
-               <div className="flex items-start gap-3">
-                <button onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i => i !== product.id) : [...prev, product.id])} className="mt-1 text-gray-200">
-                  {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={18} /> : <Square size={18} />}
-                </button>
-                <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-200 overflow-hidden relative shrink-0">
-                  {product.image ? <img src={product.image} className="object-cover" alt={product.name} /> : <ImageIcon size={18} />}
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs text-gray-400 font-medium mb-1">Total Batch</p>
+            <p className="text-2xl font-black text-gray-900">{batches.length}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs text-gray-400 font-medium mb-1">Total Qty</p>
+            <p className="text-2xl font-black text-emerald-700">{totalBatchQty.toLocaleString()}</p>
+          </div>
+          <div className="bg-amber-50 rounded-2xl border border-amber-100 shadow-sm p-4">
+            <p className="text-xs text-amber-500 font-medium mb-1">Exp. &lt; 30 hari</p>
+            <p className="text-2xl font-black text-amber-700">{expiringSoon}</p>
+          </div>
+          <div className="bg-red-50 rounded-2xl border border-red-100 shadow-sm p-4">
+            <p className="text-xs text-red-400 font-medium mb-1">Stok Rendah</p>
+            <p className="text-2xl font-black text-red-700">{lowStock.length}</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex border-b border-gray-100">
+            {tabs.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${tab === t.key ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {t.label}
+                <span className={`px-2 py-0.5 rounded-full text-xs ${tab === t.key ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                  {t.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4">
+            {/* Filters for batches */}
+            {tab === 'batches' && (
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Cari produk, SKU, atau batch..."
+                    className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[8px] font-black text-blue-500 italic">#{(product as any).sku || 'N/A'}</span>
-                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">• {product.category || 'GENERAL'}</span>
-                  </div>
-                  <h3 className="text-[11px] font-black text-gray-800 uppercase leading-none tracking-tight line-clamp-2 mb-1.5">{product.name}</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-emerald-600">
-                      {(() => {
-                        const sel = (unitSelection[product.id] || product.unit || '').toUpperCase();
-                        if (sel === (product.unit || '').toUpperCase()) return `Rp${Number(product.price || 0).toLocaleString('id-ID')} /${sel}`;
-                        const found = (product.units || []).find(u => (u.code || '').toUpperCase() === sel);
-                        return `Rp${Number(found?.price || 0).toLocaleString('id-ID')} /${sel}`;
-                      })()}
-                    </span>
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg"><ChevronRight size={14} /></Link>
-                  </div>
-                </div>
+                <select
+                  value={warehouseFilter}
+                  onChange={e => setWarehouseFilter(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Semua Gudang</option>
+                  {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
               </div>
-              <div className="flex items-center justify-between pt-2 px-1 border-t border-gray-50/50">
-                <div className="flex flex-col gap-1 w-full">
-                  <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Available Stock</p>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    {editingId === product.id ? (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-gray-100 rounded-lg">
-                          <input autoFocus type="number" className="w-16 p-2 bg-transparent text-[11px] font-black outline-none text-right" value={tempStock} onChange={(e) => setTempStock(Number(e.target.value))} />
-                          <span className="pr-2 text-[10px] font-bold text-gray-400 uppercase">{product.unit || 'PCS'}</span>
-                        </div>
-                        <button onClick={() => handleQuickUpdate(product.id)} className="p-2 bg-black text-white rounded-lg"><Check size={12} /></button>
-                        <button onClick={() => setEditingId(null)} className="p-2 bg-gray-200 text-gray-500 rounded-lg"><X size={12} /></button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-0.5">
-                        <button onClick={() => { setEditingId(product.id); setTempStock(product.stock); }} className={`text-[11px] font-black px-2.5 py-1.5 rounded-xl transition-all w-fit ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}>
-                          {displayedStock(product).toLocaleString()} <span className="text-[9px] opacity-60 ml-0.5 font-bold">{(unitSelection[product.id] || product.unit || '').toUpperCase() === 'DUS' ? 'CTN' : (unitSelection[product.id] || product.unit || '').toUpperCase()}</span>
-                        </button>
-                        
-                        {/* Stock Breakdown */}
-                        {stockBreakdown(product) && (
-                          <span className="text-[9px] font-bold text-slate-400 mt-0.5">
-                            (= {stockBreakdown(product)})
-                          </span>
-                        )}
-                      </div>
-                    )}
+            )}
 
-                    {/* Unit Selector */}
-                    {unitCodes(product).length > 1 && (
-                      <select
-                        value={unitSelection[product.id] || product.unit || ''}
-                        onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
-                        className="text-[9px] font-black text-gray-400 uppercase bg-gray-50 hover:bg-gray-100 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                      >
-                        {unitCodes(product).map(u => (
-                          <option key={u} value={u}>{u === 'DUS' ? 'CTN' : u}</option>
+            {loading ? (
+              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+            ) : (
+              <>
+                {/* Batches Tab */}
+                {tab === 'batches' && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                        <th className="text-left p-3">Produk</th>
+                        <th className="text-left p-3">Gudang</th>
+                        <th className="text-left p-3">No. Batch</th>
+                        <th className="text-center p-3">Qty</th>
+                        <th className="text-left p-3">Expired</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {filteredBatches.length === 0 ? (
+                          <tr><td colSpan={5} className="text-center py-8 text-gray-400 text-sm">Tidak ada data</td></tr>
+                        ) : filteredBatches.map(b => {
+                          const isExpiringSoon = b.expiryDate && new Date(b.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+                          const isExpired = b.expiryDate && new Date(b.expiryDate) < new Date();
+                          return (
+                            <tr key={b.id} className={`hover:bg-gray-50 transition-colors ${isExpired ? 'bg-red-50' : isExpiringSoon ? 'bg-amber-50' : ''}`}>
+                              <td className="p-3">
+                                <p className="font-bold text-gray-800">{b.product.name}</p>
+                                <p className="text-xs text-gray-400 font-mono">{b.product.sku}</p>
+                              </td>
+                              <td className="p-3 text-gray-600">{b.warehouse.name}</td>
+                              <td className="p-3 font-mono text-xs text-gray-600">{b.batchNumber}</td>
+                              <td className="p-3 text-center">
+                                <span className={`px-3 py-1 rounded-lg text-xs font-bold ${b.quantity < 5 ? 'bg-red-100 text-red-700' : b.quantity < 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  {b.quantity} {b.product.unit}
+                                </span>
+                              </td>
+                              <td className="p-3 text-xs">
+                                {b.expiryDate ? (
+                                  <span className={`font-bold ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-amber-600' : 'text-gray-600'}`}>
+                                    {isExpired ? '⚠️ ' : isExpiringSoon ? '⏰ ' : ''}
+                                    {new Date(b.expiryDate).toLocaleDateString('id-ID')}
+                                  </span>
+                                ) : <span className="text-gray-400">—</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Low Stock Tab */}
+                {tab === 'lowstock' && (
+                  <div className="space-y-3">
+                    {lowStock.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Package size={40} className="mx-auto text-gray-300 mb-2" />
+                        <p className="text-gray-400 text-sm">Semua stok dalam kondisi aman 🎉</p>
+                      </div>
+                    ) : lowStock.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+                        <div>
+                          <p className="font-bold text-gray-800 text-sm">{p.name}</p>
+                          <p className="text-xs text-gray-500 font-mono">{p.sku} · {p.category?.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-red-600">{p.stock}</p>
+                          <p className="text-xs text-red-400 font-medium">{p.unit} tersisa</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Movements Tab */}
+                {tab === 'movements' && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                        <th className="text-left p-3">Produk</th>
+                        <th className="text-left p-3">Gudang</th>
+                        <th className="text-center p-3">Tipe</th>
+                        <th className="text-center p-3">Qty</th>
+                        <th className="text-left p-3">Referensi</th>
+                        <th className="text-left p-3">Tanggal</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {movements.length === 0 ? (
+                          <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Belum ada pergerakan stok</td></tr>
+                        ) : movements.map((m: any) => (
+                          <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="p-3">
+                              <p className="font-bold text-gray-800">{m.product.name}</p>
+                              <p className="text-xs text-gray-400 font-mono">{m.batch.batchNumber}</p>
+                            </td>
+                            <td className="p-3 text-gray-600 text-xs">{m.warehouse.name}</td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                                m.type === 'IN' ? 'bg-emerald-100 text-emerald-700' :
+                                m.type === 'OUT' ? 'bg-red-100 text-red-600' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {m.type === 'IN' ? <ArrowDown size={10} className="inline mr-1" /> : m.type === 'OUT' ? <ArrowUp size={10} className="inline mr-1" /> : null}
+                                {m.type}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center font-bold text-gray-800">{Math.abs(m.quantity)}</td>
+                            <td className="p-3 text-xs text-gray-500">{m.reference || '—'}</td>
+                            <td className="p-3 text-xs text-gray-500">{new Date(m.createdAt).toLocaleDateString('id-ID')}</td>
+                          </tr>
                         ))}
-                      </select>
-                    )}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Adjust Stock Modal */}
+      {adjustModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAdjustModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-black text-gray-900">Penyesuaian Stok</h2>
+              <button onClick={() => setAdjustModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Produk *</label>
+                <select value={adjustForm.productId} onChange={e => setAdjustForm(p => ({ ...p, productId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Pilih Produk</option>
+                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Gudang *</label>
+                <select value={adjustForm.warehouseId} onChange={e => setAdjustForm(p => ({ ...p, warehouseId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Pilih Gudang</option>
+                  {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Jumlah (positif = tambah, negatif = kurangi) *</label>
+                <input type="number" value={adjustForm.quantity} onChange={e => setAdjustForm(p => ({ ...p, quantity: Number(e.target.value) }))}
+                  placeholder="Contoh: 50 atau -10"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Catatan</label>
+                <input value={adjustForm.notes} onChange={e => setAdjustForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Alasan penyesuaian..."
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50/50">
-              <tr>
-                <th className="px-4 py-2 w-10">
-                  <button onClick={() => setSelectedIds(selectedIds.length === currentItems.length ? [] : currentItems.map(p => p.id))}>
-                    {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-300" size={16} />}
-                  </button>
-                </th>
-                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Product</th>
-                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest">Warehouse</th>
-                <th className="px-4 py-2 text-[9px] font-black text-gray-400 tracking-widest text-center">Stock</th>
-                <th className="px-4 py-2 text-right text-[9px] font-black text-gray-400 tracking-widest">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {currentItems.map(product => (
-                <tr key={product.id} className={`hover:bg-gray-50/50 ${selectedIds.includes(product.id) ? 'bg-blue-50/40' : ''}`}>
-                  <td className="px-4 py-2">
-                    <button onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i => i !== product.id) : [...prev, product.id])}>
-                      {selectedIds.includes(product.id) ? <CheckSquare className="text-black" size={16} /> : <Square className="text-gray-200" size={16} />}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-xl relative overflow-hidden">
-                        {product.image ? <img src={product.image} className="object-cover" alt={product.name} /> : <ImageIcon size={16} className="m-3 text-gray-300" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-gray-800">{product.name}</span>
-                        <span className="text-[8px] font-bold text-gray-400">{(product as any).sku} • {product.category}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-[9px] font-black text-gray-500">
-                    {displayWarehouses.find(w => w.id === (product as any).warehouseId)?.name || 'Central'}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      {editingId === product.id ? (
-                        <div className="flex items-center gap-1 justify-center">
-                          <div className="flex items-center bg-gray-100 rounded-lg">
-                            <input 
-                              autoFocus 
-                              type="number" 
-                              className="w-16 p-1.5 bg-transparent text-[10px] font-black outline-none text-right" 
-                              value={tempStock} 
-                              onChange={(e) => setTempStock(Number(e.target.value))} 
-                            />
-                            <span className="pr-1.5 text-[9px] font-bold text-gray-400 uppercase">{product.unit || 'PCS'}</span>
-                          </div>
-                          <button onClick={() => handleQuickUpdate(product.id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"><Check size={10} /></button>
-                          <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-200 text-gray-500 hover:bg-gray-300 rounded-lg"><X size={10} /></button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center">
-                          <span 
-                            onClick={() => { setEditingId(product.id); setTempStock(product.stock); }}
-                            className={`text-[10px] font-black px-2 py-1 rounded-lg cursor-pointer hover:opacity-80 transition-all ${product.stock <= (product.minStock || 0) ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-800'}`}
-                            title="Klik untuk quick edit stok dasar"
-                          >
-                            {displayedStock(product).toLocaleString()} {(unitSelection[product.id] || product.unit || '').toUpperCase() === 'DUS' ? 'CTN' : (unitSelection[product.id] || product.unit || '').toUpperCase()}
-                          </span>
-                          
-                          {/* Stock Breakdown */}
-                          {stockBreakdown(product) && (
-                            <span className="text-[9px] font-bold text-slate-400 mt-0.5 whitespace-nowrap">
-                              (= {stockBreakdown(product)})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Unit Selector */}
-                      {unitCodes(product).length > 1 && (
-                        <select
-                          value={unitSelection[product.id] || product.unit || ''}
-                          onChange={(e) => setUnitSelection(prev => ({ ...prev, [product.id]: e.target.value }))}
-                          className="text-[8px] font-black text-gray-400 uppercase bg-gray-50 hover:bg-gray-100 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                        >
-                          {unitCodes(product).map(u => (
-                            <option key={u} value={u}>{u === 'DUS' ? 'CTN' : u}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <Link href={`/admin/products/edit/${product.id}`} className="p-1.5 border rounded-lg inline-block"><ChevronRight size={14} /></Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-between items-center px-4">
-        <span className="text-[10px] font-black text-gray-400 uppercase">Page {currentPage} of {totalPages}</span>
-        <div className="flex gap-2">
-          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 border rounded-xl disabled:opacity-30"><ChevronLeft size={16} /></button>
-          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 border rounded-xl disabled:opacity-30"><ChevronRight size={16} /></button>
-        </div>
-      </div>
-
-      {selectedIds.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-4 rounded-3xl shadow-2xl z-50 flex items-center gap-6 animate-in slide-in-from-bottom-10">
-          <span className="text-[11px] font-black text-emerald-400">{selectedIds.length} SELECTED</span>
-          <div className="flex gap-4">
-            <button onClick={() => { setBatchAction('warehouse'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1"><MapPinned size={18} /><span className="text-[8px] font-black">Move</span></button>
-            <button onClick={() => { setBatchAction('category'); setIsBatchModalOpen(true); }} className="flex flex-col items-center gap-1"><FolderInput size={18} /><span className="text-[8px] font-black">Category</span></button>
-            <button onClick={executeBatchDelete} className="flex flex-col items-center gap-1"><Trash2 size={18} className="text-red-400" /><span className="text-[8px] font-black">Delete</span></button>
-          </div>
-          <button onClick={() => setSelectedIds([])} className="bg-gray-800 p-2 rounded-full"><X size={16} /></button>
-        </div>
-      )}
-
-      {isBatchModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] p-8">
-            <h2 className="text-xl font-black mb-6">{batchAction === 'warehouse' ? 'Relocate' : 'Reclassify'}</h2>
-            <select className="w-full bg-gray-50 p-5 rounded-3xl text-xs font-black outline-none mb-10" value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
-              <option value="">Select Target...</option>
-              {batchAction === 'warehouse' ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>) : categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-            <div className="flex gap-4">
-              <button onClick={() => setIsBatchModalOpen(false)} className="flex-1 py-5 text-[10px] font-black text-gray-400">Cancel</button>
-              <button onClick={executeBatchUpdate} className="flex-1 py-5 bg-black text-white rounded-[2rem] text-[10px] font-black">Confirm</button>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setAdjustModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
+              <button onClick={handleAdjust} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Memproses...' : 'Terapkan'}
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-interface NavCardProps {
-  icon: LucideIcon;
-  label: string;
-  href?: string;
-  color: string;
-  bg: string;
-}
-
-function NavCard({ icon: Icon, label, href, color, bg }: NavCardProps) {
-  return (
-    <Link href={href || '#'} className={`p-3 rounded-2xl ${bg} ${color} flex flex-col items-center gap-1 hover:scale-[1.05] transition-all cursor-pointer shadow-sm border border-transparent hover:border-current active:scale-95 w-full`}>
-      <Icon size={18} />
-      <span className="text-[8px] font-black tracking-widest uppercase">{label}</span>
-    </Link>
+    </>
   );
 }

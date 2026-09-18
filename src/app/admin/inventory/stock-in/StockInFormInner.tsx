@@ -5,24 +5,14 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  serverTimestamp,
-  runTransaction
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { ArrowDown, Plus } from 'lucide-react';
 import notify from '@/lib/notify';
 import { addStockTx, computeAverageCost } from '@/lib/inventory';
+import { supabase } from '@/lib/supabase';
 
 
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, runTransaction } from '@/lib/firebase';
 type Product = {
   id: string;
   name: string;
@@ -86,7 +76,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -130,7 +120,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           quantity: formData.quantity,
           purchasePrice: formData.purchasePrice,
           expiredDate: formData.expiredDate,
-          createdAt: serverTimestamp()
+          createdAt: new Date().toISOString()
         };
 
         // Baca data produk untuk menghitung Modal (Average Cost) baru
@@ -155,8 +145,8 @@ export default function StockInFormInner({ productId }: { productId: string }) {
             productId: formData.productId,
             oldCost: oldModal,
             newCost: newModal,
-            adminEmail: auth.currentUser?.email || 'system',
-            changeDate: serverTimestamp()
+            adminEmail: (await supabase.auth.getUser()).data.user?.email || 'system',
+            changeDate: new Date().toISOString()
           });
         }
 
@@ -165,7 +155,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
           productId: formData.productId,
           amount: formData.quantity,
           warehouseId: 'gudang-utama',
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           note: `Pembelian dari ${transactionData.supplierName}`,
           source: 'PURCHASE',
           prefetchedSnap: productSnap,

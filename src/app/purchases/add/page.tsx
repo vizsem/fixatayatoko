@@ -4,18 +4,10 @@
 import { useEffect, useState, useCallback } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  serverTimestamp
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import toast, { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
 type Supplier = {
   id: string;
   name: string;
@@ -93,7 +85,7 @@ export default function AddPurchasePage() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -189,7 +181,7 @@ export default function AddPurchasePage() {
         subtotal: calculateSubtotal(),
         total: calculateTotal(),
         status: 'MENUNGGU',
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       };
 
       await addDoc(collection(db, 'purchases'), purchaseData);

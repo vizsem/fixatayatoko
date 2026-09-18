@@ -2,26 +2,13 @@
  * Stock Sync Service - Sinkronisasi otomatis antara produk dan gudang
  */
 
-import { db } from '@/lib/firebase';
-import {
-  doc,
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  writeBatch,
-  serverTimestamp,
-  onSnapshot,
-  addDoc,
-  DocumentData,
-  QuerySnapshot
-} from 'firebase/firestore';
-import { SyncConfig, StockSyncLog, StockValidation } from '@/lib/types';
+import { SyncConfig, StockValidation } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import logger from '@/lib/logger';
 
 class StockSyncService {
   private static instance: StockSyncService;
-  private syncListeners: Map<string, () => void> = new Map();
+  private syncChannels: Map<string, any> = new Map();
   private config: SyncConfig = {
     autoSync: true,
     syncInterval: 5000,
@@ -76,122 +63,101 @@ class StockSyncService {
     const startTime = Date.now();
     
     try {
-      // Validasi parameter input
       this.validateSyncParams(productId, warehouseId);
-      
-      console.log(`Memulai sinkronisasi stok untuk produk ${productId} di gudang ${warehouseId}`);
+      logger.info(`Memulai sinkronisasi stok untuk produk ${productId} di gudang ${warehouseId}`);
 
-      // Ambil data produk dengan error handling
-      const productRef = doc(db, 'products', productId);
-      const productSnap = await getDocs(collection(db, 'products'));
-      const productDoc = productSnap.docs.find(doc => doc.id === productId);
+      // Ambil data produk
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .maybeSingle();
       
-      if (!productDoc) {
-        throw new Error(`Produk ${productId} tidak ditemukan`);
+      if (productError || !product) {
+        throw new Error(`Produk ${productId} tidak ditemukan: ${productError?.message || ''}`);
       }
 
-      const product = productDoc.data();
+      // Ambil stok produk dari gudang terkait
+      const { data: warehouseStockRecord } = await supabase
+        .from('warehouseStock')
+        .select('*')
+        .eq('productId', productId)
+        .eq('warehouseId', warehouseId)
+        .maybeSingle();
       
-      // Validasi struktur data produk
-      if (!product || typeof product !== 'object') {
-        throw new Error('Data produk tidak valid');
-      }
-
-      // Validasi nama produk
-      if (!product.name || typeof product.name !== 'string') {
-        throw new Error('Nama produk tidak valid');
-      }
-
-      // Ambil stok dari gudang dengan error handling
-      const warehouseStockRef = collection(db, 'warehouseStock');
-      const q = query(warehouseStockRef, 
-        where('productId', '==', productId),
-        where('warehouseId', '==', warehouseId)
-      );
-      
-      const warehouseStockSnap = await getDocs(q);
-      
-      // Validasi hasil query
-      if (warehouseStockSnap.empty) {
-        console.warn(`Tidak ada data warehouse stock untuk produk ${productId} di gudang ${warehouseId}`);
-      }
-      
-      const warehouseStockData = warehouseStockSnap.docs[0]?.data();
-      const warehouseStock = warehouseStockData?.quantity || 0;
-
-      // Validasi nilai stok gudang
+      const warehouseStock = Number(warehouseStockRecord?.quantity) || 0;
       this.validateStockValue(warehouseStock, 'Stok gudang');
 
-      // Hitung total stok dari semua gudang dengan validasi
-      const allWarehouseStockSnap = await getDocs(
-        query(warehouseStockRef, where('productId', '==', productId))
-      );
+      // Ambil semua stok gudang untuk produk ini
+      const { data: allWarehouseStocks } = await supabase
+        .from('warehouseStock')
+        .select('*')
+        .eq('productId', productId);
       
       let totalStock = 0;
-      allWarehouseStockSnap.forEach(doc => {
-        const stockValue = Number(doc.data().quantity) || 0;
-        this.validateStockValue(stockValue, `Stok gudang ${doc.id}`);
-        totalStock += stockValue;
+      (allWarehouseStocks || []).forEach((item: any) => {
+        const val = Number(item.quantity) || 0;
+        totalStock += val;
       });
 
-      // Validasi total stok
       this.validateStockValue(totalStock, 'Total stok');
 
-      // Siapkan data stok per gudang
+      // Update stok produk
       const currentProductStock = product.stockByWarehouse?.[warehouseId] || 0;
       const updatedStockByWarehouse = {
-        ...product.stockByWarehouse,
+        ...(product.stockByWarehouse || {}),
         [warehouseId]: warehouseStock
       };
 
-      // Update stok produk dengan batch untuk atomic operation
-      const batch = writeBatch(db);
-      batch.update(productRef, {
-        stock: totalStock,
-        stockByWarehouse: updatedStockByWarehouse,
-        lastSyncAt: serverTimestamp(),
-        lastSyncWarehouse: warehouseId
-      });
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          stock: totalStock,
+          stockByWarehouse: updatedStockByWarehouse,
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', productId);
 
-      // Catat aktivitas sinkronisasi dengan detail lengkap
-      const syncLogRef = collection(db, 'stockSyncLogs');
-      batch.set(doc(syncLogRef), {
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Catat log
+      await supabase.from('stockSyncLogs').insert({
         productId,
         warehouseId,
         type: 'WAREHOUSE_TO_PRODUCT',
+        status: 'SUCCESS',
         previousStock: currentProductStock,
         newStock: warehouseStock,
         difference: warehouseStock - currentProductStock,
-        status: 'SUCCESS',
-        timestamp: serverTimestamp(),
-        operator: 'SYSTEM',
         executionTime: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+        operator: 'SYSTEM',
         validation: {
           productExists: true,
-          warehouseStockExists: !warehouseStockSnap.empty,
+          warehouseStockExists: !!warehouseStockRecord,
           stockValuesValid: true,
-          totalStockValid: true
+          totalStockValid: true,
+          paramsValid: true
         }
       });
 
-      await batch.commit();
-      
-      console.log(`Sinkronisasi berhasil: ${currentProductStock} -> ${warehouseStock} (selisih: ${warehouseStock - currentProductStock}) dalam ${Date.now() - startTime}ms`);
+      logger.info(`Sinkronisasi berhasil: ${currentProductStock} -> ${warehouseStock} (selisih: ${warehouseStock - currentProductStock}) dalam ${Date.now() - startTime}ms`);
       return true;
 
     } catch (error) {
-      console.error('Error sinkronisasi stok:', error);
+      logger.error('Error sinkronisasi stok:', error);
       
-      // Catat error ke log dengan detail lengkap
       try {
-        await addDoc(collection(db, 'stockSyncLogs'), {
+        await supabase.from('stockSyncLogs').insert({
           productId,
           warehouseId,
           type: 'WAREHOUSE_TO_PRODUCT',
           status: 'ERROR',
           error: error instanceof Error ? error.message : 'Unknown error',
           errorStack: error instanceof Error ? error.stack : undefined,
-          timestamp: serverTimestamp(),
+          timestamp: new Date().toISOString(),
           operator: 'SYSTEM',
           executionTime: Date.now() - startTime,
           validation: {
@@ -199,7 +165,7 @@ class StockSyncService {
           }
         });
       } catch (logError) {
-        console.error('Gagal mencatat error log:', logError);
+        logger.error('Gagal mencatat error log:', logError);
       }
       
       return false;
@@ -213,10 +179,8 @@ class StockSyncService {
     const startTime = Date.now();
     
     try {
-      // Validasi parameter input
       this.validateSyncParams(productId, warehouseId);
       
-      // Validasi stok fisik
       if (typeof physicalStock !== 'number' || isNaN(physicalStock)) {
         throw new Error('Stok fisik harus berupa angka yang valid');
       }
@@ -227,24 +191,16 @@ class StockSyncService {
         throw new Error('Stok fisik melebihi batas maksimum (10.000.000)');
       }
 
-      console.log(`Memulai validasi stok untuk produk ${productId} di gudang ${warehouseId}`);
+      logger.info(`Memulai validasi stok untuk produk ${productId} di gudang ${warehouseId}`);
 
-      // Ambil stok dari sistem dengan error handling
-      const warehouseStockRef = collection(db, 'warehouseStock');
-      const q = query(warehouseStockRef, 
-        where('productId', '==', productId),
-        where('warehouseId', '==', warehouseId)
-      );
+      const { data: stockData } = await supabase
+        .from('warehouseStock')
+        .select('*')
+        .eq('productId', productId)
+        .eq('warehouseId', warehouseId)
+        .maybeSingle();
       
-      const systemStockSnap = await getDocs(q);
-      
-      if (systemStockSnap.empty) {
-        console.warn(`Tidak ada data warehouse stock untuk produk ${productId} di gudang ${warehouseId}`);
-      }
-      
-      const systemStock = systemStockSnap.docs[0]?.data()?.quantity || 0;
-
-      // Validasi stok sistem
+      const systemStock = Number(stockData?.quantity) || 0;
       this.validateStockValue(systemStock, 'Stok sistem');
 
       const difference = Math.abs(systemStock - physicalStock);
@@ -260,55 +216,48 @@ class StockSyncService {
         status
       };
 
-      // Simpan hasil validasi dengan batch untuk atomic operation
-      const batch = writeBatch(db);
-      const validationRef = doc(db, 'stockValidations', `${productId}_${warehouseId}`);
-      
-      batch.set(validationRef, {
-        ...validation,
-        timestamp: serverTimestamp(),
-        validationThreshold: this.config.validationThreshold,
-        executionTime: Date.now() - startTime
-      });
-
-      // Catat aktivitas validasi
-      const validationLogRef = collection(db, 'stockValidationLogs');
-      const newLogRef = doc(validationLogRef);
-      batch.set(newLogRef, {
+      // Simpan hasil validasi
+      await supabase.from('stockValidations').upsert({
+        id: `${productId}_${warehouseId}`,
         productId,
         warehouseId,
-        type: 'STOCK_VALIDATION',
         systemStock,
         physicalStock,
         difference,
         status,
-        validationThreshold: this.config.validationThreshold,
-        timestamp: serverTimestamp(),
-        executionTime: Date.now() - startTime
+        lastSync: new Date().toISOString()
       });
 
-      await batch.commit();
+      // Catat aktivitas validasi
+      await supabase.from('stockValidationLogs').insert({
+        productId,
+        warehouseId,
+        systemStock,
+        physicalStock,
+        difference,
+        status,
+        executionTime: Date.now() - startTime,
+        timestamp: new Date().toISOString()
+      });
 
-      console.log(`Validasi selesai: sistem=${systemStock}, fisik=${physicalStock}, selisih=${difference}, status=${status} dalam ${Date.now() - startTime}ms`);
-      
+      logger.info(`Validasi selesai: sistem=${systemStock}, fisik=${physicalStock}, selisih=${difference}, status=${status} dalam ${Date.now() - startTime}ms`);
       return validation;
       
     } catch (error) {
-      console.error('Error validasi stok:', error);
+      logger.error('Error validasi stok:', error);
       
-      // Catat error validasi
       try {
-        await addDoc(collection(db, 'stockValidationLogs'), {
+        await supabase.from('stockValidationLogs').insert({
           productId,
           warehouseId,
           type: 'STOCK_VALIDATION_ERROR',
           physicalStock,
           error: error instanceof Error ? error.message : 'Unknown error',
           executionTime: Date.now() - startTime,
-          timestamp: serverTimestamp()
+          timestamp: new Date().toISOString()
         });
       } catch (logError) {
-        console.error('Gagal mencatat error validasi:', logError);
+        logger.error('Gagal mencatat error validasi:', logError);
       }
       
       throw error;
@@ -326,7 +275,6 @@ class StockSyncService {
       throw new Error('Warehouse IDs harus berupa array yang tidak kosong');
     }
     
-    // Validasi setiap ID
     productIds.forEach((id, index) => {
       if (!id || typeof id !== 'string' || id.trim() === '') {
         throw new Error(`Product ID pada index ${index} tidak valid`);
@@ -347,23 +295,19 @@ class StockSyncService {
     const startTime = Date.now();
     
     try {
-      // Validasi parameter input
       this.validateBatchParams(productIds, warehouseIds);
-      
-      console.log(`Memulai batch sync untuk ${productIds.length} produk dan ${warehouseIds.length} gudang`);
+      logger.info(`Memulai batch sync untuk ${productIds.length} produk dan ${warehouseIds.length} gudang`);
       
       let success = 0;
       let failed = 0;
       const errors: string[] = [];
       const results: Array<{ productId: string; warehouseId: string; success: boolean; error?: string }> = [];
 
-      // Proses sinkronisasi untuk setiap kombinasi
       for (const productId of productIds) {
         for (const warehouseId of warehouseIds) {
           try {
-            console.log(`Proses sync: ${productId} - ${warehouseId}`);
+            logger.info(`Proses sync: ${productId} - ${warehouseId}`);
             const result = await this.syncWarehouseToProduct(productId, warehouseId);
-            
             results.push({ productId, warehouseId, success: result });
             
             if (result) {
@@ -376,14 +320,13 @@ class StockSyncService {
             failed++;
             const errorMsg = `Error sync ${productId} - ${warehouseId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
             errors.push(errorMsg);
-            console.error(errorMsg);
+            logger.error(errorMsg);
           }
         }
       }
 
-      // Catat hasil batch sync
       try {
-        await addDoc(collection(db, 'stockSyncLogs'), {
+        await supabase.from('stockSyncLogs').insert({
           type: 'BATCH_SYNC',
           status: 'COMPLETED',
           totalProducts: productIds.length,
@@ -392,32 +335,31 @@ class StockSyncService {
           failed,
           errors,
           executionTime: Date.now() - startTime,
-          timestamp: serverTimestamp(),
+          timestamp: new Date().toISOString(),
           operator: 'SYSTEM',
           results
         });
       } catch (logError) {
-        console.error('Gagal mencatat log batch sync:', logError);
+        logger.error('Gagal mencatat log batch sync:', logError);
       }
 
-      console.log(`Batch sync selesai: ${success} sukses, ${failed} gagal dalam ${Date.now() - startTime}ms`);
+      logger.info(`Batch sync selesai: ${success} sukses, ${failed} gagal dalam ${Date.now() - startTime}ms`);
       return { success, failed, errors };
       
     } catch (error) {
-      console.error('Error batch sync:', error);
+      logger.error('Error batch sync:', error);
       
-      // Catat error batch sync
       try {
-        await addDoc(collection(db, 'stockSyncLogs'), {
+        await supabase.from('stockSyncLogs').insert({
           type: 'BATCH_SYNC',
           status: 'ERROR',
           error: error instanceof Error ? error.message : 'Unknown error',
           executionTime: Date.now() - startTime,
-          timestamp: serverTimestamp(),
+          timestamp: new Date().toISOString(),
           operator: 'SYSTEM'
         });
       } catch (logError) {
-        console.error('Gagal mencatat error log batch sync:', logError);
+        logger.error('Gagal mencatat error log batch sync:', logError);
       }
       
       return { success: 0, failed: productIds.length * warehouseIds.length, errors: [error instanceof Error ? error.message : 'Unknown error'] };
@@ -429,50 +371,50 @@ class StockSyncService {
    */
   startAutoSync(productId: string, warehouseId: string): () => void {
     try {
-      // Validasi parameter input
       this.validateSyncParams(productId, warehouseId);
-      
       const key = `${productId}_${warehouseId}`;
       
-      if (this.syncListeners.has(key)) {
-        console.log(`Auto-sync sudah aktif untuk ${key}`);
-        return this.syncListeners.get(key)!;
+      if (this.syncChannels.has(key)) {
+        logger.info(`Auto-sync sudah aktif untuk ${key}`);
+        return () => this.stopAutoSync(productId, warehouseId);
       }
 
-      console.log(`Memulai auto-sync untuk ${key}`);
+      logger.info(`Memulai auto-sync untuk ${key}`);
 
-      const unsubscribe = onSnapshot(
-        doc(db, 'warehouseStock', `${productId}_${warehouseId}`),
-        async (doc) => {
-          if (doc.exists() && this.config.autoSync) {
-            try {
-              console.log(`Auto-sync terpicu untuk ${key}`);
-              await this.syncWarehouseToProduct(productId, warehouseId);
-            } catch (error) {
-              console.error(`Error auto-sync untuk ${key}:`, error);
+      const channel = supabase
+        .channel(`warehouseStock:${key}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'warehouseStock',
+            filter: `productId=eq.${productId}`
+          },
+          async () => {
+            if (this.config.autoSync) {
+              try {
+                logger.info(`Auto-sync terpicu untuk ${key}`);
+                await this.syncWarehouseToProduct(productId, warehouseId);
+              } catch (error) {
+                logger.error(`Error auto-sync untuk ${key}:`, error);
+              }
             }
           }
-        },
-        (error) => {
-          console.error(`Error listener auto-sync untuk ${key}:`, error);
-        }
-      );
+        )
+        .subscribe();
 
-      this.syncListeners.set(key, unsubscribe);
-      console.log(`Auto-sync dimulai untuk ${key}`);
+      this.syncChannels.set(key, channel);
+      logger.info(`Auto-sync dimulai untuk ${key}`);
       
       return () => {
-        unsubscribe();
-        this.syncListeners.delete(key);
-        console.log(`Auto-sync dihentikan untuk ${key}`);
+        this.stopAutoSync(productId, warehouseId);
       };
       
     } catch (error) {
-      console.error('Error startAutoSync:', error);
-      
-      // Return dummy unsubscribe function untuk error handling yang konsisten
+      logger.error('Error startAutoSync:', error);
       return () => {
-        console.log('Auto-sync tidak dimulai karena error');
+        logger.info('Auto-sync tidak dimulai karena error');
       };
     }
   }
@@ -482,11 +424,12 @@ class StockSyncService {
    */
   stopAutoSync(productId: string, warehouseId: string): void {
     const key = `${productId}_${warehouseId}`;
-    const unsubscribe = this.syncListeners.get(key);
+    const channel = this.syncChannels.get(key);
     
-    if (unsubscribe) {
-      unsubscribe();
-      this.syncListeners.delete(key);
+    if (channel) {
+      supabase.removeChannel(channel);
+      this.syncChannels.delete(key);
+      logger.info(`Auto-sync dihentikan untuk ${key}`);
     }
   }
 
@@ -508,24 +451,24 @@ class StockSyncService {
    * Get status auto-sync listeners
    */
   getActiveListeners(): string[] {
-    return Array.from(this.syncListeners.keys());
+    return Array.from(this.syncChannels.keys());
   }
 
   /**
    * Hentikan semua auto-sync listeners
    */
   stopAllAutoSync(): void {
-    console.log(`Menghentikan ${this.syncListeners.size} auto-sync listeners`);
-    this.syncListeners.forEach((unsubscribe, key) => {
+    logger.info(`Menghentikan ${this.syncChannels.size} auto-sync listeners`);
+    this.syncChannels.forEach((channel, key) => {
       try {
-        unsubscribe();
-        console.log(`Auto-sync dihentikan untuk ${key}`);
+        supabase.removeChannel(channel);
+        logger.info(`Auto-sync dihentikan untuk ${key}`);
       } catch (error) {
-        console.error(`Error menghentikan auto-sync untuk ${key}:`, error);
+        logger.error(`Error menghentikan auto-sync untuk ${key}:`, error);
       }
     });
-    this.syncListeners.clear();
-    console.log('Semua auto-sync listeners dihentikan');
+    this.syncChannels.clear();
+    logger.info('Semua auto-sync listeners dihentikan');
   }
 
   /**
@@ -553,32 +496,29 @@ class StockSyncService {
           break;
       }
 
-      const logsRef = collection(db, 'stockSyncLogs');
-      const q = query(
-        logsRef,
-        where('timestamp', '>=', startDate),
-        where('type', 'in', ['WAREHOUSE_TO_PRODUCT', 'BATCH_SYNC'])
-      );
+      const { data: records, error } = await supabase
+        .from('stockSyncLogs')
+        .select('*')
+        .gte('timestamp', startDate.toISOString());
       
-      const snapshot = await getDocs(q);
-      
+      if (error || !records) {
+        return { total: 0, success: 0, failed: 0, averageExecutionTime: 0 };
+      }
+
       let total = 0;
       let success = 0;
       let failed = 0;
       let totalExecutionTime = 0;
 
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
+      records.forEach((data: any) => {
         total++;
-        
         if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
           success++;
         } else if (data.status === 'ERROR') {
           failed++;
         }
-        
         if (data.executionTime) {
-          totalExecutionTime += data.executionTime;
+          totalExecutionTime += Number(data.executionTime) || 0;
         }
       });
 
@@ -592,7 +532,7 @@ class StockSyncService {
       };
       
     } catch (error) {
-      console.error('Error getSyncStats:', error);
+      logger.error('Error getSyncStats:', error);
       return {
         total: 0,
         success: 0,
@@ -609,7 +549,7 @@ export const stockSyncService = StockSyncService.getInstance();
 // Cleanup function untuk browser
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    console.log('Membersihkan StockSyncService...');
+    logger.info('Membersihkan StockSyncService...');
     stockSyncService.stopAllAutoSync();
   });
 }

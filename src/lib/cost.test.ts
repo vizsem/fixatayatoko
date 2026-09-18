@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 import { computeAverageCost } from './inventory';
 
+import { db } from '@/lib/firebase';
 describe('computeAverageCost', () => {
   it('calculates weighted average cost with conversion', () => {
     const avg = computeAverageCost(100, 1000, 5, 15000, 10);

@@ -1,6 +1,8 @@
 import nodemailer from 'nodemailer';
 import { Order, User } from './types';
+import logger from './logger';
 
+import { auth } from '@/lib/firebase';
 // Email configuration dari environment variables
 const SMTP_CONFIG = {
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -22,9 +24,9 @@ const getTransporter = () => {
     // Verify connection configuration
     transporter.verify((error) => {
       if (error) {
-        console.error('SMTP connection error:', error);
+        logger.error('SMTP connection error:', error);
       } else {
-        console.log('SMTP server is ready to send emails');
+        logger.info('SMTP server is ready to send emails');
       }
     });
   }
@@ -146,10 +148,10 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
     };
 
     const result = await getTransporter().sendMail(mailOptions);
-    console.log('Email sent successfully:', result.messageId);
+    logger.info('Email sent successfully:', result.messageId);
     return true;
   } catch (error) {
-    console.error('Failed to send email:', error);
+    logger.error('Failed to send email:', error);
     return false;
   }
 };
@@ -159,7 +161,7 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
  */
 export const sendOrderConfirmation = async (order: Order & { customerEmail?: string; customerName?: string }): Promise<boolean> => {
   if (!order.customerEmail) {
-    console.warn('No customer email provided for order:', order.id);
+    logger.warn('No customer email provided for order:', order.id);
     return false;
   }
 

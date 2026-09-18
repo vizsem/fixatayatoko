@@ -1,5 +1,5 @@
-import { addDoc, collection, doc, serverTimestamp, WriteBatch, Transaction } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { doc, collection } from '@/lib/firebase';
 
 type Account =
   | 'Cash'
@@ -12,8 +12,8 @@ type Account =
   | 'AccountsPayable'
   | 'AccountsReceivable'
   | 'CustomerWallet'
-  | 'LossOnInventory'   // Beban kerugian barang hilang/rusak
-  | 'GainOnInventory';  // Pendapatan dari kelebihan stok (opname)
+  | 'LossOnInventory'
+  | 'GainOnInventory';
 
 export interface LedgerEntry {
   date?: any;
@@ -29,28 +29,49 @@ export interface LedgerEntry {
 }
 
 /**
- * Mencatat jurnal double-entry sederhana ke koleksi 'ledger_entries'
- * Supports optional batch or transaction for atomic operations
+ * Mencatat jurnal double-entry ke tabel 'ledger_entries'
  */
-export const postJournal = async (entry: LedgerEntry, batchOrTx?: WriteBatch | Transaction) => {
+export const postJournal = async (entry: LedgerEntry, tx?: any) => {
   if (!entry || !entry.debitAccount || !entry.creditAccount || !entry.amount) return;
-  
-  const ledgerData = {
-    ...entry,
-    date: serverTimestamp()
-  };
 
-  const newLogRef = doc(collection(db, 'ledger_entries'));
-  
-  if (batchOrTx) {
-    if ('commit' in batchOrTx) {
-      // It's a WriteBatch
-      (batchOrTx as WriteBatch).set(newLogRef, ledgerData);
-    } else {
-      // It's a Transaction
-      (batchOrTx as Transaction).set(newLogRef, ledgerData);
+  try {
+    const id = `ledg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+    const entryDate = entry.date
+      ? (typeof entry.date?.toISOString === 'function' ? entry.date.toISOString() : entry.date)
+      : now;
+
+    const raw_data = {
+      date: entryDate,
+      debitAccount: entry.debitAccount,
+      creditAccount: entry.creditAccount,
+      amount: Number(entry.amount),
+      memo: entry.memo || '',
+      refType: entry.refType || '',
+      refId: entry.refId || entry.referenceId || '',
+      postedBy: entry.postedBy || 'system',
+      extra: entry.extra || {},
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (tx && typeof tx.set === 'function') {
+      const docRef = doc(collection({} as any, 'ledger_entries'), id);
+      tx.set(docRef, raw_data);
+      return;
     }
-  } else {
-    await addDoc(collection(db, 'ledger_entries'), ledgerData);
+
+    const { error } = await supabase.from('ledger_entries').insert({
+      id,
+      raw_data,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (error) {
+      console.error('Error posting journal:', error);
+    }
+  } catch (err) {
+    console.error('postJournal error:', err);
   }
 };

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { Box, Layers, Search, Warehouse, ChevronLeft, Calendar, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, getDocs } from '@/lib/firebase';
 type ProductLayer = { qty: number; costPerPcs: number; ts?: any; purchaseId?: string; supplierName?: string; warehouseId?: string };
 type Product = {
   id: string;

@@ -3,14 +3,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { User, Lock, Mail, MapPin, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { auth, db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 
+import { auth, createUserWithEmailAndPassword, db, doc, setDoc } from '@/lib/firebase';
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({

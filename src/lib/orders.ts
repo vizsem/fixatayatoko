@@ -1,8 +1,7 @@
-// lib/createOrder.ts (atau di dalam komponen/Route Handler)
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+// lib/orders.ts - Rewritten for Supabase
+import { supabase } from '@/lib/supabase';
 
-
+import { auth } from '@/lib/firebase';
 export const createOrder = async (orderData: {
   customerName: string;
   customerPhone: string;
@@ -18,7 +17,7 @@ export const createOrder = async (orderData: {
   note?: string;
   customerAddress?: string;
 }) => {
-  const user = auth.currentUser;
+  const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('User tidak login');
 
@@ -28,20 +27,24 @@ export const createOrder = async (orderData: {
   }
 
   const newOrder = {
-    customerId: user.uid,
-    customerName: orderData.customerName.trim(),
-    customerPhone: orderData.customerPhone.trim(),
-    customerAddress: orderData.customerAddress?.trim(),
+    user_id: user.id,
+    customer_name: orderData.customerName.trim(),
+    customer_phone: orderData.customerPhone.trim(),
+    customer_address: orderData.customerAddress?.trim(),
     items: orderData.items,
     total: orderData.total,
-    paymentMethod: orderData.paymentMethod,
-    deliveryMethod: orderData.deliveryMethod,
+    payment_method: orderData.paymentMethod,
+    delivery_method: orderData.deliveryMethod,
     note: orderData.note?.trim(),
-    status: 'MENUNGGU', // Status awal
-    createdAt: serverTimestamp(), // ✅ INI YANG PENTING
-    // updatedAt tidak perlu di sini, bisa diupdate saat ubah status
+    status: 'MENUNGGU',
   };
 
-  const docRef = await addDoc(collection(db, 'orders'), newOrder);
-  return docRef.id; // ID pesanan baru
+  const { data, error } = await supabase
+    .from('orders')
+    .insert(newOrder)
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };

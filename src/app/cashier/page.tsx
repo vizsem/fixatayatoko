@@ -3,29 +3,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  updateDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  where,
-  serverTimestamp,
-  getDoc,
-  getDocs,
-  limit,
-  writeBatch,
-  addDoc,
-  increment
-} from 'firebase/firestore';
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from 'firebase/storage';
-import { auth, db, storage } from '@/lib/firebase';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
@@ -37,7 +14,10 @@ import { addInventoryLog } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
+import { supabase } from '@/lib/supabase';
+import logger from '@/lib/logger';
 
+import { Timestamp, addDoc, auth, collection, db, doc, getDoc, getDocs, getDownloadURL, increment, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, updateDoc, uploadBytes, where, writeBatch } from '@/lib/firebase';
 // Types
 type UnitOption = {
   code: string;
@@ -127,6 +107,7 @@ export default function CashierPOS() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [displayLimit, setDisplayLimit] = useState(80);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [newOrderCount, setNewOrderCount] = useState(0);
@@ -223,44 +204,8 @@ export default function CashierPOS() {
     }
   }, []);
 
-  // === GLOBAL BARCODE SCANNER LISTENER ===
-
-  useEffect(() => {
-    const checkAuthAndShift = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      
-      // Load Active Shift
-      try {
-        const q = query(
-          collection(db, 'cashier_shifts'), 
-          where('cashierId', '==', user.uid),
-          where('status', '==', 'OPEN'),
-          limit(1)
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const shiftDoc = snap.docs[0];
-          setCurrentShift({ id: shiftDoc.id, ...shiftDoc.data() } as CashierShift);
-        }
-      } catch (err) {
-        console.error("Error loading shift:", err);
-      }
-    };
-    
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        checkAuthAndShift();
-      } else {
-        router.push('/profil/login');
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [router]);
+  // NOTE: Auth & shift loading is handled by the main useEffect below.
+  // Removed duplicate auth listener that caused race conditions.
 
   useEffect(() => {
     let scanner: any = null;
@@ -466,23 +411,36 @@ export default function CashierPOS() {
     return 0;
   }, [cashGiven, total, paymentMethod]);
 
-  // Search Customer for Wallet
+  // Search Customer for Wallet - query customers table (raw_data JSONB)
   useEffect(() => {
     if (customerSearch.length < 3) {
       setCustomerResults([]);
       return;
     }
     const performSearch = async () => {
-      const nameQuery = query(collection(db, 'users'), where('name', '>=', customerSearch), where('name', '<=', customerSearch + '\uf8ff'), limit(5));
-      const phoneQuery = query(collection(db, 'users'), where('phone', '>=', customerSearch), where('phone', '<=', customerSearch + '\uf8ff'), limit(5));
-      
-      const [nameSnap, phoneSnap] = await Promise.all([getDocs(nameQuery), getDocs(phoneQuery)]);
-      
-      const results = new Map();
-      nameSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
-      phoneSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
-      
-      setCustomerResults(Array.from(results.values()));
+      try {
+        const term = customerSearch.toLowerCase();
+        // customers table stores name/phone inside raw_data JSONB
+        const { data: rows } = await supabase
+          .from('customers')
+          .select('id, raw_data')
+          .or(`raw_data->>name.ilike.%${term}%,raw_data->>phone.ilike.%${term}%`)
+          .limit(10);
+
+        const results = (rows || []).map((c: any) => {
+          const raw = c.raw_data || {};
+          return {
+            id: c.id,
+            name: raw.name || 'Tanpa Nama',
+            phone: raw.phone || '',
+            walletBalance: Number(raw.walletBalance || raw.wallet_balance || 0),
+          };
+        });
+        setCustomerResults(results);
+      } catch (err) {
+        console.error('Customer search error:', err);
+        setCustomerResults([]);
+      }
     };
     const debounce = setTimeout(performSearch, 300);
     return () => clearTimeout(debounce);
@@ -502,14 +460,15 @@ export default function CashierPOS() {
     const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) setCart(JSON.parse(savedCart));
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       
       // Jika offline, kita asumsikan user valid jika sudah ada di auth (karena persistence)
       if (navigator.onLine) {
          try {
            const userDoc = await getDoc(doc(db, 'users', user.uid));
-           if (userDoc.data()?.role !== 'cashier' && userDoc.data()?.role !== 'admin') {
+           const userRole = userDoc.data()?.role || user.role || user.user_metadata?.role;
+           if (userRole !== 'cashier' && userRole !== 'admin') {
              router.push('/profil'); return;
            }
 
@@ -526,7 +485,7 @@ export default function CashierPOS() {
            } else {
              setShowShiftModal('open');
            }
-         } catch (e) { console.log("Offline or error fetching user role", e); }
+         } catch (e) { logger.warn("Offline or error fetching user role", e); }
       }
       
       setLoading(false);
@@ -606,25 +565,48 @@ export default function CashierPOS() {
 
   useEffect(() => {
     if (loading) return;
-    
-    // OPTIMASI: Gunakan query dengan limit dan hanya ambil field yang diperlukan
-    // Jangan gunakan onSnapshot untuk seluruh koleksi - terlalu mahal!
+
     const fetchProducts = async () => {
       try {
-        const q = query(
-          collection(db, 'products'),
-          where('isActive', '==', true),
-          orderBy('name', 'asc'),
-          limit(200)
-        );
-        
-        const snapshot = await getDocs(q);
-        const p = snapshot.docs.map(d => {
-          const data = d.data();
-          const baseUnit = String(data.unit || data.Satuan || 'PCS').toUpperCase();
-          const basePrice = Number(data.price || data.priceEcer || data.Ecer || 0);
-          const baseCost = Number(data.cost || data.Modal || 0); // Ambil Modal
-          const rawUnits = Array.isArray(data.units) ? data.units as Array<Record<string, unknown>> : [];
+        const { count, error: countErr } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true });
+
+        if (countErr) {
+          console.error('Error counting products:', countErr);
+        }
+
+        const pageSize = 1000;
+        const totalPages = Math.max(1, Math.ceil((count || 0) / pageSize));
+
+        const promises = [];
+        for (let i = 0; i < totalPages; i++) {
+          const from = i * pageSize;
+          const to = from + pageSize - 1;
+          promises.push(
+            supabase
+              .from('products')
+              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url')
+              .order('name', { ascending: true })
+              .range(from, to)
+              .then(res => res.data || [])
+          );
+        }
+
+        const pagesData = await Promise.all(promises);
+        const rows = pagesData.flat();
+
+        const p: Product[] = [];
+        for (const d of rows) {
+          const raw = d.raw_data || {};
+          // Only show active products (exclude archived)
+          const isActive = raw.isActive !== false && raw.Status !== 1 && raw.status !== 'ARCHIVED';
+          if (!isActive) continue;
+
+          const baseUnit = String(d.unit || raw.unit || raw.Satuan || 'PCS').toUpperCase();
+          const basePrice = Number(d.price ?? raw.price ?? raw.priceEcer ?? raw.Ecer ?? 0);
+          const baseCost = Number(d.cost_price ?? raw.cost ?? raw.Modal ?? raw.purchasePrice ?? 0);
+          const rawUnits = Array.isArray(raw.units) ? (raw.units as Array<Record<string, unknown>>) : [];
           const units: UnitOption[] = rawUnits
             .map(u => {
               const ru = u as Record<string, unknown>;
@@ -634,93 +616,44 @@ export default function CashierPOS() {
               const price = typeof ru.price === 'number' ? ru.price : Number(ru.price || 0);
               const rawMin = ru.minQty;
               const minQty = typeof rawMin === 'number' ? rawMin : (rawMin !== undefined ? Number(rawMin) : undefined);
-              return { code, contains, price, minQty } as UnitOption;
+              return { code, contains, price, minQty, barcode: ru.barcode ? String(ru.barcode) : undefined } as UnitOption;
             })
             .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
           if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
-          return {
+
+          p.push({
             id: d.id,
-            name: data.name || 'TANPA NAMA',
+            name: d.name || raw.name || raw.Nama || 'TANPA NAMA',
             price: basePrice,
             cost: baseCost,
             unit: baseUnit,
-            stock: data.stock || data.Stok || 0,
-            barcode: data.barcode || '',
-            image: data.image || data.imageUrl || data.photo || null,
+            stock: Number(d.stock ?? raw.stock ?? raw.Stok ?? 0),
+            barcode: d.barcode || raw.barcode || raw.Barcode || '',
+            image: d.image_url || raw.image || raw.imageUrl || raw.photo || null,
             units,
-            Kategori: data.Kategori || data.kategori || 'UMUM',
-            stockByWarehouse: data.stockByWarehouse || {},
-            channelPricing: data.channelPricing
-          } as Product;
-        }); // REMOVE FILTER HERE TO SHOW EMPTY STOCK
+            Kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
+            kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
+            stockByWarehouse: raw.stockByWarehouse || {},
+            channelPricing: raw.channelPricing
+          });
+        }
+
         setProducts(p);
         setFilteredProducts(p);
 
         // Extract Categories
         const cats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || 'UMUM'))).filter(Boolean) as string[];
         setCategories(cats.sort());
-      } catch (error: unknown) {
-        const err = error as { code?: string; message?: string };
-        const needsIndex =
-          String(err?.code) === 'failed-precondition' ||
-          /requires an index/i.test(String(err?.message || ''));
-        if (needsIndex) {
-          try {
-            const q2 = query(
-              collection(db, 'products'),
-              where('isActive', '==', true),
-              limit(200)
-            );
-            const snapshot2 = await getDocs(q2);
-            const list = snapshot2.docs.map(d => {
-              const data = d.data();
-              const baseUnit = String(data.unit || data.Satuan || 'PCS').toUpperCase();
-              const basePrice = Number(data.price || data.priceEcer || data.Ecer || 0);
-              const rawUnits = Array.isArray(data.units) ? data.units as Array<Record<string, unknown>> : [];
-              const units: UnitOption[] = rawUnits
-                .map(u => {
-                  const ru = u as Record<string, unknown>;
-                  const code = String(ru.code || '').toUpperCase();
-                  if (!code) return null;
-                  const contains = typeof ru.contains === 'number' ? ru.contains : Number(ru.contains || 0);
-                  const price = typeof ru.price === 'number' ? ru.price : Number(ru.price || 0);
-                  const rawMin = ru.minQty;
-                  const minQty = typeof rawMin === 'number' ? rawMin : (rawMin !== undefined ? Number(rawMin) : undefined);
-                  return { code, contains, price, minQty } as UnitOption;
-                })
-                .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
-              if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
-              return {
-                id: d.id,
-                name: data.name || 'TANPA NAMA',
-                price: basePrice,
-                unit: baseUnit,
-                stock: data.stock || data.Stok || 0,
-                barcode: data.barcode || '',
-                image: data.image || data.imageUrl || data.photo || null,
-                units,
-                channelPricing: data.channelPricing
-              } as Product;
-            }); // REMOVE FILTER HERE TOO
-            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            setProducts(list);
-            setFilteredProducts(list);
-          } catch (e) {
-            console.error('Fallback fetch products error:', e);
-            toast.error('Gagal memuat produk.');
-          }
-        } else {
-          console.error('Error fetching products:', err);
-          toast.error('Gagal memuat produk. Silakan coba lagi.');
-        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast.error('Gagal memuat produk. Silakan coba lagi.');
       }
     };
     
     fetchProducts();
     
-    // Refresh data setiap 2 menit instead of real-time (jauh lebih hemat)
+    // Refresh data setiap 2 menit
     const interval = setInterval(fetchProducts, 120000);
-    
     return () => clearInterval(interval);
   }, [loading]);
 
@@ -730,7 +663,7 @@ export default function CashierPOS() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setChatUnreadCount(snapshot.size);
     }, (error) => {
-      console.log("Chat listener error (probably index missing):", error);
+      logger.warn("Chat listener error (probably index missing):", error);
     });
     return () => unsubscribe();
   }, []);
@@ -745,16 +678,20 @@ export default function CashierPOS() {
   }, [activeTab]);
 
   useEffect(() => {
+    const term = searchQuery.toLowerCase().trim();
     const filtered = products.filter(p => {
-      const matchSearch = (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || p.barcode === searchQuery;
+      const matchSearch = !term || 
+        (p.name?.toLowerCase() || '').includes(term) || 
+        (p.barcode?.toLowerCase() || '').includes(term);
       const matchCategory = selectedCategory === 'SEMUA' || (p.Kategori || p.kategori || 'UMUM') === selectedCategory;
       const matchStock = stockFilter === 'all' ? true : (stockFilter === 'instock' ? (p.stock || 0) > 0 : (p.stock || 0) <= 0);
       
       return matchSearch && matchCategory && matchStock;
     });
     setFilteredProducts(filtered);
+    setDisplayLimit(80);
 
-    const exactMatch = products.find(p => p.barcode === searchQuery);
+    const exactMatch = products.find(p => p.barcode && p.barcode === searchQuery.trim());
     if (exactMatch && searchQuery.length >= 3) {
       addToCart(exactMatch);
       setSearchQuery('');
@@ -783,10 +720,13 @@ export default function CashierPOS() {
     setLoading(true);
     try {
       const initial = parseInt(shiftInput.initialCash.replace(/\D/g, '')) || 0;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const cashierId = authUser?.id || '';
+      const cashierName = authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Cashier';
       const newShift: Partial<CashierShift> = {
-        cashierId: auth.currentUser?.uid || '',
-        cashierName: auth.currentUser?.displayName || 'Cashier',
-        openedAt: serverTimestamp(),
+        cashierId,
+        cashierName,
+        openedAt: new Date().toISOString(),
         initialCash: initial,
         status: 'OPEN',
         totalCashSales: 0,
@@ -850,7 +790,7 @@ export default function CashierPOS() {
       const diff = actual - shiftSummary.expected;
       
       const updateData = {
-        closedAt: serverTimestamp(),
+        closedAt: new Date().toISOString(),
         status: 'CLOSED' as const,
         actualCash: actual,
         difference: diff,
@@ -982,7 +922,7 @@ export default function CashierPOS() {
         deliveryMethod, transactionType,
         status: paymentMethod === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI',
         dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
         payAmount: finalPayAmount,
         changeAmount: finalChange,
@@ -991,6 +931,10 @@ export default function CashierPOS() {
 
       const newOrderRef = doc(collection(db, 'orders'));
       batch.set(newOrderRef, orderData);
+
+      // FIX: Fetch auth user once outside the loop (was called 2x per item)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUserId = currentUser?.id || 'cashier';
 
       for (const item of cart) {
         const pRef = doc(db, 'products', item.id);
@@ -1057,13 +1001,13 @@ export default function CashierPOS() {
             stockByWarehouse: newStockByWarehouse
           });
 
-          // Log Inventory
+          // Log Inventory — uses currentUserId fetched once before loop
           await addInventoryLog({
             productId: item.id,
             productName: item.name,
             type: 'KELUAR',
             amount: pcsToDeduct,
-            adminId: auth.currentUser?.uid || 'cashier',
+            adminId: currentUserId,
             source: 'CASHIER',
             referenceId: newOrderRef.id,
             orderId: newOrderRef.id,
@@ -1077,17 +1021,33 @@ export default function CashierPOS() {
 
       // --- LOGIKA BARU UNTUK DOMPET ---
       if (paymentMethod === 'DOMPET' && selectedCustomer) {
-        const userRef = doc(db, 'users', selectedCustomer.id);
         const newBalance = selectedCustomer.walletBalance - total;
-        batch.update(userRef, { walletBalance: newBalance });
+        // FIX: Update walletBalance ke kolom native Supabase + raw_data
+        // Menggunakan Supabase langsung agar kolom wallet_balance ikut terupdate
+        await supabase
+          .from('customers')
+          .update({
+            wallet_balance: newBalance,
+          })
+          .eq('id', selectedCustomer.id);
+        // Juga update via batch compat agar raw_data.walletBalance konsisten
+        const custRef = doc(db, 'customers', selectedCustomer.id);
+        batch.update(custRef, { walletBalance: newBalance });
 
-        const logRef = doc(collection(db, 'wallet_logs'));
-        batch.set(logRef, {
-          userId: selectedCustomer.id,
+        // Log dompet langsung ke wallet_logs (punya kolom native)
+        await supabase.from('wallet_logs').insert({
+          id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          user_id: selectedCustomer.id,
           amount: -total,
-          type: 'payment',
           description: `Pembayaran pesanan #${newOrderRef.id}`,
-          createdAt: serverTimestamp()
+          created_at: new Date().toISOString(),
+          raw_data: {
+            type: 'payment',
+            userId: selectedCustomer.id,
+            amount: -total,
+            orderId: newOrderRef.id,
+            createdAt: new Date().toISOString(),
+          }
         });
       }
       // --- AKHIR LOGIKA DOMPET ---
@@ -1129,7 +1089,7 @@ export default function CashierPOS() {
       if (isOffline) {
         // Jangan await batch.commit() jika offline, agar UI tidak hang
         // Firebase akan menyimpannya di antrean IndexedDB dan sinkron saat online
-        batch.commit().catch(err => console.log('Offline commit queued:', err));
+        batch.commit().catch(err => logger.warn('Offline commit queued:', err));
         toast.success('Disimpan Offline (Akan sinkron saat koneksi kembali)');
       } else {
         await batch.commit();
@@ -1159,6 +1119,13 @@ export default function CashierPOS() {
   };
 
   const printReceipt = useCallback(async (order: Partial<Order>) => {
+    // FIX: Fetch cashier name BEFORE template string (await inside template literal tidak valid)
+    let cashierDisplayName = 'Admin';
+    try {
+      const { data: { user: prUser } } = await supabase.auth.getUser();
+      cashierDisplayName = prUser?.user_metadata?.full_name || prUser?.email?.split('@')[0] || 'Admin';
+    } catch { /* fallback */ }
+
     // Ambil settingan dari state atau local storage jika memungkinkan
     // Untuk keamanan, default buka (true) jika tidak ada setting
     let isDrawerEnabled = true;
@@ -1198,7 +1165,7 @@ export default function CashierPOS() {
         const escOpenDrawer = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
         await printToThermal(escOpenDrawer);
       } catch (err) {
-        console.log('Gagal membuka laci kasir otomatis:', err);
+        logger.warn('Gagal membuka laci kasir otomatis:', err);
       }
     };
 
@@ -1272,7 +1239,7 @@ export default function CashierPOS() {
           
           <div class="flex"><span>Tgl: ${dateStr}</span></div>
           <div class="flex"><span>No : #${(order.id || '').slice(-6).toUpperCase()}</span></div>
-          <div class="flex"><span>Ksr: ${auth.currentUser?.displayName || 'Admin'}</span></div>
+          <div class="flex"><span>Ksr: ${cashierDisplayName}</span></div>
           <div class="flex"><span>Plg: ${order.customerName || 'Umum'}</span></div>
           
           <div class="line"></div>
@@ -1486,6 +1453,10 @@ export default function CashierPOS() {
                     <Trash2 size={16} />
                   </button>
                 )}
+
+                <span className="text-[10px] font-bold text-gray-400 shrink-0 ml-auto">
+                  {filteredProducts.length} Produk
+                </span>
               </div>
             </div>
             {showScanner && <div id="pos-scanner" className="p-2 bg-white rounded-2xl border border-gray-100" />}
@@ -1495,8 +1466,12 @@ export default function CashierPOS() {
               style={{ maxHeight: 'calc(100vh - 200px)' }}
               data-testid="product-grid-view"
             >
-              {filteredProducts.map(p => (
-                <div key={p.id} className={`bg-white border shadow-sm hover:border-green-500 transition-all text-left flex relative ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'} ${(p.stock || 0) <= 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+              {filteredProducts.slice(0, displayLimit).map(p => (
+                <div 
+                  key={p.id} 
+                  onClick={() => addToCart(p)}
+                  className={`bg-white border shadow-sm hover:border-green-500 hover:shadow-md transition-all text-left flex relative cursor-pointer active:scale-95 ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'} ${(p.stock || 0) <= 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
+                >
                   {(p.stock || 0) <= 0 && (
                     <div className="absolute top-2 right-2 bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
                   )}
@@ -1529,7 +1504,14 @@ export default function CashierPOS() {
                         unitPrice = (p.channelPricing as ChannelPricing)['website']![u.code].price!;
                       }
                       return (
-                        <div key={u.code} className="flex items-center justify-between mt-0.5 gap-1">
+                        <div 
+                          key={u.code} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCartWithUnit(p, u);
+                          }}
+                          className="flex items-center justify-between mt-0.5 gap-1 hover:bg-blue-50/50 p-0.5 rounded cursor-pointer transition-colors"
+                        >
                           <span className="text-[9px] font-bold text-blue-400 shrink-0">{u.code} <span className="text-gray-300 font-medium">Isi {contains}</span></span>
                           <span className="text-[9px] font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
@@ -1542,6 +1524,24 @@ export default function CashierPOS() {
                   </div>
                 </div>
               ))}
+
+              {filteredProducts.length === 0 && (
+                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-16 text-center text-gray-400 font-bold" : "py-16 text-center text-gray-400 font-bold"}>
+                  <Package size={40} className="mx-auto mb-2 text-gray-300" />
+                  <p>Tidak ada produk aktif yang cocok</p>
+                </div>
+              )}
+
+              {filteredProducts.length > displayLimit && (
+                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-4 text-center" : "py-4 text-center"}>
+                  <button
+                    onClick={() => setDisplayLimit(prev => prev + 80)}
+                    className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-black uppercase tracking-wider rounded-2xl shadow-sm transition-all hover:scale-105 active:scale-95"
+                  >
+                    Muat Lebih Banyak ({displayLimit} dari {filteredProducts.length} Produk)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1868,28 +1868,38 @@ export default function CashierPOS() {
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto space-y-4">
             <h2 className="font-black text-xl text-gray-800 flex items-center gap-2"><History /> 20 Transaksi Terakhir</h2>
-            {completedOrders.map(order => (
-              <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                <div className="flex gap-4 items-center">
-                  <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24} /></div>
-                  <div>
-                    <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">
-                      {order.createdAt
-                        ? ('seconds' in order.createdAt
-                          ? new Date(order.createdAt.seconds * 1000).toLocaleString('id-ID')
-                          : order.createdAt.toLocaleString('id-ID'))
-                        : '-'}
-                    </p>
-                  </div>
+            {completedOrders.length === 0 ? (
+              <div className="bg-white p-12 rounded-3xl border border-gray-100 shadow-sm text-center">
+                <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <History size={32} />
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-green-600">Rp{order.total?.toLocaleString()}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
-                </div>
-                <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18} /></button>
+                <h3 className="text-base font-bold text-gray-800">Belum Ada Riwayat Transaksi</h3>
+                <p className="text-xs text-gray-400 mt-1">Transaksi yang sudah diselesaikan akan muncul di sini.</p>
               </div>
-            ))}
+            ) : (
+              completedOrders.map(order => (
+                <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                  <div className="flex gap-4 items-center">
+                    <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24} /></div>
+                    <div>
+                      <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">
+                        {order.createdAt
+                          ? (typeof order.createdAt === 'object' && order.createdAt !== null && 'seconds' in order.createdAt
+                            ? new Date((order.createdAt as any).seconds * 1000).toLocaleString('id-ID')
+                            : new Date(order.createdAt as any).toLocaleString('id-ID'))
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-green-600">Rp{order.total?.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
+                  </div>
+                  <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18} /></button>
+                </div>
+              ))
+            )}
           </div>
         </main>
       )}

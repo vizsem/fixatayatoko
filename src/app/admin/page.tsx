@@ -1,19 +1,16 @@
 'use client';
 
 import { useEffect, useState, useLayoutEffect, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Activity, Gift, Zap,
   Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3,
-  TrendingUp, Users, ShoppingCart, ArrowUpRight, ArrowRight, MoreHorizontal, Calendar
+  TrendingUp, Users, ShoppingCart, ArrowUpRight, ArrowRight, MoreHorizontal, Calendar,
+  RefreshCw
 } from 'lucide-react';
-import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { LucideIcon } from 'lucide-react';
-import {
-  collection, doc, getDoc, getDocs, query, orderBy, limit, where, Timestamp, getAggregateFromServer, sum, count
-} from 'firebase/firestore';
+import { getDashboardStats } from '@/lib/actions/dashboard.actions';
 
 interface Order {
   id: string;
@@ -76,6 +73,7 @@ const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [stats, setStats] = useState({
     dailySales: 0,
@@ -83,12 +81,13 @@ export default function AdminDashboard() {
     monthlySales: 0,
     totalProducts: 0,
     lowStock: 0,
-    unreadOrders: 0,
     warehouses: 0,
-    promotions: 0,
     users: 0,
+    // Kept for UI compatibility
+    unreadOrders: 0,
+    promotions: 0,
     totalPointsIssued: 0,
-    activeVouchers: 0
+    activeVouchers: 0,
   });
 
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -102,160 +101,37 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStart = today.toISOString();
-      
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(today.getDate() - 6);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
-      
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-
-      // Aggregation for Weekly and Monthly Sales
-      const qMonthly = query(collection(db, 'orders'), where('createdAt', '>=', startOfMonth));
-      const monthlyAgg = await getAggregateFromServer(qMonthly, { totalSales: sum('total') });
-      let salesMonthly = monthlyAgg.data().totalSales || 0;
-
-      const qWeekly = query(collection(db, 'orders'), where('createdAt', '>=', sevenDaysAgo));
-      const weeklyAgg = await getAggregateFromServer(qWeekly, { totalSales: sum('total') });
-      let salesWeekly = weeklyAgg.data().totalSales || 0;
-
-      // Aggregation for Today's Sales
-      const qToday = query(collection(db, 'orders'), where('createdAt', '>=', todayStart));
-      const todayAgg = await getAggregateFromServer(qToday, { totalSales: sum('total') });
-      let salesToday = todayAgg.data().totalSales || 0;
-
-      // Only fetch the last 7 days of orders for the chart to save reads
-      const qOrdersChart = query(
-        collection(db, 'orders'), 
-        where('createdAt', '>=', sevenDaysAgo),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const ordersSnap = await getDocs(qOrdersChart);
-      
-      const dailyMap = new Map<string, number>();
-      const productSalesMap = new Map<string, number>();
-
-      // Initialize last 7 days map
-      for (let i = 0; i < 7; i++) {
-        const d = new Date();
-        d.setDate(today.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        dailyMap.set(dateStr, 0);
-      }
-
-      ordersSnap.forEach(d => {
-        const data = d.data();
-        const created = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-        const dateStr = created.toISOString().split('T')[0];
-        const amount = Number(data.total) || 0;
-
-        // Daily Chart Data (Last 7 Days)
-        if (dailyMap.has(dateStr)) {
-          dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + amount);
-        }
-
-        // Product Sales Analysis (Last 7 Days)
-        if (data.items && Array.isArray(data.items)) {
-          data.items.forEach((item: any) => {
-            const pid = item.productId || item.id;
-            const qty = Number(item.quantity) || 0;
-            if (pid) {
-              productSalesMap.set(pid, (productSalesMap.get(pid) || 0) + qty);
-            }
-          });
-        }
-      });
-
-      // Prepare Chart Data
-      const chartData: DailySales[] = [];
-      const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-      
-      // Sort dates ascending for chart
-      const sortedDates = Array.from(dailyMap.keys()).sort();
-      sortedDates.forEach(date => {
-        const d = new Date(date);
-        chartData.push({
-          date,
-          amount: dailyMap.get(date) || 0,
-          dayName: days[d.getDay()]
-        });
-      });
-
-      // Fetch Top Products Details
-      const sortedProductIds = Array.from(productSalesMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([id]) => id);
-
-      const topProductsData: Product[] = [];
-      if (sortedProductIds.length > 0) {
-        // Firestore 'in' query supports max 10 items
-        const productsSnap = await getDocs(query(collection(db, 'products'), where('__name__', 'in', sortedProductIds)));
-        productsSnap.forEach(doc => {
-          const data = doc.data();
-          topProductsData.push({
-            id: doc.id,
-            name: data.name || data.Nama || 'Unnamed Product',
-            price: Number(data.price || data.priceEcer || data.Ecer || 0),
-            stock: Number(data.stock || data.Stok || 0),
-            sales: productSalesMap.get(doc.id) || 0
-          });
-        });
-        // Sort again because Firestore results are not ordered by 'in' array
-        topProductsData.sort((a, b) => (b.sales || 0) - (a.sales || 0));
-      }
-
-      // Other Stats (using getAggregateFromServer to save reads!)
-      const productsActiveAgg = await getAggregateFromServer(query(collection(db, 'products'), where('isActive', '==', true)), { count: count() });
-      const lowStockAgg = await getAggregateFromServer(query(collection(db, 'products'), where('stock', '<=', 10)), { count: count() });
-      const unreadSnap = await getDocs(query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']), limit(5)));
-      const unreadAgg = await getAggregateFromServer(query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING'])), { count: count() });
-      
-      const usersAgg = await getAggregateFromServer(collection(db, 'users'), { count: count(), totalPoints: sum('points') });
-      const whAgg = await getAggregateFromServer(collection(db, 'warehouses'), { count: count() });
-      const promSnap = await getDocs(collection(db, 'promotions'));
-
+      const data = await getDashboardStats();
       setStats({
-        dailySales: salesToday,
-        weeklySales: salesWeekly,
-        monthlySales: salesMonthly,
-        totalProducts: productsActiveAgg.data().count,
-        lowStock: lowStockAgg.data().count,
-        unreadOrders: unreadAgg.data().count,
-        warehouses: whAgg.data().count,
-        promotions: promSnap.size,
-        users: usersAgg.data().count,
-        totalPointsIssued: usersAgg.data().totalPoints || 0,
-        activeVouchers: promSnap.docs.filter(d => d.data()?.isActive === true).length
+        dailySales: data.stats.dailySales,
+        weeklySales: data.stats.weeklySales,
+        monthlySales: data.stats.monthlySales,
+        totalProducts: data.stats.totalProducts,
+        lowStock: data.stats.lowStock,
+        warehouses: data.stats.warehouses,
+        users: data.stats.users,
+        unreadOrders: data.recentOrders.filter(o => o.status === 'CONFIRMED').length,
+        promotions: 0,
+        totalPointsIssued: 0,
+        activeVouchers: 0,
       });
-
-      setRecentOrders(unreadSnap.docs.map(d => {
-        const data = d.data();
-        return { 
-          id: d.id, 
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
-        } as Order;
-      }));
-      
-      setSalesChartData(chartData);
-      setTopProducts(topProductsData);
-
+      setRecentOrders(data.recentOrders);
+      setTopProducts(data.topProducts);
+      setSalesChartData(data.salesChartData);
     } catch (e) {
-      console.error("Dashboard Fetch Error:", e);
+      console.error('Dashboard Fetch Error:', e);
     }
   }, []);
 
-  const { authLoading } = useAdminAuth();
-
   useEffect(() => {
-    if (!authLoading) {
-      fetchDashboardData().then(() => setLoading(false));
-    }
-  }, [authLoading, fetchDashboardData]);
+    fetchDashboardData().then(() => setLoading(false));
+  }, [fetchDashboardData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -279,55 +155,55 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-3">
           <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-xs font-bold text-gray-600">Sistem Online</span>
+            <span className="text-xs font-bold text-gray-600">PostgreSQL Connected</span>
           </div>
-          <button 
-            onClick={() => fetchDashboardData()} 
+          <button
+            onClick={handleRefresh}
             className="p-2 bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
             title="Refresh Data"
+            disabled={refreshing}
           >
-            <Activity size={18} className="text-gray-500" />
+            <RefreshCw size={18} className={`text-gray-500 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-        <StatBox 
-          label="Total Pendapatan (Bulan Ini)" 
-          value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`} 
-          icon={DollarSign} 
-          color="text-emerald-600" 
-          bg="bg-emerald-50" 
-          trend="+12%"
+        <StatBox
+          label="Total Pendapatan (Bulan Ini)"
+          value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`}
+          icon={DollarSign}
+          color="text-emerald-600"
+          bg="bg-emerald-50"
         />
-        <StatBox 
-          label="Total Pesanan Baru" 
-          value={stats.unreadOrders} 
-          icon={ShoppingCart} 
-          color="text-blue-600" 
-          bg="bg-blue-50" 
+        <StatBox
+          label="Penjualan Hari Ini"
+          value={`Rp${stats.dailySales.toLocaleString('id-ID')}`}
+          icon={ShoppingCart}
+          color="text-blue-600"
+          bg="bg-blue-50"
         />
-        <StatBox 
-          label="Total Pelanggan" 
-          value={stats.users} 
-          icon={Users} 
-          color="text-purple-600" 
-          bg="bg-purple-50" 
+        <StatBox
+          label="Total SKU Produk"
+          value={stats.totalProducts}
+          icon={Package}
+          color="text-purple-600"
+          bg="bg-purple-50"
         />
-        <StatBox 
-          label="Stok Perlu Perhatian" 
-          value={stats.lowStock} 
-          icon={AlertTriangle} 
-          color="text-amber-600" 
-          bg="bg-amber-50" 
+        <StatBox
+          label="Stok Perlu Perhatian"
+          value={stats.lowStock}
+          icon={AlertTriangle}
+          color="text-amber-600"
+          bg="bg-amber-50"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* Sales Chart Section */}
           <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-5">
@@ -340,19 +216,19 @@ export default function AdminDashboard() {
                 <p className="text-[9px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full inline-block">Minggu Ini</p>
               </div>
             </div>
-            
+
             {/* Simple CSS Bar Chart */}
             <div className="h-48 flex items-end justify-between gap-2 md:gap-4 mt-8">
               {salesChartData.map((data, idx) => {
-                const heightPercentage = Math.max((data.amount / maxChartValue) * 100, 5); // Min 5% height
+                const heightPercentage = Math.max((data.amount / maxChartValue) * 100, 5);
                 return (
                   <div key={idx} className="flex flex-col items-center flex-1 group relative">
                     {/* Tooltip */}
                     <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] py-1 px-2 rounded-lg whitespace-nowrap z-10 pointer-events-none">
                       Rp{data.amount.toLocaleString('id-ID')}
                     </div>
-                    
-                    <div 
+
+                    <div
                       className={`w-full max-w-[32px] rounded-t-lg transition-all duration-500 ease-out hover:opacity-80 ${idx === salesChartData.length - 1 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gray-100 hover:bg-emerald-200'}`}
                       style={{ height: `${heightPercentage}%` }}
                     ></div>
@@ -398,7 +274,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-gray-900">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
-                      <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[9px] font-bold rounded-md mt-1">
+                      <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-md mt-1 ${
+                        order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                        order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
                         {order.status}
                       </span>
                     </div>
@@ -411,12 +291,12 @@ export default function AdminDashboard() {
 
         {/* Sidebar Column */}
         <div className="space-y-6">
-          
+
           {/* Quick Actions Grid */}
           <div className="grid grid-cols-2 gap-3">
             <QuickActionCard icon={Package} title="Produk" description="Kelola stok & harga" href="/admin/products" color="bg-blue-50 text-blue-600" />
             <QuickActionCard icon={Truck} title="Supplier" description="Data pemasok" href="/admin/suppliers" color="bg-purple-50 text-purple-600" />
-            <QuickActionCard icon={Gift} title="Promo" description="Diskon & Voucher" href="/admin/promotions" color="bg-pink-50 text-pink-600" />
+            <QuickActionCard icon={Gift} title="Pembelian" description="Purchase Orders" href="/admin/purchases" color="bg-pink-50 text-pink-600" />
             <QuickActionCard icon={BarChart3} title="Laporan" description="Analisis data" href="/admin/reports" color="bg-orange-50 text-orange-600" />
           </div>
 
@@ -448,28 +328,28 @@ export default function AdminDashboard() {
 
           {/* System Info Widget */}
           <div className="bg-gray-900 p-5 rounded-2xl text-white relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-5">
-                <Database size={100} />
-             </div>
-             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Infrastruktur</h3>
-             <div className="space-y-4 relative z-10">
-                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                   <span className="text-xs text-gray-400">Gudang Aktif</span>
-                   <span className="font-bold">{stats.warehouses}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                   <span className="text-xs text-gray-400">Total SKU</span>
-                   <span className="font-bold">{stats.totalProducts}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                   <span className="text-xs text-gray-400">Promo Aktif</span>
-                   <span className="font-bold text-green-400">{stats.activeVouchers}</span>
-                </div>
-                <div className="flex justify-between items-center pb-2">
-                   <span className="text-xs text-gray-400">Total User</span>
-                   <span className="font-bold">{stats.users}</span>
-                </div>
-             </div>
+            <div className="absolute top-0 right-0 p-4 opacity-5">
+              <Database size={100} />
+            </div>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Infrastruktur</h3>
+            <div className="space-y-4 relative z-10">
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span className="text-xs text-gray-400">Database</span>
+                <span className="font-bold text-green-400 text-xs">PostgreSQL ✓</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span className="text-xs text-gray-400">Gudang Aktif</span>
+                <span className="font-bold">{stats.warehouses}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span className="text-xs text-gray-400">Total SKU</span>
+                <span className="font-bold">{stats.totalProducts}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2">
+                <span className="text-xs text-gray-400">Total User</span>
+                <span className="font-bold">{stats.users}</span>
+              </div>
+            </div>
           </div>
 
         </div>

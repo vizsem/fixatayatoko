@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
 
-import {
-  collection, query, orderBy, limit, onSnapshot,
-  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp
-} from 'firebase/firestore';
 
 import {
   Users,
@@ -24,7 +19,9 @@ import {
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, addDoc, collection, db, doc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc } from '@/lib/firebase';
 interface PointLog { id: string; userId: string; pointsChanged: number; type: string; description: string; createdAt: Timestamp | { toDate: () => Date } | null; }
 
 
@@ -84,7 +81,7 @@ export default function AdminPointsDashboard() {
         pointsChanged: pointsToChange,
         type: adjustData.type === 'BONUS' ? 'BONUS' : 'PENALTY',
         description: adjustData.reason || (adjustData.type === 'BONUS' ? 'Bonus Admin' : 'Penalti Kecurangan'),
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       });
 
       toast.success("Berhasil memperbarui poin");

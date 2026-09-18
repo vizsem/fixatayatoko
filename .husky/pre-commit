@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npm test
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/Users/hadzikoh/.nvm/versions/node/v24.12.0/bin"
+npm test -- --run

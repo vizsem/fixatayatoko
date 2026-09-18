@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, query, orderBy, getDocs, deleteDoc, doc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { OperationalExpense } from '@/lib/types';
 import { Plus, Search, Filter, Download, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -15,7 +13,9 @@ import * as Sentry from '@sentry/nextjs';
 // Components
 import { ExpensesSummary } from '@/components/admin/expenses/ExpensesSummary';
 import { ExpensesTable } from '@/components/admin/expenses/ExpensesTable';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, collection, db, deleteDoc, doc, getDocs, orderBy, query } from '@/lib/firebase';
 export default function OperationalExpensesPage() {
   const [expenses, setExpenses] = useState<OperationalExpense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +73,7 @@ export default function OperationalExpensesPage() {
   };
 
   const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredExpenses.map(i => ({ Date: i.date instanceof Timestamp ? i.date.toDate() : i.date, Category: i.category, Description: i.description, Amount: i.amount })));
+    const ws = XLSX.utils.json_to_sheet(filteredExpenses.map(i => ({ Date: (i.date as any)?.toDate ? (i.date as any).toDate() : i.date, Category: i.category, Description: i.description, Amount: i.amount })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
     XLSX.writeFile(wb, `Expenses_${dateFilter}.xlsx`);

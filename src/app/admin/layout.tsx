@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { db } from '@/lib/firebase';
 
 import {
   LayoutDashboard, ShoppingCart, Package, Users,
@@ -14,13 +13,14 @@ import {
   DollarSign, AlertTriangle
 } from 'lucide-react';
 
-import { collection, onSnapshot, orderBy, limit, query, Timestamp, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import AdminMobileHeader from '@/components/AdminMobileHeader';
 import AdminMobileNav from '@/components/AdminMobileNav';
+import { supabase } from '@/lib/supabase';
 
 
 
 
+import { Timestamp, collection, db, doc, getDocs, limit, onSnapshot, orderBy, query, where, getCountFromServer } from '@/lib/firebase';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);

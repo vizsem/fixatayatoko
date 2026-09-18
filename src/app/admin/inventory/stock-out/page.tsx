@@ -1,21 +1,18 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { deductStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
-import {
-  collection, getDocs, doc, serverTimestamp, runTransaction, getDoc
-} from 'firebase/firestore';
 import { ArrowLeft, ArrowUpCircle, Search, AlertCircle, CheckCircle2, Package, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, runTransaction } from '@/lib/firebase';
 export default function StockOutPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,7 +23,7 @@ export default function StockOutPage() {
   const [reason, setReason] = useState('Barang Rusak');
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') {
@@ -66,7 +63,7 @@ export default function StockOutPage() {
         await deductStockTx(tx, {
           productId: selectedProduct.id,
           amount: qty,
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           source: 'MANUAL',
           note: `Manual Out: ${reason}`,
           mainWarehouseId: 'gudang-utama'

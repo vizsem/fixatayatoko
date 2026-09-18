@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
 import { RefreshCcw, CheckCircle, XCircle } from 'lucide-react';
 import { addStockTx, deductStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 import notify from '@/lib/notify';
 import { Search, Plus, Trash2 } from 'lucide-react';
 import { Product } from '@/lib/types';
-import { getDocs, addDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDocs, onSnapshot, orderBy, query, runTransaction, updateDoc } from '@/lib/firebase';
 type ReturnReq = {
   id: string;
   type: 'SALES_RETURN' | 'PURCHASE_RETURN';
@@ -89,8 +88,8 @@ export default function ReturnsPage() {
     try {
       await addDoc(collection(db, 'returns'), {
         ...newReturn,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       notify.admin.success("Request retur berhasil dibuat");
       setIsModalOpen(false);
@@ -105,7 +104,7 @@ export default function ReturnsPage() {
 
     try {
       if (action === 'REJECT') {
-        await updateDoc(doc(db, 'returns', ret.id), { status: 'REJECTED', updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'returns', ret.id), { status: 'REJECTED', updatedAt: new Date().toISOString() });
         notify.admin.success('Retur ditolak');
         return;
       }
@@ -125,7 +124,7 @@ export default function ReturnsPage() {
               productId: item.productId,
               amount: item.quantity,
               warehouseId: 'gudang-utama',
-              adminId: auth.currentUser?.uid || 'system',
+              adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
               note: `Retur Penjualan #${ret.refId}`,
               source: 'MANUAL' // Adjust if needed
             });
@@ -147,7 +146,7 @@ export default function ReturnsPage() {
               productId: item.productId,
               amount: item.quantity,
               mainWarehouseId: 'gudang-utama',
-              adminId: auth.currentUser?.uid || 'system',
+              adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
               note: `Retur Pembelian #${ret.refId}`,
               source: 'MANUAL'
             });
@@ -163,7 +162,7 @@ export default function ReturnsPage() {
           }, tx);
         }
 
-        tx.update(retRef, { status: 'APPROVED', updatedAt: serverTimestamp() });
+        tx.update(retRef, { status: 'APPROVED', updatedAt: new Date().toISOString() });
       });
 
       notify.admin.success('Retur disetujui dan stok disesuaikan.');

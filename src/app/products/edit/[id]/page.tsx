@@ -3,21 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  getDocs
-} from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL,
-  deleteObject 
-} from 'firebase/storage';
-import { auth, db, storage } from '@/lib/firebase';
 import { 
   Image as ImageIcon,
   AlertTriangle,
@@ -25,7 +10,9 @@ import {
   Warehouse
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, deleteObject, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
 type Product = {
   id: string;
   name: string;
@@ -60,7 +47,7 @@ export default function EditProductPage() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

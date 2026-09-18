@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
 
-import { 
-  doc, updateDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove 
-} from 'firebase/firestore';
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
@@ -16,9 +11,10 @@ import {
 import Link from 'next/link';
 import MemberCard from '@/components/MemberCard';
 import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
-import { User as FirebaseUser } from 'firebase/auth';
 
+import { arrayRemove, arrayUnion, auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, updateDoc, where, FirebaseUser } from '@/lib/firebase';
 // --- TYPES ---
 type Address = {
   id: string;

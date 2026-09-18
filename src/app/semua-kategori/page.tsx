@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, getDocs, orderBy, query, where } from '@/lib/firebase';
 export default function AllCategoriesPage() {
   const [categories, setCategories] = useState<{ name: string, slug: string }[]>([]);
   const [loading, setLoading] = useState(true);

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
@@ -12,9 +10,10 @@ import {
 import notify from '@/lib/notify';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
 import imageCompression from 'browser-image-compression';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 
 
+import { addDoc, collection, db, getDocs, getDownloadURL, onSnapshot, query, ref, storage, uploadBytes, where } from '@/lib/firebase';
 export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -265,8 +264,8 @@ export default function AddProductPage() {
           height: Number(formData.dimHeight || 0)
         },
         volumeInCtn: Number(formData.volumeInCtn || 0),
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
 
       notify.admin.success('Produk berhasil ditambahkan ke database!');

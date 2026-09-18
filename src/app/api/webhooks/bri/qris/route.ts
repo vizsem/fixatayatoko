@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb, FieldValue } from '@/lib/firebaseAdmin';
+import { supabase } from '@/lib/supabase';
 import { briVerifyAsymmetricSignature } from '@/lib/briSnap';
 
 const isPaidStatus = (data: any) => {
@@ -17,10 +17,6 @@ const pickReference = (data: any) => {
 };
 
 export async function POST(req: Request) {
-  if (!adminDb || typeof adminDb.collection !== 'function') {
-    return NextResponse.json({ error: 'Server Misconfiguration: Database connection failed.' }, { status: 500 });
-  }
-
   const rawBody = await req.text();
   let body: any = {};
   try {
@@ -50,44 +46,59 @@ export async function POST(req: Request) {
 
   const { partnerReferenceNo, originalReferenceNo } = pickReference(body);
   const externalId = String(req.headers.get('x-external-id') || '');
+  const now = new Date().toISOString();
 
   try {
-    let orderQuery: any = adminDb.collection('orders');
+    let orderQuery = supabase.from('orders').select('*');
     if (partnerReferenceNo) {
-      orderQuery = orderQuery.where('orderId', '==', partnerReferenceNo);
+      orderQuery = orderQuery.or(`order_id.eq.${partnerReferenceNo},id.eq.${partnerReferenceNo}`);
     } else if (originalReferenceNo) {
-      orderQuery = orderQuery.where('payment.bri.referenceNo', '==', originalReferenceNo);
+      orderQuery = orderQuery.eq('raw_data->payment->bri->>referenceNo', originalReferenceNo);
     } else if (externalId) {
-      orderQuery = orderQuery.where('payment.bri.externalId', '==', externalId);
+      orderQuery = orderQuery.eq('raw_data->payment->bri->>externalId', externalId);
     } else {
-      await adminDb.collection('bri_webhook_logs').add({
-        type: 'QRIS',
-        verified,
-        headers: Object.fromEntries(req.headers.entries()),
-        body,
-        createdAt: FieldValue.serverTimestamp(),
+      await supabase.from('bri_webhook_logs').insert({
+        id: `wh_${Date.now()}`,
+        raw_data: {
+          type: 'QRIS',
+          verified,
+          headers: Object.fromEntries(req.headers.entries()),
+          body,
+          createdAt: now,
+        },
+        created_at: now,
       });
       return NextResponse.json({ ok: true });
     }
 
-    const snap = await orderQuery.limit(1).get();
-    if (snap.empty) {
-      await adminDb.collection('bri_webhook_logs').add({
-        type: 'QRIS',
-        verified,
-        headers: Object.fromEntries(req.headers.entries()),
-        body,
-        createdAt: FieldValue.serverTimestamp(),
+    const { data: orders } = await orderQuery.limit(1);
+    if (!orders || orders.length === 0) {
+      await supabase.from('bri_webhook_logs').insert({
+        id: `wh_${Date.now()}`,
+        raw_data: {
+          type: 'QRIS',
+          verified,
+          headers: Object.fromEntries(req.headers.entries()),
+          body,
+          createdAt: now,
+        },
+        created_at: now,
       });
       return NextResponse.json({ ok: true });
     }
 
-    const orderDoc = snap.docs[0];
+    const orderDoc = orders[0];
+    const orderData = orderDoc.raw_data || {};
     const paid = isPaidStatus(body);
-    const patch: Record<string, unknown> = {
+
+    const mergedRaw = {
+      ...orderData,
       paymentStatus: paid ? 'PAID' : 'UNPAID',
+      status: paid ? 'MENUNGGU' : (orderData.status || 'PENDING'),
       payment: {
+        ...(orderData.payment || {}),
         bri: {
+          ...(orderData.payment?.bri || {}),
           lastNotification: {
             verified,
             headers: {
@@ -97,18 +108,18 @@ export async function POST(req: Request) {
               'x-external-id': externalId,
             },
             body,
-            receivedAt: FieldValue.serverTimestamp(),
+            receivedAt: now,
           },
         },
       },
-      updatedAt: FieldValue.serverTimestamp(),
+      updatedAt: now,
     };
-    if (paid) patch.status = 'MENUNGGU';
 
-    await orderDoc.ref.set(
-      patch,
-      { merge: true },
-    );
+    await supabase.from('orders').update({
+      status: paid ? 'MENUNGGU' : orderDoc.status,
+      raw_data: mergedRaw,
+      updated_at: now,
+    }).eq('id', orderDoc.id);
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

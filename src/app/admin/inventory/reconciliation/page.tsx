@@ -1,21 +1,12 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { adjustStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 
-import {
-  collection,
-  doc,
-  updateDoc,
-  serverTimestamp,
-  getDoc,
-  runTransaction
-} from 'firebase/firestore';
 import {
   ArrowLeft,
   RotateCcw,
@@ -34,7 +25,9 @@ import {
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { auth, db, doc, ref, runTransaction } from '@/lib/firebase';
 interface ReconciliationItem {
   product: NormalizedProduct;
   systemStock: number;
@@ -133,7 +126,7 @@ export default function StockReconciliationPage() {
 
     setLoading(true);
     try {
-      const adminId = auth.currentUser?.uid || 'system';
+      const adminId = (await supabase.auth.getUser()).data.user?.uid || 'system';
       const timestamp = new Date().toISOString();
 
       await runTransaction(db, async (tx) => {

@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 import {
   ArrowLeft, Search,
@@ -13,7 +11,9 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, collection, db, doc, limit, onSnapshot, orderBy, query } from '@/lib/firebase';
 interface StockLog {
   id: string;
   adminEmail: string;

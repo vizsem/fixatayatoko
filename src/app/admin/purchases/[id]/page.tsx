@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import toast, { Toaster } from 'react-hot-toast';
 
 
+import { supabase } from '@/lib/supabase';
+import { Timestamp, db, doc, getDoc, updateDoc } from '@/lib/firebase';
 import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,

@@ -7,11 +7,11 @@ import {
   ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
   ChevronLeft, ChevronRight, Sparkles, Package 
 } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, getDoc, getDocs, orderBy, query, where } from '@/lib/firebase';
 type Product = {
   id: string;
   name: string;

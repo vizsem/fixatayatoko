@@ -2,12 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { ArrowLeft, Printer, AlertTriangle } from 'lucide-react';
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
+import { supabase } from '@/lib/supabase';
 
+import { db, doc, getDoc } from '@/lib/firebase';
 function BulkPrintContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

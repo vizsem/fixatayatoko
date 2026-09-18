@@ -2,13 +2,13 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { AlertTriangle, Package, ChevronLeft, CheckCircle } from 'lucide-react'; // Tambah ChevronLeft
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast'; // Pastikan Toaster ada di layout atau tambahkan disini
+import { supabase } from '@/lib/supabase';
 
+import { db, doc, getDoc, updateDoc } from '@/lib/firebase';
 type OrderItem = {
   id: string;
   name: string;
@@ -87,7 +87,7 @@ export default function PublicOrderDetailPage() {
       const orderRef = doc(db, 'orders', order.id);
       await updateDoc(orderRef, {
         status: 'SELESAI',
-        updatedAt: Timestamp.now()
+        updatedAt: new Date().toISOString()
       });
       
       setOrder(prev => prev ? { ...prev, status: 'SELESAI' } : null);

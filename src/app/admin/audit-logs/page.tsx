@@ -1,10 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
 import { 
   Activity, User, Clock, Shield, 
   Search, Filter, ChevronRight, AlertCircle,
@@ -14,6 +11,8 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { ActivityLog } from '@/lib/activity';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
+import { supabase } from '@/lib/supabase';
+import { auth, collection, db, doc, getDoc, limit, onAuthStateChanged, onSnapshot, orderBy, query } from '@/lib/firebase';
 
 const TYPE_ICONS: Record<string, any> = {
   PRODUCT_CREATE: FileText,
@@ -42,7 +41,7 @@ export default function AuditLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

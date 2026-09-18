@@ -3,14 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { 
   Download,
   Users,
@@ -38,7 +30,7 @@ export default function OperationsReport() {
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -431,3 +423,6 @@ export default function OperationsReport() {
 // Icon tambahan yang dibutuhkan
 import { ShoppingCart, Database } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';

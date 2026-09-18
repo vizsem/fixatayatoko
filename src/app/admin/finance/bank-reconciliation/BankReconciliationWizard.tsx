@@ -12,10 +12,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { collection, query, where, getDocs, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, getDocs, query, where, writeBatch } from '@/lib/firebase';
 // Types
 type BankMutation = {
   id: string; // generated
@@ -218,7 +218,7 @@ export default function BankReconciliationWizard() {
           const payoutRef = doc(db, 'marketplace_transactions', m.matchId);
           batch.update(payoutRef, { 
             status: 'reconciled',
-            reconciledAt: serverTimestamp(),
+            reconciledAt: new Date().toISOString(),
             reconciledWith: m.description
           });
         }

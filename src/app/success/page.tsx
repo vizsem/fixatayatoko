@@ -4,14 +4,13 @@ import { useEffect, useState, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle, ShoppingBag, MessageCircle, Printer, Copy, Check, Image as ImageIcon, Loader2, Download } from 'lucide-react';
 import Link from 'next/link';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { Order, OrderItem } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { supabase } from '@/lib/supabase';
 
 
+import { auth, collection, db, doc, getDocs, limit, onAuthStateChanged, query, ref, where } from '@/lib/firebase';
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('id');

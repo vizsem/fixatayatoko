@@ -6,9 +6,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { stockSyncService } from '@/lib/stockSyncService';
 import { type StockSyncLog, type StockValidation, type SyncConfig } from '@/lib/types';
-import { onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
+import { limit } from '@/lib/firebase';
 export function useStockSync(productId?: string, warehouseId?: string) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -30,21 +30,32 @@ export function useStockSync(productId?: string, warehouseId?: string) {
   useEffect(() => {
     if (!productId) return;
 
-    const q = query(
-      collection(db, 'stockSyncLogs'),
-      orderBy('timestamp', 'desc'),
-      limit(10)
-    );
+    const fetchLogs = async () => {
+      const { data } = await supabase
+        .from('stockSyncLogs')
+        .select('*')
+        .eq('productId', productId)
+        .order('timestamp', { ascending: false })
+        .limit(10);
+      if (data) setSyncLogs(data as StockSyncLog[]);
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const logs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as StockSyncLog));
-      setSyncLogs(logs);
-    });
+    fetchLogs();
 
-    return () => unsubscribe();
+    const channel = supabase
+      .channel(`stockSyncLogs:${productId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'stockSyncLogs', filter: `productId=eq.${productId}` },
+        () => {
+          fetchLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [productId]);
 
   const syncStock = useCallback(async () => {
@@ -125,22 +136,32 @@ export function useSyncLogs(limitCount: number = 50) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'stockSyncLogs'),
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const logsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as StockSyncLog));
-      setLogs(logsData);
+    const fetchLogs = async () => {
+      const { data } = await supabase
+        .from('stockSyncLogs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limitCount);
+      if (data) setLogs(data as StockSyncLog[]);
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchLogs();
+
+    const channel = supabase
+      .channel('stockSyncLogs:all')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'stockSyncLogs' },
+        () => {
+          fetchLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [limitCount]);
 
   return { logs, loading };

@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart, ArrowLeft, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
-import { collection, getDocs, query, where, documentId, limit, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
 
+import { collection, db, doc, documentId, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);

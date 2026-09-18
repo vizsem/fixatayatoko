@@ -3,16 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { 
   CreditCard, 
   Download,
@@ -41,7 +31,7 @@ export default function FinanceReport() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -327,3 +317,6 @@ export default function FinanceReport() {
 }
 
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';

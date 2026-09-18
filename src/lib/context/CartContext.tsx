@@ -1,12 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { CartItem, Product } from '@/lib/types';
+import { CartItem } from '@/lib/types';
 import notify from '@/lib/notify';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
+import { auth } from '@/lib/firebase';
 interface CartContextType {
   cart: CartItem[];
   itemCount: number;
@@ -33,11 +32,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (uid) {
       try {
-        await setDoc(doc(db, 'carts', uid), { 
-          userId: uid, 
-          items: newCart, 
-          updatedAt: new Date().toISOString() 
-        }, { merge: true });
+        await supabase.from('carts').upsert({
+          user_id: uid,
+          items: newCart,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
       } catch (err) {
         console.error('Failed to sync cart to cloud', err);
       }
@@ -45,31 +44,44 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setUserId(user?.uid || null);
+    const initCart = async (uid: string | null) => {
       const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
-      
-      if (user) {
-        const snap = await getDoc(doc(db, 'carts', user.uid));
-        if (snap.exists()) {
-          const cloudCart = snap.data().items || [];
-          // Simple merge logic: Cloud wins but could be more complex
-          setCart(cloudCart.length > 0 ? cloudCart : localCart);
-        } else {
-          setCart(localCart);
-        }
+
+      if (uid) {
+        const { data } = await supabase
+          .from('carts')
+          .select('items')
+          .eq('user_id', uid)
+          .single();
+
+        const cloudCart = data?.items || [];
+        setCart(cloudCart.length > 0 ? cloudCart : localCart);
       } else {
         setCart(localCart);
       }
       setLoading(false);
+    };
+
+    // Get initial session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id || null);
+      initCart(user?.id || null);
     });
-    return () => unsub();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id || null;
+      setUserId(uid);
+      initCart(uid);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const addToCart = useCallback((product: any, quantity: number = 1, unit: string = '') => {
     const pId = product.id || product.productId || '';
     const unitToUse = unit || product.unit || 'PCS';
-    
+
     setCart(prev => {
       const idx = prev.findIndex(item => (item.id === pId || item.productId === pId) && item.unit === unitToUse);
       let next;
@@ -87,7 +99,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const updateQuantity = useCallback((id: string, qty: number, unit?: string) => {
     setCart(prev => {
-      const next = prev.map(item => 
+      const next = prev.map(item =>
         (item.id === id || item.productId === id) && (!unit || item.unit === unit)
           ? { ...item, quantity: Math.max(1, qty) }
           : item

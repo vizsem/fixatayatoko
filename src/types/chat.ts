@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 
 export interface ChatThread {
   id: string; // User ID
@@ -9,10 +8,10 @@ export interface ChatThread {
     photoURL?: string;
   };
   lastMessage: string;
-  lastMessageTime: Timestamp;
+  lastMessageTime: string | Date;
   unreadCount: number;
   isReadByAdmin: boolean;
-  updatedAt?: Timestamp;
+  updatedAt?: string | Date;
 }
 
 export interface ChatMessage {
@@ -21,6 +20,6 @@ export interface ChatMessage {
   text: string;
   type: 'text' | 'image';
   imageUrl?: string;
-  createdAt: Timestamp;
+  createdAt: string | Date;
   isRead: boolean;
 }

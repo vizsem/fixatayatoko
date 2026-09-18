@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
+import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, ref, signOut, storage, where } from '@/lib/firebase';
 import {
   Bell,
   ChevronDown,
@@ -16,7 +16,6 @@ import {
   Ticket,
   User,
 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
 
 type OrderRow = {
   id: string;

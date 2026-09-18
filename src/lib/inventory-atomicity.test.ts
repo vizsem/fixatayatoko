@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { addStockTx, deductStockTx, transferStockTx, adjustStockTx } from '@/lib/inventory';
-import { serverTimestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, increment, ref, serverTimestamp } from '@/lib/firebase';
 // Mock Firebase
 vi.mock('@/lib/firebase', () => ({
-  db: {}
+  db: {},
+  doc: vi.fn((_db, collection, id) => ({ path: `${collection}/${id}` })),
+  collection: vi.fn((_db, path) => ({ path })),
+  serverTimestamp: vi.fn(() => 'mocked-timestamp'),
+  increment: vi.fn((n) => `incremented-${n}`)
 }));
 
 vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((db, collection, id) => ({ path: `${collection}/${id}` })),
-  collection: vi.fn((db, path) => ({ path })),
+  doc: vi.fn((_db, collection, id) => ({ path: `${collection}/${id}` })),
+  collection: vi.fn((_db, path) => ({ path })),
   serverTimestamp: vi.fn(() => 'mocked-timestamp'),
   increment: vi.fn((n) => `incremented-${n}`)
 }));

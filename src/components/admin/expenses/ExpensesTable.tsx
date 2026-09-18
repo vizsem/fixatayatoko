@@ -1,7 +1,7 @@
 import { Trash2, Edit, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { Timestamp } from 'firebase/firestore';
 
+import { Timestamp } from '@/lib/firebase';
 interface Expense {
   id: string;
   date: any;

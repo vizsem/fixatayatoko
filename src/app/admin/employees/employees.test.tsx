@@ -8,7 +8,9 @@ const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
 const mockRunTransaction = vi.fn();
 
-vi.mock('firebase/firestore', () => ({
+vi.mock('@/lib/firebase', () => ({
+  auth: {},
+  db: {},
   collection: vi.fn(),
   doc: vi.fn(),
   updateDoc: vi.fn(),
@@ -24,14 +26,6 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
   arrayUnion: vi.fn(),
   setDoc: vi.fn(),
-}));
-
-vi.mock('@/lib/firebase', () => ({
-  auth: {},
-  db: {},
-}));
-
-vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (_auth: unknown, cb: (user: { uid: string } | null) => void) => {
     cb({ uid: 'admin-user' });
     return () => {};
@@ -40,6 +34,25 @@ vi.mock('firebase/auth', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock('@/lib/hooks/useAdminAuth', () => ({
+  __esModule: true,
+  default: () => ({ adminId: 'admin-user', role: 'admin', authLoading: false }),
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(async () => ({
+        data: { user: { id: 'admin-user', app_metadata: { role: 'admin' } } },
+      })),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
+    },
+    storage: {},
+  },
 }));
 
 vi.mock('jspdf', () => ({

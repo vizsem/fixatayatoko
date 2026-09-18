@@ -1,6 +1,6 @@
-import { Timestamp } from 'firebase/firestore';
 import { History, Trash2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
+import { Timestamp } from '@/lib/firebase';
 interface Transaction {
   id: string;
   type: 'INJECTION' | 'WITHDRAWAL';

@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { Order } from './types';
+import logger from './logger';
 
 // Twilio configuration dari environment variables
 const TWILIO_CONFIG = {
@@ -14,7 +15,7 @@ let twilioClient: ReturnType<typeof twilio> | null = null;
 const getTwilioClient = () => {
   if (!twilioClient) {
     if (!TWILIO_CONFIG.accountSid || !TWILIO_CONFIG.authToken) {
-      console.warn('Twilio credentials not configured. SMS notifications will be disabled.');
+      logger.warn('Twilio credentials not configured. SMS notifications will be disabled.');
       return null;
     }
     twilioClient = twilio(TWILIO_CONFIG.accountSid, TWILIO_CONFIG.authToken);
@@ -42,10 +43,10 @@ export const sendSMS = async (to: string, body: string): Promise<boolean> => {
       to: formattedTo,
     });
 
-    console.log('SMS sent successfully:', message.sid);
+    logger.info('SMS sent successfully:', message.sid);
     return true;
   } catch (error) {
-    console.error('Failed to send SMS:', error);
+    logger.error('Failed to send SMS:', error);
     return false;
   }
 };

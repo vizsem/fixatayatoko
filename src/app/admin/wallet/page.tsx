@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
 
-import {
-  collection, query, orderBy, limit, onSnapshot,
-  getDocs, doc, updateDoc, addDoc, increment, serverTimestamp, Timestamp,
-  runTransaction
-} from 'firebase/firestore';
 
 import {
   Users,
@@ -22,7 +16,9 @@ import {
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, collection, db, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction } from '@/lib/firebase';
 interface WalletLog { id: string; userId: string; amountChanged: number; type: string; description: string; createdAt: Timestamp | { toDate: () => Date } | null; orderId?: string; }
 interface UserWithWallet { id: string; displayName?: string; email?: string; walletBalance: number; }
 
@@ -97,7 +93,7 @@ export default function AdminWalletDashboard() {
           amountChanged: amountToChange,
           type: adjustData.type,
           description: adjustData.reason || (adjustData.type === 'TOPUP_ADMIN' ? 'Top-up oleh Admin' : 'Penarikan oleh Admin'),
-          createdAt: serverTimestamp()
+          createdAt: new Date().toISOString()
         });
       });
 

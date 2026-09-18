@@ -1,21 +1,8 @@
 'use client';
 
 import { useEffect, useState, use, useMemo } from 'react';
-import { auth, db } from '@/lib/firebase';
 
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  Timestamp,
-  doc,
-  getDoc,
-  updateDoc,
-  serverTimestamp,
-  runTransaction,
-  increment,
-  collection,
-  addDoc
-} from 'firebase/firestore';
 import {
   MapPin,
   CreditCard,
@@ -32,7 +19,9 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, addDoc, auth, collection, db, doc, getDoc, increment, onAuthStateChanged, runTransaction, updateDoc } from '@/lib/firebase';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 type DeliveryLocation = { lat: number; lng: number };
@@ -121,7 +110,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -199,7 +188,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const orderRef = doc(db, 'orders', order.id);
       await updateDoc(orderRef, {
         status: newStatus,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       });
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       notify.admin.success(`Status: ${newStatus}`, { icon: '🚀' });
@@ -347,7 +336,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 productName: newItem.name,
                 type: stockChange > 0 ? 'MASUK' : 'KELUAR',
                 amount: Math.abs(stockChange),
-                adminId: auth.currentUser?.uid || 'system',
+                adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
                 source: 'ORDER',
                 orderId: order.id,
                 referenceId: order.id,
@@ -396,7 +385,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           subtotal: calculatedNewSubtotal,
           total: calculatedNewTotal,
           status: 'DIPROSES',
-          updatedAt: serverTimestamp()
+          updatedAt: new Date().toISOString()
         });
 
         const isRefundablePayment = !['CASH', 'TEMPO', 'COD'].includes((current.paymentMethod || '').toUpperCase());
@@ -417,7 +406,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       // Execute logs
       if (logsToAdd && logsToAdd.length > 0) {
-        await Promise.all(logsToAdd.map(log => addInventoryLog(log)));
+        await Promise.all(logsToAdd.map((log: any) => addInventoryLog(log)));
       }
 
       if (
@@ -432,7 +421,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           amountChanged: refundAmount,
           type: 'REFUND_STOCK',
           description: 'Pengembalian dana karena stok tidak sesuai',
-          createdAt: serverTimestamp()
+          createdAt: new Date().toISOString()
         });
       }
 
@@ -482,8 +471,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         reason: returnReason,
         status: 'PENDING',
         totalValue,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
 
       notify.admin.success("Request retur berhasil dibuat");

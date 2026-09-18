@@ -3,9 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import NextImage from 'next/image';
-import { auth, db, storage } from '@/lib/firebase';
-import { collection, doc, getDoc, query, where, getDocs, limit, serverTimestamp, setDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import { ChevronLeft, Loader2, ShoppingBag } from 'lucide-react';
 import notify from '@/lib/notify';
 import { CartItem, UserProfile, Voucher } from '@/lib/types';
@@ -16,7 +13,9 @@ import { CartItemCard } from '@/components/cart/CartItemCard';
 import { CartPromoBanner } from '@/components/cart/CartPromoBanner';
 import { CheckoutForms } from '@/components/cart/CheckoutForms';
 import { CheckoutSummary } from '@/components/cart/CheckoutSummary';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, limit, query, where } from '@/lib/firebase';
 export default function CartPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -76,13 +75,13 @@ export default function CartPage() {
     const initialize = async () => {
       try {
         const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
-        onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            setUserId(user.uid);
-            const [uSnap, cSnap] = await Promise.all([
-              getDoc(doc(db, 'users', user.uid)),
-              getDoc(doc(db, 'carts', user.uid))
-            ]);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserId(user.id);
+          const [uSnap, cSnap] = await Promise.all([
+            getDoc(doc(db, 'users', user.id)),
+            getDoc(doc(db, 'carts', user.id))
+          ]);
             if (uSnap.exists()) {
                const uData = uSnap.data() as UserProfile;
                setUserData(uData);
@@ -94,7 +93,6 @@ export default function CartPage() {
             setCart(localCart);
           }
           setIsLoaded(true);
-        });
 
         // Fetch Promo
         const pSnap = await getDocs(query(collection(db, 'products'), where('stock', '>', 0), where('status', '==', 'active'), limit(1)));

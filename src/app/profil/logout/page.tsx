@@ -3,10 +3,9 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
-import { auth } from '@/lib/firebase';
 
+import { auth, signOut } from '@/lib/firebase';
 export default function LogoutPage() {
   const router = useRouter();
 

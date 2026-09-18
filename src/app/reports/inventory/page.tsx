@@ -3,14 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { 
   Package, 
   Download,
@@ -37,7 +29,7 @@ export default function InventoryReport() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;
@@ -277,3 +269,6 @@ export default function InventoryReport() {
 }
 
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';

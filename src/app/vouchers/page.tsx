@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
 
-import {
-  collection, doc, getDoc, getDocs,
-  updateDoc, addDoc, increment, serverTimestamp
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import {
   Ticket, Coins, ArrowLeft, Lock,
   Gift, Zap, Snowflake, Truck, Wallet, Store, Percent
@@ -15,10 +9,11 @@ import {
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile } from '@/lib/types';
 import { SkeletonList, EmptyState } from '@/components/UIState';
+import { supabase } from '@/lib/supabase';
 
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, increment, onAuthStateChanged, updateDoc, FirebaseUser } from '@/lib/firebase';
 interface UserData extends UserProfile {
   _addresses?: unknown[]; // internal extended field
 }
@@ -131,7 +126,7 @@ export default function VoucherExchangePage() {
         name: voucher.name,
         value: voucher.value,
         status: 'ACTIVE',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
 
       await addDoc(collection(db, 'point_logs'), {
@@ -139,7 +134,7 @@ export default function VoucherExchangePage() {
         pointsChanged: -voucher.cost,
         type: 'VOUCHER_EXCHANGE',
         description: `Tukar voucher: ${voucher.name} (${voucherCode})`,
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       });
 
       // 2. OTOMATIS SALIN KE CLIPBOARD

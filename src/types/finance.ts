@@ -1,8 +1,7 @@
-import { Timestamp } from 'firebase/firestore';
 
 export interface CapitalTransaction {
   id: string;
-  date: Timestamp | Date;
+  date: string | Date;
   type: 'INJECTION' | 'WITHDRAWAL'; // Tambah Modal / Tarik Modal
   amount: number;
   description: string;
@@ -17,8 +16,8 @@ export interface LoanRecord {
   interestRate?: number; // Bunga (%)
   interestPeriod?: 'MONTHLY' | 'YEARLY'; // Periode Bunga
   loanType?: 'STANDARD' | 'REKENING_KORAN'; // Tipe Pinjaman
-  startDate: Timestamp | Date;
-  dueDate?: Timestamp | Date;
+  startDate: string | Date;
+  dueDate?: string | Date;
   status: 'ACTIVE' | 'PAID';
   description?: string;
 }

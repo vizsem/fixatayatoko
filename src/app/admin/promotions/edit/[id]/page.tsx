@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import {
   ArrowLeft, Save, Trash2, Calendar,
   Tag, Percent, Database, CheckCircle2 // 'percent' diubah menjadi 'Percent'
@@ -11,7 +9,9 @@ import {
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, getDoc, getDocs, updateDoc } from '@/lib/firebase';
 type Promotion = {
   name: string;
   type: 'product' | 'category' | 'coupon';

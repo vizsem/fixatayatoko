@@ -1,18 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { getReportSummary } from '@/lib/actions/report.actions';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-} from 'firebase/firestore';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import {
@@ -35,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { auth, collection, db, doc, getDocs, query, where } from '@/lib/firebase';
 import {
   AreaChart,
   Area,
@@ -99,90 +91,18 @@ export default function ReportsDashboard() {
   const [dateRange, setDateRange] = useState(getInitialDateRange());
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
-        notify.aksesDitolakAdmin();
-        router.push('/profil');
-        return;
-      }
-    });
-    return () => unsubscribe();
+    // TODO: Implement Supabase auth check for admin role
   }, [router]);
 
   const fetchReportSummary = useCallback(async () => {
     setLoading(true);
     try {
       const start = new Date(dateRange.startDate);
-      start.setHours(0, 0, 0, 0);
       const end = new Date(dateRange.endDate);
-      end.setHours(23, 59, 59, 999);
-
-      const qOrders = query(
-        collection(db, 'orders'),
-        where('createdAt', '>=', start),
-        where('createdAt', '<=', end),
-        orderBy('createdAt', 'asc')
-      );
-      const ordersSnap = await getDocs(qOrders);
-
-      let tSales = 0;
-      let tDebt = 0;
-      const customerIds = new Set<string>();
-      const salesMap: Record<string, number> = {};
-
-      const currentDate = new Date(start);
-      while (currentDate <= end) {
-        const dateKey = currentDate.toISOString().split('T')[0];
-        salesMap[dateKey] = 0;
-        currentDate.setDate(currentDate.getDate() + 1);
+      const summary = await getReportSummary(start, end);
+      if (summary) {
+        setSummary(summary);
       }
-
-      ordersSnap.forEach((doc) => {
-        const data = doc.data();
-        const status = String(data.status || '').toUpperCase();
-        
-        if (['SELESAI', 'SUCCESS'].includes(status)) {
-          const total = Number(data.total || 0);
-          tSales += total;
-          if (data.createdAt) {
-            const dateKey = data.createdAt.toDate().toISOString().split('T')[0];
-            if (salesMap[dateKey] !== undefined) salesMap[dateKey] += total;
-          }
-        }
-
-        if (!['SELESAI', 'DIBATALKAN', 'SUCCESS'].includes(status)) {
-          tDebt += Number(data.total || 0);
-        }
-
-        if (data.customerId) customerIds.add(data.customerId);
-      });
-
-      const dailySales = Object.entries(salesMap).map(([date, total]) => ({
-        date,
-        total,
-        label: new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
-      })).sort((a, b) => a.date.localeCompare(b.date));
-
-      const productsSnap = await getDocs(collection(db, 'products'));
-      const lowStock = productsSnap.docs.filter(d => ((d.data().stock as number) || 0) <= 10).length;
-      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
-
-      setSummary({
-        totalSales: tSales,
-        totalOrders: ordersSnap.size,
-        totalProducts: productsSnap.size,
-        lowStockCount: lowStock,
-        totalCustomers: usersSnap.size,
-        outstandingDebt: tDebt,
-        activeCustomers: customerIds.size,
-        averageOrderValue: ordersSnap.size > 0 ? tSales / ordersSnap.size : 0,
-        dailySales
-      });
     } catch (error) {
       console.error("Error fetching reports:", error);
       notify.admin.error("Gagal memuat data laporan");

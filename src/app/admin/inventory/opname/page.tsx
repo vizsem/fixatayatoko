@@ -1,21 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { adjustStockTx } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
 
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct } from '@/lib/normalize';
 
-import {
-  collection,
-  doc,
-  updateDoc,
-  serverTimestamp,
-  getDoc,
-  runTransaction
-} from 'firebase/firestore';
 import {
   ArrowLeft,
   RotateCcw,
@@ -28,7 +19,9 @@ import {
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { auth, db, doc, runTransaction } from '@/lib/firebase';
 export default function StockOpnamePage() {
   const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   const [loading, setLoading] = useState(false);
@@ -81,7 +74,7 @@ export default function StockOpnamePage() {
           productId: selectedProduct.id,
           newStock: newMainStock,
           warehouseId: MAIN_WAREHOUSE_ID,
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           source: 'OPNAME',
           note: note || (totalDiff >= 0 ? 'Kelebihan barang (Opname)' : 'Barang kurang/hilang (Opname)')
         });

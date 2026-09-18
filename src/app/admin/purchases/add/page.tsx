@@ -2,8 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { collection, writeBatch, serverTimestamp, onSnapshot, doc, getDocs, query, orderBy, where, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
   Package, Store, Truck, Calculator,
@@ -13,7 +11,9 @@ import Link from 'next/link';
 import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
+import { supabase } from '@/lib/supabase';
 
+import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
 interface CartItem { 
@@ -263,13 +263,13 @@ function AddPurchaseFormContent() {
         paymentMethod,
         notes,
         status: 'MENUNGGU',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
 
       if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
          const capitalRef = doc(collection(db, 'capital_transactions'));
          batch.set(capitalRef, {
-           date: serverTimestamp(),
+           date: new Date().toISOString(),
            type: 'WITHDRAWAL',
            amount: total,
            description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
@@ -278,7 +278,7 @@ function AddPurchaseFormContent() {
          });
       }
 
-      batch.commit().catch(err => console.log('Offline commit queued for PO:', err));
+      batch.commit().catch(() => {});
 
       notify.admin.success("Purchase Order berhasil disimpan!");
       router.push('/admin/purchases');

@@ -5,13 +5,6 @@ import { useEffect, useState, useMemo } from 'react';
 
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import {
-  collection,
-  getDocs,
-  query,
-  where
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import * as XLSX from 'xlsx';
 import {
   TrendingUp,
@@ -21,7 +14,9 @@ import {
   Users
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, collection, db, getDocs, query, where } from '@/lib/firebase';
 type SaleItem = {
   id: string;
   date: string;

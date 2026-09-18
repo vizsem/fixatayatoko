@@ -1,3 +1,4 @@
+import { doc } from '@/lib/firebase';
 // Lazy loading untuk dependencies berat
 
 interface HtmlToImageOptions {

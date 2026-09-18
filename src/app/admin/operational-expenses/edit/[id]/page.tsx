@@ -3,18 +3,6 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  doc,
-  getDoc,
-  updateDoc,
-  Timestamp 
-} from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
-} from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
-import { 
   ArrowLeft, 
   Save, 
   Upload, 
@@ -22,7 +10,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
+import { Timestamp, db, doc, getDoc, getDownloadURL, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
 export default function EditOperationalExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -52,8 +42,8 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
           setCurrentProofUrl(data.proofOfPayment || null);
           
           // Handle date
-          if (data.date instanceof Timestamp) {
-            setDate(data.date.toDate().toISOString().split('T')[0]);
+          if (data.date && typeof (data.date as any).toDate === 'function') {
+            setDate((data.date as any).toDate().toISOString().split('T')[0]);
           } else if (data.date) {
             setDate(new Date(data.date).toISOString().split('T')[0]);
           }
@@ -99,7 +89,7 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
         date: Timestamp.fromDate(new Date(date)),
         description,
         proofOfPayment: proofUrl,
-        updatedAt: Timestamp.now()
+        updatedAt: new Date().toISOString()
       });
 
       notify.success('Pengeluaran berhasil diperbarui');

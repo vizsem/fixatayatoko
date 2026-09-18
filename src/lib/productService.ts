@@ -1,77 +1,76 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  where,
-  serverTimestamp // Gunakan ini agar sinkron dengan fungsi import Excel
-} from 'firebase/firestore';
-
-import { db } from '@/lib/firebase';
+// lib/productService.ts - Rewritten for Supabase
+import { supabase } from '@/lib/supabase';
 import { Product } from './types';
 
-
+import { query } from '@/lib/firebase';
 // ✅ Membuat Produk Baru
 export async function createProduct(product: Omit<Product, 'id'>): Promise<string> {
-  // Gunakan ID dari Excel sebagai ID dokumen jika tersedia, jika tidak generate otomatis
-  const customId = product.ID || undefined;
-  const docRef = customId ? doc(db, 'products', customId) : doc(collection(db, 'products'));
+  const payload: any = { ...product };
+  // Remove undefined ID so Supabase generates one
+  if (!payload.ID) delete payload.ID;
 
-  await setDoc(docRef, {
-    ...product,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('products')
+    .insert(payload)
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data.id;
 }
 
 // ✅ Mengambil Satu Produk
 export async function getProduct(id: string): Promise<Product | null> {
-  const docSnap = await getDoc(doc(db, 'products', id));
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Product;
-  }
-  return null;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+  return { id: data.id, ...data } as Product;
 }
 
 // ✅ Update Produk (Mendukung Partial Update)
 export async function updateProduct(id: string, product: Partial<Product>): Promise<void> {
-  await updateDoc(doc(db, 'products', id), {
-    ...product,
-    updatedAt: serverTimestamp()
-  });
+  const { error } = await supabase
+    .from('products')
+    .update({ ...product, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
 // ✅ Hapus Produk
 export async function deleteProduct(id: string): Promise<void> {
-  await deleteDoc(doc(db, 'products', id));
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
 // ✅ Ambil Semua Produk (Bisa difilter yang aktif saja)
 export async function getProducts(onlyActive = false): Promise<Product[]> {
-  let q = query(collection(db, 'products'));
+  let query = supabase.from('products').select('*');
 
   if (onlyActive) {
-    q = query(collection(db, 'products'), where("Status", "==", 1));
+    query = query.eq('Status', 1);
   }
 
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Product[];
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as Product[];
 }
 
 // ✅ Ambil Produk Berdasarkan Parent_ID (Untuk Variasi)
 export async function getProductVariations(parentId: string): Promise<Product[]> {
-  const q = query(collection(db, 'products'), where("Parent_ID", "==", parentId));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Product[];
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('Parent_ID', parentId);
+
+  if (error) throw error;
+  return (data || []) as Product[];
 }

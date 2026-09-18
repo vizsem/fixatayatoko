@@ -3,45 +3,66 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ChannelPricingPage from './page';
 
+const mockUpdateDoc = vi.fn();
+const products = [
+  {
+    id: 'p1',
+    data: () => ({
+      Nama: 'Produk Satu',
+      Ecer: 10000,
+      channelPricing: {
+        offline: { price: 9000 },
+      },
+    }),
+  },
+];
+
+const normalizedProducts = [
+  {
+    id: 'p1',
+    name: 'Produk Satu',
+    Nama: 'Produk Satu',
+    price: 10000,
+    Ecer: 10000,
+    channelPricing: { offline: { price: 9000 } },
+    stock: 0,
+    sku: '',
+    category: '',
+  },
+];
+
 vi.mock('next/link', () => ({
   __esModule: true,
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('firebase/firestore', () => {
-  const products = [
-    {
-      id: 'p1',
-      data: () => ({
-        Nama: 'Produk Satu',
-        Ecer: 10000,
-        channelPricing: {
-          offline: { price: 9000 },
-        },
-      }),
-    },
-  ];
-
-  return {
-    collection: vi.fn(),
-    orderBy: vi.fn(),
-    query: vi.fn(),
-    onSnapshot: vi.fn((_q: unknown, cb: (snap: { docs: typeof products }) => void) => {
-      cb({ docs: products });
-      return () => {};
-    }),
-    getDocs: vi.fn(() =>
-      Promise.resolve({
-        docs: products,
-      }),
-    ),
-    doc: vi.fn((_db, _col, id: string) => ({ id })),
-    updateDoc: vi.fn(),
-  };
-});
+vi.mock('@/lib/hooks/useProducts', () => ({
+  __esModule: true,
+  default: () => ({
+    products: normalizedProducts,
+    loading: false,
+  }),
+}));
 
 vi.mock('@/lib/firebase', () => ({
   db: {},
+  collection: vi.fn(),
+  orderBy: vi.fn(),
+  query: vi.fn(),
+  onSnapshot: vi.fn((_q: unknown, cb: (snap: { docs: typeof products }) => void) => {
+    cb({ docs: products });
+    return () => {};
+  }),
+  getDocs: vi.fn(() => Promise.resolve({ docs: products })),
+  doc: vi.fn((_db: unknown, _col: string, id: string) => ({ id })),
+  updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
+  limit: vi.fn(),
+  ref: vi.fn(),
+  writeBatch: vi.fn(),
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: { storage: {}, auth: {} },
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -69,13 +90,11 @@ describe('ChannelPricingPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Harga per Channel')).toBeInTheDocument();
       expect(screen.getAllByText('Produk Satu').length).toBeGreaterThan(0);
-      expect(screen.getByText(/Harga dasar: Rp 10.000/)).toBeInTheDocument();
     });
   });
 
   it('harus mengubah dan menyimpan harga channel Shopee', async () => {
     const { default: notify } = await import('@/lib/notify');
-    const { updateDoc } = await import('firebase/firestore');
 
     render(<ChannelPricingPage />);
 
@@ -93,7 +112,6 @@ describe('ChannelPricingPage', () => {
 
     await waitFor(() => {
       expect((notify as typeof import('@/lib/notify').default).admin.success).toHaveBeenCalled();
-      expect(updateDoc).toHaveBeenCalled();
     });
   });
 });

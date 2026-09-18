@@ -1,8 +1,9 @@
-import { getAuth, GoogleAuthProvider, signInWithRedirect } from "firebase/auth";
-
-const auth = getAuth();
-const provider = new GoogleAuthProvider();
+import { supabase } from './supabase';
 
 export const loginWithGoogle = async () => {
-  await signInWithRedirect(auth, provider);
+  await supabase.auth.signInWithOAuth({ provider: 'google' });
+};
+
+export const authOptions: any = {
+  providers: [],
 };

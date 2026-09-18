@@ -1,21 +1,21 @@
-// Custom hooks untuk Firebase
-import { auth, db, storage } from '@/lib/firebase';
+// Custom hooks untuk Supabase (menggantikan Firebase)
+import { supabase } from '@/lib/supabase';
 
 export const useFirebaseAuth = () => {
-  return { auth, loading: false, error: null };
+  return { auth: supabase.auth, loading: false, error: null };
 };
 
 export const useFirestore = () => {
-  return { db, loading: false, error: null };
+  return { db: supabase, loading: false, error: null };
 };
 
 export const useFirebaseStorage = () => {
-  return { storage, loading: false, error: null };
+  return { storage: supabase.storage, loading: false, error: null };
 };
 
 export const useFirebase = () => {
   return { 
-    services: { auth, db, storage }, 
+    services: { auth: supabase.auth, db: supabase, storage: supabase.storage }, 
     loading: false, 
     error: null 
   };

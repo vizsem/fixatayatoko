@@ -3,16 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import * as XLSX from 'xlsx';
 import {
   Gift,
@@ -23,8 +13,10 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 type PromotionRecord = {
   id: string;
   name: string;
@@ -44,7 +36,7 @@ export default function PromotionsReport() {
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         router.push('/profil/login');
         return;

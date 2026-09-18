@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import MarketplaceOrdersPage from './page';
 import notify from '@/lib/notify';
-import * as firestore from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -16,67 +16,55 @@ vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('firebase/firestore', async () => {
-  const actual = await vi.importActual('firebase/firestore');
-  return {
-    ...actual,
-    collection: vi.fn((_db: unknown, _path: string) => ({ path: _path })),
-    doc: vi.fn((_dbOrCol: unknown, ...args: string[]) => {
-      // Support both doc(db, 'collection', 'id') and doc(collectionRef, 'id')
-      const id = args.length === 2 ? args[1] : args[0];
-      return { id, path: id };
-    }),
-    query: vi.fn(() => ({})),
-    orderBy: vi.fn(),
-    where: vi.fn(),
-    getDoc: vi.fn(async () => ({
-      exists: () => true,
-      data: () => ({ role: 'admin' }),
-    })),
-    getDocs: vi.fn(async () => ({
-      docs: [
-        {
-          id: 'p1',
-          data: () => ({
-            name: 'Produk Marketplace',
-            Nama: 'Produk Marketplace',
-            sku: 'SKU001',
-            priceEcer: 10000,
-            Ecer: 10000,
-            stock: 10,
-            priceShopee: 12000,
-            channelPricing: {
-              shopee: { price: 12000 },
-            },
-          }),
-        },
-      ],
-    })),
-    serverTimestamp: vi.fn(),
-    updateDoc: vi.fn(async () => {}),
-    addDoc: vi.fn(async () => ({ id: 'order-1' })),
-    runTransaction: vi.fn(async (_db: unknown, fn: (tx: any) => unknown) => {
-      const tx = {
-        get: vi.fn(async () => ({
-          exists: () => true,
-          data: () => ({ stock: 100, stockByWarehouse: {} }),
-        })),
-        update: vi.fn(async () => {}),
-        set: vi.fn(async () => {}),
-      };
-      return await fn(tx);
-    }),
-  };
-});
-
 vi.mock('@/lib/firebase', () => ({
   auth: {},
   db: {},
-}));
-
-vi.mock('firebase/auth', () => ({
+  collection: vi.fn((_db: unknown, _path: string) => ({ path: _path })),
+  doc: vi.fn((_dbOrCol: unknown, ...args: string[]) => {
+    const id = args.length === 2 ? args[1] : args[0];
+    return { id, path: id };
+  }),
+  query: vi.fn(() => ({})),
+  orderBy: vi.fn(),
+  where: vi.fn(),
+  getDoc: vi.fn(async () => ({
+    exists: () => true,
+    data: () => ({ role: 'admin' }),
+  })),
+  getDocs: vi.fn(async () => ({
+    docs: [
+      {
+        id: 'p1',
+        data: () => ({
+          name: 'Produk Marketplace',
+          Nama: 'Produk Marketplace',
+          sku: 'SKU001',
+          priceEcer: 10000,
+          Ecer: 10000,
+          stock: 10,
+          priceShopee: 12000,
+          channelPricing: {
+            shopee: { price: 12000 },
+          },
+        }),
+      },
+    ],
+  })),
+  serverTimestamp: vi.fn(),
+  updateDoc: vi.fn(async () => {}),
+  addDoc: vi.fn(async () => ({ id: 'order-1' })),
+  runTransaction: vi.fn(async (_db: unknown, fn: (tx: any) => unknown) => {
+    const tx = {
+      get: vi.fn(async () => ({
+        exists: () => true,
+        data: () => ({ stock: 100, stockByWarehouse: {} }),
+      })),
+      update: vi.fn(async () => {}),
+      set: vi.fn(async () => {}),
+    };
+    return await fn(tx);
+  }),
   onAuthStateChanged: (_auth: unknown, callback: (user: { uid: string } | null) => void) => {
-    // Panggil callback dengan user admin
     setTimeout(() => callback({ uid: 'admin-user' }), 0);
     return () => {};
   },

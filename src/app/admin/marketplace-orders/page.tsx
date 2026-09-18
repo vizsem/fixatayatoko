@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, doc, getDoc, getDocs, serverTimestamp, writeBatch, query, where } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import notify from '@/lib/notify';
 import { deductStockBatch } from '@/lib/inventory';
 import { Toaster } from 'react-hot-toast';
@@ -24,7 +21,9 @@ import { ProductSearchList } from '@/components/admin/marketplace/ProductSearchL
 import { CartTable } from '@/components/admin/marketplace/CartTable';
 import { Product } from '@/lib/types';
 import * as Sentry from '@sentry/nextjs';
+import { supabase } from '@/lib/supabase';
 
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, ref, where, writeBatch } from '@/lib/firebase';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
 interface CartItem {
@@ -101,7 +100,7 @@ export default function MarketplaceOrdersPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
@@ -229,8 +228,8 @@ export default function MarketplaceOrdersPage() {
         channel,
         paymentMethod,
         status: 'SELESAI',
-        createdAt: serverTimestamp(),
-        adminId: auth.currentUser?.uid
+        createdAt: new Date().toISOString(),
+        adminId: (await supabase.auth.getUser()).data.user?.uid
       };
 
       // FIX: Pre-fetch ALL product snapshots BEFORE batch writes
@@ -244,7 +243,7 @@ export default function MarketplaceOrdersPage() {
         await deductStockBatch(batch, {
           productId: item.id,
           amount: item.quantity,
-          adminId: auth.currentUser?.uid || 'system',
+          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
           source: 'MARKETPLACE',
           note: `Marketplace Order: ${channel} - ${externalOrderId}`,
           prefetchedSnap: pSnap
@@ -253,8 +252,7 @@ export default function MarketplaceOrdersPage() {
 
       batch.set(orderRef, orderData);
       
-      // Do not await batch.commit() to support offline queueing
-      batch.commit().catch(err => console.log('Offline commit queued for Marketplace:', err));
+      batch.commit().catch(() => {});
 
       notify.success("Pesanan marketplace berhasil disimpan");
       setCart([]);
