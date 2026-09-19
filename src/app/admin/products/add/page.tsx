@@ -10,10 +10,9 @@ import {
 import notify from '@/lib/notify';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
 import imageCompression from 'browser-image-compression';
-import { supabase } from '@/lib/supabase';
-
-
-import { addDoc, collection, db, getDocs, getDownloadURL, onSnapshot, query, ref, storage, uploadBytes, where } from '@/lib/firebase';
+import { addProductFull, getCategories } from '@/lib/actions/product.actions';
+import { uploadImageAction } from '@/lib/actions/upload.actions';
+import { onSnapshot, collection, db } from '@/lib/firebase';
 export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -159,22 +158,20 @@ export default function AddProductPage() {
     try {
       const baseId = formData.ID.trim();
       if (!baseId) throw new Error('ID Produk wajib diisi.');
+      if (!formData.Nama.trim()) throw new Error('Nama Produk wajib diisi.');
 
       const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
       const cleanedUnits = (units || [])
         .map((u) => {
           const code = String(u.code || '').trim().toUpperCase();
           if (!code) return null;
-
           const contains = typeof u.contains === 'number' ? u.contains : Number(u.contains || 0);
           const price = typeof u.price === 'number' ? u.price : Number(u.price || 0);
-
           const unitEntry: UnitOption = { code, contains, price };
           if (u.minQty !== undefined && u.minQty !== null) {
             unitEntry.minQty = typeof u.minQty === 'number' ? u.minQty : Number(u.minQty);
           }
           if (u.label) unitEntry.label = String(u.label);
-
           return unitEntry;
         })
         .filter(Boolean) as UnitOption[];
@@ -189,23 +186,17 @@ export default function AddProductPage() {
         ...cleanedUnits.filter((u) => u.code !== baseUnit),
       ];
 
-      // 1. Validasi ID Duplikat (Wajib Unik untuk Sinkronisasi Excel)
-      const q = query(collection(db, 'products'), where('ID', '==', baseId));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        throw new Error(`ID Produk "${baseId}" sudah terdaftar di database!`);
-      }
-
-      // 2. Simpan ke Firestore (lengkap dengan field ter-normalisasi)
-      const totalStock = Number(formData.Stok || 0);
-      const byWarehouse = formData.warehouseId ? { [formData.warehouseId]: totalStock } : {};
-      const displayName = String(formData.Nama || '').toUpperCase();
+      // 1. Upload foto ke Supabase Storage (jika ada)
       let imageUrl = formData.Link_Foto || '';
       if (imageFile) {
         const compressed = await imageCompression(imageFile, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
-        const imageRef = ref(storage, `products/${baseId}/${Date.now()}`);
-        await uploadBytes(imageRef, compressed);
-        imageUrl = await getDownloadURL(imageRef);
+        const fd = new FormData();
+        fd.append('file', new File([compressed], imageFile.name, { type: compressed.type }));
+        fd.append('folder', 'products');
+        const uploadResult = await uploadImageAction(fd);
+        if (uploadResult.success && uploadResult.url) {
+          imageUrl = uploadResult.url;
+        }
       }
 
       const pricingStrategy: PricingStrategy =
@@ -218,55 +209,23 @@ export default function AddProductPage() {
             }
           : { mode: 'manual' };
 
-      await addDoc(collection(db, 'products'), {
+      // 2. Simpan ke Supabase
+      const normalizedUnits = ensuredBase.map((u) => ({
+        ...u,
+        contains: typeof u.contains === 'number' ? u.contains : Number(u.contains ?? 1),
+      }));
+      const result = await addProductFull({
         ...formData,
         ID: baseId,
-        Nama: displayName,
-        Satuan: baseUnit,
-        sku: baseId,
-        name: displayName,
-        category: formData.Kategori,
-        unit: baseUnit,
-        description: formData.Deskripsi || '',
-        stock: totalStock,
-        Stok: totalStock,
-        stockByWarehouse: byWarehouse,
-        minStock: Number(formData.Min_Stok || 0),
-        Min_Stok: Number(formData.Min_Stok || 0),
-        purchasePrice: Number(formData.Modal || 0),
-        Modal: Number(formData.Modal || 0),
-        priceEcer: nextEcer,
         Ecer: nextEcer,
-        price: nextEcer,
-        priceGrosir: Number(formData.Grosir || 0),
-        wholesalePrice: Number(formData.Grosir || 0),
-        Min_Grosir: Number(formData.Min_Grosir || 0),
-        minWholesale: Number(formData.Min_Grosir || 0),
-        barcode: formData.Barcode || '',
-        Barcode: formData.Barcode || '',
+        units: normalizedUnits,
         imageUrl,
-        image: imageUrl,
-        URL_Produk: imageUrl,
-        isActive: Number(formData.Status) === 1,
-        Status: Number(formData.Status) === 1 ? 1 : 0,
-        warehouseId: formData.warehouseId || '',
-        tgl_masuk: formData.tgl_masuk || '',
-        expired_date: formData.expired_date || formData.Expired_Default || '',
-        expiredDate: formData.expired_date || formData.Expired_Default || '',
-        Lokasi: formData.Lokasi || '',
-        units: ensuredBase,
-        pricingStrategy,
-        minPurchase: Number(formData.minPurchase || 1),
-        maxPurchase: Number(formData.maxPurchase || 0),
-        dimensions: {
-          length: Number(formData.dimLength || 0),
-          width: Number(formData.dimWidth || 0),
-          height: Number(formData.dimHeight || 0)
-        },
-        volumeInCtn: Number(formData.volumeInCtn || 0),
-        updatedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
+        pricingStrategy: pricingStrategy as Record<string, unknown>,
       });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Gagal menyimpan produk');
+      }
 
       notify.admin.success('Produk berhasil ditambahkan ke database!');
       router.push('/admin/products');
@@ -277,7 +236,6 @@ export default function AddProductPage() {
         setErrorMsg('An unknown error occurred');
       }
     } finally {
-
       setLoading(false);
     }
   };
@@ -306,7 +264,7 @@ export default function AddProductPage() {
     };
   }, [scannerReady]);
 
-  // Load warehouses
+  // Load warehouses (masih dari Firestore) + categories (dari Supabase)
   useEffect(() => {
     const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => {
       setWarehouses(s.docs.map(d => {
@@ -315,10 +273,11 @@ export default function AddProductPage() {
         return { id: d.id, name };
       }));
     });
-    const unsubC = onSnapshot(collection(db, 'categories'), (s) => {
-      setCategories(s.docs.map(d => ({ id: d.id, name: d.data().name })));
+    // Load kategori dari Supabase
+    getCategories().then((cats) => {
+      setCategories(cats.map((c) => ({ id: c.id, name: c.name })));
     });
-    return () => { unsubW(); unsubC(); };
+    return () => { unsubW(); };
   }, []);
   return (
     <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-24 text-black font-sans">
@@ -356,14 +315,23 @@ export default function AddProductPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
-                <input
-                  required
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
-                  type="text"
-                  value={formData.ID}
-                  onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
-                  placeholder="Contoh: BRG-001"
-                />
+                <div className="flex gap-2">
+                  <input
+                    required
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                    type="text"
+                    value={formData.ID}
+                    onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
+                    placeholder="Contoh: BRG-001"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, ID: `PRD-${Date.now().toString().slice(-6)}` })}
+                    className="px-3 py-2 bg-blue-50 text-blue-600 text-[9px] font-black rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                  >
+                    Auto ID
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Parent ID</label>

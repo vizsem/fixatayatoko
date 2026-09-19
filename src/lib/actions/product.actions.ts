@@ -302,6 +302,156 @@ export async function getCategories() {
   }
 }
 
+export async function addProductFull(payload: {
+  // Identitas
+  ID: string;
+  Barcode?: string;
+  Parent_ID?: string;
+  Nama: string;
+  Kategori?: string;
+  Brand?: string;
+  Deskripsi?: string;
+  // Stok
+  Satuan: string;
+  Stok: number;
+  Min_Stok: number;
+  warehouseId?: string;
+  minPurchase?: number;
+  maxPurchase?: number;
+  // Dimensi
+  dimLength?: number;
+  dimWidth?: number;
+  dimHeight?: number;
+  volumeInCtn?: number;
+  // Harga
+  Modal: number;
+  Ecer: number;
+  Harga_Coret?: number;
+  Grosir?: number;
+  Min_Grosir?: number;
+  // Satuan multi-unit
+  units?: Array<{ code: string; contains: number; price?: number; label?: string; minQty?: number }>;
+  // Supplier
+  Supplier?: string;
+  No_WA_Supplier?: string;
+  Lokasi?: string;
+  // Tanggal
+  Expired_Default?: string;
+  expired_date?: string;
+  tgl_masuk?: string;
+  // Media
+  imageUrl?: string;
+  // Status
+  Status: number;
+  // Pricing strategy
+  pricingStrategy?: Record<string, unknown>;
+}) {
+  try {
+    const now = new Date().toISOString();
+    const sku = payload.ID.trim();
+    const displayName = payload.Nama.trim().toUpperCase();
+    const baseUnit = (payload.Satuan || 'PCS').trim().toUpperCase();
+    const totalStock = Number(payload.Stok || 0);
+    const isActive = Number(payload.Status) === 1;
+    const byWarehouse = payload.warehouseId ? { [payload.warehouseId]: totalStock } : {};
+
+    // Validasi duplikat SKU di Supabase
+    const { data: existing } = await supabaseAdmin
+      .from('products')
+      .select('id')
+      .eq('sku', sku)
+      .maybeSingle();
+    if (existing) {
+      return { success: false, error: `ID/SKU "${sku}" sudah terdaftar di database!` };
+    }
+
+    const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const raw_data = {
+      ID: sku,
+      Barcode: payload.Barcode || '',
+      Parent_ID: payload.Parent_ID || '',
+      Nama: displayName,
+      name: displayName,
+      Kategori: payload.Kategori || '',
+      category: payload.Kategori || '',
+      Brand: payload.Brand || '',
+      Deskripsi: payload.Deskripsi || '',
+      description: payload.Deskripsi || '',
+      Satuan: baseUnit,
+      unit: baseUnit,
+      Stok: totalStock,
+      stock: totalStock,
+      stockByWarehouse: byWarehouse,
+      Min_Stok: Number(payload.Min_Stok || 5),
+      minStock: Number(payload.Min_Stok || 5),
+      Modal: Number(payload.Modal || 0),
+      purchasePrice: Number(payload.Modal || 0),
+      Ecer: Number(payload.Ecer || 0),
+      price: Number(payload.Ecer || 0),
+      priceEcer: Number(payload.Ecer || 0),
+      Harga_Coret: Number(payload.Harga_Coret || 0),
+      Grosir: Number(payload.Grosir || 0),
+      wholesalePrice: Number(payload.Grosir || 0),
+      priceGrosir: Number(payload.Grosir || 0),
+      Min_Grosir: Number(payload.Min_Grosir || 1),
+      minWholesale: Number(payload.Min_Grosir || 1),
+      minWholesaleQty: Number(payload.Min_Grosir || 1),
+      warehouseId: payload.warehouseId || '',
+      minPurchase: Number(payload.minPurchase || 1),
+      maxPurchase: Number(payload.maxPurchase || 0),
+      dimensions: {
+        length: Number(payload.dimLength || 0),
+        width: Number(payload.dimWidth || 0),
+        height: Number(payload.dimHeight || 0),
+      },
+      volumeInCtn: Number(payload.volumeInCtn || 0),
+      units: payload.units || [{ code: baseUnit, contains: 1, price: Number(payload.Ecer || 0), label: '' }],
+      Supplier: payload.Supplier || '',
+      supplierName: payload.Supplier || '',
+      No_WA_Supplier: payload.No_WA_Supplier || '',
+      Lokasi: payload.Lokasi || '',
+      Expired_Default: payload.Expired_Default || '',
+      expiredDate: payload.expired_date || payload.Expired_Default || '',
+      tgl_masuk: payload.tgl_masuk || '',
+      imageUrl: payload.imageUrl || '',
+      image: payload.imageUrl || '',
+      Link_Foto: payload.imageUrl || '',
+      // Status flags (compatible with normalization)
+      isActive,
+      Status: isActive ? 0 : 1,  // 0=active, 1=archived in legacy schema
+      status: isActive ? 'ACTIVE' : 'ARCHIVED',
+      pricingStrategy: payload.pricingStrategy || { mode: 'manual' },
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const { error } = await supabaseAdmin.from('products').insert({
+      id,
+      name: displayName,
+      sku,
+      barcode: payload.Barcode || null,
+      description: payload.Deskripsi || null,
+      price: Number(payload.Ecer || 0),
+      cost_price: Number(payload.Modal || 0),
+      category: payload.Kategori || null,
+      unit: baseUnit,
+      stock: totalStock,
+      image_url: payload.imageUrl || null,
+      raw_data,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (error) throw error;
+    revalidatePath('/admin/products');
+    return { success: true, data: { id, name: displayName, sku } };
+  } catch (error: any) {
+    console.error('Failed to add product:', error);
+    return { success: false, error: error?.message || 'Gagal menambah produk' };
+  }
+}
+
 export async function createCategory(data: { name: string; description?: string }) {
   try {
     const id = `cat_${Date.now()}`;

@@ -68,6 +68,8 @@ export const ProductCard = ({
           alt={product.name} 
           className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
           loading="lazy"
+          decoding="async"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }}
         />
         {isOut && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">

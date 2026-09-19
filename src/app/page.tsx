@@ -47,7 +47,7 @@ export default function Home() {
   const { products: normalizedProducts, loading: productsLoading } = useProducts({ 
     isActive: true, 
     orderByField: 'name',
-    warehouseId: selectedWarehouseId || undefined 
+    limit: 60,
   });
   
   const [showFilter, setShowFilter] = useState(false);
@@ -224,7 +224,8 @@ export default function Home() {
     localStorage.setItem('atayatoko-wishlist', JSON.stringify(newWish));
   };
 
-  if (!isMounted || isLoading) return <HomeSkeleton />;
+  if (!isMounted) return <HomeSkeleton />;
+
 
   return (
     <div className="min-h-screen bg-gray-50 text-black pb-24 page-fade">
@@ -315,7 +316,7 @@ export default function Home() {
               </div>
             </div>
 
-            {categories.map(cat => {
+            {categories.slice(0, 6).map(cat => {
               const items = products.filter(p => p.category === cat.name);
               if (items.length === 0) return null;
               return (
@@ -333,6 +334,13 @@ export default function Home() {
                 </div>
               );
             })}
+            {categories.length > 6 && (
+              <div className="mb-8 px-4 text-center">
+                <Link href="/semua-produk" className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-colors">
+                  Lihat Semua Kategori <ArrowRight size={14} />
+                </Link>
+              </div>
+            )}
           </>
         )}
       </main>
