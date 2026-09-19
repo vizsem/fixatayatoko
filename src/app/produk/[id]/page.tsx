@@ -67,39 +67,59 @@ export default async function ProductDetailPage({ params }: PageProps) {
       const raw = prod.raw_data || {};
       const stock = Number(prod.stock ?? raw.stock ?? raw.Stok ?? 0);
       const price = Number(prod.price ?? raw.price ?? raw.Ecer ?? 0);
+      const rawWholesale = Number(raw.wholesalePrice ?? raw.Grosir ?? raw.Harga_Grosir ?? 0);
+      const wholesalePrice = rawWholesale > 0 && rawWholesale < price ? rawWholesale : 0;
+      const categoryName = prod.category || raw.category || raw.Kategori || 'Umum';
+      const cleanCategory = categoryName.toLowerCase() === 'semua' ? 'Umum' : categoryName;
 
       product = {
         id: prod.id,
         name: prod.name || raw.name || raw.Nama || 'Produk',
         price,
-        wholesalePrice: Number(raw.wholesalePrice ?? raw.Grosir ?? raw.Harga_Grosir ?? price),
+        wholesalePrice,
         minWholesale: Number(raw.minWholesale ?? raw.Min_Grosir ?? raw.Min_Stok_Grosir ?? 12),
         stock,
         unit: prod.unit || raw.unit || raw.Satuan || 'pcs',
-        category: prod.category || raw.category || raw.Kategori || 'Umum',
+        category: cleanCategory,
         image: prod.image_url || raw.imageUrl || raw.Link_Foto || raw.image || '/logo-atayatoko.png',
         description: prod.description || raw.description || raw.Deskripsi || '',
         units: raw.units || [],
       };
 
-      // Fetch Related Products from same category
-      const { data: relatedData } = await supabase
+      // Fetch Related Products (hanya yang aktif)
+      let relatedQuery = supabase
         .from('products')
         .select('*')
-        .eq('category', product.category)
         .neq('id', id)
+        .eq('is_active', true)
         .limit(8);
 
-      if (relatedData) {
-        relatedProducts = relatedData.map((d: any) => {
-          const rRaw = d.raw_data || {};
-          return {
-            id: d.id,
-            name: d.name || rRaw.name || rRaw.Nama || 'Produk',
-            price: Number(d.price ?? rRaw.price ?? rRaw.Ecer ?? 0),
-            image: d.image_url || rRaw.imageUrl || rRaw.Link_Foto || rRaw.image || '/logo-atayatoko.png',
-          };
-        });
+      if (cleanCategory !== 'Umum') {
+        relatedQuery = relatedQuery.eq('category', cleanCategory);
+      }
+
+      const { data: relatedData } = await relatedQuery;
+
+      if (relatedData && relatedData.length > 0) {
+        relatedProducts = relatedData
+          .filter((d: any) => {
+            const rRaw = d.raw_data || {};
+            return (
+              d.is_active !== false &&
+              rRaw.isActive !== false &&
+              rRaw.status !== 'ARCHIVED' &&
+              rRaw.Status !== 1
+            );
+          })
+          .map((d: any) => {
+            const rRaw = d.raw_data || {};
+            return {
+              id: d.id,
+              name: d.name || rRaw.name || rRaw.Nama || 'Produk',
+              price: Number(d.price ?? rRaw.price ?? rRaw.Ecer ?? 0),
+              image: d.image_url || rRaw.imageUrl || rRaw.Link_Foto || rRaw.image || '/logo-atayatoko.png',
+            };
+          });
       }
     }
   } catch (error) {

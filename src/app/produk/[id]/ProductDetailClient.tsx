@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2, Sparkles, Info, ShieldCheck, Truck,
-  Star, MessageSquare
+  Star, MessageSquare, ChevronRight, Zap
 } from 'lucide-react';
 import Link from 'next/link';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
@@ -139,10 +139,10 @@ export default function ProductDetailClient({
     return () => unsub();
   }, [product]);
 
-  const syncToFirebaseCart = async (p: Product, q: number) => {
+  const syncToFirebaseCart = async (p: Product, q: number, redirectToCart = false) => {
     if (p.stock <= 0) {
       toast.error("Maaf, stok barang sedang habis");
-      return;
+      return false;
     }
 
     setIsAdding(true);
@@ -150,7 +150,8 @@ export default function ProductDetailClient({
     const idToMatch = p.id;
     
     // Determine current price and unit
-    const isWholesale = p.wholesalePrice > 0 && q >= p.minWholesale;
+    const hasWholesale = p.wholesalePrice > 0 && p.wholesalePrice < p.price;
+    const isWholesale = hasWholesale && q >= p.minWholesale;
     let finalPrice = isWholesale ? p.wholesalePrice : p.price;
     let unitCode = p.unit;
     let conversionFactor = 1;
@@ -164,7 +165,7 @@ export default function ProductDetailClient({
             conversionFactor = targetUnit.contains;
             
             // Check wholesale for custom unit
-            if (targetUnit.wholesalePrice > 0 && q >= targetUnit.minWholesale) {
+            if (targetUnit.wholesalePrice > 0 && targetUnit.wholesalePrice < targetUnit.price && q >= targetUnit.minWholesale) {
                 finalPrice = targetUnit.wholesalePrice;
             }
         }
@@ -172,27 +173,14 @@ export default function ProductDetailClient({
 
     // Check existing quantity in cart
     const localIdx = localCart.findIndex((item) => (item.productId === idToMatch && item.unit === unitCode));
-    let currentQtyInCart = 0;
     
     // Calculate total stock needed in base unit
     let totalRequestedBaseQty = q * conversionFactor;
     
-    // Check all cart items for this product to sum up total base quantity usage
-    const allCartItemsForProduct = localCart.filter(item => item.productId === idToMatch);
-    let totalBaseQtyInCart = 0;
-    
-    allCartItemsForProduct.forEach(item => {
-        // Assume existing items might be in different units, we'd need their conversion factors
-        // For simplicity, we can just check if we have enough stock for THIS addition
-        // Ideally, cart items should store conversion factor or we fetch product again
-    });
-    
-    // Simplified stock check for now: just check against total stock
-    // NOTE: This is a loose check. Strict check requires iterating all cart items for this product and normalizing to base unit.
     if (totalRequestedBaseQty > p.stock) {
       toast.error(`Stok tidak mencukupi! Sisa stok: ${p.stock} ${p.unit}`);
       setIsAdding(false);
-      return;
+      return false;
     }
 
     if (localIdx > -1) {
@@ -228,11 +216,18 @@ export default function ProductDetailClient({
           });
         }
         await setDoc(cartRef, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
-        toast.success(`${p.name} (${q} ${unitCode}) ditambah ke keranjang`);
-      } catch (error) { console.error(error); } finally { setIsAdding(false); }
-    } else {
-      setIsAdding(false);
+      } catch (error) { 
+        console.error(error); 
+      }
     }
+
+    setIsAdding(false);
+    if (redirectToCart) {
+      router.push('/cart');
+    } else {
+      toast.success(`${p.name} (${q} ${unitCode}) ditambah ke keranjang`);
+    }
+    return true;
   };
 
   const handleSubmitReview = async () => {
@@ -300,61 +295,81 @@ export default function ProductDetailClient({
     <div className="min-h-screen bg-white pb-40">
       <Toaster position="top-center" />
       
-      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-50 px-4 py-4 flex items-center justify-between">
-          <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-all"><ArrowLeft size={20}/></button>
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 px-4 py-3.5 flex items-center justify-between">
+          <button onClick={() => router.back()} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl active:scale-90 transition-all text-gray-700">
+            <ArrowLeft size={20}/>
+          </button>
           <div className="flex flex-col items-center">
             <Link href="/" className="leading-none mb-1">
-              <h1 className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-green-600 transition-colors cursor-pointer">ATAYAMARKET</h1>
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-green-600 transition-colors cursor-pointer">ATAYAMARKET</span>
             </Link>
-            <span className="text-[10px] font-bold text-green-600 uppercase">Product Details</span>
+            <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider">Detail Produk</span>
           </div>
-          <Link href="/cart" className="p-2.5 bg-green-50 text-green-600 rounded-2xl relative">
+          <Link href="/cart" className="p-2.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-2xl relative transition-all">
             <ShoppingCart size={20} />
           </Link>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 pt-6">
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        {/* BREADCRUMB */}
+        <nav className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 mb-5 overflow-x-auto whitespace-nowrap pb-1 no-scrollbar">
+          <Link href="/" className="hover:text-green-700 transition-colors">Beranda</Link>
+          <ChevronRight size={13} className="text-gray-300 shrink-0" />
+          <Link href={`/kategori?name=${encodeURIComponent(product.category)}`} className="hover:text-green-700 transition-colors">
+            {product.category}
+          </Link>
+          <ChevronRight size={13} className="text-gray-300 shrink-0" />
+          <span className="text-gray-800 font-bold truncate max-w-[200px] md:max-w-md">{product.name}</span>
+        </nav>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           <div className="relative">
-            <div className="aspect-square rounded-[2.5rem] md:rounded-[4rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-2xl relative">
+            <div className="aspect-square rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-xl relative">
               <img 
                 src={getProxiedImage(product.image)} 
                 alt={product.name} 
                 className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
               />
               {isOutOfStock && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
-                  <span className="bg-white text-black px-6 py-2 rounded-full font-black uppercase text-[10px]">Stok Habis</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
+                  <span className="bg-red-600 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg">Stok Habis</span>
                 </div>
               )}
             </div>
             <button 
               onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} 
-              className="absolute top-6 right-6 p-4 bg-white/90 backdrop-blur shadow-2xl rounded-full active:scale-75 transition-all"
+              className="absolute top-5 right-5 p-3.5 bg-white/95 backdrop-blur shadow-xl rounded-full active:scale-75 transition-all border border-gray-100"
+              title="Tambah ke Wishlist"
             >
-              <Heart size={20} className={inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-300'} />
+              <Heart size={20} className={inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'} />
             </button>
           </div>
 
           <div className="flex flex-col">
             <div className="mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-[9px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-lg inline-block">{product.category}</span>
-                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-lg inline-block">Stok: {product.stock} {product.unit}</span>
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-[10px] font-black text-green-700 uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-lg inline-block border border-green-100">
+                  {product.category}
+                </span>
+                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg inline-block ${
+                  isOutOfStock ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-blue-50 text-blue-700 border border-blue-100'
+                }`}>
+                  Stok: {product.stock} {product.unit}
+                </span>
               </div>
-              <h1 className="text-4xl md:text-5xl font-black text-gray-900 uppercase tracking-tighter leading-[0.85] mb-2">{product.name}</h1>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 uppercase tracking-tight leading-[1.05] mb-2">{product.name}</h1>
               <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                HARGA PER {currentUnit} {isOutOfStock && <span className="text-red-500 font-black">• KOSONG</span>}
+                HARGA PER {currentUnit} {isOutOfStock && <span className="text-red-500 font-black">• SEDANG KOSONG</span>}
               </p>
             </div>
 
-            <div className={`rounded-[2.5rem] p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-600 text-white border-orange-700 shadow-xl scale-[1.02]' : 'bg-gray-50 border-gray-100'}`}>
+            <div className={`rounded-[2.5rem] p-7 md:p-8 mb-8 border transition-all duration-500 ${isWholesaleEligible ? 'bg-orange-600 text-white border-orange-700 shadow-xl scale-[1.01]' : 'bg-gray-50/80 border-gray-200/70 shadow-sm'}`}>
               {/* Unit Selection */}
               {product.units && product.units.length > 0 && product.units.some(u => u.code !== product.unit) && (
-                <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+                <div className="mb-6 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                   <button
                     onClick={() => setSelectedUnit(product.unit)}
-                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedUnit === product.unit ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'}`}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedUnit === product.unit ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
                   >
                     {product.unit} (Utama)
                   </button>
@@ -362,7 +377,7 @@ export default function ProductDetailClient({
                     <button
                       key={u.code}
                       onClick={() => setSelectedUnit(u.code)}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedUnit === u.code ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'}`}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedUnit === u.code ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
                     >
                       {u.code} (@{u.contains} {product.unit})
                     </button>
@@ -371,73 +386,96 @@ export default function ProductDetailClient({
               )}
 
               <div className="flex flex-col mb-4">
-                <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-400'}`}>
-                  {isWholesaleEligible ? '✨ Harga Grosir Aktif' : 'Harga Eceran'}
+                <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-500'}`}>
+                  {isWholesaleEligible ? '✨ Harga Grosir Aktif' : 'Harga Terbaik'}
                 </span>
                 <div className="flex items-end gap-2">
-                  <span className="text-5xl font-black tracking-tighter">
+                  <span className="text-4xl md:text-5xl font-black tracking-tighter">
                     Rp{displayPrice.toLocaleString('id-ID')}
                   </span>
-                  <span className={`text-lg font-bold mb-2 ${isWholesaleEligible ? 'text-orange-200' : 'text-gray-400'}`}>/{currentUnit}</span>
+                  <span className={`text-base md:text-lg font-bold mb-1.5 ${isWholesaleEligible ? 'text-orange-200' : 'text-gray-400'}`}>/{currentUnit}</span>
                 </div>
               </div>
 
-              <div className={`pt-4 border-t border-dashed ${isWholesaleEligible ? 'border-orange-400' : 'border-gray-300'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className={`text-[11px] font-black uppercase italic ${isWholesaleEligible ? 'text-white' : 'text-blue-600'}`}>Target Grosir</span>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xl font-black ${isWholesaleEligible ? 'text-white' : 'text-gray-900'}`}>
-                      {currentWholesalePrice > 0 ? `Rp${currentWholesalePrice.toLocaleString('id-ID')}` : 'Tanya Admin'}
-                    </span>
-                  </div>
-                </div>
-                
-                {!isWholesaleEligible && (
-                  <div className="mt-4">
-                    <div className="bg-gray-200 h-2 rounded-full overflow-hidden p-0.5">
-                      <div 
-                        className="bg-blue-600 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
-                        style={{ width: `${Math.min((quantity / (currentMinWholesale || 12)) * 100, 100)}%` }}
-                      ></div>
+              {/* Tampilkan bagian grosir HANYA jika ada harga grosir yang valid (< harga eceran) */}
+              {currentWholesalePrice > 0 && currentWholesalePrice < currentPrice ? (
+                <div className={`pt-4 border-t border-dashed ${isWholesaleEligible ? 'border-orange-400' : 'border-gray-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className={`text-[11px] font-black uppercase italic ${isWholesaleEligible ? 'text-white' : 'text-blue-700'}`}>Harga Grosir</span>
+                      <span className={`text-[10px] ${isWholesaleEligible ? 'text-orange-100' : 'text-gray-500'}`}>Min. Beli {currentMinWholesale} {currentUnit}</span>
                     </div>
-                    <p className="mt-2 text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 animate-pulse">
-                      <Sparkles size={10} /> Tambah {Math.max(0, (currentMinWholesale || 12) - quantity)} lagi untuk grosir!
-                    </p>
+                    <div className="text-right">
+                      <span className={`text-xl font-black ${isWholesaleEligible ? 'text-white' : 'text-gray-900'}`}>
+                        Rp{currentWholesalePrice.toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
+                  
+                  {!isWholesaleEligible && (
+                    <div className="mt-4">
+                      <div className="bg-gray-200 h-2 rounded-full overflow-hidden p-0.5">
+                        <div 
+                          className="bg-blue-600 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
+                          style={{ width: `${Math.min((quantity / (currentMinWholesale || 12)) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                      <p className="mt-2 text-[9px] font-black text-blue-700 uppercase flex items-center gap-1">
+                        <Sparkles size={11} /> Tambah {Math.max(0, (currentMinWholesale || 12) - quantity)} lagi untuk aktifkan grosir!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="pt-3 border-t border-dashed border-gray-200 flex items-center gap-2 text-gray-500 text-[11px] font-semibold">
+                  <ShieldCheck size={16} className="text-green-600 shrink-0" />
+                  <span>Jaminan 100% Produk Asli & Harga Hemat Langsung Distributor</span>
+                </div>
+              )}
 
-              {/* ACTION BUTTONS UNTUK DESKTOP (Tersembunyi di Mobile) */}
-              <div className="hidden md:flex flex-col mt-8 pt-6 border-t border-gray-100">
+              {/* ACTION BUTTONS UNTUK DESKTOP */}
+              <div className="hidden md:flex flex-col mt-7 pt-6 border-t border-gray-200/60">
                 <div className="flex items-center gap-4 mb-4">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Atur Jumlah</span>
-                  <div className="flex items-center bg-gray-50 rounded-2xl p-1 border border-gray-200">
-                    <button onClick={() => handleQuantity('minus')} className="p-3 text-gray-500 hover:bg-white hover:shadow-sm rounded-xl transition-all"><Minus size={18}/></button>
-                    <span className="w-12 text-center font-black text-lg">{quantity}</span>
-                    <button onClick={() => handleQuantity('plus')} className="p-3 text-gray-500 hover:bg-white hover:shadow-sm rounded-xl transition-all"><Plus size={18}/></button>
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Jumlah:</span>
+                  <div className="flex items-center bg-white rounded-2xl p-1 border border-gray-200 shadow-sm">
+                    <button onClick={() => handleQuantity('minus')} className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><Minus size={16}/></button>
+                    <span className="w-12 text-center font-black text-base">{quantity}</span>
+                    <button onClick={() => handleQuantity('plus')} className="p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><Plus size={16}/></button>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2.5">
                   <button 
-                    onClick={() => syncToFirebaseCart(product, quantity)} 
+                    onClick={() => syncToFirebaseCart(product, quantity, false)} 
                     disabled={isOutOfStock || isAdding}
-                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-2 shadow-xl hover:-translate-y-1 ${
-                      isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 
-                      isAdding ? 'bg-green-700 text-white opacity-80' : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-green-600/30'
+                    className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-md hover:-translate-y-0.5 ${
+                      isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' : 
+                      isAdding ? 'bg-gray-800 text-white opacity-80' : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}
                   >
-                    {isAdding ? <Loader2 size={20} className="animate-spin" /> : <ShoppingCart size={20} />}
-                    {isOutOfStock ? 'STOK HABIS' : 'TAMBAH KERANJANG'}
+                    {isAdding ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
+                    {isOutOfStock ? 'STOK HABIS' : '+ KERANJANG'}
                   </button>
+
+                  <button 
+                    onClick={() => syncToFirebaseCart(product, quantity, true)} 
+                    disabled={isOutOfStock || isAdding}
+                    className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg hover:-translate-y-0.5 ${
+                      isOutOfStock ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 
+                      'bg-green-600 text-white hover:bg-green-700 shadow-green-600/20'
+                    }`}
+                  >
+                    <Zap size={18} className="fill-current" />
+                    BELI LANGSUNG
+                  </button>
+
                   <button 
                     onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }}
-                    className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-center hover:-translate-y-1 ${
-                      inWishlist ? 'border-red-100 bg-red-50 text-red-500' : 'border-gray-100 bg-white text-gray-400 hover:border-red-100 hover:text-red-500'
+                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-center hover:-translate-y-0.5 ${
+                      inWishlist ? 'border-red-200 bg-red-50 text-red-500' : 'border-gray-200 bg-white text-gray-400 hover:border-red-200 hover:text-red-500'
                     }`}
+                    title="Favorit"
                   >
-                    <Heart size={24} className={inWishlist ? 'fill-current' : ''} />
+                    <Heart size={20} className={inWishlist ? 'fill-current' : ''} />
                   </button>
                 </div>
               </div>
@@ -556,21 +594,30 @@ export default function ProductDetailClient({
         )}
       </div>
 
-      {/* 1. TOMBOL TAMBAH KERANJANG */}
-      <div className="md:hidden fixed bottom-24 left-0 right-0 z-[90] px-4 pointer-events-none">
-        <div className="max-w-md mx-auto pointer-events-auto">
-          <div className="bg-white/80 backdrop-blur-2xl border border-gray-100 p-3 rounded-[2rem] shadow-[0_10px_40px_rgba(0,0,0,0.1)] flex items-center gap-3">
-            <div className="flex items-center bg-gray-100 rounded-2xl p-1">
-               <button onClick={() => handleQuantity('minus')} className="p-2.5 text-gray-500"><Minus size={16}/></button>
-               <span className="w-8 text-center font-black text-sm">{quantity}</span>
-               <button onClick={() => handleQuantity('plus')} className="p-2.5 text-gray-500"><Plus size={16}/></button>
+      {/* FLOATING BOTTOM ACTION BAR (MOBILE) */}
+      <div className="md:hidden fixed bottom-4 left-0 right-0 z-[90] px-3 pointer-events-none">
+        <div className="max-w-lg mx-auto pointer-events-auto">
+          <div className="bg-white/95 backdrop-blur-xl border border-gray-200/80 p-2.5 rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center gap-2">
+            <div className="flex items-center bg-gray-100/90 rounded-2xl p-1 shrink-0">
+               <button onClick={() => handleQuantity('minus')} className="p-2 text-gray-600 active:scale-75 transition-all"><Minus size={15}/></button>
+               <span className="w-7 text-center font-black text-xs">{quantity}</span>
+               <button onClick={() => handleQuantity('plus')} className="p-2 text-gray-600 active:scale-75 transition-all"><Plus size={15}/></button>
             </div>
+
             <button 
-              onClick={() => syncToFirebaseCart(product, quantity)}
+              onClick={() => syncToFirebaseCart(product, quantity, false)}
               disabled={isAdding || isOutOfStock}
-              className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
+              className="flex-1 bg-gray-900 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm disabled:bg-gray-200 disabled:text-gray-400"
             >
-              {isAdding ? <Loader2 className="animate-spin" size={16} /> : <><Plus size={16} strokeWidth={3} /> Tambah</>}
+              {isAdding ? <Loader2 className="animate-spin" size={14} /> : <><ShoppingCart size={14} /> + Keranjang</>}
+            </button>
+
+            <button 
+              onClick={() => syncToFirebaseCart(product, quantity, true)}
+              disabled={isAdding || isOutOfStock}
+              className="flex-1 bg-green-600 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-green-600/20 disabled:bg-gray-200 disabled:text-gray-400"
+            >
+              <Zap size={14} className="fill-current" /> Beli Langsung
             </button>
           </div>
         </div>
