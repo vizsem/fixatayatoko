@@ -177,13 +177,14 @@ export default function AdminProducts() {
     if (!confirm(`${actionLabel} ${selectedIds.length} produk yang dipilih?`)) return;
     const t = notify.admin.loading(`${isArchiving ? 'Mengarsipkan' : 'Memulihkan'} ${selectedIds.length} produk...`);
     try {
-      await updateProductStatus(selectedIds, newStatus);
+      const res = await updateProductStatus(selectedIds, newStatus);
+      if (!res?.success) throw new Error(res?.error || "Gagal memperbarui status");
       setSelectedIds([]);
       notify.admin.success(`Berhasil di-${actionLabel.toLowerCase()}!`, { id: t });
       window.location.reload();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      notify.admin.error("Gagal memperbarui", { id: t });
+      notify.admin.error(err?.message || "Gagal memperbarui", { id: t });
     }
   };
 
@@ -193,14 +194,15 @@ export default function AdminProducts() {
     const t = notify.admin.loading(`Menghapus ${selectedIds.length} produk...`);
     try {
       for (const id of selectedIds) {
-        await deleteProduct(id);
+        const res = await deleteProduct(id);
+        if (!res?.success) throw new Error(res?.error || 'Gagal menghapus produk');
       }
       setSelectedIds([]);
       notify.admin.success("Produk berhasil dihapus permanen", { id: t });
       window.location.reload();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      notify.admin.error("Gagal menghapus produk", { id: t });
+      notify.admin.error(err?.message || "Gagal menghapus produk", { id: t });
     }
   };
   // States
@@ -453,14 +455,15 @@ export default function AdminProducts() {
 
   const handleDelete = async (product: ProductRow) => {
     if (!confirm(`Hapus permanen produk "${product.Nama || product.name}"? Tindakan ini tidak bisa dikembalikan.`)) return;
-    
+    const t = notify.admin.loading('Menghapus produk...');
     try {
-      await deleteProduct(product.id);
-      notify.success('Produk berhasil dihapus');
+      const res = await deleteProduct(product.id);
+      if (!res?.success) throw new Error(res?.error || 'Gagal menghapus produk');
+      notify.admin.success('Produk berhasil dihapus', { id: t });
       window.location.reload(); 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Gagal menghapus produk:', error);
-      notify.error('Gagal menghapus produk');
+      notify.admin.error(error?.message || 'Gagal menghapus produk', { id: t });
     }
   };
 
@@ -470,12 +473,13 @@ export default function AdminProducts() {
     
     const t = notify.admin.loading(`${actionLabel} produk...`);
     try {
-      await updateProductStatus([product.id], shouldArchive ? 1 : 0);
+      const res = await updateProductStatus([product.id], shouldArchive ? 1 : 0);
+      if (!res?.success) throw new Error(res?.error || `Gagal ${actionLabel.toLowerCase()} produk`);
       notify.admin.success(`Produk berhasil di-${actionLabel.toLowerCase()}!`, { id: t });
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Gagal mengubah status arsip produk:', error);
-      notify.admin.error(`Gagal ${actionLabel.toLowerCase()} produk`, { id: t });
+      notify.admin.error(error?.message || `Gagal ${actionLabel.toLowerCase()} produk`, { id: t });
     }
   };
 

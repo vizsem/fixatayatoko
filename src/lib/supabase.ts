@@ -1,11 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseKey = 
+const supabaseAnonKey = 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
   process.env.SUPABASE_PUBLISHABLE_KEY || 
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 
   '';
+const supabaseServiceKey = 
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  process.env.SUPABASE_SECRET_KEY || 
+  '';
+
+const supabaseKey = supabaseAnonKey || supabaseServiceKey;
 
 if (!supabaseUrl || !supabaseKey) {
   // Log warning agar terlihat di Vercel Function Logs
@@ -22,6 +27,20 @@ if (!supabaseUrl || !supabaseKey) {
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock'
+);
+
+/**
+ * Admin client with Service Role Key for server actions and backend mutations (bypasses RLS)
+ */
+export const supabaseAdmin = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseServiceKey || supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    }
+  }
 );
 
 /**

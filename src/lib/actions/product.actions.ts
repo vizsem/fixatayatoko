@@ -13,11 +13,11 @@ export type ProductQueryOptions = {
   limit?: number
 }
 
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function getProducts(options?: ProductQueryOptions) {
   try {
-    let query = supabase.from('products').select('*');
+    let query = supabaseAdmin.from('products').select('*');
 
     if (options?.category) {
       query = query.eq('category', options.category);
@@ -50,12 +50,18 @@ export async function getProducts(options?: ProductQueryOptions) {
       return [];
     }
 
-    return rows.map((p: any) => {
+    const mapped = rows.map((p: any) => {
       const raw = p.raw_data || {};
       const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
       const priceEcer = Number(p.price ?? raw.price ?? raw.Ecer ?? 0);
       const purchasePrice = Number(p.cost_price ?? raw.purchasePrice ?? raw.Modal ?? 0);
       const stockByWarehouse = raw.stockByWarehouse || { 'gudang-utama': stock };
+      const isArchivedLegacy = 
+        raw.isActive === false || 
+        raw.isActive === 'false' || 
+        raw.Status === 1 || 
+        raw.Status === '1' || 
+        raw.status === 'ARCHIVED';
 
       return {
         id: p.id,
@@ -74,7 +80,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         priceEcer,
         priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? priceEcer),
         unit: p.unit || raw.unit || raw.Satuan || 'pcs',
-        isActive: raw.isActive !== false && raw.Status !== 1 && raw.status !== 'ARCHIVED',
+        isActive: !isArchivedLegacy,
         imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image,
         purchasePrice,
         createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
@@ -83,6 +89,12 @@ export async function getProducts(options?: ProductQueryOptions) {
         batches: []
       };
     });
+
+    if (options?.isActive !== undefined) {
+      return mapped.filter((p) => p.isActive === options.isActive);
+    }
+
+    return mapped;
   } catch (error) {
     console.error('Failed to fetch products:', error);
     return [];
@@ -91,7 +103,7 @@ export async function getProducts(options?: ProductQueryOptions) {
 
 export async function getProductById(id: string) {
   try {
-    const { data: p, error } = await supabase.from('products').select('*').eq('id', id).single();
+    const { data: p, error } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
     if (error || !p) return null;
     const raw = p.raw_data || {};
     const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
@@ -140,7 +152,7 @@ export async function createProduct(data: {
       updatedAt: now,
     };
 
-    const { error } = await supabase.from('products').insert({
+    const { error } = await supabaseAdmin.from('products').insert({
       id,
       name: data.name,
       sku: data.sku,
@@ -160,7 +172,7 @@ export async function createProduct(data: {
     return { success: true, data: { id, ...data, stock: 0 } };
   } catch (error: any) {
     console.error('Failed to create product:', error);
-    return { success: false, error: 'Gagal membuat produk' };
+    return { success: false, error: error?.message || 'Gagal membuat produk' };
   }
 }
 
@@ -176,7 +188,7 @@ export async function updateProduct(id: string, data: {
 }) {
   try {
     const now = new Date().toISOString();
-    const { data: existing } = await supabase.from('products').select('*').eq('id', id).single();
+    const { data: existing } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
     const raw = existing?.raw_data || {};
 
     const updatedRaw = {
@@ -204,79 +216,80 @@ export async function updateProduct(id: string, data: {
     if (data.categoryId) payload.category = data.categoryId;
     if (data.unit) payload.unit = data.unit;
 
-    const { error } = await supabase.from('products').update(payload).eq('id', id);
+    const { error } = await supabaseAdmin.from('products').update(payload).eq('id', id);
     if (error) throw error;
 
     revalidatePath('/admin/products');
     return { success: true, data: { id, ...data } };
   } catch (error: any) {
     console.error('Failed to update product:', error);
-    return { success: false, error: 'Gagal mengupdate produk' };
+    return { success: false, error: error?.message || 'Gagal mengupdate produk' };
   }
 }
 
 export async function archiveProducts(ids: string[]) {
-  try {
-    const now = new Date().toISOString();
-    for (const id of ids) {
-      const { data: p } = await supabase.from('products').select('*').eq('id', id).single();
-      if (p) {
-        const raw = p.raw_data || {};
-        raw.isActive = false;
-        raw.Status = 1; // 1 = Archived in legacy schema
-        raw.status = 'ARCHIVED';
-        await supabase.from('products').update({
-          raw_data: raw,
-          updated_at: now,
-        }).eq('id', id);
-      }
-    }
-    revalidatePath('/admin/products');
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: 'Gagal mengarsip produk' };
-  }
+  return updateProductStatus(ids, 1);
 }
 
 export async function deleteProduct(id: string) {
   try {
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
     if (error) throw error;
     revalidatePath('/admin/products');
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete error:', error);
-    return { success: false, error: 'Gagal menghapus produk' };
+    return { success: false, error: error?.message || 'Gagal menghapus produk' };
   }
 }
 
 export async function updateProductStatus(ids: string[], status: string | number) {
   try {
+    if (!ids || ids.length === 0) return { success: true };
     const now = new Date().toISOString();
     const isArchived = Number(status) === 1 || String(status).toUpperCase() === 'ARCHIVED';
-    for (const id of ids) {
-      const { data: p } = await supabase.from('products').select('*').eq('id', id).single();
-      if (p) {
-        const raw = p.raw_data || {};
-        raw.isActive = !isArchived;
-        raw.Status = isArchived ? 1 : 0;
-        raw.status = isArchived ? 'ARCHIVED' : 'ACTIVE';
-        await supabase.from('products').update({
+
+    const { data: products, error: fetchError } = await supabaseAdmin
+      .from('products')
+      .select('id, raw_data')
+      .in('id', ids);
+
+    if (fetchError) {
+      console.error('Error fetching products for status update:', fetchError);
+      throw fetchError;
+    }
+
+    for (const p of products || []) {
+      const raw = (p.raw_data && typeof p.raw_data === 'object') ? { ...p.raw_data } : {};
+      raw.isActive = !isArchived;
+      raw.Status = isArchived ? 1 : 0;
+      raw.status = isArchived ? 'ARCHIVED' : 'ACTIVE';
+
+      const { error: updateError } = await supabaseAdmin
+        .from('products')
+        .update({
           raw_data: raw,
           updated_at: now,
-        }).eq('id', id);
+        })
+        .eq('id', p.id);
+
+      if (updateError) {
+        console.error(`Failed to update status for product ${p.id}:`, updateError);
+        throw updateError;
       }
     }
+
     revalidatePath('/admin/products');
     return { success: true };
-  } catch (error) {
-    return { success: false, error: 'Gagal mengubah status produk' };
+  } catch (error: any) {
+    console.error('Failed to update product status:', error);
+    return { success: false, error: error?.message || 'Gagal mengubah status produk' };
   }
 }
 
 export async function getCategories() {
   try {
-    const { data: rows, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+    const { data: rows, error } = await supabaseAdmin.from('categories').select('*').order('name', { ascending: true });
     if (error || !rows) return [];
     return rows.map((c: any) => ({
       id: c.id,
@@ -293,7 +306,7 @@ export async function createCategory(data: { name: string; description?: string 
   try {
     const id = `cat_${Date.now()}`;
     const now = new Date().toISOString();
-    const { error } = await supabase.from('categories').insert({
+    const { error } = await supabaseAdmin.from('categories').insert({
       id,
       name: data.name,
       raw_data: { ...data, createdAt: now },
@@ -304,7 +317,7 @@ export async function createCategory(data: { name: string; description?: string 
     revalidatePath('/admin/products');
     revalidatePath('/admin/kategori');
     return { success: true, data: { id, ...data } };
-  } catch (error) {
-    return { success: false, error: 'Gagal membuat kategori' };
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Gagal membuat kategori' };
   }
 }
