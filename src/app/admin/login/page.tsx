@@ -34,8 +34,8 @@ function AdminLoginForm() {
         return;
       }
 
-      // Check role from app_metadata
-      const role = data?.user?.app_metadata?.role;
+      // Check role from app_metadata or user_metadata
+      const role = data?.user?.app_metadata?.role || data?.user?.user_metadata?.role;
       if (!role || !['admin', 'cashier', 'employee'].includes(role)) {
         notify.error('Akses ditolak. Anda tidak memiliki izin admin.', { id: toastId });
         setLoading(false);

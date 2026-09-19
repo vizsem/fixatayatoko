@@ -219,7 +219,7 @@ export default function AdminProducts() {
   // Effects
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) { router.push('/profil/login'); return; }
+      if (!user) { router.push('/admin/login?callbackUrl=/admin/products'); return; }
       setLoading(false);
     });
     const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => setWarehouses(s.docs.map(d => ({ id: d.id, ...d.data() })) as Warehouse[]));

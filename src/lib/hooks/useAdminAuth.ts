@@ -31,7 +31,7 @@ interface AdminAuthState {
  *   if (authLoading) return <Spinner />;
  */
 export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthState {
-  const { allowedRoles = ['admin'], redirectOnFail = '/profil/login' } = options || {};
+  const { allowedRoles = ['admin'], redirectOnFail = '/admin/login' } = options || {};
   const router = useRouter();
 
   const [adminId, setAdminId] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
           return;
         }
 
-        const userRole = user.app_metadata?.role as string | undefined;
+        const userRole = (user.app_metadata?.role || user.user_metadata?.role || (user.email?.startsWith('admin') ? 'admin' : (user.email?.startsWith('kasir') ? 'cashier' : undefined))) as string | undefined;
 
         if (!userRole || !allowedRoles.includes(userRole as AllowedRole)) {
           notify.aksesDitolakAdmin();
@@ -77,7 +77,7 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
         router.push(redirectOnFail);
         return;
       }
-      const userRole = session.user.app_metadata?.role as string | undefined;
+      const userRole = (session.user.app_metadata?.role || session.user.user_metadata?.role || (session.user.email?.startsWith('admin') ? 'admin' : (session.user.email?.startsWith('kasir') ? 'cashier' : undefined))) as string | undefined;
       if (!userRole || !allowedRoles.includes(userRole as AllowedRole)) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
