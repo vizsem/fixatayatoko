@@ -14,6 +14,7 @@ import {
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getProducts } from '@/lib/actions/product.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
+import ProductSearchCombobox from '@/components/admin/ProductSearchCombobox';
 import * as XLSX from 'xlsx';
 
 type PO = {
@@ -70,9 +71,14 @@ export default function AdminPurchases() {
 
   useEffect(() => {
     load();
-    Promise.all([getSuppliers(), getProducts(), getWarehouses()]).then(([s, p, w]) => {
+    Promise.all([
+      getSuppliers(),
+      getProducts({ isActive: true, limit: 1000 }),
+      getWarehouses(),
+    ]).then(([s, p, w]) => {
       setSuppliers(s);
-      setProducts(p);
+      // Strictly filter to ensure only active products are presented
+      setProducts((p as any[]).filter((prod) => prod.isActive !== false));
       setWarehouses(w);
     });
   }, [load]);
@@ -88,6 +94,17 @@ export default function AdminPurchases() {
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, key: keyof POItem, value: any) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [key]: value } : item));
+  };
+  const handleProductSelect = (idx: number, productId: string, product?: any) => {
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const defaultPrice = product?.purchasePrice || product?.costPrice || product?.cost_price || item.unitPrice || 0;
+      return {
+        ...item,
+        productId,
+        unitPrice: defaultPrice,
+      };
+    }));
   };
 
   const totalAmount = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
@@ -297,14 +314,12 @@ export default function AdminPurchases() {
                   {items.map((item, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-5">
-                        <select
+                        <ProductSearchCombobox
                           value={item.productId}
-                          onChange={e => updateItem(idx, 'productId', e.target.value)}
-                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        >
-                          <option value="">Pilih Produk</option>
-                          {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
+                          products={products}
+                          onChange={(productId, product) => handleProductSelect(idx, productId, product)}
+                          placeholder="Pilih / Cari Produk..."
+                        />
                       </div>
                       <div className="col-span-2">
                         <input
