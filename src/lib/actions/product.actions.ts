@@ -19,6 +19,11 @@ export async function getProducts(options?: ProductQueryOptions) {
   try {
     let query = supabaseAdmin.from('products').select('*');
 
+    // Filter is_active langsung di database (lebih efisien)
+    if (options?.isActive !== undefined) {
+      query = query.eq('is_active', options.isActive);
+    }
+
     if (options?.category) {
       query = query.eq('category', options.category);
     }
@@ -63,6 +68,9 @@ export async function getProducts(options?: ProductQueryOptions) {
         raw.Status === '1' || 
         raw.status === 'ARCHIVED';
 
+      // Gunakan kolom is_active dari DB jika ada, fallback ke heuristik raw_data
+      const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
+
       return {
         id: p.id,
         name: p.name || raw.name || raw.Nama || 'Produk',
@@ -80,7 +88,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         priceEcer,
         priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? priceEcer),
         unit: p.unit || raw.unit || raw.Satuan || 'pcs',
-        isActive: !isArchivedLegacy,
+        isActive,
         imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image,
         purchasePrice,
         createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
@@ -90,7 +98,9 @@ export async function getProducts(options?: ProductQueryOptions) {
       };
     });
 
-    if (options?.isActive !== undefined) {
+    // Filter sudah dilakukan di level DB via .eq('is_active', ...)
+    // Fallback client-side jika kolom belum ada di DB lama
+    if (options?.isActive !== undefined && rows.some((r: any) => r.is_active === null || r.is_active === undefined)) {
       return mapped.filter((p) => p.isActive === options.isActive);
     }
 
@@ -438,6 +448,7 @@ export async function addProductFull(payload: {
       unit: baseUnit,
       stock: totalStock,
       image_url: payload.imageUrl || null,
+      is_active: isActive,
       raw_data,
       created_at: now,
       updated_at: now,

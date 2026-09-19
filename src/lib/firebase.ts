@@ -126,7 +126,7 @@ const TABLES_WITH_RAW_DATA = new Set([
 ]);
 
 const TABLE_COLUMNS: Record<string, Set<string>> = {
-  products: new Set(['id', 'name', 'description', 'price', 'stock', 'created_at', 'updated_at', 'sku', 'category', 'unit', 'cost_price', 'image_url', 'barcode', 'raw_data']),
+  products: new Set(['id', 'name', 'description', 'price', 'stock', 'created_at', 'updated_at', 'sku', 'category', 'unit', 'cost_price', 'image_url', 'barcode', 'is_active', 'raw_data']),
   orders: new Set(['id', 'user_id', 'status', 'total', 'created_at', 'updated_at', 'order_id', 'customer_name', 'customer_phone', 'items', 'payment', 'delivery', 'raw_data']),
   customers: new Set(['id', 'name', 'email', 'phone', 'address', 'created_at', 'updated_at', 'raw_data']),
   suppliers: new Set(['id', 'name', 'contact', 'created_at', 'updated_at', 'raw_data']),
@@ -172,9 +172,9 @@ const CAMEL_TO_SNAKE: Record<string, string> = {
 function resolveQueryField(table: string, field: string): { targetField?: string; ignore?: boolean } {
   if (field === '__name__' || field === 'id') return { targetField: 'id' };
 
-  // If table is products and field is isActive: products don't have isActive column and all non-archived are active
+  // products table now has is_active column — map to it
   if (table === 'products' && (field === 'isActive' || field === 'is_active')) {
-    return { ignore: true };
+    return { targetField: 'is_active' };
   }
 
   // users table uses full_name instead of name
