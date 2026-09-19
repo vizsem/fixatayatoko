@@ -185,6 +185,22 @@ export default function CashierPOS() {
         toast.error('Barcode tidak ditemukan');
         return;
       }
+
+      // Pastikan produk berstatus aktif
+      const raw = prod.raw_data || prod;
+      const isArchived =
+        prod.is_active === false ||
+        raw.isActive === false ||
+        raw.isActive === 'false' ||
+        raw.status === 'ARCHIVED' ||
+        raw.Status === 1 ||
+        raw.Status === '1';
+
+      if (isArchived) {
+        toast.error('Produk ini telah diarsipkan dan tidak aktif');
+        return;
+      }
+
       const mapped: Product = {
         id: prod.id,
         name: prod.name || prod.Nama || 'Produk',
@@ -586,7 +602,7 @@ export default function CashierPOS() {
           promises.push(
             supabase
               .from('products')
-              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url')
+              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active')
               .order('name', { ascending: true })
               .range(from, to)
               .then(res => res.data || [])
@@ -600,8 +616,15 @@ export default function CashierPOS() {
         for (const d of rows) {
           const raw = d.raw_data || {};
           // Only show active products (exclude archived)
-          const isActive = raw.isActive !== false && raw.Status !== 1 && raw.status !== 'ARCHIVED';
-          if (!isActive) continue;
+          const isArchived =
+            d.is_active === false ||
+            raw.isActive === false ||
+            raw.isActive === 'false' ||
+            raw.status === 'ARCHIVED' ||
+            raw.Status === 1 ||
+            raw.Status === '1';
+
+          if (isArchived) continue;
 
           const baseUnit = String(d.unit || raw.unit || raw.Satuan || 'PCS').toUpperCase();
           const basePrice = Number(d.price ?? raw.price ?? raw.priceEcer ?? raw.Ecer ?? 0);
