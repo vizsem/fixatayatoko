@@ -17,6 +17,7 @@ export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [collapsedDim, setCollapsedDim] = useState(true);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([
@@ -302,7 +303,7 @@ export default function AddProductPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id="add-product-form" onSubmit={handleSubmit} className="space-y-6">
 
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
             <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
@@ -344,8 +345,8 @@ export default function AddProductPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
-                <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk <span className="text-red-500">*</span></label>
+                <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-400" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} placeholder="Masukkan nama produk..." />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
@@ -461,43 +462,56 @@ export default function AddProductPage() {
             </div>
           </div>
           
-          {/* BAGIAN 2.5: DIMENSI & VOLUME */}
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-blue-600">
-              <Package size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Dimensi & Volume (Kapasitas Gudang)</h3>
-            </div>
-            <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
-                  const l = Number(e.target.value);
-                  const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
+          {/* BAGIAN 2.5: DIMENSI & VOLUME — collapsible */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setCollapsedDim(p => !p)}
+              className="w-full flex items-center justify-between px-5 md:px-6 py-4 text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Package size={18} />
+                <h3 className="text-xs font-black uppercase tracking-widest">Dimensi &amp; Volume <span className="text-[9px] text-gray-400">(Opsional)</span></h3>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
-                  const w = Number(e.target.value);
-                  const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${collapsedDim ? '' : 'rotate-180'}`}>
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </button>
+            {!collapsedDim && (
+              <div className="px-5 md:px-6 pb-6">
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
+                    <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
+                      const l = Number(e.target.value);
+                      const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
+                      setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
+                    <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
+                      const w = Number(e.target.value);
+                      const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
+                      setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
+                    <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
+                      const h = Number(e.target.value);
+                      const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
+                      setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
+                    }} />
+                  </div>
+                  <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
+                    <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Volume Setara</p>
+                    <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-[10px] uppercase">CTN</span></p>
+                    <p className="text-[7px] font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
-                  const h = Number(e.target.value);
-                  const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
-              </div>
-              <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Volume Setara</p>
-                <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-[10px] uppercase">CTN</span></p>
-                <p className="text-[7px] font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* BAGIAN 3: HARGA & GROSIR */}
@@ -769,16 +783,39 @@ export default function AddProductPage() {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 pt-6">
-            <button type="button" onClick={() => router.back()} className="flex-1 p-5 bg-white text-gray-400 font-black uppercase text-xs rounded-[2rem] shadow-sm border hover:bg-gray-100 transition-all">
+          {/* Spacer for sticky bar */}
+          <div className="h-6" />
+        </form>
+      </div>
+
+      {/* Sticky Save Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-2xl px-4 py-3">
+        <div className="max-w-4xl mx-auto">
+          {errorMsg && (
+            <div className="mb-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-2 text-[11px] font-black uppercase">
+              <AlertCircle size={14} /> {errorMsg}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex-1 py-4 bg-gray-100 text-gray-500 font-black uppercase text-xs rounded-2xl hover:bg-gray-200 transition-all"
+            >
               Batal
             </button>
-            <button type="submit" disabled={loading} className="flex-[2] p-5 bg-black text-white font-black uppercase text-xs rounded-[2rem] shadow-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-widest">
-              {loading ? 'SISTEM MENYIMPAN...' : <><Save size={18} /> Simpan Produk</>}
+            <button
+              type="submit"
+              form="add-product-form"
+              disabled={loading}
+              className="flex-[3] py-4 bg-black text-white font-black uppercase text-xs rounded-2xl shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-widest disabled:opacity-60"
+            >
+              {loading
+                ? <><span className="animate-pulse">●</span> Menyimpan...</>
+                : <><Save size={16} /> Simpan Produk</>}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
