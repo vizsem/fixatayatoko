@@ -207,6 +207,14 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   const [selectedProductRestock, setSelectedProductRestock] = useState<ProductRow | null>(null);
   const [showInactive, setShowInactive] = useState(false);
@@ -214,7 +222,12 @@ export default function AdminProducts() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
 
-  const { products: liveProducts } = useProducts({ isActive: showInactive ? false : true, orderByField: sortBy, orderDirection: 'desc' });
+  const { products: liveProducts, loading: productsLoading } = useProducts({
+    isActive: showInactive ? false : true,
+    orderByField: sortBy,
+    orderDirection: 'desc',
+    search: debouncedSearch,
+  });
 
   // Effects
   useEffect(() => {
@@ -284,14 +297,25 @@ export default function AdminProducts() {
   // ========================================
 
   const filteredAndSorted = useMemo(() => {
-    return rows.filter(p => {
-      const name = (p.name || '').toLowerCase();
-      const sku = (p.sku || '').toLowerCase();
-      const term = searchTerm.toLowerCase();
-      const matchSearch = name.includes(term) || sku.includes(term);
-      const matchStatus = showInactive ? p.isActive === false : p.isActive !== false;
-      return matchSearch && matchStatus;
-    });
+    let result = rows;
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      const tokens = term.split(/\s+/).filter(Boolean);
+      result = result.filter((p) => {
+        const name = (p.name || '').toLowerCase();
+        const sku = (p.sku || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
+        const category = (p.category || '').toLowerCase();
+        return tokens.every(
+          (t) =>
+            name.includes(t) ||
+            sku.includes(t) ||
+            barcode.includes(t) ||
+            category.includes(t)
+        );
+      });
+    }
+    return result.filter((p) => (showInactive ? p.isActive === false : p.isActive !== false));
   }, [rows, searchTerm, showInactive]);
 
   const stats = useMemo(() => {
@@ -537,14 +561,27 @@ export default function AdminProducts() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-2">
         <div className="p-2 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+            {productsLoading ? (
+              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={12} />
+            ) : (
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+            )}
             <input
               type="text"
-              placeholder="Search SKU..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[10px] font-bold focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+              placeholder="Cari nama barang, SKU, barcode, kategori..."
+              className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[10px] font-bold focus:ring-2 focus:ring-blue-100 transition-all outline-none"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
+            {searchTerm && (
+              <button
+                onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                title="Hapus pencarian"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">

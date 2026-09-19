@@ -17,12 +17,12 @@ export default function useProducts(options?: ProductQueryOptions) {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to load products via Prisma:", err);
+        console.error("Failed to load products via Supabase:", err);
         if (isMounted) setLoading(false);
       });
 
     return () => { isMounted = false; };
-  }, [options?.category, options?.warehouseId, options?.orderByField, options?.orderDirection, options?.isActive]);
+  }, [options?.category, options?.warehouseId, options?.orderByField, options?.orderDirection, options?.isActive, options?.search, options?.limit]);
 
   return { products, loading };
 }

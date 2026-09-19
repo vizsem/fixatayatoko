@@ -10,6 +10,7 @@ export type NormalizedProduct = {
   id: string;
   name: string;
   sku: string;
+  barcode?: string;
   category: string;
   warehouseId: string;
   stock: number;

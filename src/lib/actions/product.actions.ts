@@ -9,6 +9,8 @@ export type ProductQueryOptions = {
   warehouseId?: string
   orderByField?: 'name' | 'updatedAt' | 'sku' | 'createdAt'
   orderDirection?: 'asc' | 'desc'
+  search?: string
+  limit?: number
 }
 
 import { supabase } from '@/lib/supabase';
@@ -19,6 +21,24 @@ export async function getProducts(options?: ProductQueryOptions) {
 
     if (options?.category) {
       query = query.eq('category', options.category);
+    }
+
+    if (options?.search && options.search.trim()) {
+      const tokens = options.search
+        .trim()
+        .split(/\s+/)
+        .map((t) => t.replace(/[%_,()]/g, '').trim())
+        .filter(Boolean);
+
+      tokens.forEach((token) => {
+        query = query.or(
+          `name.ilike.%${token}%,sku.ilike.%${token}%,barcode.ilike.%${token}%,category.ilike.%${token}%`
+        );
+      });
+
+      query = query.limit(options.limit || 300);
+    } else {
+      query = query.limit(options?.limit || 1000);
     }
 
     const sortField = options?.orderByField === 'name' ? 'name' : 'created_at';
@@ -41,6 +61,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         id: p.id,
         name: p.name || raw.name || raw.Nama || 'Produk',
         sku: p.sku || raw.sku || raw.Barcode || raw.barcode || p.id,
+        barcode: p.barcode || raw.barcode || raw.Barcode || '',
         description: p.description || raw.description || raw.Deskripsi || '',
         category: p.category || raw.category || raw.Kategori || 'Semua',
         categoryId: p.category || 'cat_umum',
