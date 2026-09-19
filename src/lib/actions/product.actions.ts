@@ -241,16 +241,21 @@ export async function archiveProducts(ids: string[]) {
   return updateProductStatus(ids, 1);
 }
 
-export async function deleteProduct(id: string) {
+export async function deleteProductsBulk(ids: string[]) {
   try {
-    const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
+    if (!ids || ids.length === 0) return { success: true, count: 0 };
+    const { error } = await supabaseAdmin.from('products').delete().in('id', ids);
     if (error) throw error;
     revalidatePath('/admin/products');
-    return { success: true };
+    return { success: true, count: ids.length };
   } catch (error: any) {
-    console.error('Delete error:', error);
+    console.error('Bulk delete error:', error);
     return { success: false, error: error?.message || 'Gagal menghapus produk' };
   }
+}
+
+export async function deleteProduct(id: string) {
+  return deleteProductsBulk([id]);
 }
 
 export async function updateProductStatus(ids: string[], status: string | number) {

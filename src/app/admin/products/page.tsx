@@ -8,7 +8,7 @@ import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
 
 
-import { deleteProduct, archiveProducts, updateProductStatus } from '@/lib/actions/product.actions';
+import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus } from '@/lib/actions/product.actions';
 
 
 import Link from 'next/link';
@@ -169,40 +169,139 @@ export default function AdminProducts() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
-  // Fungsi Bulk Update Status
+  // Bulk Progress State
+  const [bulkProgress, setBulkProgress] = useState<{
+    isOpen: boolean;
+    title: string;
+    current: number;
+    total: number;
+    percent: number;
+    status: 'processing' | 'done' | 'error';
+    errorMsg?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    current: 0,
+    total: 0,
+    percent: 0,
+    status: 'processing'
+  });
+
+  // Fungsi Bulk Update Status dengan Chunking & Live Progress Bar
   const handleBulkStatus = async (newStatus: number) => {
     if (selectedIds.length === 0) return;
     const isArchiving = newStatus === 1;
     const actionLabel = isArchiving ? 'Arsipkan' : 'Pulihkan';
-    if (!confirm(`${actionLabel} ${selectedIds.length} produk yang dipilih?`)) return;
-    const t = notify.admin.loading(`${isArchiving ? 'Mengarsipkan' : 'Memulihkan'} ${selectedIds.length} produk...`);
+    const totalItems = selectedIds.length;
+    if (!confirm(`${actionLabel} ${totalItems} produk yang dipilih?`)) return;
+
+    setBulkProgress({
+      isOpen: true,
+      title: `${actionLabel} ${totalItems} Produk`,
+      current: 0,
+      total: totalItems,
+      percent: 0,
+      status: 'processing'
+    });
+
+    const chunkSize = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < totalItems; i += chunkSize) {
+      chunks.push(selectedIds.slice(i, i + chunkSize));
+    }
+
     try {
-      const res = await updateProductStatus(selectedIds, newStatus);
-      if (!res?.success) throw new Error(res?.error || "Gagal memperbarui status");
+      let processed = 0;
+      for (const chunk of chunks) {
+        const res = await updateProductStatus(chunk, newStatus);
+        if (!res?.success) throw new Error(res?.error || "Gagal memperbarui sebagian produk");
+        processed += chunk.length;
+        const pct = Math.round((processed / totalItems) * 100);
+        setBulkProgress(prev => ({
+          ...prev,
+          current: processed,
+          percent: pct
+        }));
+      }
+
+      setBulkProgress(prev => ({
+        ...prev,
+        current: totalItems,
+        percent: 100,
+        status: 'done'
+      }));
+
       setSelectedIds([]);
-      notify.admin.success(`Berhasil di-${actionLabel.toLowerCase()}!`, { id: t });
-      window.location.reload();
+      notify.admin.success(`Berhasil di-${actionLabel.toLowerCase()} ${totalItems} produk!`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
     } catch (err: any) {
       console.error(err);
-      notify.admin.error(err?.message || "Gagal memperbarui", { id: t });
+      setBulkProgress(prev => ({
+        ...prev,
+        status: 'error',
+        errorMsg: err?.message || 'Terjadi kesalahan saat memproses data'
+      }));
+      notify.admin.error(err?.message || "Gagal memperbarui status produk");
     }
   };
 
+  // Fungsi Bulk Delete dengan Chunking & Live Progress Bar
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Hapus permanen ${selectedIds.length} produk? Tindakan ini tidak bisa dikembalikan.`)) return;
-    const t = notify.admin.loading(`Menghapus ${selectedIds.length} produk...`);
+    const totalItems = selectedIds.length;
+    if (!confirm(`PERINGATAN: Hapus permanen ${totalItems} produk? Tindakan ini TIDAK DAPAT DIBATALKAN.`)) return;
+
+    setBulkProgress({
+      isOpen: true,
+      title: `Menghapus Permanen ${totalItems} Produk`,
+      current: 0,
+      total: totalItems,
+      percent: 0,
+      status: 'processing'
+    });
+
+    const chunkSize = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < totalItems; i += chunkSize) {
+      chunks.push(selectedIds.slice(i, i + chunkSize));
+    }
+
     try {
-      for (const id of selectedIds) {
-        const res = await deleteProduct(id);
-        if (!res?.success) throw new Error(res?.error || 'Gagal menghapus produk');
+      let processed = 0;
+      for (const chunk of chunks) {
+        const res = await deleteProductsBulk(chunk);
+        if (!res?.success) throw new Error(res?.error || 'Gagal menghapus sebagian produk');
+        processed += chunk.length;
+        const pct = Math.round((processed / totalItems) * 100);
+        setBulkProgress(prev => ({
+          ...prev,
+          current: processed,
+          percent: pct
+        }));
       }
+
+      setBulkProgress(prev => ({
+        ...prev,
+        current: totalItems,
+        percent: 100,
+        status: 'done'
+      }));
+
       setSelectedIds([]);
-      notify.admin.success("Produk berhasil dihapus permanen", { id: t });
-      window.location.reload();
+      notify.admin.success(`Berhasil menghapus permanen ${totalItems} produk!`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
     } catch (err: any) {
       console.error(err);
-      notify.admin.error(err?.message || "Gagal menghapus produk", { id: t });
+      setBulkProgress(prev => ({
+        ...prev,
+        status: 'error',
+        errorMsg: err?.message || 'Terjadi kesalahan saat menghapus data'
+      }));
+      notify.admin.error(err?.message || "Gagal menghapus produk");
     }
   };
   // States
@@ -928,6 +1027,67 @@ export default function AdminProducts() {
       </div>
 
       {selectedProductRestock && <RestockModal product={selectedProductRestock} isOpen={!!selectedProductRestock} onClose={() => setSelectedProductRestock(null)} />}
+
+      {/* MODAL LIVE PROGRESS BULK ACTION */}
+      {bulkProgress.isOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 max-w-md w-full border border-gray-100 flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
+            {bulkProgress.status === 'processing' && (
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+                <RefreshCw size={28} className="animate-spin" />
+              </div>
+            )}
+            {bulkProgress.status === 'done' && (
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-4">
+                <CheckSquare size={28} />
+              </div>
+            )}
+            {bulkProgress.status === 'error' && (
+              <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mb-4">
+                <AlertTriangle size={28} />
+              </div>
+            )}
+
+            <h3 className="text-base font-black text-gray-900 uppercase tracking-tight mb-1">
+              {bulkProgress.title}
+            </h3>
+
+            <p className="text-xs font-semibold text-gray-500 mb-6">
+              {bulkProgress.status === 'processing' && 'Mohon jangan menutup halaman ini...'}
+              {bulkProgress.status === 'done' && 'Semua data telah berhasil diproses!'}
+              {bulkProgress.status === 'error' && (bulkProgress.errorMsg || 'Gagal memproses data')}
+            </p>
+
+            {/* PROGRESS BAR */}
+            <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden p-0.5 mb-3 border border-gray-200">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  bulkProgress.status === 'error' 
+                    ? 'bg-red-500' 
+                    : bulkProgress.status === 'done' 
+                    ? 'bg-emerald-500' 
+                    : 'bg-blue-600'
+                }`}
+                style={{ width: `${bulkProgress.percent}%` }}
+              ></div>
+            </div>
+
+            <div className="flex justify-between w-full text-[11px] font-black uppercase text-gray-400 mb-4">
+              <span>{bulkProgress.current} dari {bulkProgress.total} Produk</span>
+              <span className="text-gray-900 font-black">{bulkProgress.percent}%</span>
+            </div>
+
+            {bulkProgress.status === 'error' && (
+              <button
+                onClick={() => setBulkProgress(prev => ({ ...prev, isOpen: false }))}
+                className="mt-2 w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-all"
+              >
+                Tutup
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   </ErrorBoundary>
