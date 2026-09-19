@@ -31,6 +31,137 @@ model User {
   deliveries     Delivery[]
   payments       Payment[]
   auditLogs      AuditLog[]
+  carts          Cart[]
+  userVouchers   UserVoucher[]
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("carts")
+}
+
+model Promotion {
+  id            String    @id @default(cuid())
+  name          String
+  type          String    // product, category, coupon, flash-sale, bundle
+  discountType  String    @default("percentage") // percentage, fixed
+  discountValue Float     @default(0)
+  targetId      String?
+  targetName    String?
+  code          String?   @unique
+  startDate     DateTime?
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vouchers      UserVoucher[]
+
+  @@map("promotions")
+}
+
+model UserVoucher {
+  id          String     @id @default(cuid())
+  userId      String     @map("user_id")
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promotionId String?    @map("promotion_id")
+  promotion   Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  code        String
+  value       Float      @default(0)
+  status      String     @default("ACTIVE") // ACTIVE, USED, EXPIRED
+  usedAt      DateTime?
+  rawData     Json?      @map("raw_data")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("user_vouchers")
+}
+
+model LedgerEntry {
+  id            String   @id @default(cuid())
+  debitAccount  String   @map("debit_account")
+  creditAccount String   @map("credit_account")
+  amount        Float
+  memo          String?
+  refType       String?  @map("ref_type")
+  refId         String?  @map("ref_id")
+  postedBy      String?  @default("system") @map("posted_by")
+  rawData       Json?    @map("raw_data")
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("ledger_entries")
+}
+
+model InventoryLog {
+  id              String   @id @default(cuid())
+  productId       String?  @map("product_id")
+  productName     String?  @map("product_name")
+  warehouseId     String?  @map("warehouse_id")
+  fromWarehouseId String?  @map("from_warehouse_id")
+  toWarehouseId   String?  @map("to_warehouse_id")
+  type            String?  // IN, OUT, ADJUSTMENT, OPNAME, TRANSFER, MARKETPLACE, ORDER
+  source          String?
+  amount          Float?
+  quantity        Int?
+  prevStock       Int?     @map("prev_stock")
+  nextStock       Int?     @map("next_stock")
+  referenceId     String?  @map("reference_id")
+  orderId         String?  @map("order_id")
+  adminId         String?  @map("admin_id")
+  note            String?
+  rawData         Json?    @map("raw_data")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("inventory_logs")
+}
+
+model StockSyncLog {
+  id            String   @id @default(cuid())
+  productId     String   @map("product_id")
+  productName   String?  @map("product_name")
+  warehouseId   String   @map("warehouse_id")
+  warehouseName String?  @map("warehouse_name")
+  type          String   // WAREHOUSE_TO_PRODUCT, BATCH_SYNC, etc
+  status        String   @default("SUCCESS") // SUCCESS, COMPLETED, ERROR
+  quantity      Int?
+  previousStock Int?     @map("previous_stock")
+  newStock      Int?     @map("new_stock")
+  difference    Int?
+  systemStock   Int?     @map("system_stock")
+  reason        String?
+  synced        Boolean? @default(true)
+  syncError     String?  @map("sync_error")
+  executionTime Float?   @map("execution_time")
+  operator      String?
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("stockSyncLogs")
+}
+
+model StockValidation {
+  id            String   @id @default(cuid())
+  productId     String   @map("product_id")
+  warehouseId   String   @map("warehouse_id")
+  systemStock   Int      @map("system_stock")
+  physicalStock Int      @map("physical_stock")
+  difference    Int      @default(0)
+  status        String   @default("VALID") // VALID, INVALID, PENDING
+  lastSync      DateTime @default(now()) @map("last_sync")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, warehouseId])
+  @@map("stockValidations")
 }
 
 model Category {
@@ -293,14 +424,19 @@ model Payment {
 }
 
 model Expense {
-  id          String    @id @default(cuid())
-  category    String    // Operasional, Gaji, dll
-  amount      Float
-  description String?
-  date        DateTime
+  id             String    @id @default(cuid())
+  category       String    // Operasional, Gaji, dll
+  amount         Float
+  description    String?
+  date           DateTime  @default(now())
+  proofOfPayment String?   @map("proof_of_payment")
+  recordedBy     String?   @map("recorded_by")
+  rawData        Json?     @map("raw_data")
   
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("operational_expenses")
 }
 
 model BusinessSetting {
