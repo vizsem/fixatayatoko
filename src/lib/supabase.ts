@@ -1,9 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+  process.env.SUPABASE_PUBLISHABLE_KEY || 
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  '';
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseKey) {
+  // Log warning agar terlihat di Vercel Function Logs
+  console.error(
+    '[Supabase] KONFIGURASI TIDAK LENGKAP!\n' +
+    'Pastikan variabel berikut sudah di-set di Vercel Environment Variables:\n' +
+    '  - NEXT_PUBLIC_SUPABASE_URL\n' +
+    '  - NEXT_PUBLIC_SUPABASE_ANON_KEY\n' +
+    'URL:', supabaseUrl ? '✓ ada' : '✗ KOSONG',
+    '| Key:', supabaseKey ? '✓ ada' : '✗ KOSONG'
+  );
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock'
+);
 
 /**
  * Server-side helper to upload a buffer/blob directly to Supabase Storage
