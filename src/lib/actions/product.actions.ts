@@ -278,6 +278,7 @@ export async function updateProductStatus(ids: string[], status: string | number
       const { error: updateError } = await supabaseAdmin
         .from('products')
         .update({
+          is_active: !isArchived,
           raw_data: raw,
           updated_at: now,
         })
