@@ -266,13 +266,13 @@ export default function AdminPurchases() {
                         {new Date(po.createdAt).toLocaleDateString('id-ID')}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-2 justify-end transition-opacity">
                           <button onClick={() => setDetailModal(po)} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">
                             Detail
                           </button>
-                          {po.status === 'APPROVED' && (
+                          {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
                             <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
-                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1">
+                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
                               <Truck size={12} /> Terima
                             </button>
                           )}

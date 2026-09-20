@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 
 
-import { supabase } from '@/lib/supabase';
+import { getPurchaseOrderById, receivePurchaseOrder } from '@/lib/actions/purchase.actions';
 import { Timestamp, db, doc, getDoc, updateDoc } from '@/lib/firebase';
 import {
   Printer, Truck, Calendar, CreditCard,
@@ -14,19 +14,15 @@ import {
   RefreshCw
 } from 'lucide-react';
 
- 
-
 interface PurchaseItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
 interface PurchaseData { id: string; supplierName: string; warehouseName: string; items: PurchaseItem[]; subtotal: number; shippingCost: number; total: number; status: string; paymentStatus: string; paymentMethod: string; notes?: string; dueDate?: string; createdAt?: Timestamp | { toDate: () => Date } | null; }
-
-
-
 
 export default function PurchaseDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [purchase, setPurchase] = useState<PurchaseData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [receiving, setReceiving] = useState(false);
   
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -119,15 +115,60 @@ export default function PurchaseDetail() {
     }
   };
 
+  const handleReceive = async () => {
+    if (!purchase) return;
+    setReceiving(true);
+    try {
+      const targetWh = (purchase as any).warehouseId || 'gudang-utama';
+      const res = await receivePurchaseOrder(purchase.id, targetWh);
+      if (res.success) {
+        toast.success('Barang berhasil diterima & stok telah ditambahkan!');
+        setPurchase({ ...purchase, status: 'DITERIMA' });
+      } else {
+        toast.error(res.error || 'Gagal menerima barang');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menerima barang');
+    } finally {
+      setReceiving(false);
+    }
+  };
+
   useEffect(() => {
     const fetchPurchase = async () => {
       try {
+        // 1. Coba ambil dari Supabase (primary DB)
+        const spData = await getPurchaseOrderById(id as string);
+        if (spData) {
+          setPurchase({
+            id: spData.id,
+            supplierName: spData.supplier?.name || 'Supplier',
+            warehouseName: spData.warehouseName || 'Gudang Utama',
+            items: spData.items.map((i: any) => ({
+              id: i.productId || i.id,
+              name: i.product?.name || i.name,
+              purchasePrice: i.unitPrice,
+              quantity: i.quantity,
+              unit: i.product?.unit || 'PCS'
+            })),
+            subtotal: spData.totalAmount,
+            shippingCost: 0,
+            total: spData.totalAmount,
+            status: spData.status,
+            paymentStatus: (spData as any).raw_data?.paymentStatus || 'LUNAS',
+            paymentMethod: (spData as any).raw_data?.paymentMethod || 'CASH',
+            notes: spData.notes || '',
+            createdAt: spData.createdAt as any,
+          } as any);
+          return;
+        }
+
+        // 2. Fallback ke Firestore
         const docRef = doc(db, 'purchases', id as string);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);
         } else {
-
           router.push('/admin/purchases');
         }
       } catch (err) {
@@ -145,7 +186,9 @@ export default function PurchaseDetail() {
 
   const dateFormatted = purchase.createdAt?.toDate
     ? purchase.createdAt.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-    : 'N/A';
+    : (purchase.createdAt ? new Date(purchase.createdAt as any).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A');
+
+  const isReceived = purchase.status === 'DITERIMA' || purchase.status === 'RECEIVED';
 
   return (
     <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-32 font-sans text-black">
@@ -161,9 +204,18 @@ export default function PurchaseDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!isReceived && purchase.status !== 'CANCELLED' && (
+            <button
+              onClick={handleReceive}
+              disabled={receiving}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md disabled:opacity-50"
+            >
+              <Truck size={16} /> {receiving ? 'Memproses...' : 'Terima Barang & Tambah Stok'}
+            </button>
+          )}
           <button
             onClick={() => router.push(`/admin/purchases/add?duplicateFrom=${purchase.id}`)}
-            className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all"
+            className="bg-gray-800 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all"
           >
             <RefreshCw size={16} /> Order Lagi
           </button>

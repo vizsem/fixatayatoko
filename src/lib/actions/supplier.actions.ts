@@ -1,11 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function getSuppliers() {
   try {
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await supabaseAdmin
       .from('suppliers')
       .select('*')
       .order('created_at', { ascending: false });
@@ -33,7 +33,7 @@ export async function getSuppliers() {
 
 export async function getSupplierById(id: string) {
   try {
-    const { data, error } = await supabase.from('suppliers').select('*').eq('id', id).single();
+    const { data, error } = await supabaseAdmin.from('suppliers').select('*').eq('id', id).single();
     if (error || !data) return null;
     const raw = data.raw_data || {};
     return {
@@ -68,7 +68,7 @@ export async function createSupplier(data: {
       createdAt: new Date().toISOString()
     };
 
-    const { error } = await supabase.from('suppliers').insert({
+    const { error } = await supabaseAdmin.from('suppliers').insert({
       id,
       name: data.name,
       contact: data.contactPerson || null,
@@ -78,7 +78,7 @@ export async function createSupplier(data: {
     });
 
     if (error) {
-      console.error('Failed to create supplier in supabase:', error);
+      console.error('Failed to create supplier in supabaseAdmin:', error);
       return { success: false, error: error.message };
     }
 
@@ -98,7 +98,7 @@ export async function updateSupplier(id: string, data: {
   address?: string
 }) {
   try {
-    const { data: existing } = await supabase.from('suppliers').select('*').eq('id', id).single();
+    const { data: existing } = await supabaseAdmin.from('suppliers').select('*').eq('id', id).single();
     if (!existing) return { success: false, error: 'Supplier tidak ditemukan' };
 
     const updatedRaw = {
@@ -107,7 +107,7 @@ export async function updateSupplier(id: string, data: {
       updatedAt: new Date().toISOString()
     };
 
-    const { error } = await supabase.from('suppliers').update({
+    const { error } = await supabaseAdmin.from('suppliers').update({
       name: data.name ?? existing.name,
       contact: data.contactPerson ?? existing.contact,
       raw_data: updatedRaw,
@@ -126,7 +126,7 @@ export async function updateSupplier(id: string, data: {
 
 export async function deleteSupplier(id: string) {
   try {
-    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('suppliers').delete().eq('id', id);
     if (error) throw error;
     revalidatePath('/admin/suppliers');
     return { success: true };

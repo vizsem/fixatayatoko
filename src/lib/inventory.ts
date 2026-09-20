@@ -1,7 +1,7 @@
+import { supabaseAdmin } from '@/lib/supabase';
+import { collection, db, doc, increment, serverTimestamp } from '@/lib/firebase';
 
-import { supabase } from '@/lib/supabase';
-import { collection, db, doc, increment, orderBy, serverTimestamp, where } from '@/lib/firebase';
-export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION'
+export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION';
 
 export type InventoryLogData = {
   productId?: string
@@ -16,11 +16,13 @@ export type InventoryLogData = {
   notes?: string
   fromWarehouseId?: string
   toWarehouseId?: string
+  warehouseId?: string
   prevStock?: number
   nextStock?: number
   type?: string
+  batchNumber?: string
   [key: string]: any
-}
+};
 
 export function computeAverageCost(
   currentStock: number,
@@ -37,7 +39,7 @@ export function computeAverageCost(
   return Math.round(totalVal / totalQty);
 }
 
-export const addInventoryLog = async (logData: InventoryLogData, batch?: any) => {
+export const addInventoryLog = async (logData: InventoryLogData, _batch?: any) => {
   try {
     const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
@@ -48,18 +50,33 @@ export const addInventoryLog = async (logData: InventoryLogData, batch?: any) =>
       updatedAt: now,
     };
 
-    if (batch && typeof batch.set === 'function') {
-      batch.set(doc(collection(db, 'inventory_logs'), id), entry);
-      return { success: true, id };
-    }
+    const targetWarehouse = logData.warehouseId || logData.toWarehouseId || logData.fromWarehouseId || 'gudang-utama';
 
-    const { error } = await supabase.from('inventory_logs').insert({
+    const { error } = await supabaseAdmin.from('inventory_logs').insert({
       id,
+      product_id: logData.productId || null,
+      product_name: logData.productName || null,
+      warehouse_id: targetWarehouse,
+      to_warehouse_id: logData.toWarehouseId || null,
+      from_warehouse_id: logData.fromWarehouseId || null,
+      type: logData.type || 'MASUK',
+      source: logData.source || 'PURCHASE',
+      amount: Math.abs(Number(logData.amount || logData.quantity || 0)),
+      quantity: Number(logData.quantity || logData.amount || 0),
+      prev_stock: logData.prevStock ?? null,
+      next_stock: logData.nextStock ?? null,
+      reference_id: logData.referenceId || logData.reference || null,
+      order_id: logData.orderId || null,
+      admin_id: logData.adminId || null,
+      note: logData.note || logData.notes || '',
       raw_data: entry,
       created_at: now,
       updated_at: now,
     });
-    if (error) console.error('Error adding inventory log:', error);
+
+    if (error) {
+      console.error('Error adding inventory log in supabaseAdmin:', error);
+    }
     return { success: true, id };
   } catch (err) {
     console.error('Failed to add inventory log:', err);
@@ -98,7 +115,7 @@ export async function deductStockFEFO(
   }
 
   try {
-    const { data: product, error: fetchErr } = await supabase
+    const { data: product, error: fetchErr } = await supabaseAdmin
       .from('products')
       .select('*')
       .eq('id', productId)
@@ -128,7 +145,7 @@ export async function deductStockFEFO(
       updatedAt: now,
     };
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('products')
       .update({
         stock: newStock,
@@ -153,6 +170,7 @@ export async function deductStockFEFO(
       orderId: reference,
       note: notes || 'Pengurangan stok penjualan',
       fromWarehouseId: warehouseId,
+      warehouseId,
       source: 'ORDER',
     });
 
@@ -169,23 +187,25 @@ export async function deductStockFEFO(
 export const addStock = async (params: {
   productId: string
   amount: number
-  warehouseId: string
+  warehouseId?: string
   batchNumber?: string
   expiryDate?: Date
   reference?: string
   notes?: string
 }) => {
-  const { productId, amount, warehouseId, batchNumber, reference, notes } = params;
+  const { productId, amount, batchNumber, reference, notes } = params;
+  const warehouseId = params.warehouseId || 'gudang-utama';
+
   if (amount <= 0) throw new Error('Amount must be > 0');
 
   try {
-    const { data: product, error: fetchErr } = await supabase
+    const { data: product, error: fetchErr } = await supabaseAdmin
       .from('products')
       .select('*')
       .eq('id', productId)
       .single();
 
-    if (fetchErr || !product) throw new Error('Produk tidak ditemukan');
+    if (fetchErr || !product) throw new Error(`Produk tidak ditemukan: ${productId}`);
 
     const raw = product.raw_data || {};
     const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
@@ -203,7 +223,7 @@ export const addStock = async (params: {
       updatedAt: now,
     };
 
-    await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('products')
       .update({
         stock: newStock,
@@ -211,6 +231,8 @@ export const addStock = async (params: {
         updated_at: now,
       })
       .eq('id', productId);
+
+    if (updateErr) throw updateErr;
 
     await addInventoryLog({
       productId,
@@ -223,6 +245,7 @@ export const addStock = async (params: {
       referenceId: reference,
       note: notes || 'Penambahan stok',
       toWarehouseId: warehouseId,
+      warehouseId,
       source: 'PURCHASE',
       batchNumber,
     });
@@ -250,8 +273,8 @@ export const transferStock = async (params: {
 
   if (!productId) return { success: true };
 
-  const { data: product } = await supabase.from('products').select('*').eq('id', productId).single();
-  if (!product) throw new Error('Produk tidak ditemukan');
+  const { data: product, error: fetchErr } = await supabaseAdmin.from('products').select('*').eq('id', productId).single();
+  if (fetchErr || !product) throw new Error('Produk tidak ditemukan');
 
   const raw = product.raw_data || {};
   const stockMap = { ...(raw.stockByWarehouse || {}) };
@@ -263,7 +286,7 @@ export const transferStock = async (params: {
   stockMap[toWarehouseId] = Number(stockMap[toWarehouseId] || 0) + amount;
 
   const now = new Date().toISOString();
-  await supabase.from('products').update({
+  await supabaseAdmin.from('products').update({
     raw_data: { ...raw, stockByWarehouse: stockMap, updatedAt: now },
     updated_at: now,
   }).eq('id', productId);
@@ -275,6 +298,7 @@ export const transferStock = async (params: {
     amount,
     fromWarehouseId,
     toWarehouseId,
+    warehouseId: toWarehouseId,
     referenceId: reference,
     note: notes || `Transfer dari ${fromWarehouseId} ke ${toWarehouseId}`,
     source: 'TRANSFER',
@@ -284,7 +308,7 @@ export const transferStock = async (params: {
 };
 
 /**
- * Transitional helper for deductStockTx
+ * Transitional helpers
  */
 export const deductStockTx = async (txOrParams: any, maybeParams?: any) => {
   const params = maybeParams || txOrParams;
@@ -298,9 +322,6 @@ export const deductStockTx = async (txOrParams: any, maybeParams?: any) => {
   });
 };
 
-/**
- * Transitional helper for addStockTx
- */
 export const addStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
   const tx = isTx ? txOrParams : null;
@@ -337,9 +358,6 @@ export const addStockTx = async (txOrParams: any, maybeParams?: any) => {
   });
 };
 
-/**
- * Transitional helper for transferStockTx
- */
 export const transferStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
   const tx = isTx ? txOrParams : null;
@@ -389,26 +407,21 @@ export const transferStockTx = async (txOrParams: any, maybeParams?: any) => {
     return { success: true };
   }
 
-  if (params.batchId) {
-    return await transferStock({
-      batchId: params.batchId,
-      amount: params.amount || 0,
-      toWarehouseId: params.toWarehouseId,
-      reference: params.reference,
-      notes: params.notes,
-    });
-  }
-  return { success: true };
+  return await transferStock({
+    productId: params.productId,
+    amount: params.amount || 0,
+    fromWarehouseId: params.fromWarehouseId || 'gudang-utama',
+    toWarehouseId: params.toWarehouseId || 'gudang-utama',
+    reference: params.reference,
+    notes: params.notes,
+  });
 };
 
-/**
- * Transitional helper for adjustStockTx
- */
 export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
   const tx = isTx ? txOrParams : null;
   const params = isTx ? maybeParams : txOrParams;
-  if (!params) return { success: true };
+  if (!params || !params.productId) return { success: true };
 
   if (tx) {
     const productRef = doc(db, 'products', params.productId);
@@ -451,7 +464,47 @@ export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
     return { success: true, diff };
   }
 
-  return { success: true };
+  const { data: product } = await supabaseAdmin.from('products').select('*').eq('id', params.productId).single();
+  if (!product) throw new Error('Product not found');
+
+  const raw = product.raw_data || {};
+  const stockMap = { ...(raw.stockByWarehouse || {}) };
+  const warehouseId = params.warehouseId || 'gudang-utama';
+  const targetStock = params.newStock !== undefined ? params.newStock : (params.actualStock !== undefined ? params.actualStock : 0);
+  const prevWhStock = Number(stockMap[warehouseId] || 0);
+  const diff = targetStock - prevWhStock;
+
+  stockMap[warehouseId] = targetStock;
+  const prevTotal = Number(product.stock ?? raw.stock ?? 0);
+  const nextTotal = Math.max(0, prevTotal + diff);
+
+  const now = new Date().toISOString();
+  await supabaseAdmin.from('products').update({
+    stock: nextTotal,
+    raw_data: {
+      ...raw,
+      stock: nextTotal,
+      stockByWarehouse: stockMap,
+      updatedAt: now,
+    },
+    updated_at: now,
+  }).eq('id', params.productId);
+
+  await addInventoryLog({
+    productId: params.productId,
+    productName: product.name || raw.name || 'Produk',
+    type: diff < 0 ? 'KELUAR' : 'MASUK',
+    amount: Math.abs(diff),
+    quantity: diff,
+    prevStock: prevTotal,
+    nextStock: nextTotal,
+    warehouseId,
+    adminId: params.adminId,
+    source: params.source || 'OPNAME',
+    note: params.notes || 'Penyesuaian stok opname',
+  });
+
+  return { success: true, diff };
 };
 
 export const deductStockBatch = async (

@@ -1,8 +1,6 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-
-import { increment, limit, orderBy, where } from '@/lib/firebase';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function getInventoryBatches(warehouseId?: string) {
   try {
@@ -109,28 +107,30 @@ export async function getLowStockProducts(threshold: number = 10) {
 
 export async function getInventoryMovements(filters?: { productId?: string; warehouseId?: string; limit?: number }) {
   try {
-    let query = supabase.from('inventory_logs').select('*');
-    if (filters?.productId) query = query.eq('raw_data->>productId', filters.productId);
+    let query = supabaseAdmin.from('inventory_logs').select('*');
+    if (filters?.productId) {
+      query = query.or(`product_id.eq.${filters.productId},raw_data->>productId.eq.${filters.productId}`);
+    }
     query = query.order('created_at', { ascending: false }).limit(filters?.limit || 100);
 
-    const { data: logs } = await query;
-    if (!logs) return [];
+    const { data: logs, error } = await query;
+    if (error || !logs) return [];
 
     return logs.map((l: any) => {
       const raw = l.raw_data || {};
       return {
         id: l.id,
-        type: raw.type || raw.action || 'ADJUSTMENT',
-        quantity: Number(raw.quantity || raw.qty || raw.stockChange || 0),
-        reference: raw.reference || raw.orderId || l.id,
-        notes: raw.notes || raw.reason || '',
+        type: l.type || raw.type || raw.action || 'ADJUSTMENT',
+        quantity: Number(l.quantity || l.amount || raw.quantity || raw.qty || raw.stockChange || 0),
+        reference: l.reference_id || raw.reference || raw.orderId || l.id,
+        notes: l.note || raw.notes || raw.reason || '',
         createdAt: l.created_at ? new Date(l.created_at) : new Date(),
         product: {
-          name: raw.productName || 'Produk',
+          name: l.product_name || raw.productName || 'Produk',
           sku: raw.sku || ''
         },
         warehouse: {
-          name: raw.warehouseName || raw.warehouseId || 'Gudang Utama'
+          name: l.warehouse_id === 'gudang-utama' ? 'Gudang Utama' : (raw.warehouseName || l.warehouse_id || 'Gudang Utama')
         },
         batch: {
           batchNumber: raw.batchNumber || 'BATCH-DEFAULT'
@@ -151,7 +151,7 @@ export async function adjustStock(data: {
   createdById?: string
 }) {
   try {
-    const { data: p, error: fetchErr } = await supabase
+    const { data: p, error: fetchErr } = await supabaseAdmin
       .from('products')
       .select('*')
       .eq('id', data.productId)
@@ -169,7 +169,7 @@ export async function adjustStock(data: {
     stockByWarehouse[data.warehouseId] = Math.max(0, curWhStock + data.quantity);
 
     const now = new Date().toISOString();
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('products')
       .update({
         stock: newStock,
@@ -182,8 +182,18 @@ export async function adjustStock(data: {
       return { success: false, error: updateErr.message };
     }
 
-    await supabase.from('inventory_logs').insert({
+    await supabaseAdmin.from('inventory_logs').insert({
       id: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      product_id: data.productId,
+      product_name: p.name || raw.name || 'Produk',
+      warehouse_id: data.warehouseId,
+      quantity: data.quantity,
+      amount: Math.abs(data.quantity),
+      type: data.quantity >= 0 ? 'MASUK' : 'KELUAR',
+      source: 'OPNAME',
+      prev_stock: currentStock,
+      next_stock: newStock,
+      note: data.notes || 'Penyesuaian stok manual',
       raw_data: {
         productId: data.productId,
         productName: p.name || raw.name || 'Produk',
@@ -203,6 +213,7 @@ export async function adjustStock(data: {
     });
 
     revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
     return { success: true };
   } catch (error) {
     console.error('Failed to adjust stock:', error);
@@ -212,7 +223,7 @@ export async function adjustStock(data: {
 
 export async function getWarehouses() {
   try {
-    const { data: rows } = await supabase.from('warehouses').select('*').order('name', { ascending: true });
+    const { data: rows } = await supabaseAdmin.from('warehouses').select('*').order('name', { ascending: true });
     if (!rows) return [];
 
     return rows.map((w: any) => {
@@ -235,7 +246,7 @@ export async function createWarehouse(data: { name: string; address?: string }) 
   try {
     const id = `wh_${Date.now()}`;
     const now = new Date().toISOString();
-    const { error } = await supabase.from('warehouses').insert({
+    const { error } = await supabaseAdmin.from('warehouses').insert({
       id,
       name: data.name,
       location: data.address || null,
@@ -246,6 +257,7 @@ export async function createWarehouse(data: { name: string; address?: string }) 
 
     if (error) return { success: false, error: error.message };
     revalidatePath('/admin/warehouses');
+    revalidatePath('/admin/inventory');
     return { success: true, data: { id, ...data } };
   } catch (error) {
     return { success: false, error: 'Gagal membuat gudang' };
@@ -255,7 +267,7 @@ export async function createWarehouse(data: { name: string; address?: string }) 
 export async function updateWarehouse(id: string, data: { name?: string; address?: string }) {
   try {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('warehouses').update({
+    const { error } = await supabaseAdmin.from('warehouses').update({
       name: data.name,
       location: data.address,
       updated_at: now,
@@ -263,6 +275,7 @@ export async function updateWarehouse(id: string, data: { name?: string; address
 
     if (error) return { success: false, error: error.message };
     revalidatePath('/admin/warehouses');
+    revalidatePath('/admin/inventory');
     return { success: true, data: { id, ...data } };
   } catch (error) {
     return { success: false, error: 'Gagal mengupdate gudang' };

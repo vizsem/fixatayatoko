@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { addStock } from '@/lib/inventory'
 
 type PurchaseItemInput = {
@@ -15,8 +15,8 @@ function normalizeStatus(status?: string): string {
   const s = status.toUpperCase();
   if (s === 'DITERIMA' || s === 'RECEIVED') return 'RECEIVED';
   if (s === 'DIBATALKAN' || s === 'CANCELLED') return 'CANCELLED';
-  if (s === 'PENDING' || s === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
-  if (s === 'APPROVED') return 'APPROVED';
+  if (s === 'MENUNGGU' || s === 'PENDING' || s === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
+  if (s === 'APPROVED' || s === 'DISETUJUI') return 'APPROVED';
   if (s === 'DRAFT') return 'DRAFT';
   return s;
 }
@@ -35,7 +35,7 @@ function parseDate(val: any): Date {
 
 export async function getPurchaseOrders(filters?: { status?: string; supplierId?: string }) {
   try {
-    const query = supabase
+    const query = supabaseAdmin
       .from('purchases')
       .select('*')
       .order('created_at', { ascending: false });
@@ -52,6 +52,7 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         const total = Number(item.totalPrice ?? (qty * price));
         return {
           id: item.id || `item_${idx}`,
+          productId: item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : undefined),
           quantity: qty,
           unitPrice: price,
           totalPrice: total,
@@ -70,6 +71,8 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         id: p.id,
         poNumber,
         status,
+        warehouseId: raw.warehouseId || null,
+        warehouseName: raw.warehouseName || null,
         totalAmount,
         notes: raw.notes || null,
         createdAt: parseDate(raw.createdAt || p.created_at),
@@ -97,7 +100,7 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
 
 export async function getPurchaseOrderById(id: string) {
   try {
-    const { data: p, error } = await supabase.from('purchases').select('*').eq('id', id).single();
+    const { data: p, error } = await supabaseAdmin.from('purchases').select('*').eq('id', id).single();
     if (error || !p) return null;
 
     const raw = p.raw_data || {};
@@ -107,6 +110,7 @@ export async function getPurchaseOrderById(id: string) {
       const total = Number(item.totalPrice ?? (qty * price));
       return {
         id: item.id || `item_${idx}`,
+        productId: item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : undefined),
         quantity: qty,
         unitPrice: price,
         totalPrice: total,
@@ -121,6 +125,8 @@ export async function getPurchaseOrderById(id: string) {
       id: p.id,
       poNumber: raw.poNumber || raw.invoiceNumber || `PO-${p.id.slice(0, 8).toUpperCase()}`,
       status: normalizeStatus(raw.status || p.status),
+      warehouseId: raw.warehouseId || 'gudang-utama',
+      warehouseName: raw.warehouseName || 'Gudang Utama',
       totalAmount: Number(p.total ?? raw.total ?? raw.totalAmount ?? 0),
       notes: raw.notes || null,
       createdAt: parseDate(raw.createdAt || p.created_at),
@@ -128,6 +134,7 @@ export async function getPurchaseOrderById(id: string) {
         name: raw.supplierName || 'Supplier Umum'
       },
       items,
+      raw_data: raw,
     };
   } catch {
     return null;
@@ -148,11 +155,12 @@ export async function createPurchaseOrder(data: {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const poNumber = `PO-${Date.now()}`;
     const id = `po_${Date.now()}`;
+    const targetWarehouse = data.warehouseId || 'gudang-utama';
 
     // Cari supplier name
     let supplierName = 'Supplier';
     try {
-      const { data: sup } = await supabase.from('suppliers').select('raw_data, name').eq('id', data.supplierId).single();
+      const { data: sup } = await supabaseAdmin.from('suppliers').select('raw_data, name').eq('id', data.supplierId).single();
       if (sup) {
         supplierName = sup.name || sup.raw_data?.name || 'Supplier';
       }
@@ -164,7 +172,7 @@ export async function createPurchaseOrder(data: {
         let name = `Produk ${item.productId}`;
         let unit = 'PCS';
         try {
-          const { data: prod } = await supabase.from('products').select('name, raw_data').eq('id', item.productId).single();
+          const { data: prod } = await supabaseAdmin.from('products').select('name, raw_data').eq('id', item.productId).single();
           if (prod) {
             name = prod.name || prod.raw_data?.name || name;
             unit = prod.raw_data?.unit || unit;
@@ -183,21 +191,26 @@ export async function createPurchaseOrder(data: {
       })
     );
 
+    const isAutoReceive = Boolean(data.autoReceive);
+    const status = isAutoReceive ? 'DITERIMA' : 'APPROVED';
+
     const raw_data = {
       poNumber,
       supplierId: data.supplierId,
       supplierName,
       createdById: data.createdById,
+      warehouseId: targetWarehouse,
       notes: data.notes || '',
-      status: data.autoReceive && data.warehouseId ? 'DITERIMA' : 'APPROVED',
+      status,
       total: totalAmount,
       subtotal: totalAmount,
       items: enrichedItems,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      receivedAt: isAutoReceive ? new Date().toISOString() : undefined,
     };
 
-    const { error } = await supabase.from('purchases').insert({
+    const { error } = await supabaseAdmin.from('purchases').insert({
       id,
       total: totalAmount,
       raw_data,
@@ -206,18 +219,18 @@ export async function createPurchaseOrder(data: {
     });
 
     if (error) {
-      console.error('Failed to create purchase in supabase:', error);
+      console.error('Failed to create purchase in supabaseAdmin:', error);
       return { success: false, error: error.message };
     }
 
-    // Jika autoReceive diaktifkan dan warehouseId dipilih, langsung proses penambahan stok
-    if (data.autoReceive && data.warehouseId) {
+    // Jika autoReceive diaktifkan, langsung proses penambahan stok ke produk dan inventory_logs
+    if (isAutoReceive) {
       for (const item of enrichedItems) {
         if (item.productId) {
           await addStock({
             productId: item.productId,
             amount: item.quantity,
-            warehouseId: data.warehouseId,
+            warehouseId: targetWarehouse,
             batchNumber: data.batchNumber || `${poNumber}-${item.productId.slice(-4)}`,
             expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
             reference: poNumber,
@@ -231,32 +244,38 @@ export async function createPurchaseOrder(data: {
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
     return { success: true, data: { id, ...raw_data } };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create purchase order:', error);
-    return { success: false, error: 'Gagal membuat purchase order' };
+    return { success: false, error: error?.message || 'Gagal membuat purchase order' };
   }
 }
 
 export async function receivePurchaseOrder(poId: string, warehouseId: string, batchNumber?: string, expiryDate?: string) {
   try {
-    const { data: p } = await supabase.from('purchases').select('*').eq('id', poId).single();
-    if (!p) return { success: false, error: 'PO tidak ditemukan' };
+    const { data: p, error: fetchErr } = await supabaseAdmin.from('purchases').select('*').eq('id', poId).single();
+    if (fetchErr || !p) return { success: false, error: 'PO tidak ditemukan' };
 
     const raw = p.raw_data || {};
-    if (raw.status === 'DITERIMA' || raw.status === 'RECEIVED') {
-      return { success: false, error: 'PO sudah diterima' };
+    const norm = normalizeStatus(raw.status || p.status);
+    if (norm === 'RECEIVED') {
+      return { success: false, error: 'PO sudah diterima sebelumnya' };
     }
 
+    const targetWarehouse = warehouseId || raw.warehouseId || 'gudang-utama';
     raw.status = 'DITERIMA';
     raw.receivedAt = new Date().toISOString();
-    raw.warehouseId = warehouseId;
+    raw.warehouseId = targetWarehouse;
 
-    await supabase.from('purchases').update({
+    const { error: updateErr } = await supabaseAdmin.from('purchases').update({
       raw_data: raw,
       updated_at: new Date().toISOString()
     }).eq('id', poId);
 
-    // Tambah stok ke produk & catat log inventory
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    // Tambah stok ke produk & catat log inventory via supabaseAdmin
     for (const item of (raw.items || [])) {
       const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
       const qty = Number(item.quantity || 1);
@@ -264,7 +283,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
         await addStock({
           productId: prodId,
           amount: qty,
-          warehouseId,
+          warehouseId: targetWarehouse,
           batchNumber: batchNumber || `${raw.poNumber || poId}-${prodId.slice(-4)}`,
           expiryDate: expiryDate ? new Date(expiryDate) : undefined,
           reference: raw.poNumber || poId,
@@ -277,21 +296,21 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to receive PO:', error);
-    return { success: false, error: 'Gagal menerima purchase order' };
+    return { success: false, error: error?.message || 'Gagal menerima purchase order' };
   }
 }
 
 export async function updatePurchaseStatus(id: string, status: string) {
   try {
-    const { data: p } = await supabase.from('purchases').select('*').eq('id', id).single();
+    const { data: p } = await supabaseAdmin.from('purchases').select('*').eq('id', id).single();
     if (!p) return { success: false, error: 'PO tidak ditemukan' };
 
     const raw = p.raw_data || {};
     raw.status = status;
     raw.updatedAt = new Date().toISOString();
-    await supabase.from('purchases').update({
+    await supabaseAdmin.from('purchases').update({
       raw_data: raw,
       updated_at: new Date().toISOString()
     }).eq('id', id);
@@ -305,7 +324,7 @@ export async function updatePurchaseStatus(id: string, status: string) {
 
 export async function deletePurchaseOrder(id: string) {
   try {
-    const { error } = await supabase.from('purchases').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('purchases').delete().eq('id', id);
     if (error) throw error;
     revalidatePath('/admin/purchases');
     return { success: true };

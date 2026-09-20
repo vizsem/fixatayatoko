@@ -11,8 +11,9 @@ import Link from 'next/link';
 import notify from '@/lib/notify';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
-import { supabase } from '@/lib/supabase';
-
+import { createPurchaseOrder } from '@/lib/actions/purchase.actions';
+import { getSuppliers } from '@/lib/actions/supplier.actions';
+import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
@@ -108,29 +109,24 @@ function AddPurchaseFormContent() {
   }, [duplicateFrom, productsLoading, liveProducts, duplicateLoaded]);
 
   useEffect(() => {
+    getSuppliers().then(s => {
+      if (s && s.length > 0) setSuppliers(s as any[]);
+    }).catch(() => {});
+    getWarehouses().then(w => {
+      if (w && w.length > 0) setWarehouses(w as any[]);
+    }).catch(() => {});
+
     const unsubSup = onSnapshot(collection(db, 'suppliers'), (s) => {
-      setSuppliers(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Supplier)));
-    });
+      if (!s.empty) {
+        setSuppliers(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Supplier)));
+      }
+    }, () => {});
     const unsubWar = onSnapshot(collection(db, 'warehouses'), (s) => {
-      const base = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse));
-      const knownIds = new Set(base.map(w => w.id));
-      const knownNames = new Set(base.map(w => w.name));
-      const derived = new Set<string>();
-      type WarehouseInfo = { stockByWarehouse?: Record<string, number>; warehouseId?: string; warehouse?: string };
-      liveProducts.forEach((p) => {
-        const info = p as unknown as WarehouseInfo;
-        const by = info.stockByWarehouse;
-        if (by && typeof by === 'object') {
-          Object.keys(by).forEach(k => derived.add(k));
-        }
-        const wid = info.warehouseId || info.warehouse;
-        if (wid) derived.add(wid);
-      });
-      const virtuals = Array.from(derived)
-        .filter(k => !knownIds.has(k) && !knownNames.has(k))
-        .map(k => ({ id: k, name: k } as Warehouse));
-      setWarehouses([...base, ...virtuals].sort((a, b) => a.name.localeCompare(b.name)));
-    });
+      if (!s.empty) {
+        const base = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse));
+        setWarehouses(base.sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    }, () => {});
     return () => {
       unsubSup();
       unsubWar();
@@ -247,40 +243,63 @@ function AddPurchaseFormContent() {
       const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
       const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
 
-      const batch = writeBatch(db);
-      const purchaseRef = doc(collection(db, 'purchases'));
-
-      batch.set(purchaseRef, {
+      // 1. Simpan ke Supabase (Primary Database) & langsung tambahkan stok ke Gudang & Inventory Log
+      const purchaseRes = await createPurchaseOrder({
         supplierId: selectedSupplier,
-        supplierName,
+        createdById: 'admin',
         warehouseId: selectedWarehouse,
-        warehouseName,
-        items: cart,
-        subtotal,
-        shippingCost,
-        total,
-        paymentStatus,
-        paymentMethod,
-        notes,
-        status: 'MENUNGGU',
-        createdAt: new Date().toISOString(),
+        notes: notes || undefined,
+        autoReceive: true, // Pembelian baru otomatis menambah stok fisik ke gudang
+        items: cart.map(item => ({
+          productId: item.id,
+          quantity: item.quantity * (item.conversion || 1),
+          unitPrice: (item.purchasePrice || 0) / (item.conversion || 1),
+        })),
       });
 
-      if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
-         const capitalRef = doc(collection(db, 'capital_transactions'));
-         batch.set(capitalRef, {
-           date: new Date().toISOString(),
-           type: 'WITHDRAWAL',
-           amount: total,
-           description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
-           recordedBy: 'system',
-           referenceId: purchaseRef.id
-         });
+      if (!purchaseRes.success) {
+        throw new Error(purchaseRes.error || 'Gagal menyimpan Purchase Order ke database');
       }
 
-      batch.commit().catch(() => {});
+      // 2. Safe sync ke Firestore untuk kompatibilitas riwayat/modal
+      try {
+        const batch = writeBatch(db);
+        const purchaseRef = doc(collection(db, 'purchases'));
 
-      notify.admin.success("Purchase Order berhasil disimpan!");
+        batch.set(purchaseRef, {
+          supplierId: selectedSupplier,
+          supplierName,
+          warehouseId: selectedWarehouse,
+          warehouseName,
+          items: cart,
+          subtotal,
+          shippingCost,
+          total,
+          paymentStatus,
+          paymentMethod,
+          notes,
+          status: 'DITERIMA',
+          createdAt: new Date().toISOString(),
+        });
+
+        if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
+           const capitalRef = doc(collection(db, 'capital_transactions'));
+           batch.set(capitalRef, {
+             date: new Date().toISOString(),
+             type: 'WITHDRAWAL',
+             amount: total,
+             description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
+             recordedBy: 'system',
+             referenceId: purchaseRef.id
+           });
+        }
+
+        await batch.commit();
+      } catch (fsErr) {
+        console.warn('Firestore sync skipped or failed:', fsErr);
+      }
+
+      notify.admin.success("Purchase Order berhasil disimpan & stok telah ditambahkan!");
       router.push('/admin/purchases');
     } catch (err: any) {
       console.error(err);
