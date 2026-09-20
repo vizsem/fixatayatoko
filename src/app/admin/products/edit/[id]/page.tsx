@@ -211,12 +211,43 @@ export default function EditProductPage() {
 
   const fetchProductData = useCallback(async () => {
     try {
-      const docSnap = await getDoc(doc(db, 'products', id));
-      if (!docSnap.exists()) {
-        toast.error('Produk tidak ditemukan');
-        return router.push('/admin/products');
+      // Try Supabase first (primary DB), fallback to Firestore
+      let data: any = null;
+      const { data: spRow, error: spErr } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (!spErr && spRow) {
+        // Merge Supabase row with raw_data
+        const raw = spRow.raw_data || {};
+        data = {
+          ...raw,
+          // Supabase top-level columns take precedence
+          ID: spRow.id,
+          Nama: spRow.name || raw.Nama || raw.name || '',
+          Kategori: spRow.category || raw.Kategori || raw.category || 'UMUM',
+          Satuan: spRow.unit || raw.Satuan || raw.unit || 'PCS',
+          Stok: Number(spRow.stock ?? raw.Stok ?? raw.stock ?? 0),
+          Modal: Number(spRow.cost_price ?? raw.Modal ?? raw.purchasePrice ?? 0),
+          Ecer: Number(spRow.price ?? raw.Ecer ?? raw.price ?? 0),
+          Barcode: spRow.barcode || raw.Barcode || raw.barcode || '',
+          Link_Foto: spRow.image_url || raw.Link_Foto || raw.imageUrl || raw.image || raw.URL_Produk || '',
+          Deskripsi: spRow.description || raw.Deskripsi || raw.description || '',
+          warehouseId: raw.warehouseId || '',
+          stockByWarehouse: raw.stockByWarehouse || {},
+        };
+      } else {
+        // Fallback to Firestore
+        const docSnap = await getDoc(doc(db, 'products', id));
+        if (!docSnap.exists()) {
+          toast.error('Produk tidak ditemukan');
+          return router.push('/admin/products');
+        }
+        data = docSnap.data();
       }
-      const data = docSnap.data();
+
       const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
       const basePrice = Number(data.Ecer || 0);
       const cp = data.channelPricing || {};
@@ -308,7 +339,7 @@ export default function EditProductPage() {
 
       setUnits(mergedUnits);
 
-      const currentPhoto = data.URL_Produk || data.Link_Foto || data.image;
+      const currentPhoto = data.Link_Foto || data.image_url || data.URL_Produk || data.imageUrl || data.image || '';
       setImagePreview(currentPhoto || null);
     } catch (e) {
       console.error(e);
@@ -554,6 +585,23 @@ export default function EditProductPage() {
       };
 
       await updateDoc(doc(db, 'products', id), updatePayload);
+
+      // Also sync to Supabase (primary read DB)
+      await supabase.from('products').update({
+        name: String(formData.Nama || '').toUpperCase(),
+        category: formData.Kategori,
+        unit: baseUnit,
+        price: nextEcer,
+        cost_price: Number(formData.Modal || 0),
+        stock: totalStock,
+        barcode: formData.Barcode || '',
+        image_url: finalImageUrl,
+        description: formData.Deskripsi || '',
+        is_active: Number(formData.Status) === 1,
+        raw_data: updatePayload,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id);
+
 
       // Write Logs
       if (logEntries.length > 0) {
@@ -1242,7 +1290,7 @@ export default function EditProductPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="object-cover" />
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" width={112} height={112} />
                     ) : (
                       <ImageIcon size={20} className="text-gray-300" />
                     )}
@@ -1257,7 +1305,7 @@ export default function EditProductPage() {
                     />
                   </label>
                 </div>
-                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => setFormData({ ...formData, Link_Foto: e.target.value })} />
+                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => { setFormData({ ...formData, Link_Foto: e.target.value }); setImagePreview(e.target.value || null); }} />
                 <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}></textarea>
               </div>
             </div>
