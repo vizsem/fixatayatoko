@@ -2,11 +2,11 @@
 import { revalidatePath } from 'next/cache'
 
 import { increment, limit, orderBy, where } from '@/lib/firebase';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function getInventoryBatches(warehouseId?: string) {
   try {
-    const { data: products } = await supabase.from('products').select('*');
+    const { data: products } = await supabaseAdmin.from('products').select('*');
     if (!products) return [];
 
     const batches: any[] = [];
@@ -57,7 +57,7 @@ export async function getInventoryBatches(warehouseId?: string) {
 
 export async function getLowStockProducts(threshold: number = 10) {
   try {
-    const { data: products } = await supabase.from('products').select('*');
+    const { data: products } = await supabaseAdmin.from('products').select('*');
     if (!products) return [];
 
     return products

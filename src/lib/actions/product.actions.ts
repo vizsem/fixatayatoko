@@ -21,7 +21,11 @@ export async function getProducts(options?: ProductQueryOptions) {
 
     // Filter is_active langsung di database (lebih efisien)
     if (options?.isActive !== undefined) {
-      query = query.eq('is_active', options.isActive);
+      if (options.isActive === true) {
+        query = query.or('is_active.eq.true,is_active.is.null');
+      } else {
+        query = query.eq('is_active', false);
+      }
     }
 
     if (options?.category) {
