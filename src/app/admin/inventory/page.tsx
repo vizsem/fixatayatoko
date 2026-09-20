@@ -5,13 +5,14 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {
   Package, Search, AlertTriangle, Warehouse, TrendingDown,
-  ArrowDown, ArrowUp, RefreshCw, Filter, BarChart2
+  ArrowDown, ArrowUp, RefreshCw, Filter, BarChart2, CheckCircle, XCircle, Ban
 } from 'lucide-react';
 import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjustStock, getWarehouses } from '@/lib/actions/inventory.actions';
 import { getProducts } from '@/lib/actions/product.actions';
 
 import { limit } from '@/lib/firebase';
 type Tab = 'batches' | 'lowstock' | 'movements';
+type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function AdminInventory() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,7 @@ export default function AdminInventory() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [adjustModal, setAdjustModal] = useState(false);
   const [adjustForm, setAdjustForm] = useState({ productId: '', warehouseId: '', quantity: 0, notes: '' });
@@ -46,13 +48,28 @@ export default function AdminInventory() {
 
   useEffect(() => { load(); }, [load]);
 
+  const activeBatchesCount = useMemo(() => batches.filter(b => b.product?.isActive !== false).length, [batches]);
+  const inactiveBatchesCount = useMemo(() => batches.filter(b => b.product?.isActive === false).length, [batches]);
+
   const filteredBatches = useMemo(() => batches.filter(b => {
     const matchWarehouse = warehouseFilter === 'all' || b.warehouseId === warehouseFilter;
     const matchSearch = b.product.name.toLowerCase().includes(search.toLowerCase()) ||
       b.product.sku.toLowerCase().includes(search.toLowerCase()) ||
       b.batchNumber.toLowerCase().includes(search.toLowerCase());
-    return matchWarehouse && matchSearch;
-  }), [batches, warehouseFilter, search]);
+    const matchStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && b.product?.isActive !== false) ||
+      (statusFilter === 'inactive' && b.product?.isActive === false);
+    return matchWarehouse && matchSearch && matchStatus;
+  }), [batches, warehouseFilter, search, statusFilter]);
+
+  const filteredLowStock = useMemo(() => lowStock.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.sku.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && p.isActive !== false) ||
+      (statusFilter === 'inactive' && p.isActive === false);
+    return matchSearch && matchStatus;
+  }), [lowStock, search, statusFilter]);
 
   const handleAdjust = async () => {
     if (!adjustForm.productId || !adjustForm.warehouseId || adjustForm.quantity === 0) {
@@ -98,7 +115,7 @@ export default function AdminInventory() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl font-black text-gray-900">Manajemen Inventori</h1>
-            <p className="text-xs text-gray-500 mt-0.5">FEFO (First Expired First Out) aktif</p>
+            <p className="text-xs text-gray-500 mt-0.5">FEFO (First Expired First Out) aktif · Pemisahan Produk Aktif & Tidak Aktif</p>
           </div>
           <div className="flex gap-2">
             <button onClick={load} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 shadow-sm">
@@ -111,20 +128,28 @@ export default function AdminInventory() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 font-medium mb-1">Total Batch</p>
             <p className="text-2xl font-black text-gray-900">{batches.length}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <p className="text-xs text-gray-400 font-medium mb-1">Total Qty</p>
-            <p className="text-2xl font-black text-emerald-700">{totalBatchQty.toLocaleString()}</p>
+          <div className="bg-emerald-50 rounded-2xl border border-emerald-100 shadow-sm p-4">
+            <p className="text-xs text-emerald-600 font-medium mb-1 flex items-center gap-1">
+              <CheckCircle size={12} /> Batch Aktif
+            </p>
+            <p className="text-2xl font-black text-emerald-700">{activeBatchesCount}</p>
+          </div>
+          <div className="bg-slate-100 rounded-2xl border border-slate-200 shadow-sm p-4">
+            <p className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1">
+              <Ban size={12} /> Batch Nonaktif
+            </p>
+            <p className="text-2xl font-black text-slate-700">{inactiveBatchesCount}</p>
           </div>
           <div className="bg-amber-50 rounded-2xl border border-amber-100 shadow-sm p-4">
             <p className="text-xs text-amber-500 font-medium mb-1">Exp. &lt; 30 hari</p>
             <p className="text-2xl font-black text-amber-700">{expiringSoon}</p>
           </div>
-          <div className="bg-red-50 rounded-2xl border border-red-100 shadow-sm p-4">
+          <div className="bg-red-50 rounded-2xl border border-red-100 shadow-sm p-4 col-span-2 md:col-span-1">
             <p className="text-xs text-red-400 font-medium mb-1">Stok Rendah</p>
             <p className="text-2xl font-black text-red-700">{lowStock.length}</p>
           </div>
@@ -148,26 +173,61 @@ export default function AdminInventory() {
           </div>
 
           <div className="p-4">
-            {/* Filters for batches */}
-            {tab === 'batches' && (
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <div className="relative flex-1">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Cari produk, SKU, atau batch..."
-                    className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+            {/* Filters for batches & lowstock */}
+            {(tab === 'batches' || tab === 'lowstock') && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <div className="relative flex-1">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Cari produk, SKU, atau batch..."
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  {tab === 'batches' && (
+                    <select
+                      value={warehouseFilter}
+                      onChange={e => setWarehouseFilter(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Semua Gudang</option>
+                      {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  )}
                 </div>
-                <select
-                  value={warehouseFilter}
-                  onChange={e => setWarehouseFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Semua Gudang</option>
-                  {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
+
+                {/* Status Filter Toggle */}
+                <div className="flex items-center border border-gray-200 bg-gray-100/80 p-1 rounded-xl gap-1 shrink-0 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      statusFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Semua
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('active')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                      statusFilter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:text-emerald-800'
+                    }`}
+                  >
+                    <CheckCircle size={12} /> Aktif ({activeBatchesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('inactive')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                      statusFilter === 'inactive' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                  >
+                    <Ban size={12} /> Tidak Aktif ({inactiveBatchesCount})
+                  </button>
+                </div>
               </div>
             )}
 
@@ -181,6 +241,7 @@ export default function AdminInventory() {
                     <table className="w-full text-sm">
                       <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
                         <th className="text-left p-3">Produk</th>
+                        <th className="text-center p-3">Status Produk</th>
                         <th className="text-left p-3">Gudang</th>
                         <th className="text-left p-3">No. Batch</th>
                         <th className="text-center p-3">Qty</th>
@@ -188,20 +249,40 @@ export default function AdminInventory() {
                       </tr></thead>
                       <tbody className="divide-y divide-gray-50">
                         {filteredBatches.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center py-8 text-gray-400 text-sm">Tidak ada data</td></tr>
+                          <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Tidak ada data batch</td></tr>
                         ) : filteredBatches.map(b => {
                           const isExpiringSoon = b.expiryDate && new Date(b.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
                           const isExpired = b.expiryDate && new Date(b.expiryDate) < new Date();
+                          const isActive = b.product?.isActive !== false;
                           return (
-                            <tr key={b.id} className={`hover:bg-gray-50 transition-colors ${isExpired ? 'bg-red-50' : isExpiringSoon ? 'bg-amber-50' : ''}`}>
+                            <tr key={b.id} className={`hover:bg-gray-50 transition-colors ${
+                              !isActive ? 'bg-gray-50/70 text-gray-500' :
+                              isExpired ? 'bg-red-50' :
+                              isExpiringSoon ? 'bg-amber-50' : ''
+                            }`}>
                               <td className="p-3">
-                                <p className="font-bold text-gray-800">{b.product.name}</p>
+                                <p className={`font-bold ${isActive ? 'text-gray-800' : 'text-gray-500 line-through'}`}>{b.product.name}</p>
                                 <p className="text-xs text-gray-400 font-mono">{b.product.sku}</p>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  isActive
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-gray-100 text-gray-600 border border-gray-300'
+                                }`}>
+                                  {isActive ? <CheckCircle size={11} /> : <Ban size={11} />}
+                                  {isActive ? 'Aktif' : 'Tidak Aktif'}
+                                </span>
                               </td>
                               <td className="p-3 text-gray-600">{b.warehouse.name}</td>
                               <td className="p-3 font-mono text-xs text-gray-600">{b.batchNumber}</td>
                               <td className="p-3 text-center">
-                                <span className={`px-3 py-1 rounded-lg text-xs font-bold ${b.quantity < 5 ? 'bg-red-100 text-red-700' : b.quantity < 10 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                                  !isActive ? 'bg-gray-200 text-gray-600' :
+                                  b.quantity < 5 ? 'bg-red-100 text-red-700' :
+                                  b.quantity < 10 ? 'bg-amber-100 text-amber-700' :
+                                  'bg-emerald-100 text-emerald-700'
+                                }`}>
                                   {b.quantity} {b.product.unit}
                                 </span>
                               </td>
@@ -224,23 +305,35 @@ export default function AdminInventory() {
                 {/* Low Stock Tab */}
                 {tab === 'lowstock' && (
                   <div className="space-y-3">
-                    {lowStock.length === 0 ? (
+                    {filteredLowStock.length === 0 ? (
                       <div className="text-center py-8">
                         <Package size={40} className="mx-auto text-gray-300 mb-2" />
-                        <p className="text-gray-400 text-sm">Semua stok dalam kondisi aman 🎉</p>
+                        <p className="text-gray-400 text-sm">Tidak ada produk stok rendah sesuai filter</p>
                       </div>
-                    ) : lowStock.map((p: any) => (
-                      <div key={p.id} className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
-                        <div>
-                          <p className="font-bold text-gray-800 text-sm">{p.name}</p>
-                          <p className="text-xs text-gray-500 font-mono">{p.sku} · {p.category?.name}</p>
+                    ) : filteredLowStock.map((p: any) => {
+                      const isActive = p.isActive !== false;
+                      return (
+                        <div key={p.id} className={`flex items-center justify-between p-3.5 rounded-xl border ${
+                          isActive ? 'bg-red-50 border-red-100' : 'bg-gray-100 border-gray-200 opacity-80'
+                        }`}>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className={`font-bold text-sm ${isActive ? 'text-gray-800' : 'text-gray-600 line-through'}`}>{p.name}</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+                              }`}>
+                                {isActive ? 'Aktif' : 'Tidak Aktif'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 font-mono mt-0.5">{p.sku} · {p.category?.name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-lg font-black ${isActive ? 'text-red-600' : 'text-gray-600'}`}>{p.stock}</p>
+                            <p className="text-xs text-gray-500 font-medium">{p.unit} tersisa</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-black text-red-600">{p.stock}</p>
-                          <p className="text-xs text-red-400 font-medium">{p.unit} tersisa</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -306,7 +399,16 @@ export default function AdminInventory() {
                 <select value={adjustForm.productId} onChange={e => setAdjustForm(p => ({ ...p, productId: e.target.value }))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Pilih Produk</option>
-                  {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <optgroup label="Produk Aktif">
+                    {products.filter((p: any) => p.isActive !== false).map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Produk Tidak Aktif">
+                    {products.filter((p: any) => p.isActive === false).map((p: any) => (
+                      <option key={p.id} value={p.id}>[Tidak Aktif] {p.name}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
               <div>
@@ -342,3 +444,4 @@ export default function AdminInventory() {
     </>
   );
 }
+

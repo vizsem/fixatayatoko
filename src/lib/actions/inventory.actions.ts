@@ -15,6 +15,14 @@ export async function getInventoryBatches(warehouseId?: string) {
       const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
       const stockByWarehouse = raw.stockByWarehouse || { 'gudang-utama': stock };
 
+      const isArchivedLegacy = 
+        raw.isActive === false || 
+        raw.isActive === 'false' || 
+        raw.Status === 1 || 
+        raw.Status === '1' || 
+        raw.status === 'ARCHIVED';
+      const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
+
       Object.entries(stockByWarehouse).forEach(([whId, qty]: [string, any]) => {
         const qNum = Number(qty || 0);
         if (warehouseId && whId !== warehouseId) return;
@@ -30,7 +38,8 @@ export async function getInventoryBatches(warehouseId?: string) {
             id: p.id,
             name: p.name || raw.name || raw.Nama || 'Produk',
             sku: p.sku || raw.sku || raw.Barcode || p.id,
-            unit: p.unit || raw.unit || 'pcs'
+            unit: p.unit || raw.unit || 'pcs',
+            isActive
           },
           warehouse: {
             name: whId === 'gudang-utama' ? 'Gudang Utama' : whId
@@ -55,12 +64,21 @@ export async function getLowStockProducts(threshold: number = 10) {
       .map((p: any) => {
         const raw = p.raw_data || {};
         const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
+        const isArchivedLegacy = 
+          raw.isActive === false || 
+          raw.isActive === 'false' || 
+          raw.Status === 1 || 
+          raw.Status === '1' || 
+          raw.status === 'ARCHIVED';
+        const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
         return {
           id: p.id,
           name: p.name || raw.name || raw.Nama || 'Produk',
           sku: p.sku || raw.sku || raw.Barcode || p.id,
           category: { name: p.category || raw.category || 'Umum' },
-          stock
+          stock,
+          unit: p.unit || raw.unit || 'pcs',
+          isActive
         };
       })
       .filter((p: any) => p.stock <= threshold)

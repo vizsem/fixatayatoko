@@ -57,7 +57,7 @@ export default function AdminPurchases() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [form, setForm] = useState({ supplierId: '', notes: '' });
+  const [form, setForm] = useState({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
   const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0 }]);
   const [receiveForm, setReceiveForm] = useState({ warehouseId: '', batchNumber: '', expiryDate: '' });
   const [saving, setSaving] = useState(false);
@@ -112,18 +112,23 @@ export default function AdminPurchases() {
   const handleCreate = async () => {
     if (!form.supplierId) { notify.error('Pilih supplier terlebih dahulu'); return; }
     if (items.some(i => !i.productId)) { notify.error('Pilih produk untuk semua item'); return; }
+    if (form.autoReceive && !form.warehouseId) { notify.error('Pilih gudang tujuan penerimaan'); return; }
+
     setSaving(true);
-    // We need a createdById - use a placeholder for now
     const result = await createPurchaseOrder({
       supplierId: form.supplierId,
-      createdById: 'system', // TODO: get from session
+      createdById: 'system',
       notes: form.notes || undefined,
       items: items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
+      autoReceive: form.autoReceive,
+      warehouseId: form.autoReceive ? form.warehouseId : undefined,
+      batchNumber: form.autoReceive && form.batchNumber ? form.batchNumber : undefined,
+      expiryDate: form.autoReceive && form.expiryDate ? form.expiryDate : undefined,
     });
     if (result.success) {
-      notify.success('Purchase Order dibuat');
+      notify.success(form.autoReceive ? 'PO berhasil dibuat & stok telah ditambahkan!' : 'Purchase Order berhasil dibuat');
       setModalOpen(false);
-      setForm({ supplierId: '', notes: '' });
+      setForm({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
       setItems([{ productId: '', quantity: 1, unitPrice: 0 }]);
       await load();
     } else {
@@ -361,6 +366,55 @@ export default function AdminPurchases() {
                   placeholder="Catatan tambahan..."
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
+              </div>
+
+              {/* Opsi Langsung Terima Barang & Tambah Stok */}
+              <div className="pt-2 border-t border-gray-100">
+                <label className="flex items-center gap-2.5 cursor-pointer font-bold text-xs text-emerald-800 bg-emerald-50 p-3 rounded-xl border border-emerald-200 hover:bg-emerald-100/60 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={form.autoReceive}
+                    onChange={e => setForm(p => ({ ...p, autoReceive: e.target.checked }))}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                  />
+                  <span>📦 Langsung Terima Barang & Tambah Stok ke Gudang</span>
+                </label>
+
+                {form.autoReceive && (
+                  <div className="mt-3 p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Gudang Tujuan *</label>
+                      <select
+                        value={form.warehouseId}
+                        onChange={e => setForm(p => ({ ...p, warehouseId: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">Pilih Gudang Cabang</option>
+                        {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">No. Batch (opsional)</label>
+                        <input
+                          value={form.batchNumber}
+                          onChange={e => setForm(p => ({ ...p, batchNumber: e.target.value }))}
+                          placeholder="Contoh: BATCH-001"
+                          className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Tgl Expired (opsional)</label>
+                        <input
+                          type="date"
+                          value={form.expiryDate}
+                          onChange={e => setForm(p => ({ ...p, expiryDate: e.target.value }))}
+                          className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

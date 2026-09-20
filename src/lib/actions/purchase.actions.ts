@@ -139,6 +139,10 @@ export async function createPurchaseOrder(data: {
   createdById: string
   notes?: string
   items: PurchaseItemInput[]
+  autoReceive?: boolean
+  warehouseId?: string
+  batchNumber?: string
+  expiryDate?: string
 }) {
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -185,7 +189,7 @@ export async function createPurchaseOrder(data: {
       supplierName,
       createdById: data.createdById,
       notes: data.notes || '',
-      status: 'APPROVED',
+      status: data.autoReceive && data.warehouseId ? 'DITERIMA' : 'APPROVED',
       total: totalAmount,
       subtotal: totalAmount,
       items: enrichedItems,
@@ -206,7 +210,26 @@ export async function createPurchaseOrder(data: {
       return { success: false, error: error.message };
     }
 
+    // Jika autoReceive diaktifkan dan warehouseId dipilih, langsung proses penambahan stok
+    if (data.autoReceive && data.warehouseId) {
+      for (const item of enrichedItems) {
+        if (item.productId) {
+          await addStock({
+            productId: item.productId,
+            amount: item.quantity,
+            warehouseId: data.warehouseId,
+            batchNumber: data.batchNumber || `${poNumber}-${item.productId.slice(-4)}`,
+            expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
+            reference: poNumber,
+            notes: `Pembelian Langsung: ${poNumber}`,
+          });
+        }
+      }
+    }
+
     revalidatePath('/admin/purchases');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
     return { success: true, data: { id, ...raw_data } };
   } catch (error) {
     console.error('Failed to create purchase order:', error);
@@ -235,7 +258,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
 
     // Tambah stok ke produk & catat log inventory
     for (const item of (raw.items || [])) {
-      const prodId = item.productId || item.id;
+      const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
       const qty = Number(item.quantity || 1);
       if (prodId) {
         await addStock({
@@ -252,6 +275,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
 
     revalidatePath('/admin/purchases');
     revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
     return { success: true };
   } catch (error) {
     console.error('Failed to receive PO:', error);
