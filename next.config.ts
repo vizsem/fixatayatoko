@@ -14,20 +14,20 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   workboxOptions: {
     runtimeCaching: [
       {
-        urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+        urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
         handler: "NetworkFirst",
         options: {
-          cacheName: "firestore-api",
+          cacheName: "supabase-api",
           networkTimeoutSeconds: 10,
           cacheableResponse: { statuses: [0, 200] },
           expiration: { maxEntries: 50, maxAgeSeconds: 300 }
         }
       },
       {
-        urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+        urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
         handler: "CacheFirst",
         options: {
-          cacheName: "firebase-storage",
+          cacheName: "supabase-storage",
           cacheableResponse: { statuses: [0, 200] },
           expiration: { maxEntries: 100, maxAgeSeconds: 86400 }
         }
@@ -52,6 +52,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
+  turbopack: {},
   images: {
     remotePatterns: [
       {
@@ -60,7 +61,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '**.digitaloceanspaces.com', // ✅ Tambahkan ini untuk domain Reny Swalayan
+        hostname: '**.digitaloceanspaces.com',
       },
       {
         protocol: 'https',
@@ -76,7 +77,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
+        hostname: '**.supabase.co',
       },
       {
         protocol: 'https',

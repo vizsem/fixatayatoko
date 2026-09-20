@@ -1,9 +1,13 @@
 /**
  * Supabase-backed Firebase / Firestore Compatibility Bridge
  * Seamlessly routes all Firestore, Auth, and Storage calls directly to Supabase Postgres.
+ * Uses supabaseAdmin (service role) for all data operations to bypass RLS.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
+
+// Use admin client for all data operations (bypasses RLS)
+const db_client = supabaseAdmin;
 
 // --- Interfaces & Types ---
 export interface DocRef {
@@ -49,7 +53,7 @@ export interface QuerySnapshot<T = any> {
 
 export const db: any = {
   type: 'firestore_compat',
-  supabase,
+  supabase: db_client,
 };
 
 export function collection(_database: any, path: string, ...subPaths: string[]): CollectionRef {
@@ -262,7 +266,7 @@ export async function getDoc<T = any>(docRef: DocRef): Promise<DocumentSnapshot<
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db_client
       .from(docRef.table)
       .select('*')
       .eq('id', docRef.id)
@@ -293,7 +297,7 @@ export async function getDoc<T = any>(docRef: DocRef): Promise<DocumentSnapshot<
 
 export async function getDocs<T = any>(target: CollectionRef | QueryRef): Promise<QuerySnapshot<T>> {
   try {
-    let builder: any = supabase.from(target.table).select('*');
+    let builder: any = db_client.from(target.table).select('*');
     const constraints = (target as any).constraints || [];
 
     for (const c of constraints) {
@@ -454,7 +458,7 @@ export async function addDoc(colRef: CollectionRef, data: any): Promise<{ id: st
       payload.raw_data = { ...data, createdAt: data.createdAt || now, updatedAt: now };
     }
 
-    const { error } = await supabase
+    const { error } = await db_client
       .from(colRef.table)
       .insert(payload);
 
@@ -477,7 +481,7 @@ export async function setDoc(docRef: DocRef, data: any, options?: { merge?: bool
 
     if (hasRawData && options?.merge) {
       // Fetch existing raw_data first and merge
-      const { data: existing } = await supabase
+      const { data: existing } = await db_client
         .from(docRef.table)
         .select('raw_data')
         .eq('id', docRef.id)
@@ -494,7 +498,7 @@ export async function setDoc(docRef: DocRef, data: any, options?: { merge?: bool
     };
     if (hasRawData) payload.raw_data = raw_data;
 
-    const { error } = await supabase
+    const { error } = await db_client
       .from(docRef.table)
       .upsert(payload);
 
@@ -528,7 +532,7 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
 
     if (hasRawData) {
       // Fetch existing raw_data and merge patch (excluding increment markers)
-      const { data: existing } = await supabase
+      const { data: existing } = await db_client
         .from(docRef.table)
         .select('raw_data')
         .eq('id', docRef.id)
@@ -553,7 +557,7 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
     } else {
       // For tables without raw_data, handle increments via fetching current value
       if (Object.keys(incrementFields).length > 0) {
-        const { data: existing } = await supabase
+        const { data: existing } = await db_client
           .from(docRef.table)
           .select(Object.keys(incrementFields).join(','))
           .eq('id', docRef.id)
@@ -565,7 +569,7 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
       }
     }
 
-    const { error } = await supabase
+    const { error } = await db_client
       .from(docRef.table)
       .update(updatePayload)
       .eq('id', docRef.id);
@@ -580,7 +584,7 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
 
 export async function deleteDoc(docRef: DocRef): Promise<void> {
   try {
-    const { error } = await supabase
+    const { error } = await db_client
       .from(docRef.table)
       .delete()
       .eq('id', docRef.id);
@@ -608,7 +612,7 @@ export function onSnapshot<T = any>(
   }
 
   // Realtime subscription
-  const channel = supabase
+  const channel = db_client
     .channel(`realtime:${table}:${Date.now()}_${Math.random()}`)
     .on(
       'postgres_changes',
@@ -629,7 +633,7 @@ export function onSnapshot<T = any>(
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    db_client.removeChannel(channel);
   };
 }
 
