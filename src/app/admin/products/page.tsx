@@ -322,6 +322,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
+  const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
 
   const { products: liveProducts, loading: productsLoading } = useProducts({
     isActive: showInactive ? false : true,
@@ -329,6 +330,25 @@ export default function AdminProducts() {
     orderDirection: 'desc',
     search: debouncedSearch,
   });
+
+  // Fetch count live
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [resAct, resInact] = await Promise.all([
+          supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_active', true),
+          supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_active', false)
+        ]);
+        setDbCounts({
+          active: resAct.count || 0,
+          inactive: resInact.count || 0
+        });
+      } catch (e) {
+        console.error("Error fetching product counts:", e);
+      }
+    };
+    fetchCounts();
+  }, [showInactive]);
 
   // Effects
   useEffect(() => {
@@ -662,17 +682,54 @@ export default function AdminProducts() {
 
       {/* TABLE BOX */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-2">
-        <div className="p-2 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
+        {/* SEGMENTED TAB (AKTIF VS ARSIP) */}
+        <div className="flex border-b border-gray-100 bg-gray-50/50 p-1.5 gap-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => { setShowInactive(false); setCurrentPage(1); setSelectedIds([]); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${
+              !showInactive 
+                ? 'bg-white text-emerald-700 border border-emerald-200/60 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
+            }`}
+          >
+            <Eye size={15} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
+            <span>Produk Aktif</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              !showInactive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+            }`}>
+              {dbCounts.active || stats.totalJenis}
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setShowInactive(true); setCurrentPage(1); setSelectedIds([]); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${
+              showInactive 
+                ? 'bg-white text-rose-700 border border-rose-200/60 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
+            }`}
+          >
+            <Archive size={15} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
+            <span>Arsip / Non-Aktif</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              showInactive ? 'bg-rose-100 text-rose-800' : 'bg-gray-200 text-gray-600'
+            }`}>
+              {dbCounts.inactive || 0}
+            </span>
+          </button>
+        </div>
+
+        <div className="p-2.5 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
           <div className="relative flex-1 min-w-[200px]">
             {productsLoading ? (
-              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={12} />
+              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={13} />
             ) : (
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
             )}
             <input
               type="text"
               placeholder="Cari nama barang, SKU, barcode, kategori..."
-              className="w-full pl-8 pr-7 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[10px] font-bold focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+              className="w-full pl-8 pr-7 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all outline-none"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
@@ -682,7 +739,7 @@ export default function AdminProducts() {
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
                 title="Hapus pencarian"
               >
-                <X size={12} />
+                <X size={13} />
               </button>
             )}
           </div>
@@ -691,49 +748,63 @@ export default function AdminProducts() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="px-2 py-1.5 rounded-lg border border-gray-50 bg-gray-50 text-[9px] font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-[10px] font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
             >
-              <option value="createdAt">SORT: NEWEST</option>
-              <option value="updatedAt">SORT: RECENT</option>
-              <option value="name">SORT: NAME A-Z</option>
+              <option value="createdAt">URUTKAN: TERBARU</option>
+              <option value="updatedAt">URUTKAN: DIUPDATE</option>
+              <option value="name">URUTKAN: NAMA A-Z</option>
             </select>
-            
+
+            {/* Tombol Pilih Semua Halaman Ini */}
             <button
-              onClick={() => setShowInactive(!showInactive)}
-              className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all flex items-center gap-1 shadow-sm active:scale-95 ${
-                showInactive 
-                  ? 'bg-red-50 text-red-600 border-red-100' 
-                  : 'bg-gray-50 text-gray-600 border-gray-100'
+              onClick={toggleSelectAll}
+              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                selectedIds.length === currentItems.length && currentItems.length > 0
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {showInactive ? <EyeOff size={12} /> : <Eye size={12} />}
-              {showInactive ? 'SHOW ACTIVE' : 'ARCHIVE'}
+              {selectedIds.length === currentItems.length && currentItems.length > 0 ? (
+                <CheckSquare size={13} />
+              ) : (
+                <Square size={13} />
+              )}
+              <span>{selectedIds.length > 0 ? `Dipilih (${selectedIds.length})` : 'Pilih Semua'}</span>
             </button>
           </div>
 
           {/* Bulk Action Button Bar */}
           {selectedIds.length > 0 && (
-            <div className="w-full flex flex-wrap gap-1.5 pt-1">
+            <div className="w-full flex flex-wrap items-center gap-2 p-2 bg-blue-50/70 rounded-xl border border-blue-100 animate-in fade-in duration-200">
+              <span className="text-xs font-black text-blue-900 uppercase tracking-wide mr-1">
+                {selectedIds.length} Produk Terpilih:
+              </span>
               <button
                 onClick={() => {
                   const idsParam = selectedIds.join(',');
                   window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
                 }}
-                className="flex-1 max-w-[120px] bg-amber-500 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-amber-100 active:scale-95 transition-all"
+                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
-                <Printer size={12} /> LABELS ({selectedIds.length})
+                <Printer size={13} /> Cetak Label ({selectedIds.length})
               </button>
               <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
-                className="flex-1 max-w-[120px] bg-blue-600 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-blue-100 active:scale-95 transition-all"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
-                <CheckSquare size={12} /> {showInactive ? 'RESTORE' : 'ARCHIVE'}
+                <CheckSquare size={13} /> {showInactive ? 'Pulihkan (Aktifkan)' : 'Arsipkan'}
               </button>
               <button
                 onClick={handleBulkDelete}
-                className="flex-1 max-w-[120px] bg-red-600 text-white px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm shadow-red-100 active:scale-95 transition-all"
+                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
-                <Trash2 size={12} /> DELETE
+                <Trash2 size={13} /> Hapus Permanen
+              </button>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="ml-auto text-gray-500 hover:text-gray-800 text-[10px] font-bold uppercase tracking-wider underline"
+              >
+                Batalkan Pilihan
               </button>
             </div>
           )}
@@ -760,8 +831,13 @@ export default function AdminProducts() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku || 'N/A'}</span>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {p.isActive === false ? 'Arsip' : 'Aktif'}
+                        </span>
                       </div>
                       <h3 className="font-black text-gray-900 text-[10px] uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
                       <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
@@ -890,9 +966,14 @@ export default function AdminProducts() {
                             <Camera size={14} className="text-gray-300" />
                           )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1 mb-0.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
                             <p className="text-[8px] font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
+                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {p.isActive === false ? 'Arsip' : 'Aktif'}
+                            </span>
                           </div>
                           <h3 className="font-black text-gray-900 text-[10px] leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
                           <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
