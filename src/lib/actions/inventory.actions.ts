@@ -6,14 +6,28 @@ import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function getInventoryBatches(warehouseId?: string) {
   try {
-    const { data: products } = await supabaseAdmin.from('products').select('*');
+    const { data: products } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .order('is_active', { ascending: false })
+      .order('updated_at', { ascending: false });
     if (!products) return [];
 
     const batches: any[] = [];
     products.forEach((p: any) => {
       const raw = p.raw_data || {};
       const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
-      const stockByWarehouse = raw.stockByWarehouse || { 'gudang-utama': stock };
+      let stockByWarehouse = raw.stockByWarehouse;
+
+      if (!stockByWarehouse || typeof stockByWarehouse !== 'object' || Object.keys(stockByWarehouse).length === 0) {
+        stockByWarehouse = { 'gudang-utama': stock };
+      } else {
+        const sum = Object.values(stockByWarehouse).reduce((a: number, b: any) => a + Number(b || 0), 0);
+        if (sum === 0 && stock > 0) {
+          const k = Object.keys(stockByWarehouse)[0] || 'gudang-utama';
+          stockByWarehouse[k] = stock;
+        }
+      }
 
       const isArchivedLegacy = 
         raw.isActive === false || 
@@ -57,7 +71,11 @@ export async function getInventoryBatches(warehouseId?: string) {
 
 export async function getLowStockProducts(threshold: number = 10) {
   try {
-    const { data: products } = await supabaseAdmin.from('products').select('*');
+    const { data: products } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .order('is_active', { ascending: false })
+      .order('updated_at', { ascending: false });
     if (!products) return [];
 
     return products
