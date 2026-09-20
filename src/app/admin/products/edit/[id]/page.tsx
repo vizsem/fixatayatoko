@@ -13,8 +13,9 @@ import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { supabase } from '@/lib/supabase';
+import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
 
-import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
+import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, setDoc, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
 type ChannelPrices = {
   offline?: number;
   website?: number;
@@ -211,15 +212,11 @@ export default function EditProductPage() {
 
   const fetchProductData = useCallback(async () => {
     try {
-      // Try Supabase first (primary DB), fallback to Firestore
+      // Try Supabase first (primary DB via server action)
       let data: any = null;
-      const { data: spRow, error: spErr } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const spRow = await getProductByIdForEdit(id);
 
-      if (!spErr && spRow) {
+      if (spRow) {
         // Merge Supabase row with raw_data
         const raw = spRow.raw_data || {};
         data = {
@@ -237,6 +234,7 @@ export default function EditProductPage() {
           Deskripsi: spRow.description || raw.Deskripsi || raw.description || '',
           warehouseId: raw.warehouseId || '',
           stockByWarehouse: raw.stockByWarehouse || {},
+          Status: spRow.is_active ? 1 : 0,
         };
       } else {
         // Fallback to Firestore
@@ -584,10 +582,8 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, 'products', id), updatePayload);
-
-      // Also sync to Supabase (primary read DB)
-      await supabase.from('products').update({
+      // 1. Save to Supabase (primary read DB via server action with admin privileges)
+      const saveRes = await saveEditedProduct(id, {
         name: String(formData.Nama || '').toUpperCase(),
         category: formData.Kategori,
         unit: baseUnit,
@@ -599,8 +595,18 @@ export default function EditProductPage() {
         description: formData.Deskripsi || '',
         is_active: Number(formData.Status) === 1,
         raw_data: updatePayload,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
+      });
+
+      if (!saveRes.success) {
+        throw new Error(saveRes.error || 'Gagal menyimpan produk ke database');
+      }
+
+      // 2. Safe sync to Firestore (optional fallback)
+      try {
+        await setDoc(doc(db, 'products', id), updatePayload, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore sync skipped or failed:', fsErr);
+      }
 
 
       // Write Logs
@@ -641,7 +647,18 @@ export default function EditProductPage() {
     setIsDeleting(true);
     const toastId = toast.loading('Menghapus produk...');
     try {
-      await deleteDoc(doc(db, 'products', id));
+      // 1. Delete from Supabase (primary DB)
+      const res = await deleteProduct(id);
+      if (!res.success) {
+        throw new Error(res.error || 'Gagal menghapus produk');
+      }
+
+      // 2. Safe delete from Firestore
+      try {
+        await deleteDoc(doc(db, 'products', id));
+      } catch (fsErr) {
+        console.warn('Firestore delete skipped or failed:', fsErr);
+      }
       
       // Catat Log Hapus
       await addDoc(collection(db, 'stock_logs'), {
@@ -659,9 +676,9 @@ export default function EditProductPage() {
 
       toast.success('Produk berhasil dihapus');
       router.push('/admin/products');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Gagal menghapus produk');
+      toast.error(error?.message || 'Gagal menghapus produk');
       setIsDeleting(false);
     } finally {
       toast.dismiss(toastId);

@@ -190,6 +190,78 @@ export async function createProduct(data: {
   }
 }
 
+export async function getProductByIdForEdit(id: string) {
+  try {
+    const { data: spRow, error } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
+    if (error || !spRow) return null;
+    const raw = spRow.raw_data || {};
+    return {
+      id: spRow.id,
+      name: spRow.name || raw.Nama || raw.name || '',
+      category: spRow.category || raw.Kategori || raw.category || 'UMUM',
+      unit: spRow.unit || raw.Satuan || raw.unit || 'PCS',
+      stock: Number(spRow.stock ?? raw.Stok ?? raw.stock ?? 0),
+      cost_price: Number(spRow.cost_price ?? raw.Modal ?? raw.purchasePrice ?? 0),
+      price: Number(spRow.price ?? raw.Ecer ?? raw.price ?? 0),
+      barcode: spRow.barcode || raw.Barcode || raw.barcode || '',
+      image_url: spRow.image_url || raw.Link_Foto || raw.imageUrl || raw.image || raw.URL_Produk || '',
+      description: spRow.description || raw.Deskripsi || raw.description || '',
+      is_active: typeof spRow.is_active === 'boolean' ? spRow.is_active : raw.isActive !== false && raw.Status !== 1,
+      raw_data: raw,
+    };
+  } catch (err) {
+    console.error('Failed to get product for edit:', err);
+    return null;
+  }
+}
+
+export async function saveEditedProduct(id: string, payload: {
+  name: string
+  category: string
+  unit: string
+  price: number
+  cost_price: number
+  stock: number
+  barcode: string
+  image_url: string
+  description: string
+  is_active: boolean
+  raw_data: any
+}) {
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from('products').upsert({
+      id,
+      name: payload.name,
+      category: payload.category,
+      unit: payload.unit,
+      price: payload.price,
+      cost_price: payload.cost_price,
+      stock: payload.stock,
+      barcode: payload.barcode,
+      image_url: payload.image_url,
+      description: payload.description,
+      is_active: payload.is_active,
+      raw_data: {
+        ...payload.raw_data,
+        updatedAt: now,
+      },
+      updated_at: now,
+    });
+
+    if (error) throw error;
+
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+    revalidatePath(`/admin/products/edit/${id}`);
+    revalidatePath(`/produk/${id}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Failed to save edited product:', error);
+    return { success: false, error: error?.message || 'Gagal menyimpan produk' };
+  }
+}
+
 export async function updateProduct(id: string, data: {
   name?: string
   sku?: string
