@@ -661,8 +661,13 @@ function AddPurchaseFormContent() {
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
                 <option value="CASH">CASH / TUNAI</option>
-                <option value="TRANSFER">BANK TRANSFER</option>
+                <option value="TRANSFER">TRANSFER BANK</option>
+                <option value="TEMPO">TEMPO / NET TERMS</option>
+                <option value="DP">DP + PELUNASAN</option>
                 <option value="GIRO">GIRO / CEK</option>
+                <option value="QRIS">QRIS / TRANSFER INSTAN</option>
+                <option value="KREDIT">KREDIT SUPPLIER</option>
+                <option value="KONSINYASI">KONSINYASI</option>
               </select>
             </div>
 
