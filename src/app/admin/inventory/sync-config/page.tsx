@@ -25,6 +25,7 @@ import { SyncConfig } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
 import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncConfigPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,7 @@ export default function SyncConfigPage() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

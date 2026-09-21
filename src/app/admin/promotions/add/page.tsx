@@ -9,6 +9,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 /* ================= TYPES ================= */
 
 type Promotion = {
@@ -87,7 +88,7 @@ function AddPromotionContent() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

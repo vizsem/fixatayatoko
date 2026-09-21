@@ -7,6 +7,7 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
  import { ArrowLeft, Save, Users, Phone, Mail, MapPin } from 'lucide-react';
 
  
@@ -46,7 +47,7 @@ import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/fire
        }
  
        const userDoc = await getDoc(doc(db, 'users', user.uid));
-       if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+       if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
          router.push('/profil');
          return;

@@ -13,6 +13,7 @@ import { ActivityLog } from '@/lib/activity';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 import { auth, collection, db, doc, getDoc, limit, onAuthStateChanged, onSnapshot, orderBy, query } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 
 const TYPE_ICONS: Record<string, any> = {
   PRODUCT_CREATE: FileText,
@@ -47,7 +48,7 @@ export default function AuditLogsPage() {
         return;
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         router.push('/profil');
         return;
       }

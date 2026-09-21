@@ -17,6 +17,7 @@ import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, arrayUnion, collection, db, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, ref, runTransaction, setDoc, updateDoc, where } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Employee = {
   id: string;
   name: string;
@@ -343,11 +344,11 @@ export default function EmployeesPage() {
     }
   }, [authLoading, adminId, role]);
 
-  const canManageStaff = currentUser?.role === 'admin' || currentUser?.role === 'hr';
-  const canManagePayroll = currentUser?.role === 'admin' || currentUser?.role === 'hr';
-  const canApprovePayroll = currentUser?.role === 'admin' || currentUser?.role === 'hr';
-  const canManageRecruitment = currentUser?.role === 'admin' || currentUser?.role === 'hr';
-  const canManagePettyCash = currentUser?.role === 'admin' || currentUser?.role === 'hr';
+  const canManageStaff = isAdminRole(currentUser?.role) || currentUser?.role === 'hr';
+  const canManagePayroll = isAdminRole(currentUser?.role) || currentUser?.role === 'hr';
+  const canApprovePayroll = isAdminRole(currentUser?.role) || currentUser?.role === 'hr';
+  const canManageRecruitment = isAdminRole(currentUser?.role) || currentUser?.role === 'hr';
+  const canManagePettyCash = isAdminRole(currentUser?.role) || currentUser?.role === 'hr';
 
   useEffect(() => {
     if (!authorized) return;

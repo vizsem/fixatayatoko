@@ -25,6 +25,7 @@ import { StockSyncLog } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
 import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, where } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncLogsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -75,7 +76,7 @@ export default function SyncLogsPage() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

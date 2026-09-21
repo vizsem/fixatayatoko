@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 // Tipe data pesanan
@@ -68,7 +69,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
       }
 
       const role = userDoc.data()?.role;
-      if (role !== 'cashier' && role !== 'admin') {
+      if (!isAdminRole(role) && role !== 'cashier') {
         toast.error('Akses ditolak! Hanya kasir atau admin yang dapat melihat halaman ini.');
         router.push('/profil');
         return;

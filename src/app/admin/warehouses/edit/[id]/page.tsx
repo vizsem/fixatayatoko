@@ -12,6 +12,7 @@ import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type WarehouseData = {
   id: string;
   name: string;
@@ -40,7 +41,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
         return;
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
+      if (!isAdminRole(userDoc.data()?.role)) {
         notify.admin.error("Akses ditolak! Anda bukan admin.");
         router.push('/admin');
         return;

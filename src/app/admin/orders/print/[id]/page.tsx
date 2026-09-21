@@ -8,6 +8,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 import { Timestamp, auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Order = {
   id: string;
   customerName: string;
@@ -35,7 +36,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin' && userDoc.data()?.role !== 'cashier') {
+      if (!isAdminRole(userDoc.data()?.role) && userDoc.data()?.role !== 'cashier') {
         router.push('/profil'); return;
       }
       setAuthChecked(true);

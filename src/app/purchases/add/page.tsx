@@ -8,6 +8,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Supplier = {
   id: string;
   name: string;
@@ -92,7 +93,7 @@ export default function AddPurchasePage() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

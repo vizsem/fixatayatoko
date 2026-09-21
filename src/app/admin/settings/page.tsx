@@ -15,6 +15,7 @@ import { logActivity } from '@/lib/activity';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, onAuthStateChanged, ref, setDoc, updateDoc, writeBatch } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 // --- TYPES ---
 type PaymentMethod = { id: string; name: string; enabled: boolean; requiresProof?: boolean; description?: string };
 type DeliveryMethod = { id: string; name: string; enabled: boolean; cost: number; description: string; };
@@ -105,7 +106,7 @@ export default function AdminSettings() {
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') { router.push('/'); return; }
+      if (!isAdminRole(userDoc.data()?.role)) { router.push('/'); return; }
 
       await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners(), loadWarehouses()]);
       setLoading(false);

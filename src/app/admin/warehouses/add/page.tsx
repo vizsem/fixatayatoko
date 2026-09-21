@@ -8,6 +8,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Warehouse = {
   name: string;
   location: string;
@@ -39,7 +40,7 @@ function WarehouseFormContent() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

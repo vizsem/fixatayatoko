@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { supabase } from '@/lib/supabase';
 import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
+import { isAdminRole } from '@/lib/auth-helpers';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, setDoc, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
 type ChannelPrices = {
@@ -359,7 +360,7 @@ export default function EditProductPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') return router.push('/profil');
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) return router.push('/profil');
       await Promise.all([fetchProductData(), fetchWarehouses(), fetchCategories(), fetchCostHistory()]);
       setLoading(false);
     });

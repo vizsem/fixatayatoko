@@ -18,6 +18,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 export default function EditCustomer() {
   const router = useRouter();
   const { id } = useParams();
@@ -44,7 +45,7 @@ export default function EditCustomer() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         router.push('/profil');
         return;
       }

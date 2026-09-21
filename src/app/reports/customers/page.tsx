@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Order = {
   id: string;
   customerId: string;
@@ -63,7 +64,7 @@ export default function CustomerReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

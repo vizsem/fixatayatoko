@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { auth, collection, db, deleteObject, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
   name: string;
@@ -54,7 +55,7 @@ export default function EditProductPage() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;

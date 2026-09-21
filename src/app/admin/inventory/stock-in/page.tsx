@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 
 
 import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction, where } from '@/lib/firebase';
+import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
   name: string;
@@ -111,7 +112,7 @@ function StockInContent() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
