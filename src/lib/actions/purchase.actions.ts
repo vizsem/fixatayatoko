@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
-import { addStock } from '@/lib/inventory'
+import { addStock, deductStockFEFO } from '@/lib/inventory'
 
 type PurchaseItemInput = {
   productId: string
@@ -246,6 +246,7 @@ export async function createPurchaseOrder(data: {
             expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
             reference: poNumber,
             notes: `Pembelian Langsung (${item.quantity} ${item.unit || 'PCS'}): ${poNumber}`,
+            incomingPrice: item.unitPrice,
           });
         }
       }
@@ -301,6 +302,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
           expiryDate: expiryDate ? new Date(expiryDate) : undefined,
           reference: raw.poNumber || poId,
           notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${raw.poNumber || poId}`,
+          incomingPrice: item.unitPrice,
         });
       }
     }
@@ -345,3 +347,160 @@ export async function deletePurchaseOrder(id: string) {
     return { success: false, error: 'Gagal menghapus PO' };
   }
 }
+
+export async function updatePurchaseOrder(
+  id: string,
+  data: {
+    supplierId: string
+    warehouseId: string
+    notes?: string
+    items: PurchaseItemInput[]
+    autoReceive?: boolean
+    batchNumber?: string
+    expiryDate?: string
+  }
+) {
+  try {
+    const { data: oldData, error: fetchErr } = await supabaseAdmin
+      .from('purchases')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !oldData) return { success: false, error: 'PO tidak ditemukan' };
+
+    const raw = oldData.raw_data || {};
+    const normStatus = normalizeStatus(raw.status || oldData.status);
+
+    const oldItems = raw.items || [];
+    const oldWarehouseId = raw.warehouseId || 'gudang-utama';
+    
+    // 1. Calculate Deltas
+    const newItems = data.items;
+    
+    // We only need to adjust stock if PO is already received
+    if (normStatus === 'RECEIVED' || data.autoReceive) {
+      for (const newItem of newItems) {
+        const oldItem = oldItems.find((oi: any) => oi.productId === newItem.productId);
+        const oldQty = oldItem ? Number(oldItem.quantity || 1) * Number(oldItem.conversion || 1) : 0;
+        const newQty = newItem.quantity;
+        const delta = newQty - oldQty;
+        
+        if (delta > 0) {
+          // Tambah stok
+          await addStock({
+            productId: newItem.productId,
+            amount: delta,
+            warehouseId: data.warehouseId,
+            batchNumber: data.batchNumber || `${id}-${newItem.productId.slice(-4)}`,
+            expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
+            reference: id,
+            notes: `Edit PO (Penambahan ${delta}): ${id}`,
+            incomingPrice: newItem.unitPrice,
+          });
+        } else if (delta < 0) {
+          // Kurangi stok
+          try {
+            await deductStockFEFO({
+              productId: newItem.productId,
+              amount: Math.abs(delta),
+              warehouseId: data.warehouseId,
+              reference: id,
+              notes: `Edit PO (Pengurangan ${Math.abs(delta)}): ${id}`,
+            });
+          } catch (e: any) {
+            throw new Error(`Gagal mengedit PO. Stok produk ${newItem.productId} tidak mencukupi untuk dikurangi (${e.message}). Harap sesuaikan qty penjualan terlebih dahulu.`);
+          }
+        }
+      }
+
+      // Handle items that were removed completely
+      for (const oldItem of oldItems) {
+        const stillExists = newItems.find(ni => ni.productId === oldItem.productId);
+        if (!stillExists) {
+          const oldQty = Number(oldItem.quantity || 1) * Number(oldItem.conversion || 1);
+          try {
+            await deductStockFEFO({
+              productId: oldItem.productId,
+              amount: oldQty,
+              warehouseId: oldWarehouseId,
+              reference: id,
+              notes: `Edit PO (Penghapusan item): ${id}`,
+            });
+          } catch (e: any) {
+            throw new Error(`Gagal mengedit PO. Stok produk ${oldItem.productId} tidak mencukupi untuk dihapus (${e.message}).`);
+          }
+        }
+      }
+    }
+
+    // 2. Update Purchase Order Record
+    const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    
+    let supplierName = raw.supplierName || 'Supplier';
+    try {
+      const { data: sup } = await supabaseAdmin.from('suppliers').select('raw_data, name').eq('id', data.supplierId).single();
+      if (sup) supplierName = sup.name || sup.raw_data?.name || supplierName;
+    } catch {}
+
+    const enrichedItems = await Promise.all(
+      data.items.map(async (item, idx) => {
+        let name = `Produk ${item.productId}`;
+        let unit = item.unit || 'PCS';
+        let conversion = 1;
+        try {
+          const { data: prod } = await supabaseAdmin.from('products').select('name, unit, raw_data').eq('id', item.productId).single();
+          if (prod) {
+            name = prod.name || prod.raw_data?.name || name;
+            if (!item.unit) {
+              unit = prod.unit || prod.raw_data?.unit || unit;
+            }
+            const rawUnits = prod.raw_data?.units || [];
+            const found = rawUnits.find((u: any) => u.code === unit);
+            if (found && found.contains) conversion = Number(found.contains);
+          }
+        } catch {}
+        return {
+          id: `item_${idx}_${Date.now()}`,
+          productId: item.productId,
+          name,
+          unit,
+          conversion,
+          quantity: item.quantity,
+          purchasePrice: item.unitPrice,
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice,
+        };
+      })
+    );
+
+    const updatedRaw = {
+      ...raw,
+      supplierId: data.supplierId,
+      supplierName,
+      warehouseId: data.warehouseId,
+      notes: data.notes || raw.notes || '',
+      total: totalAmount,
+      subtotal: totalAmount,
+      items: enrichedItems,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await supabaseAdmin.from('purchases').update({
+      total: totalAmount,
+      raw_data: updatedRaw,
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath('/admin/purchases');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
+    return { success: true, data: { id, ...updatedRaw } };
+  } catch (error: any) {
+    console.error('Failed to update PO:', error);
+    return { success: false, error: error?.message || 'Gagal mengubah purchase order' };
+  }
+}
+

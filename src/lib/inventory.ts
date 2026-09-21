@@ -192,8 +192,9 @@ export const addStock = async (params: {
   expiryDate?: Date
   reference?: string
   notes?: string
+  incomingPrice?: number // Harga beli masuk untuk menghitung AVG Modal
 }) => {
-  const { productId, amount, batchNumber, reference, notes } = params;
+  const { productId, amount, batchNumber, reference, notes, incomingPrice } = params;
   const warehouseId = params.warehouseId || 'gudang-utama';
 
   if (amount <= 0) throw new Error('Amount must be > 0');
@@ -209,17 +210,25 @@ export const addStock = async (params: {
 
     const raw = product.raw_data || {};
     const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
+    const currentCost = Number(product.cost_price ?? raw.Modal ?? 0);
     const newStock = currentStock + amount;
 
     const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
     const curWhStock = Number(stockByWarehouse[warehouseId] ?? 0);
     stockByWarehouse[warehouseId] = curWhStock + amount;
 
+    // Kalkulasi AVG Modal (Moving Average Cost) jika incomingPrice tersedia
+    let newCostPrice = currentCost;
+    if (incomingPrice !== undefined && incomingPrice >= 0) {
+      newCostPrice = computeAverageCost(currentStock, currentCost, amount, incomingPrice, 1);
+    }
+
     const now = new Date().toISOString();
     const updatedRaw = {
       ...raw,
       stock: newStock,
       stockByWarehouse,
+      Modal: newCostPrice,
       updatedAt: now,
     };
 
@@ -227,6 +236,7 @@ export const addStock = async (params: {
       .from('products')
       .update({
         stock: newStock,
+        cost_price: newCostPrice,
         raw_data: updatedRaw,
         updated_at: now,
       })

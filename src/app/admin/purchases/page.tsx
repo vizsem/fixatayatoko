@@ -594,6 +594,21 @@ export default function AdminPurchases() {
                 </tr>
               </tfoot>
             </table>
+
+            <div className="flex gap-3 mt-6">
+              <Link
+                href={`/admin/purchases/add?duplicateFrom=${detailModal.id}`}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"
+              >
+                Pesan Ulang
+              </Link>
+              <Link
+                href={`/admin/purchases/edit/${detailModal.id}`}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+              >
+                Edit PO
+              </Link>
+            </div>
           </div>
         </div>
       )}
