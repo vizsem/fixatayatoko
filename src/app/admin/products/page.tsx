@@ -824,8 +824,8 @@ export default function AdminProducts() {
                       {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
                     </button>
                     <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                      {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
-                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" />
+                      {p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.trim().startsWith('http') || p.imageUrl.trim().startsWith('/')) ? (
+                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                       ) : (
                         <Camera size={16} className="text-gray-300" />
                       )}

@@ -92,7 +92,7 @@ export default function ProductDetailClient({
 
   // ✅ PROXY GAMBAR Agar Gambar Supplier Muncul
   const getProxiedImage = (url: string) => {
-    if (!url || url.includes('firebasestorage.googleapis.com') || url.startsWith('data:')) {
+    if (!url || url.includes('firebasestorage.googleapis.com') || url.includes('supabase.co') || url.startsWith('data:') || url.startsWith('/')) {
       return url || '/logo-atayatoko.png';
     }
     return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=800&output=webp`;
@@ -329,6 +329,15 @@ export default function ProductDetailClient({
                 src={getProxiedImage(product.image)} 
                 alt={product.name} 
                 className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (target.src !== product.image && product.image && !target.dataset.fallbackTried) {
+                    target.dataset.fallbackTried = 'true';
+                    target.src = product.image;
+                  } else {
+                    target.src = '/logo-atayatoko.png';
+                  }
+                }}
               />
               {isOutOfStock && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">

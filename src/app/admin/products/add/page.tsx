@@ -748,7 +748,7 @@ export default function AddProductPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="object-cover" />
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                     ) : (
                       <ImageIcon size={20} className="text-gray-300" />
                     )}
@@ -770,7 +770,7 @@ export default function AddProductPage() {
                     />
                   </label>
                 </div>
-                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => setFormData({ ...formData, Link_Foto: e.target.value })} />
+                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => { setFormData({ ...formData, Link_Foto: e.target.value }); setImagePreview(e.target.value || null); }} />
                 <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}></textarea>
               </div>
             </div>

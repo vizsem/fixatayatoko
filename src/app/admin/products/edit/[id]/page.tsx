@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { supabase } from '@/lib/supabase';
 import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
+import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, setDoc, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
@@ -270,7 +271,7 @@ export default function EditProductPage() {
         Harga_Coret: Number(data.Harga_Coret || 0),
         Grosir: Number(data.Grosir || 0),
         Min_Grosir: Number(data.Min_Grosir || 1),
-        Link_Foto: data.Link_Foto || data.URL_Produk || '',
+        Link_Foto: data.Link_Foto || data.URL_Produk || data.image_url || data.imageUrl || data.image || '',
         Deskripsi: data.Deskripsi || data.description || '',
         Status: data.Status ?? 1,
         Supplier: data.Supplier || '',
@@ -285,6 +286,11 @@ export default function EditProductPage() {
         dimHeight: Number(data.dimensions?.height || 0),
         volumeInCtn: Number(data.volumeInCtn || 0)
       }));
+
+      const initialImg = data.Link_Foto || data.URL_Produk || data.image_url || data.imageUrl || data.image || '';
+      if (initialImg) {
+        setImagePreview(initialImg);
+      }
 
       const ps = (data as any).pricingStrategy as PricingStrategy | undefined;
       if (ps?.mode === 'margin') {
@@ -435,9 +441,18 @@ export default function EditProductPage() {
       // 2. Proses Gambar
       let finalImageUrl = formData.Link_Foto || '';
       if (imageFile) {
-        const imageRef = ref(storage, `products/${id}/main_${Date.now()}.jpg`);
-        await uploadBytes(imageRef, imageFile);
-        finalImageUrl = await getDownloadURL(imageRef);
+        const compressed = await imageCompression(imageFile, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
+        const fd = new FormData();
+        fd.append('file', new File([compressed], imageFile.name, { type: compressed.type }));
+        fd.append('folder', 'products');
+        const uploadResult = await uploadImageAction(fd);
+        if (uploadResult.success && uploadResult.url) {
+          finalImageUrl = uploadResult.url;
+        } else {
+          toast.error(uploadResult.error || 'Gagal mengunggah foto produk');
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // 3. Update Logic
@@ -1307,7 +1322,7 @@ export default function EditProductPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" width={112} height={112} />
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" width={112} height={112} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                     ) : (
                       <ImageIcon size={20} className="text-gray-300" />
                     )}

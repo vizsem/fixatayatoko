@@ -82,7 +82,7 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
     priceGrosir: priceGrosir,
     unit,
     isActive: typeof raw.isActive === 'boolean' ? raw.isActive : (getNum(raw.Status, 1) !== 0),
-    imageUrl: getStr(raw.imageUrl ?? raw.image ?? raw.Link_Foto ?? raw.foto ?? raw.URL_Produk ?? raw.url_produk),
+    imageUrl: getStr(raw.image_url ?? raw.imageUrl ?? raw.image ?? raw.Link_Foto ?? raw.foto ?? raw.URL_Produk ?? raw.url_produk),
     purchasePrice: getNum(raw.purchasePrice ?? raw.Modal),
     updatedAt: getTimestamp(raw.updatedAt),
     createdAt: getTimestamp(raw.createdAt),
