@@ -11,6 +11,7 @@ import {
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 import { addInventoryLog } from '@/lib/inventory';
+import { supabaseAdmin } from '@/lib/supabase';
 import { postJournal } from '@/lib/ledger';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
@@ -959,6 +960,15 @@ export default function CashierPOS() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const currentUserId = currentUser?.id || 'cashier';
 
+      // Collect Supabase sync targets during loop
+      const supabaseStockUpdates: Array<{
+        productId: string;
+        newStock: number;
+        newStockByWarehouse: Record<string, number>;
+        prevStock: number;
+        pcsToDeduct: number;
+      }> = [];
+
       for (const item of cart) {
         const pRef = doc(db, 'products', item.id);
         
@@ -979,7 +989,7 @@ export default function CashierPOS() {
           const currentStock = productData.stock || 0;
           const contains = Number(item.contains || 1);
           const pcsToDeduct = item.quantity * contains;
-          const newStock = currentStock - pcsToDeduct;
+          const newStock = Math.max(0, currentStock - pcsToDeduct);
 
           // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
           const MAIN_WAREHOUSE_ID = 'gudang-utama';
@@ -1039,6 +1049,15 @@ export default function CashierPOS() {
             prevStock: currentStock,
             nextStock: newStock
           }, batch);
+
+          // Collect for Supabase sync (done after batch.commit)
+          supabaseStockUpdates.push({
+            productId: item.id,
+            newStock,
+            newStockByWarehouse,
+            prevStock: currentStock,
+            pcsToDeduct
+          });
         }
       }
 
@@ -1117,6 +1136,32 @@ export default function CashierPOS() {
       } else {
         await batch.commit();
         toast.success('Transaksi Berhasil!');
+
+        // SYNC SUPABASE: Update stok di Supabase setelah Firestore commit sukses
+        // Jalankan secara paralel dengan Promise.allSettled agar 1 gagal tidak memblokir yang lain
+        const now = new Date().toISOString();
+        await Promise.allSettled(
+          supabaseStockUpdates.map(async ({ productId, newStock, newStockByWarehouse }) => {
+            // Fetch raw_data dulu agar tidak overwrite field lain
+            const { data: existing } = await supabaseAdmin
+              .from('products')
+              .select('raw_data')
+              .eq('id', productId)
+              .single();
+
+            const updatedRawData = {
+              ...(existing?.raw_data || {}),
+              stock: newStock,
+              stockByWarehouse: newStockByWarehouse,
+              updatedAt: now,
+            };
+
+            return supabaseAdmin
+              .from('products')
+              .update({ stock: newStock, raw_data: updatedRawData, updated_at: now })
+              .eq('id', productId);
+          })
+        );
       }
       
       printReceipt({ 
