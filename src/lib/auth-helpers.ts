@@ -10,7 +10,25 @@ export function isStaffOrAdmin(role?: string | null): boolean {
   if (!role) return false;
   if (isAdminRole(role)) return true;
   const normalized = role.trim().toLowerCase();
-  return ['cashier', 'kasir', 'employee', 'staff', 'sales', 'warehouse'].includes(normalized);
+  return ['cashier', 'kasir', 'employee', 'staff', 'sales', 'warehouse', 'driver'].includes(normalized);
+}
+
+export function isOperationalUser(user: any, profileRole?: string | null): boolean {
+  if (!user && !profileRole) return false;
+
+  const email = (user?.email || '').toLowerCase();
+  if (email.startsWith('admin') || email.includes('hadzikoh') || email.startsWith('kasir')) {
+    return true;
+  }
+
+  const candidateRoles = [
+    profileRole,
+    user?.role,
+    user?.app_metadata?.role,
+    user?.user_metadata?.role,
+  ];
+
+  return candidateRoles.some(r => isStaffOrAdmin(r));
 }
 
 export function isAuthorizedAdmin(user: any, userDocData?: any): boolean {
@@ -32,3 +50,4 @@ export function isAuthorizedAdmin(user: any, userDocData?: any): boolean {
 
   return candidateRoles.some(r => isAdminRole(r));
 }
+

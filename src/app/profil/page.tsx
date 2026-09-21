@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
-  Bell, X, Ticket
+  Bell, X, Ticket, ShieldCheck
 } from 'lucide-react';
+
 import Link from 'next/link';
 import MemberCard from '@/components/MemberCard';
 import toast from 'react-hot-toast';
@@ -15,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 
 
 import { arrayRemove, arrayUnion, auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, updateDoc, where, FirebaseUser } from '@/lib/firebase';
+import { isOperationalUser, isAdminRole } from '@/lib/auth-helpers';
 // --- TYPES ---
 type Address = {
   id: string;
@@ -232,19 +234,33 @@ export default function ProfilePage() {
             <h1 className="text-sm font-bold text-slate-800 uppercase tracking-tight underline decoration-emerald-500 underline-offset-4">Akun Saya</h1>
           </div>
           
-          <button
-            onClick={() => setShowNotif(!showNotif)}
-            className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
-            title="Notifikasi"
-          >
-            <Bell size={22} strokeWidth={1.8} className={activeOrdersCount > 0 ? 'animate-bounce' : ''} />
-            {activeOrdersCount > 0 && (
-              <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
-                {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
-              </span>
+          <div className="flex items-center gap-2">
+            {isOperationalUser(user, userRole) && (
+              <Link 
+                href="/admin" 
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-full shadow-sm shadow-emerald-200 transition-all"
+                title="Buka Panel Admin / Operasional"
+              >
+                <ShieldCheck size={14} />
+                <span>Panel Admin</span>
+              </Link>
             )}
-          </button>
+
+            <button
+              onClick={() => setShowNotif(!showNotif)}
+              className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
+              title="Notifikasi"
+            >
+              <Bell size={22} strokeWidth={1.8} className={activeOrdersCount > 0 ? 'animate-bounce' : ''} />
+              {activeOrdersCount > 0 && (
+                <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                  {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
+
 
         {showNotif && (
           <div className="absolute right-6 top-20 w-80 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -330,15 +346,20 @@ export default function ProfilePage() {
               </div>
 
               <div className="mt-6 space-y-3 pt-6 border-t border-dashed border-slate-100">
-                {(userRole === 'admin' || userRole === 'cashier') && (
-                  <Link href="/admin" className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
-                    <ClipboardList size={18} /> Panel {userRole === 'admin' ? 'Admin' : 'Kasir'}
+                {isOperationalUser(user, userRole) && (
+                  <Link 
+                    href="/admin" 
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-black uppercase tracking-wider rounded-2xl hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-200 transition-all active:scale-[0.99]"
+                  >
+                    <ClipboardList size={18} /> 
+                    Panel {userRole === 'cashier' || user?.email?.startsWith('kasir') ? 'Kasir / POS' : 'Admin & Operasional'}
                   </Link>
                 )}
                 <button onClick={handleLogout} className="w-full py-4 text-slate-400 text-[10px] font-black uppercase rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center gap-2">
                   <LogOut size={16} /> Keluar Akun
                 </button>
               </div>
+
             </div>
 
             {/* BAGIAN ALAMAT */}
