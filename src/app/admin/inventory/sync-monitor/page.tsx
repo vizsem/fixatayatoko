@@ -12,7 +12,7 @@ import { stockSyncService } from '@/lib/stockSyncService';
 import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
-
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 interface SyncStatus {
   id: string;
@@ -100,7 +100,8 @@ export default function StockSyncMonitorPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }

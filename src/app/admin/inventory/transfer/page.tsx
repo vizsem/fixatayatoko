@@ -9,7 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction } from '@/lib/firebase';
 type WarehouseType = { id: string; name: string; };
 
@@ -28,7 +28,8 @@ export default function StockTransferPage() {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }

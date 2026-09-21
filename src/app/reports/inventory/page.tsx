@@ -5,12 +5,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Package, 
-  Download,
-  AlertTriangle,
-  TrendingDown,
-  TrendingUp
+  Download, 
+  AlertTriangle, 
+  TrendingDown, 
+  TrendingUp 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
 
 type InventoryItem = {
   id: string;
@@ -36,7 +40,9 @@ export default function InventoryReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!isAuthorizedAdmin(user, userDocData)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -267,8 +273,3 @@ export default function InventoryReport() {
     </div>
   );
 }
-
-import * as XLSX from 'xlsx';
-import { supabase } from '@/lib/supabase';
-
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';

@@ -16,8 +16,7 @@ import {
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
-
-
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 type Customer = {
   id: string;
@@ -89,7 +88,9 @@ export default function CustomerReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
         return;

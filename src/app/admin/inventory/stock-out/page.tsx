@@ -11,7 +11,7 @@ import notify from '@/lib/notify';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, runTransaction } from '@/lib/firebase';
 export default function StockOutPage() {
   const router = useRouter();
@@ -26,7 +26,8 @@ export default function StockOutPage() {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }

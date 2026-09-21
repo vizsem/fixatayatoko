@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { Timestamp, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 import {
   AreaChart,
@@ -155,7 +156,9 @@ export default function FinanceReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
         return;

@@ -10,9 +10,15 @@ import {
   Package,
   Activity,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  Database
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
 
 type OperationalMetric = {
   id: string;
@@ -37,7 +43,9 @@ export default function OperationsReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!isAuthorizedAdmin(user, userDocData)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -419,10 +427,3 @@ export default function OperationsReport() {
     </div>
   );
 }
-
-// Icon tambahan yang dibutuhkan
-import { ShoppingCart, Database } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { supabase } from '@/lib/supabase';
-
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';

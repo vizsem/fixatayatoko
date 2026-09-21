@@ -10,6 +10,10 @@ import {
   TrendingDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
 
 type FinancialRecord = {
   id: string;
@@ -38,7 +42,9 @@ export default function FinanceReport() {
       }
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!isAuthorizedAdmin(user, userDocData)) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -315,8 +321,3 @@ export default function FinanceReport() {
     </div>
   );
 }
-
-import * as XLSX from 'xlsx';
-import { supabase } from '@/lib/supabase';
-
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';

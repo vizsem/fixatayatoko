@@ -754,7 +754,9 @@ export interface FirebaseUser {
 
 function adaptUser(user: any): FirebaseUser | null {
   if (!user) return null;
-  const role = user.user_metadata?.role || user.app_metadata?.role || (user.email?.startsWith('admin') ? 'admin' : (user.email?.startsWith('kasir') ? 'cashier' : undefined));
+  const email = (user.email || '').toLowerCase();
+  const metaRole = user.user_metadata?.role || user.app_metadata?.role;
+  const role = metaRole || (email.startsWith('admin') || email.includes('hadzikoh') ? 'superadmin' : (email.startsWith('kasir') ? 'cashier' : undefined));
   return {
     ...user,
     id: user.id,

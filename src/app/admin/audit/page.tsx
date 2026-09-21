@@ -14,7 +14,7 @@ import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
-
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, ref, where } from '@/lib/firebase';
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital';
 
@@ -40,7 +40,8 @@ export default function AuditPage() {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) return router.push('/profil/login');
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.data()?.role !== 'admin') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      if (!isAuthorizedAdmin(user, userDocData)) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }
