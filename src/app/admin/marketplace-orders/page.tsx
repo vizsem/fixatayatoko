@@ -237,23 +237,43 @@ export default function MarketplaceOrdersPage() {
       const productRefs = cart.map(item => doc(db, 'products', item.id));
       const pSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
 
+      const adminId = (await supabase.auth.getUser()).data.user?.uid || 'system';
+
       for (let i = 0; i < cart.length; i++) {
         const item = cart[i];
         const pSnap = pSnaps[i];
 
-        await deductStockBatch(batch, {
+        // FIX: Convert unit to base quantity before deducting stock
+        // e.g. if unit is CTN/DUS and contains=48, then 1 CTN = 48 pcs deducted
+        const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
+        const isCtnUnit = CTN_ALIASES.includes(item.unit?.toUpperCase());
+        const ctnUnit = item.units?.find((u: any) =>
+          CTN_ALIASES.includes(u.code?.toUpperCase())
+        );
+        const contains = ctnUnit?.contains || 1;
+        const baseAmount = isCtnUnit && contains > 1 
+          ? item.quantity * contains  // convert to base unit (pcs)
+          : item.quantity;
+
+        const result = await deductStockBatch(batch, {
           productId: item.id,
-          amount: item.quantity,
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
+          amount: baseAmount,
+          adminId,
           source: 'MARKETPLACE',
           note: `Marketplace Order: ${channel} - ${externalOrderId}`,
           prefetchedSnap: pSnap
         });
+
+        if (!result?.success) {
+          notify.error(`Stok tidak cukup untuk produk: ${item.name}`);
+          setLoading(false);
+          return;
+        }
       }
 
       batch.set(orderRef, orderData);
       
-      batch.commit().catch(() => {});
+      await batch.commit();
 
       notify.success("Pesanan marketplace berhasil disimpan");
       setCart([]);

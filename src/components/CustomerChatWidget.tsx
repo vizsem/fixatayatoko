@@ -142,11 +142,11 @@ export default function CustomerChatWidget() {
   if (!user) return null; // Hide if not logged in
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
       {/* Chat Window */}
       <div 
-        className={`bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden ${
-          isOpen ? 'scale-100 opacity-100 mb-4 pointer-events-auto visible' : 'scale-0 opacity-0 h-0 mb-0 pointer-events-none invisible'
+        className={`bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col transition-all duration-300 origin-bottom-right overflow-hidden pointer-events-auto ${
+          isOpen ? 'scale-100 opacity-100 mb-4 visible' : 'scale-0 opacity-0 h-0 mb-0 invisible'
         }`}
       >
         {/* Header */}
@@ -219,7 +219,7 @@ export default function CustomerChatWidget() {
       {/* Floating Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 relative ${
+        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 relative pointer-events-auto ${
           isOpen ? 'bg-slate-800 text-white rotate-90' : 'bg-emerald-600 text-white'
         }`}
       >
