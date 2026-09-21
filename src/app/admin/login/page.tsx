@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, Suspense } from 'react';
 import { signIn } from '@/lib/supabaseAuth';
+import { isOperationalUser } from '@/lib/auth-helpers';
 import { useRouter, useSearchParams } from 'next/navigation';
 import notify from '@/lib/notify';
 import { Lock, Mail, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
@@ -35,9 +36,8 @@ function AdminLoginForm() {
       }
 
       // Check role from app_metadata or user_metadata
-      const role = data?.user?.app_metadata?.role || data?.user?.user_metadata?.role;
-      if (!role || !['admin', 'cashier', 'employee'].includes(role)) {
-        notify.error('Akses ditolak. Anda tidak memiliki izin admin.', { id: toastId });
+      if (!isOperationalUser(data?.user)) {
+        notify.error('Akses ditolak. Anda tidak memiliki izin operasional.', { id: toastId });
         setLoading(false);
         return;
       }
