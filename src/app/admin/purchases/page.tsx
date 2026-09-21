@@ -44,7 +44,13 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Dibatalkan',
 };
 
-type POItem = { productId: string; quantity: number; unitPrice: number };
+type POItem = {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  availableUnits?: { code: string; contains?: number; price?: number }[];
+};
 
 export default function AdminPurchases() {
   const [loading, setLoading] = useState(true);
@@ -58,7 +64,7 @@ export default function AdminPurchases() {
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [form, setForm] = useState({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
-  const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0 }]);
+  const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
   const [receiveForm, setReceiveForm] = useState({ warehouseId: '', batchNumber: '', expiryDate: '' });
   const [saving, setSaving] = useState(false);
 
@@ -90,7 +96,7 @@ export default function AdminPurchases() {
     return matchSearch && matchStatus;
   }), [pos, search, statusFilter]);
 
-  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0 }]);
+  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, key: keyof POItem, value: any) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [key]: value } : item));
@@ -98,11 +104,24 @@ export default function AdminPurchases() {
   const handleProductSelect = (idx: number, productId: string, product?: any) => {
     setItems(prev => prev.map((item, i) => {
       if (i !== idx) return item;
-      const defaultPrice = product?.purchasePrice || product?.costPrice || product?.cost_price || item.unitPrice || 0;
+      const defaultPrice = product?.purchasePrice || product?.costPrice || product?.cost_price || product?.price || item.unitPrice || 0;
+      const baseUnit = product?.unit || product?.Satuan || 'PCS';
+
+      let availableUnits: { code: string; contains?: number; price?: number }[] = [];
+      if (Array.isArray(product?.units) && product.units.length > 0) {
+        availableUnits = product.units;
+      } else {
+        availableUnits = [{ code: baseUnit, contains: 1, price: defaultPrice }];
+      }
+
+      const selectedUnit = availableUnits[0]?.code || baseUnit;
+
       return {
         ...item,
         productId,
         unitPrice: defaultPrice,
+        unit: selectedUnit,
+        availableUnits,
       };
     }));
   };
@@ -119,7 +138,7 @@ export default function AdminPurchases() {
       supplierId: form.supplierId,
       createdById: 'system',
       notes: form.notes || undefined,
-      items: items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
+      items: items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, unit: i.unit })),
       autoReceive: form.autoReceive,
       warehouseId: form.autoReceive ? form.warehouseId : undefined,
       batchNumber: form.autoReceive && form.batchNumber ? form.batchNumber : undefined,
@@ -129,7 +148,7 @@ export default function AdminPurchases() {
       notify.success(form.autoReceive ? 'PO berhasil dibuat & stok telah ditambahkan!' : 'Purchase Order berhasil dibuat');
       setModalOpen(false);
       setForm({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
-      setItems([{ productId: '', quantity: 1, unitPrice: 0 }]);
+      setItems([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
       await load();
     } else {
       notify.error(result.error || 'Gagal membuat PO');
@@ -318,13 +337,46 @@ export default function AdminPurchases() {
                 <div className="space-y-2">
                   {items.map((item, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-5">
+                      <div className="col-span-4">
                         <ProductSearchCombobox
                           value={item.productId}
                           products={products}
                           onChange={(productId, product) => handleProductSelect(idx, productId, product)}
                           placeholder="Pilih / Cari Produk..."
                         />
+                      </div>
+                      <div className="col-span-2">
+                        <select
+                          value={item.unit || 'PCS'}
+                          onChange={e => {
+                            const newUnit = e.target.value;
+                            const found = item.availableUnits?.find(u => u.code === newUnit);
+                            updateItem(idx, 'unit', newUnit);
+                            if (found && found.price) {
+                              updateItem(idx, 'unitPrice', found.price);
+                            }
+                          }}
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold uppercase"
+                        >
+                          {item.availableUnits && item.availableUnits.length > 0 ? (
+                            item.availableUnits.map(u => (
+                              <option key={u.code} value={u.code}>{u.code}</option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="PCS">PCS</option>
+                              <option value="DUS">DUS</option>
+                              <option value="KARTON">KARTON</option>
+                              <option value="SLOP">SLOP</option>
+                              <option value="PAK">PAK</option>
+                              <option value="BAL">BAL</option>
+                              <option value="POUCH">POUCH</option>
+                              <option value="BANTAL">BANTAL</option>
+                              <option value="KG">KG</option>
+                              <option value="LITER">LITER</option>
+                            </>
+                          )}
+                        </select>
                       </div>
                       <div className="col-span-2">
                         <input
@@ -334,7 +386,7 @@ export default function AdminPurchases() {
                           className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
-                      <div className="col-span-4">
+                      <div className="col-span-3">
                         <input
                           type="number" min="0" value={item.unitPrice}
                           onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))}
@@ -342,7 +394,7 @@ export default function AdminPurchases() {
                           className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-1 flex justify-center">
                         {items.length > 1 && (
                           <button onClick={() => removeItem(idx)} className="p-1 text-red-400 hover:text-red-600">
                             <X size={14} />

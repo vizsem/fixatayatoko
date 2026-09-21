@@ -8,6 +8,7 @@ type PurchaseItemInput = {
   productId: string
   quantity: number
   unitPrice: number
+  unit?: string
 }
 
 function normalizeStatus(status?: string): string {
@@ -170,12 +171,20 @@ export async function createPurchaseOrder(data: {
     const enrichedItems = await Promise.all(
       data.items.map(async (item, idx) => {
         let name = `Produk ${item.productId}`;
-        let unit = 'PCS';
+        let unit = item.unit || 'PCS';
+        let conversion = 1;
         try {
-          const { data: prod } = await supabaseAdmin.from('products').select('name, raw_data').eq('id', item.productId).single();
+          const { data: prod } = await supabaseAdmin.from('products').select('name, unit, raw_data').eq('id', item.productId).single();
           if (prod) {
             name = prod.name || prod.raw_data?.name || name;
-            unit = prod.raw_data?.unit || unit;
+            if (!item.unit) {
+              unit = prod.unit || prod.raw_data?.unit || unit;
+            }
+            const rawUnits = prod.raw_data?.units || [];
+            const found = rawUnits.find((u: any) => u.code === unit);
+            if (found && found.contains) {
+              conversion = Number(found.contains);
+            }
           }
         } catch {}
         return {
@@ -183,6 +192,7 @@ export async function createPurchaseOrder(data: {
           productId: item.productId,
           name,
           unit,
+          conversion,
           quantity: item.quantity,
           purchasePrice: item.unitPrice,
           unitPrice: item.unitPrice,
@@ -227,14 +237,15 @@ export async function createPurchaseOrder(data: {
     if (isAutoReceive) {
       for (const item of enrichedItems) {
         if (item.productId) {
+          const baseStockToAdd = Number(item.quantity || 1) * Number(item.conversion || 1);
           await addStock({
             productId: item.productId,
-            amount: item.quantity,
+            amount: baseStockToAdd,
             warehouseId: targetWarehouse,
             batchNumber: data.batchNumber || `${poNumber}-${item.productId.slice(-4)}`,
             expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
             reference: poNumber,
-            notes: `Pembelian Langsung: ${poNumber}`,
+            notes: `Pembelian Langsung (${item.quantity} ${item.unit || 'PCS'}): ${poNumber}`,
           });
         }
       }
@@ -279,15 +290,17 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
     for (const item of (raw.items || [])) {
       const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
       const qty = Number(item.quantity || 1);
+      const conversion = Number(item.conversion || 1);
+      const baseStockToAdd = qty * conversion;
       if (prodId) {
         await addStock({
           productId: prodId,
-          amount: qty,
+          amount: baseStockToAdd,
           warehouseId: targetWarehouse,
           batchNumber: batchNumber || `${raw.poNumber || poId}-${prodId.slice(-4)}`,
           expiryDate: expiryDate ? new Date(expiryDate) : undefined,
           reference: raw.poNumber || poId,
-          notes: `Penerimaan PO: ${raw.poNumber || poId}`,
+          notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${raw.poNumber || poId}`,
         });
       }
     }

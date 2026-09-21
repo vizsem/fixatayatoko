@@ -26,7 +26,7 @@ export default function AdminInventory() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [adjustModal, setAdjustModal] = useState(false);
-  const [adjustForm, setAdjustForm] = useState({ productId: '', warehouseId: '', quantity: 0, notes: '' });
+  const [adjustForm, setAdjustForm] = useState<{ productId: string; warehouseId: string; quantity: string | number; notes: string }>({ productId: '', warehouseId: '', quantity: '', notes: '' });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -72,21 +72,22 @@ export default function AdminInventory() {
   }), [lowStock, search, statusFilter]);
 
   const handleAdjust = async () => {
-    if (!adjustForm.productId || !adjustForm.warehouseId || adjustForm.quantity === 0) {
-      notify.error('Isi semua kolom yang diperlukan');
+    const qty = Number(adjustForm.quantity);
+    if (!adjustForm.productId || !adjustForm.warehouseId || adjustForm.quantity === '' || isNaN(qty) || qty === 0) {
+      notify.error('Isi semua kolom yang diperlukan dan jumlah selain 0');
       return;
     }
     setSaving(true);
     const result = await adjustStock({
       productId: adjustForm.productId,
       warehouseId: adjustForm.warehouseId,
-      quantity: adjustForm.quantity,
+      quantity: qty,
       notes: adjustForm.notes || undefined,
     });
     if (result.success) {
       notify.success('Stok berhasil disesuaikan');
       setAdjustModal(false);
-      setAdjustForm({ productId: '', warehouseId: '', quantity: 0, notes: '' });
+      setAdjustForm({ productId: '', warehouseId: '', quantity: '', notes: '' });
       await load();
     } else {
       notify.error(result.error || 'Gagal menyesuaikan stok');
@@ -421,7 +422,7 @@ export default function AdminInventory() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Jumlah (positif = tambah, negatif = kurangi) *</label>
-                <input type="number" value={adjustForm.quantity} onChange={e => setAdjustForm(p => ({ ...p, quantity: Number(e.target.value) }))}
+                <input type="number" value={adjustForm.quantity} onChange={e => setAdjustForm(p => ({ ...p, quantity: e.target.value }))}
                   placeholder="Contoh: 50 atau -10"
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
