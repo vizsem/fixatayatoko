@@ -24,7 +24,7 @@ import * as Sentry from '@sentry/nextjs';
 import { supabase } from '@/lib/supabase';
 
 import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, ref, where, writeBatch } from '@/lib/firebase';
-import { isAdminRole } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
 interface CartItem {
@@ -104,7 +104,7 @@ export default function MarketplaceOrdersPage() {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAdminRole(userDoc.data()?.role)) { router.push('/'); return; }
+      if (!isAuthorizedAdmin(user, userDoc.data())) { router.push('/'); return; }
       fetchProducts();
     });
     return () => unsubAuth();

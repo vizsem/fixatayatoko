@@ -10,6 +10,8 @@ export interface ProductOption {
   sku?: string;
   barcode?: string;
   category?: string;
+  unit?: string;
+  units?: { code: string; contains: number; price?: number; label?: string }[];
   purchasePrice?: number;
   priceEcer?: number;
   stock?: number;

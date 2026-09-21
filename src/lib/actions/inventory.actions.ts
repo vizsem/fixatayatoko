@@ -50,7 +50,8 @@ export async function getInventoryBatches(warehouseId?: string) {
             id: p.id,
             name: p.name || raw.name || raw.Nama || 'Produk',
             sku: p.sku || raw.sku || raw.Barcode || p.id,
-            unit: p.unit || raw.unit || 'pcs',
+            unit: (p.unit || raw.unit || 'pcs').toUpperCase(),
+            units: Array.isArray(raw.units) ? raw.units : undefined,
             isActive
           },
           warehouse: {
@@ -93,7 +94,8 @@ export async function getLowStockProducts(threshold: number = 10) {
           sku: p.sku || raw.sku || raw.Barcode || p.id,
           category: { name: p.category || raw.category || 'Umum' },
           stock,
-          unit: p.unit || raw.unit || 'pcs',
+          unit: (p.unit || raw.unit || 'pcs').toUpperCase(),
+          units: Array.isArray(raw.units) ? raw.units : undefined,
           isActive
         };
       })

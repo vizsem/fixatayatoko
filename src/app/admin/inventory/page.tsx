@@ -11,7 +11,33 @@ import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjust
 import { getProducts } from '@/lib/actions/product.actions';
 
 import { limit } from '@/lib/firebase';
+
+/** Compute stock expressed in each configured unit */
+function stockInUnits(stock: number, units?: { code: string; contains?: number }[]): { code: string; qty: number }[] {
+  if (!units || units.length === 0) return [];
+  return units
+    .filter(u => u.contains && u.contains > 1)
+    .map(u => ({ code: u.code, qty: Math.floor(stock / u.contains!) }))
+    .filter(u => u.qty > 0);
+}
+
+/** Compact unit-breakdown badges */
+function StockUnitDisplay({ stock, units }: { stock: number; units?: { code: string; contains?: number }[] }) {
+  const conversions = stockInUnits(stock, units);
+  if (conversions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-0.5 mt-0.5">
+      {conversions.map(c => (
+        <span key={c.code} className="text-[7px] font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
+          {c.qty} {c.code}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 type Tab = 'batches' | 'lowstock' | 'movements';
+
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function AdminInventory() {
@@ -278,14 +304,17 @@ export default function AdminInventory() {
                               <td className="p-3 text-gray-600">{b.warehouse.name}</td>
                               <td className="p-3 font-mono text-xs text-gray-600">{b.batchNumber}</td>
                               <td className="p-3 text-center">
-                                <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
-                                  !isActive ? 'bg-gray-200 text-gray-600' :
-                                  b.quantity < 5 ? 'bg-red-100 text-red-700' :
-                                  b.quantity < 10 ? 'bg-amber-100 text-amber-700' :
-                                  'bg-emerald-100 text-emerald-700'
-                                }`}>
-                                  {b.quantity} {b.product.unit}
-                                </span>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                                    !isActive ? 'bg-gray-200 text-gray-600' :
+                                    b.quantity < 5 ? 'bg-red-100 text-red-700' :
+                                    b.quantity < 10 ? 'bg-amber-100 text-amber-700' :
+                                    'bg-emerald-100 text-emerald-700'
+                                  }`}>
+                                    {b.quantity} {b.product.unit}
+                                  </span>
+                                  <StockUnitDisplay stock={b.quantity} units={b.product.units} />
+                                </div>
                               </td>
                               <td className="p-3 text-xs">
                                 {b.expiryDate ? (
@@ -331,6 +360,7 @@ export default function AdminInventory() {
                           <div className="text-right">
                             <p className={`text-lg font-black ${isActive ? 'text-red-600' : 'text-gray-600'}`}>{p.stock}</p>
                             <p className="text-xs text-gray-500 font-medium">{p.unit} tersisa</p>
+                            <StockUnitDisplay stock={p.stock} units={p.units} />
                           </div>
                         </div>
                       );

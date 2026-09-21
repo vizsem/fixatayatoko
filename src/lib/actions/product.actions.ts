@@ -92,6 +92,8 @@ export async function getProducts(options?: ProductQueryOptions) {
         priceEcer,
         priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? priceEcer),
         unit: p.unit || raw.unit || raw.Satuan || 'pcs',
+        units: Array.isArray(raw.units) && raw.units.length > 0 ? raw.units : undefined,
+        costPrice: purchasePrice,
         isActive,
         imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image,
         purchasePrice,

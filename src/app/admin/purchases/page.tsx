@@ -105,13 +105,22 @@ export default function AdminPurchases() {
     setItems(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const defaultPrice = product?.purchasePrice || product?.costPrice || product?.cost_price || product?.price || item.unitPrice || 0;
-      const baseUnit = product?.unit || product?.Satuan || 'PCS';
+      const baseUnit = (product?.unit || product?.Satuan || 'PCS').toUpperCase();
 
       let availableUnits: { code: string; contains?: number; price?: number }[] = [];
       if (Array.isArray(product?.units) && product.units.length > 0) {
-        availableUnits = product.units;
+        // Use configured multi-unit array from product
+        availableUnits = product.units.map((u: any) => ({ code: u.code, contains: u.contains, price: u.price }));
       } else {
-        availableUnits = [{ code: baseUnit, contains: 1, price: defaultPrice }];
+        // Fallback: always show a full common unit list so buyer can choose freely
+        const COMMON_UNITS = ['PCS', 'DUS', 'KARTON', 'SLOP', 'PAK', 'BAL', 'POUCH', 'BANTAL', 'KG', 'LITER', 'LUSIN'];
+        // Put base unit first, then the rest
+        const rest = COMMON_UNITS.filter(u => u !== baseUnit);
+        availableUnits = [baseUnit, ...rest].map(code => ({
+          code,
+          contains: 1,
+          price: code === baseUnit ? defaultPrice : undefined,
+        }));
       }
 
       const selectedUnit = availableUnits[0]?.code || baseUnit;

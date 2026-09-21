@@ -28,6 +28,32 @@ import { supabase } from '@/lib/supabase';
 
 
 import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, ref, writeBatch } from '@/lib/firebase';
+
+/** Compute stock expressed in each configured unit. Returns array of {code, qty, contains}. */
+function stockInUnits(stock: number, units?: { code: string; contains?: number }[]): { code: string; qty: number; contains: number }[] {
+  if (!units || units.length === 0) return [];
+  return units
+    .filter(u => u.contains && u.contains > 1)
+    .map(u => ({ code: u.code, qty: Math.floor(stock / u.contains!), contains: u.contains! }))
+    .filter(u => u.qty > 0);
+}
+
+/** Shows compact unit-breakdown badges below a stock number */
+function StockUnitDisplay({ stock, baseUnit, units }: { stock: number; baseUnit: string; units?: { code: string; contains?: number }[] }) {
+  const conversions = stockInUnits(stock, units);
+  if (conversions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-0.5 mt-0.5">
+      {conversions.map(c => (
+        <span key={c.code} className="text-[7px] font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
+          {c.qty} {c.code}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+
 type ProductRow = NormalizedProduct & {
   tgl_masuk?: string;
   expired_date?: string;
@@ -850,6 +876,7 @@ export default function AdminProducts() {
                       <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
                         {p.stock} <span className="text-[9px] uppercase">{p.unit}</span>
                       </p>
+                      <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
                           Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
@@ -987,6 +1014,7 @@ export default function AdminProducts() {
                             {p.stock} <span className="text-[8px] uppercase">{p.unit}</span>
                           </p>
                         </div>
+                        <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
                         {Number(p.stock) <= Number(p.minStock) && (
                           <p className="text-[7px] font-bold text-red-500 uppercase">
                             Min: {p.minStock}
