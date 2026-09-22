@@ -23,6 +23,7 @@ import {
   DollarSign,
   BarChart3,
   Package,
+  Receipt
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -259,6 +260,7 @@ export default function ReportsDashboard() {
             <ReportLink title="Operasional" desc="Kinerja & logistik." icon={Package} href="/admin/reports/operations" color="text-amber-600" bg="bg-amber-50" hoverBorder="group-hover:border-amber-200" />
             <ReportLink title="Pelanggan" desc="Analisis loyalitas." icon={Users} href="/admin/reports/customers" color="text-blue-600" bg="bg-blue-50" hoverBorder="group-hover:border-blue-200" />
             <ReportLink title="Promo" desc="Efektivitas kupon." icon={Gift} href="/admin/reports/promotions" color="text-rose-600" bg="bg-rose-50" hoverBorder="group-hover:border-rose-200" />
+            <ReportLink title="Pajak (STP Cortex)" desc="Rekap PPN & PPh Final." icon={Receipt} href="/admin/reports/tax" color="text-indigo-600" bg="bg-indigo-50" hoverBorder="group-hover:border-indigo-200" />
           </div>
         </>
       )}

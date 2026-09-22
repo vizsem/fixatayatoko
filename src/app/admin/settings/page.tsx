@@ -8,7 +8,7 @@ import {
   Shield, Upload, Download,
   Plus, Trash2, Users, Tag, Save, Sparkles, AlertTriangle,
   Globe, Truck, Coins, CheckCircle2, ChevronRight, Activity, Database, RotateCcw,
-  ExternalLink, MapPin, Navigation, Package
+  ExternalLink, MapPin, Navigation, Package, Receipt, FileSpreadsheet
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -22,6 +22,8 @@ import {
   ATAYATOKO_WAREHOUSE,
   DeliveryMethodConfig
 } from '@/lib/shipping';
+
+import { TaxSettings, DEFAULT_TAX_SETTINGS } from '@/lib/tax';
 
 // --- TYPES ---
 type PaymentMethod = { id: string; name: string; enabled: boolean; requiresProof?: boolean; description?: string };
@@ -49,6 +51,7 @@ type SystemSettings = {
   paymentMethods: PaymentMethod[];
   deliveryMethods: DeliveryMethod[];
   printer: PrinterSettings;
+  tax?: TaxSettings;
   createdAt: string;
   displayWarehouseId?: string;
   marketplaceFees?: { shopee: number; tiktok: number; tokopedia: number; lazada: number };
@@ -80,13 +83,14 @@ const defaultSettings: SystemSettings = {
   ],
   deliveryMethods: DEFAULT_DELIVERY_METHODS,
   printer: { type: 'ESC/POS', paperWidth: 80, autoCut: true, characterSet: 'UTF-8' },
+  tax: DEFAULT_TAX_SETTINGS,
   createdAt: new Date().toISOString(),
   marketplaceFees: { shopee: 6.5, tiktok: 4.5, tokopedia: 5.0, lazada: 6.0 }
 };
 
 export default function AdminSettings() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'general' | 'shipping' | 'categories' | 'employees' | 'banners' | 'points' | 'backup'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'shipping' | 'tax' | 'categories' | 'employees' | 'banners' | 'points' | 'backup'>('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -335,6 +339,7 @@ export default function AdminSettings() {
           {[
             { id: 'general', label: 'Umum', icon: Globe },
             { id: 'shipping', label: 'Pengiriman', icon: Truck },
+            { id: 'tax', label: 'Pajak (Tax)', icon: Receipt },
             { id: 'points', label: 'Loyalty', icon: Coins },
             { id: 'categories', label: 'Kategori', icon: Tag },
             { id: 'employees', label: 'Staff', icon: Users },
@@ -406,6 +411,117 @@ export default function AdminSettings() {
               </div>
             </section>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'tax' && (
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+          <section className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-3">
+                  <Receipt size={24} className="text-indigo-600" /> Konfigurasi Pajak Toko (PPN / PPh Final)
+                </h2>
+                <p className="text-xs font-medium text-slate-500 mt-1">
+                  Atur mode pengenaan pajak resmi sesuai status badan usaha dan regulasi UU HPP / PMK.
+                </p>
+              </div>
+
+              {/* Status Switch */}
+              <label className="flex items-center gap-3 cursor-pointer bg-slate-50 p-2 px-4 rounded-2xl border border-slate-200">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  {settings.tax?.enabled ? '🟢 PAKAI PAJAK' : '⚪ TANPA PAJAK'}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.tax?.enabled || false}
+                  onChange={e => setSettings({
+                    ...settings,
+                    tax: { ...(settings.tax || DEFAULT_TAX_SETTINGS), enabled: e.target.checked }
+                  })}
+                  className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
+                />
+              </label>
+            </div>
+
+            {settings.tax?.enabled && (
+              <div className="space-y-6">
+                {/* Mode Pilihan: PT PKP vs Perorangan UMKM */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-3">Opsi Skema Pajak</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div
+                      onClick={() => setSettings({
+                        ...settings,
+                        tax: { ...settings.tax!, mode: 'UMKM_FINAL', pphFinalRate: 0.5 }
+                      })}
+                      className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${settings.tax.mode === 'UMKM_FINAL' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-800">👤 Perorangan / UMKM (PP 55/2022)</span>
+                        {settings.tax.mode === 'UMKM_FINAL' && <CheckCircle2 size={18} className="text-indigo-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                        PPh Final <strong>0,5%</strong> dari total omzet tahunan di atas Rp 500 Juta. Pajak diikutsertakan di HPP toko.
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setSettings({
+                        ...settings,
+                        tax: { ...settings.tax!, mode: 'PT_PKP', ppnRate: 11 }
+                      })}
+                      className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${settings.tax.mode === 'PT_PKP' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-800">🏢 PT / Badan Usaha (PKP PPN)</span>
+                        {settings.tax.mode === 'PT_PKP' && <CheckCircle2 size={18} className="text-indigo-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                        PPN resmi <strong>11%</strong> (DPP Nilai Lain 11/12 UU HPP). Bebas PPN (0%) otomatis untuk produk kategori Sembako.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Tampilan Harga: Inclusive vs Exclusive */}
+                {settings.tax.mode === 'PT_PKP' && (
+                  <div className="pt-4 border-t border-slate-100">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-3">Mekanisme Tampilan Harga Produk</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        onClick={() => setSettings({
+                          ...settings,
+                          tax: { ...settings.tax!, pricingMode: 'INCLUSIVE' }
+                        })}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${settings.tax.pricingMode === 'INCLUSIVE' ? 'border-emerald-500 bg-emerald-50/40' : 'border-slate-100'}`}
+                      >
+                        <p className="text-xs font-black text-slate-800 mb-1">⭐ Harga Sudah Termasuk Pajak (Inclusive)</p>
+                        <p className="text-[10px] text-slate-500">Harga etalase = harga bayar akhir. Pembeli tidak kaget di checkout.</p>
+                      </div>
+
+                      <div
+                        onClick={() => setSettings({
+                          ...settings,
+                          tax: { ...settings.tax!, pricingMode: 'EXCLUSIVE' }
+                        })}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${settings.tax.pricingMode === 'EXCLUSIVE' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-100'}`}
+                      >
+                        <p className="text-xs font-black text-slate-800 mb-1">➕ Pajak Ditambahkan di Checkout (Exclusive)</p>
+                        <p className="text-[10px] text-slate-500">PPN 11% dihitung secara terpisah di rincian tagihan akhir.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4">
+                  <button onClick={handleSaveSystem} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl transition-all flex items-center justify-center gap-2">
+                    <Save size={16} /> {saving ? 'Menyimpan...' : 'Simpan Pengaturan Pajak'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
