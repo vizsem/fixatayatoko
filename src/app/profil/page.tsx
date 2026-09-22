@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   User, MapPin, Package, LogOut, Edit, Save, Mail, 
   ClipboardList, ChevronRight, ChevronLeft, Loader2, Trash2, Clock, CheckCircle2, Truck,
-  Bell, X, Ticket, ShieldCheck
+  Bell, X, Ticket, ShieldCheck, Phone, Home, Building2, Star, Plus, AlertTriangle
 } from 'lucide-react';
 
 import Link from 'next/link';
@@ -16,14 +16,31 @@ import { supabase } from '@/lib/supabase';
 
 
 import { arrayRemove, arrayUnion, auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, updateDoc, where, FirebaseUser } from '@/lib/firebase';
-import { isOperationalUser, isAdminRole } from '@/lib/auth-helpers';
+import { isOperationalUser } from '@/lib/auth-helpers';
+
+const MAX_ADDRESSES = 5;
+const LABEL_PRESETS = ['Rumah', 'Kantor', 'Kos / Kost', 'Gudang', 'Lainnya'];
 // --- TYPES ---
 type Address = {
   id: string;
   label: string;
-  receiverName: string; 
+  receiverName: string;
   receiverPhone: string;
   address: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  isDefault?: boolean;
+};
+
+const EMPTY_FORM: Omit<Address, 'id' | 'isDefault'> = {
+  label: '',
+  receiverName: '',
+  receiverPhone: '',
+  address: '',
+  city: '',
+  province: '',
+  postalCode: '',
 };
 
 interface CartItem {
@@ -61,12 +78,12 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   
-  // State Input Alamat
-  const [newAddress, setNewAddress] = useState('');
-  const [newLabel, setNewLabel] = useState('');
-  const [newReceiverName, setNewReceiverName] = useState('');
-  const [newReceiverPhone, setNewReceiverPhone] = useState('');
-  
+  // Address form state
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -169,46 +186,96 @@ export default function ProfilePage() {
     }
   };
 
-  const addAddress = async () => {
-    if (!newAddress || !newReceiverName || !user) {
-      toast.error("Lengkapi nama penerima dan alamat!");
+  // Open form for new address
+  const openNewForm = () => {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  // Open form for editing existing address
+  const openEditForm = (addr: Address) => {
+    setForm({
+      label: addr.label,
+      receiverName: addr.receiverName,
+      receiverPhone: addr.receiverPhone,
+      address: addr.address,
+      city: addr.city || '',
+      province: addr.province || '',
+      postalCode: addr.postalCode || '',
+    });
+    setEditingId(addr.id);
+    setShowForm(true);
+  };
+
+  const handleSaveAddress = async () => {
+    if (!form.receiverName.trim() || !form.address.trim() || !user) {
+      toast.error("Nama penerima dan alamat lengkap wajib diisi!");
       return;
     }
     setIsSaving(true);
-    const addressObj: Address = {
-      id: Date.now().toString(),
-      label: newLabel || 'Rumah',
-      receiverName: newReceiverName,
-      receiverPhone: newReceiverPhone,
-      address: newAddress
-    };
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        addresses: arrayUnion(addressObj)
-      });
-      setNewAddress('');
-      setNewLabel('');
-      setNewReceiverName('');
-      setNewReceiverPhone('');
+      let newAddresses: Address[];
+
+      if (editingId) {
+        newAddresses = addresses.map(a =>
+          a.id === editingId
+            ? { ...a, ...form, label: form.label || 'Rumah' }
+            : a
+        );
+      } else {
+        const newAddr: Address = {
+          id: Date.now().toString(),
+          label: form.label || 'Rumah',
+          receiverName: form.receiverName,
+          receiverPhone: form.receiverPhone,
+          address: form.address,
+          city: form.city,
+          province: form.province,
+          postalCode: form.postalCode,
+          isDefault: addresses.length === 0,
+        };
+        newAddresses = [...addresses, newAddr];
+      }
+
+      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+      setEditingId(null);
+      toast.success(editingId ? "Alamat berhasil diperbarui" : "Alamat berhasil ditambahkan");
     } catch {
-      toast.error("Gagal menambah alamat");
+      toast.error("Gagal menyimpan alamat");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const deleteAddress = async (addrId: string) => {
-    if (!user || !window.confirm("Hapus alamat ini?")) return;
-    const addrToDelete = addresses.find(a => a.id === addrId);
-    if (!addrToDelete) return;
-
+  const confirmDeleteAddress = async () => {
+    if (!user || !deleteConfirmId) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        addresses: arrayRemove(addrToDelete)
-      });
+      let newAddresses = addresses.filter(a => a.id !== deleteConfirmId);
+      const wasDefault = addresses.find(a => a.id === deleteConfirmId)?.isDefault;
+      if (wasDefault && newAddresses.length > 0) {
+        newAddresses[0] = { ...newAddresses[0], isDefault: true };
+      }
+      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      toast.success("Alamat dihapus");
     } catch {
       toast.error("Gagal menghapus alamat");
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const setDefaultAddress = async (addrId: string) => {
+    if (!user) return;
+    const newAddresses = addresses.map(a => ({ ...a, isDefault: a.id === addrId }));
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      toast.success("Alamat utama diperbarui");
+    } catch {
+      toast.error("Gagal mengubah alamat utama");
     }
   };
 
@@ -223,8 +290,8 @@ export default function ProfilePage() {
   );
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 pb-24 font-sans">
-      {/* HEADER */}
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-[100] border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -362,32 +429,109 @@ export default function ProfilePage() {
 
             </div>
 
-            {/* BAGIAN ALAMAT */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-              <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-6 flex items-center gap-2">
-                  <MapPin size={14} className="text-emerald-500" /> Alamat Tersimpan
-              </h3>
-              <div className="space-y-4 mb-8">
-                {addresses.length > 0 ? addresses.map(addr => (
-                  <div key={addr.id} className="p-5 bg-slate-50 rounded-3xl relative border border-slate-50 group">
-                    <p className="text-[10px] font-bold text-green-600 uppercase mb-1">{addr.label}</p>
-                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{addr.receiverName}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase leading-relaxed">{addr.address}</p>
-                    <button onClick={() => deleteAddress(addr.id)} className="absolute top-5 right-5 text-slate-300 hover:text-rose-500 transition-colors">
-                      <Trash2 size={16}/>
+            {/* BAGIAN ALAMAT — PROFESIONAL */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-emerald-50 rounded-xl">
+                    <MapPin size={16} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Alamat Pengiriman</h3>
+                    <p className="text-[10px] text-slate-400 font-medium">{addresses.length} / {MAX_ADDRESSES} alamat</p>
+                  </div>
+                </div>
+                {addresses.length < MAX_ADDRESSES && (
+                  <button
+                    onClick={openNewForm}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all active:scale-95 shadow-sm shadow-emerald-200"
+                  >
+                    <Plus size={14} />
+                    Tambah
+                  </button>
+                )}
+              </div>
+
+              {/* Daftar alamat */}
+              <div className="px-4 pb-4 space-y-3">
+                {addresses.length === 0 ? (
+                  <div className="py-10 flex flex-col items-center gap-3 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center">
+                      <MapPin size={24} className="text-slate-300" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-500">Belum ada alamat</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Tambahkan alamat untuk mempercepat checkout</p>
+                    </div>
+                    <button
+                      onClick={openNewForm}
+                      className="mt-1 px-4 py-2 bg-emerald-600 text-white text-[11px] font-bold rounded-xl hover:bg-emerald-700 transition-all"
+                    >
+                      + Tambah Alamat Pertama
                     </button>
                   </div>
-                )) : <p className="text-[10px] text-center text-slate-400 py-4 font-medium">Belum ada alamat.</p>}
-              </div>
-              
-              <div className="bg-emerald-50/50 p-6 rounded-3xl border-2 border-dashed border-emerald-200 space-y-3">
-                <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="LABEL (MISAL: RUMAH)..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
-                <input value={newReceiverName} onChange={e => setNewReceiverName(e.target.value)} placeholder="NAMA PENERIMA..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
-                <input value={newReceiverPhone} onChange={e => setNewReceiverPhone(e.target.value)} placeholder="NO. WHATSAPP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
-                <textarea value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="ALAMAT LENGKAP..." className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 h-20 resize-none" />
-                <button onClick={addAddress} disabled={isSaving} className="w-full bg-emerald-500 text-white py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-emerald-600">
-                   {isSaving ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>} Simpan Alamat
-                </button>
+                ) : (
+                  addresses.map(addr => (
+                    <div
+                      key={addr.id}
+                      className={`rounded-2xl border-2 p-4 transition-all ${
+                        addr.isDefault
+                          ? 'border-emerald-200 bg-emerald-50/40'
+                          : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
+                      }`}
+                    >
+                      {addr.isDefault && (
+                        <span className="inline-flex items-center gap-1 mb-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">
+                          <Star size={9} className="fill-emerald-500 text-emerald-500" />
+                          Alamat Utama
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        {addr.label === 'Kantor' || addr.label === 'Gudang' ? (
+                          <Building2 size={12} className="text-slate-500" />
+                        ) : (
+                          <Home size={12} className="text-slate-500" />
+                        )}
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">{addr.label || 'Rumah'}</span>
+                      </div>
+                      <p className="text-sm font-bold text-slate-900">{addr.receiverName}</p>
+                      {addr.receiverPhone && (
+                        <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <Phone size={10} /> {addr.receiverPhone}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                        {addr.address}
+                        {addr.city && `, ${addr.city}`}
+                        {addr.province && `, ${addr.province}`}
+                        {addr.postalCode && ` ${addr.postalCode}`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-dashed border-slate-200">
+                        {!addr.isDefault && (
+                          <button
+                            onClick={() => setDefaultAddress(addr.id)}
+                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-all"
+                          >
+                            <Star size={11} /> Jadikan Utama
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openEditForm(addr)}
+                          className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-all"
+                        >
+                          <Edit size={11} /> Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(addr.id)}
+                          className="ml-auto text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 transition-all"
+                        >
+                          <Trash2 size={11} /> Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -483,5 +627,197 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+
+      {/* MODAL FORM TAMBAH / EDIT ALAMAT */}
+      {showForm && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => { setShowForm(false); setEditingId(null); }}
+          />
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 rounded-xl">
+                  <MapPin size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    {editingId ? 'Edit Alamat' : 'Tambah Alamat Baru'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Isi informasi pengiriman</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowForm(false); setEditingId(null); }}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+              {/* Label presets */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Label Alamat</label>
+                <div className="flex flex-wrap gap-2">
+                  {LABEL_PRESETS.map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, label: preset }))}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                        form.label === preset
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={form.label}
+                  onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder="Atau ketik label custom..."
+                  className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Nama penerima */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Nama Penerima <span className="text-rose-500">*</span></label>
+                <div className="relative">
+                  <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={form.receiverName}
+                    onChange={e => setForm(f => ({ ...f, receiverName: e.target.value }))}
+                    placeholder="Nama lengkap penerima"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                    autoComplete="name"
+                  />
+                </div>
+              </div>
+
+              {/* No HP */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">No. WhatsApp / HP</label>
+                <div className="relative">
+                  <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={form.receiverPhone}
+                    onChange={e => setForm(f => ({ ...f, receiverPhone: e.target.value }))}
+                    placeholder="08xx-xxxx-xxxx"
+                    type="tel"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                    autoComplete="tel"
+                  />
+                </div>
+              </div>
+
+              {/* Kota & Kode Pos */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Kota / Kabupaten</label>
+                  <input
+                    value={form.city}
+                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                    placeholder="cth: Kota Kediri"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Kode Pos</label>
+                  <input
+                    value={form.postalCode}
+                    onChange={e => setForm(f => ({ ...f, postalCode: e.target.value }))}
+                    placeholder="cth: 64116"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Provinsi */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Provinsi</label>
+                <input
+                  value={form.province}
+                  onChange={e => setForm(f => ({ ...f, province: e.target.value }))}
+                  placeholder="cth: Jawa Timur"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Alamat lengkap */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Alamat Lengkap <span className="text-rose-500">*</span></label>
+                <div className="relative">
+                  <MapPin size={15} className="absolute left-3.5 top-3 text-slate-400" />
+                  <textarea
+                    value={form.address}
+                    onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                    placeholder="Nama jalan, no. rumah, RT/RW, kelurahan, kecamatan..."
+                    rows={3}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all resize-none placeholder:text-slate-400"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Isi selengkap mungkin agar kurir mudah menemukan lokasi</p>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 pt-4 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => { setShowForm(false); setEditingId(null); }}
+                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveAddress}
+                disabled={isSaving}
+                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 disabled:opacity-60"
+              >
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {editingId ? 'Perbarui Alamat' : 'Simpan Alamat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center px-6">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setDeleteConfirmId(null)}
+          />
+          <div className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full z-10 text-center">
+            <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={28} className="text-rose-500" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Hapus Alamat?</h3>
+            <p className="text-sm text-slate-500 mb-6">Alamat ini akan dihapus permanen dan tidak bisa dikembalikan.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDeleteAddress}
+                className="flex-1 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm transition-all active:scale-[0.98]"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

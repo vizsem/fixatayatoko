@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {

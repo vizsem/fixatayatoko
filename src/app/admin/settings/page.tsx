@@ -7,7 +7,8 @@ import {
   Settings, CreditCard, Printer, Store,
   Shield, Upload, Download,
   Plus, Trash2, Users, Tag, Save, Sparkles, AlertTriangle,
-  Globe, Truck, Coins, CheckCircle2, ChevronRight, Activity, Database, RotateCcw
+  Globe, Truck, Coins, CheckCircle2, ChevronRight, Activity, Database, RotateCcw,
+  ExternalLink, MapPin, Navigation, Package
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -16,9 +17,15 @@ import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, onAuthStateChanged, ref, setDoc, updateDoc, writeBatch } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
+import {
+  DEFAULT_DELIVERY_METHODS,
+  ATAYATOKO_WAREHOUSE,
+  DeliveryMethodConfig
+} from '@/lib/shipping';
+
 // --- TYPES ---
 type PaymentMethod = { id: string; name: string; enabled: boolean; requiresProof?: boolean; description?: string };
-type DeliveryMethod = { id: string; name: string; enabled: boolean; cost: number; description: string; };
+type DeliveryMethod = DeliveryMethodConfig;
 type PrinterSettings = { type: 'ESC/POS' | 'Generic'; paperWidth: number; autoCut: boolean; characterSet: string; };
 type StoreSettings = { 
   name: string; 
@@ -71,10 +78,7 @@ const defaultSettings: SystemSettings = {
     { id: 'TRANSFER', name: 'Transfer Bank', enabled: true, requiresProof: true, description: 'BCA / Mandiri / BRI' },
     { id: 'CREDIT', name: 'Tempo', enabled: true, description: 'Hutang / Bayar Nanti' }
   ],
-  deliveryMethods: [
-    { id: 'PICKUP', name: 'Ambil di Toko', enabled: true, cost: 0, description: 'Pelanggan mengambil sendiri' },
-    { id: 'COURIER', name: 'Kurir Toko', enabled: true, cost: 10000, description: 'Dikirim oleh kurir toko (Max 5km)' }
-  ],
+  deliveryMethods: DEFAULT_DELIVERY_METHODS,
   printer: { type: 'ESC/POS', paperWidth: 80, autoCut: true, characterSet: 'UTF-8' },
   createdAt: new Date().toISOString(),
   marketplaceFees: { shopee: 6.5, tiktok: 4.5, tokopedia: 5.0, lazada: 6.0 }
@@ -100,7 +104,17 @@ export default function AdminSettings() {
   const [newEmp, setNewEmp] = useState<Employee>({ name: '', role: 'kasir', phone: '', email: '', isActive: true });
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [newDelivery, setNewDelivery] = useState<DeliveryMethod>({ id: '', name: '', enabled: true, cost: 0, description: '' });
+  const [newDelivery, setNewDelivery] = useState<DeliveryMethod>({
+    id: '',
+    name: '',
+    type: 'EKSPEDISI',
+    cost: 0,
+    minSpendFree: 0,
+    description: '',
+    enabled: true,
+    zone: 'LUAR_KOTA',
+    estimatedTime: '2-4 Hari'
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
@@ -236,7 +250,17 @@ export default function AdminSettings() {
   const handleAddDelivery = () => {
     if (!newDelivery.name || !newDelivery.id) return notify.error("Nama & ID wajib diisi");
     setSettings({ ...settings, deliveryMethods: [...settings.deliveryMethods, newDelivery] });
-    setNewDelivery({ id: '', name: '', enabled: true, cost: 0, description: '' });
+    setNewDelivery({
+      id: '',
+      name: '',
+      type: 'EKSPEDISI',
+      cost: 0,
+      minSpendFree: 0,
+      description: '',
+      enabled: true,
+      zone: 'LUAR_KOTA',
+      estimatedTime: '2-4 Hari'
+    });
   };
 
   const handleDeleteDelivery = (id: string) => {
@@ -423,52 +447,201 @@ export default function AdminSettings() {
 
       {activeTab === 'shipping' && (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+          {/* WAREHOUSE LOCATION CARD */}
+          <section className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-7 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase tracking-wider">
+                    Titik Gudang Pusat Terverifikasi
+                  </span>
+                </div>
+                <h2 className="text-xl font-black">{ATAYATOKO_WAREHOUSE.name}</h2>
+                <p className="text-xs text-slate-300 font-medium mt-1">
+                  {ATAYATOKO_WAREHOUSE.address}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg">
+                    Lat: {ATAYATOKO_WAREHOUSE.latitude}
+                  </span>
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg">
+                    Long: {ATAYATOKO_WAREHOUSE.longitude}
+                  </span>
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg">
+                    Kota: {ATAYATOKO_WAREHOUSE.city} (64116)
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <a
+                  href={ATAYATOKO_WAREHOUSE.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 transition-all"
+                >
+                  <Navigation size={15} />
+                  <span>Buka di Google Maps</span>
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+            </div>
+
+            {/* ZONES STRATEGY GUIDE */}
+            <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-black uppercase text-emerald-400 block mb-0.5">Ring 1 (0 – 3 km)</span>
+                <strong className="text-white text-xs block">Dalam Kota Dekat</strong>
+                <span className="text-[10px] text-slate-400">Gratis Min. Rp50.000</span>
+              </div>
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-black uppercase text-blue-400 block mb-0.5">Ring 2 (3 – 7 km)</span>
+                <strong className="text-white text-xs block">Sekitar Kota Kediri</strong>
+                <span className="text-[10px] text-slate-400">Subsidi / Min. Rp120.000</span>
+              </div>
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-black uppercase text-purple-400 block mb-0.5">Ring 3 (7 – 12 km)</span>
+                <strong className="text-white text-xs block">Pinggiran / Grosir</strong>
+                <span className="text-[10px] text-slate-400">Armada / Min. Rp300.000</span>
+              </div>
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-black uppercase text-amber-400 block mb-0.5">Luar Kota (&gt; 12 km)</span>
+                <strong className="text-white text-xs block">JNE / J&T / Kargo</strong>
+                <span className="text-[10px] text-slate-400">Nasional & Partai Bal</span>
+              </div>
+            </div>
+          </section>
+
+          {/* DELIVERY METHODS LIST */}
           <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-xl font-black flex items-center gap-2"><Truck className="text-slate-900" /> Metode Pengiriman</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atur kurir dan biaya antar</p>
+                <h2 className="text-xl font-black flex items-center gap-2"><Truck className="text-slate-900" /> Pengaturan Metode Pengiriman</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atur kurir toko, radius, dan ekspedisi luar kota</p>
               </div>
-              <button onClick={handleSaveSystem} className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Simpan Perubahan</button>
+              <button onClick={handleSaveSystem} className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                Simpan Perubahan
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {settings.deliveryMethods.map((method) => (
                 <div key={method.id} className="p-5 rounded-[2rem] bg-slate-50 border border-slate-100 relative group">
-                  <button onClick={() => handleDeleteDelivery(method.id)} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-white rounded-2xl shadow-sm text-slate-900"><Truck size={20} /></div>
+                  <button onClick={() => handleDeleteDelivery(method.id)} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all" title="Hapus">
+                    <Trash2 size={16} />
+                  </button>
+
+                  <div className="flex items-center gap-3.5 mb-3">
+                    <div className="p-3 bg-white rounded-2xl shadow-sm text-slate-900">
+                      {method.type === 'CARGO' ? <Package size={20} className="text-amber-600" /> : method.type === 'PICKUP' ? <Store size={20} className="text-emerald-600" /> : <Truck size={20} className="text-slate-800" />}
+                    </div>
                     <div>
-                      <p className="text-xs font-black">{method.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">{method.id}</p>
+                      <p className="text-xs font-black text-slate-900">{method.name}</p>
+                      <div className="flex gap-1.5 mt-0.5">
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
+                          {method.type || 'KURIR'}
+                        </span>
+                        {method.zone && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
+                            {method.zone}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between bg-white px-4 py-2 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Biaya</span>
-                      <input type="number" value={method.cost} onChange={e => {
-                        const updated = settings.deliveryMethods.map(m => m.id === method.id ? { ...m, cost: Number(e.target.value) } : m);
-                        setSettings({ ...settings, deliveryMethods: updated });
-                      }} className="bg-transparent text-right font-black text-xs outline-none w-24" />
+
+                  <p className="text-[11px] text-slate-500 font-medium mb-3 leading-relaxed">
+                    {method.description}
+                  </p>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Biaya Standar</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-400">Rp</span>
+                        <input
+                          type="number"
+                          value={method.cost}
+                          onChange={(e) => {
+                            const updated = settings.deliveryMethods.map((m) =>
+                              m.id === method.id ? { ...m, cost: Number(e.target.value) } : m
+                            );
+                            setSettings({ ...settings, deliveryMethods: updated });
+                          }}
+                          className="bg-transparent text-right font-black text-xs outline-none w-24"
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between bg-white px-4 py-2 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Aktif</span>
-                      <input type="checkbox" checked={method.enabled} onChange={e => {
-                        const updated = settings.deliveryMethods.map(m => m.id === method.id ? { ...m, enabled: e.target.checked } : m);
-                        setSettings({ ...settings, deliveryMethods: updated });
-                      }} className="w-4 h-4 rounded accent-slate-900" />
+
+                    <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Min. Belanja Gratis</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-400">Rp</span>
+                        <input
+                          type="number"
+                          value={method.minSpendFree || 0}
+                          onChange={(e) => {
+                            const updated = settings.deliveryMethods.map((m) =>
+                              m.id === method.id ? { ...m, minSpendFree: Number(e.target.value) } : m
+                            );
+                            setSettings({ ...settings, deliveryMethods: updated });
+                          }}
+                          placeholder="0 = Tidak ada"
+                          className="bg-transparent text-right font-black text-xs outline-none w-24"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Status Aktif</span>
+                      <input
+                        type="checkbox"
+                        checked={method.enabled}
+                        onChange={(e) => {
+                          const updated = settings.deliveryMethods.map((m) =>
+                            m.id === method.id ? { ...m, enabled: e.target.checked } : m
+                          );
+                          setSettings({ ...settings, deliveryMethods: updated });
+                        }}
+                        className="w-4 h-4 rounded accent-emerald-600 cursor-pointer"
+                      />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
+            {/* ADD NEW DELIVERY METHOD */}
             <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Tambah Metode Baru</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input type="text" placeholder="ID (ex: JNE)" value={newDelivery.id} onChange={e => setNewDelivery({...newDelivery, id: e.target.value.toUpperCase()})} className="bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none placeholder:text-white/20" />
-                <input type="text" placeholder="Nama Layanan" value={newDelivery.name} onChange={e => setNewDelivery({...newDelivery, name: e.target.value})} className="bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none placeholder:text-white/20" />
-                <button onClick={handleAddDelivery} className="bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest py-4 hover:bg-slate-100 transition-all">Tambah</button>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Tambah Layanan Kurir / Ekspedisi Baru</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <input
+                  type="text"
+                  placeholder="ID (ex: SICEPAT)"
+                  value={newDelivery.id}
+                  onChange={(e) => setNewDelivery({ ...newDelivery, id: e.target.value.toUpperCase() })}
+                  className="bg-white/10 p-3 rounded-xl text-xs font-bold outline-none placeholder:text-white/30"
+                />
+                <input
+                  type="text"
+                  placeholder="Nama Layanan"
+                  value={newDelivery.name}
+                  onChange={(e) => setNewDelivery({ ...newDelivery, name: e.target.value })}
+                  className="bg-white/10 p-3 rounded-xl text-xs font-bold outline-none placeholder:text-white/30"
+                />
+                <input
+                  type="number"
+                  placeholder="Biaya Ongkir (Rp)"
+                  value={newDelivery.cost || ''}
+                  onChange={(e) => setNewDelivery({ ...newDelivery, cost: Number(e.target.value) })}
+                  className="bg-white/10 p-3 rounded-xl text-xs font-bold outline-none placeholder:text-white/30"
+                />
+                <button
+                  onClick={handleAddDelivery}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest py-3 transition-all"
+                >
+                  Tambah Layanan
+                </button>
               </div>
             </div>
           </section>

@@ -214,7 +214,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const total = Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount - walletUsed);
+    const shippingCost = Number(delivery?.cost || 0);
+    const total = Math.max(0, calculatedSubtotal + shippingCost - pointsUsed - voucherDiscount - walletUsed);
     const orderId = generateOrderId();
     const dbOrderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
@@ -226,12 +227,16 @@ export async function POST(req: Request) {
       userId: userId || 'guest',
       items: validatedItems,
       subtotal: calculatedSubtotal,
+      shippingCost,
       pointsUsed,
       voucherUsed: appliedVoucherId,
       discountTotal: pointsUsed + voucherDiscount,
       walletUsed,
       total,
-      delivery,
+      delivery: {
+        ...delivery,
+        cost: shippingCost,
+      },
       payment,
       status: 'PENDING',
       channel: channelKey,
