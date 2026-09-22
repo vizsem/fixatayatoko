@@ -300,3 +300,61 @@ export async function updateMarketplaceBalance(data: {
   }
 }
 
+export async function adjustTotalCapital(data: {
+  targetCapital: number;
+  reason?: string;
+  recordedBy?: string;
+}) {
+  try {
+    // 1. Fetch existing transactions to compute current capital
+    const { data: rows } = await supabaseAdmin
+      .from('capital_transactions')
+      .select('*');
+
+    const transactions = (rows || []).map((t: any) => {
+      const raw = t.raw_data || {};
+      return {
+        type: raw.type || 'INJECTION',
+        amount: Number(raw.amount || 0),
+      };
+    });
+
+    const injected = transactions.filter(t => t.type === 'INJECTION').reduce((s, t) => s + t.amount, 0);
+    const withdrawn = transactions.filter(t => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.amount, 0);
+    const currentCapital = injected - withdrawn;
+
+    const target = Number(data.targetCapital || 0);
+    const diff = target - currentCapital;
+
+    if (diff === 0) {
+      return { success: true, message: 'Modal sudah sesuai, tidak ada penyesuaian yang dilakukan' };
+    }
+
+    const type = diff > 0 ? 'INJECTION' : 'WITHDRAWAL';
+    const amount = Math.abs(diff);
+
+    const id = `cap_adj_${Date.now()}`;
+    const raw_data = {
+      type,
+      amount,
+      description: data.reason ? `Penyesuaian Modal Total: ${data.reason}` : `Penyesuaian Modal Total (Revisi dari Rp ${currentCapital.toLocaleString('id-ID')} ke Rp ${target.toLocaleString('id-ID')})`,
+      recordedBy: data.recordedBy || 'Admin',
+      date: new Date().toISOString(),
+      isAdjustment: true,
+    };
+
+    await supabaseAdmin.from('capital_transactions').insert({
+      id,
+      raw_data,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    revalidatePath('/admin/capital');
+    return { success: true, data: { id, ...raw_data, date: new Date() } };
+  } catch (error: any) {
+    console.error('Failed to adjust total capital:', error);
+    return { success: false, error: error.message || 'Gagal menyesuaikan total modal' };
+  }
+}
+

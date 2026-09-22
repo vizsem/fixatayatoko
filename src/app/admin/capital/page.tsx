@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Landmark, Plus, CreditCard, Wallet, RefreshCcw, Save, X } from 'lucide-react';
+import { Landmark, Plus, CreditCard, Wallet, RefreshCcw, Save, X, SlidersHorizontal } from 'lucide-react';
 import notify from '@/lib/notify';
 import { CapitalTransaction, LoanRecord } from '@/types/finance';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
@@ -11,7 +11,8 @@ import {
   recordLoan,
   repayLoan,
   addMarketplaceAccount,
-  updateMarketplaceBalance
+  updateMarketplaceBalance,
+  adjustTotalCapital
 } from '@/lib/actions/capital.actions';
 
 // Components
@@ -59,6 +60,7 @@ export default function CapitalPage() {
 
   // Modal & Form States
   const [isCapitalModalOpen, setIsCapitalModalOpen] = useState(false);
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -69,6 +71,8 @@ export default function CapitalPage() {
   const [selectedLoan, setSelectedLoan] = useState<LoanRecord | null>(null);
   const [formData, setFormData] = useState({
     amount: '',
+    targetCapital: '',
+    adjustReason: '',
     description: '',
     type: 'INJECTION' as 'INJECTION' | 'WITHDRAWAL',
     lenderName: '',
@@ -134,6 +138,25 @@ export default function CapitalPage() {
             loadData();
           } else {
             notify.error(resCap.error || 'Gagal mencatat transaksi');
+          }
+          break;
+
+        case 'ADJUST_CAPITAL':
+          const targetCap = Number(formData.targetCapital);
+          if (isNaN(targetCap) || targetCap < 0) {
+            notify.error('Nominal modal harus berupa angka valid');
+            break;
+          }
+          const resAdj = await adjustTotalCapital({
+            targetCapital: targetCap,
+            reason: formData.adjustReason,
+          });
+          if (resAdj.success) {
+            notify.success(resAdj.message || 'Modal total berhasil disesuaikan!');
+            setIsAdjustModalOpen(false);
+            loadData();
+          } else {
+            notify.error(resAdj.error || 'Gagal menyesuaikan modal');
           }
           break;
 
@@ -250,6 +273,16 @@ export default function CapitalPage() {
             title="Refresh Data"
           >
             <RefreshCcw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              setFormData({ ...formData, targetCapital: totals.currentCapital.toString(), adjustReason: '' });
+              setIsAdjustModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-sm text-sm font-medium transition cursor-pointer"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Penyesuaian Modal Total
           </button>
           <button
             onClick={() => {
@@ -376,6 +409,59 @@ export default function CapitalPage() {
                 className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? 'Menyimpan...' : 'Simpan Transaksi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Penyesuaian Modal Total */}
+      {isAdjustModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <SlidersHorizontal size={18} className="text-purple-600" /> Penyesuaian Modal Total
+              </h3>
+              <button onClick={() => setIsAdjustModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-4 text-xs text-purple-800">
+              <p className="font-bold mb-1">Modal Total Saat Ini: Rp {totals.currentCapital.toLocaleString('id-ID')}</p>
+              <p className="text-[11px] text-purple-600">
+                Masukkan nilai modal total yang sebenarnya. Sistem akan otomatis menghitung selisih dan mencatat transaksi penyesuaian secara rapi.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Target Total Modal Baru (Rp)</label>
+                <input
+                  type="number"
+                  value={formData.targetCapital}
+                  onChange={(e) => setFormData({ ...formData, targetCapital: e.target.value })}
+                  placeholder="Contoh: 150000000"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Alasan Penyesuaian / Catatan</label>
+                <input
+                  type="text"
+                  value={formData.adjustReason}
+                  onChange={(e) => setFormData({ ...formData, adjustReason: e.target.value })}
+                  placeholder="Contoh: Opname Modal Triwulan / Audit Kas"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+              <button
+                disabled={isSubmitting}
+                onClick={() => handleAction('ADJUST_CAPITAL')}
+                className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-sm transition shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? 'Memproses...' : 'Simpan Penyesuaian Modal'}
               </button>
             </div>
           </div>
