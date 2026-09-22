@@ -16,7 +16,7 @@ import { logActivity } from '@/lib/activity';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, onAuthStateChanged, ref, setDoc, updateDoc, writeBatch } from '@/lib/firebase';
-import { isAdminRole } from '@/lib/auth-helpers';
+import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import {
   DEFAULT_DELIVERY_METHODS,
   ATAYATOKO_WAREHOUSE,
@@ -120,7 +120,8 @@ export default function AdminSettings() {
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (!user) { router.push('/profil/login'); return; }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAdminRole(userDoc.data()?.role)) { router.push('/'); return; }
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      if (!isAuthorizedAdmin(user, userDocData)) { router.push('/'); return; }
 
       await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners(), loadWarehouses()]);
       setLoading(false);
