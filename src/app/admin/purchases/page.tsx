@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
-  updatePurchaseStatus, deletePurchaseOrder
+  updatePurchaseStatus, deletePurchaseOrder, cancelPurchaseOrder
 } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getProducts } from '@/lib/actions/product.actions';
@@ -182,6 +182,20 @@ export default function AdminPurchases() {
       await load();
     } else {
       notify.error(result.error || 'Gagal menerima PO');
+    }
+    setSaving(false);
+  };
+
+  const handleCancelPO = async (poId: string, poNumber: string) => {
+    if (!confirm(`Apakah Anda yakin ingin membatalkan Purchase Order ${poNumber}?`)) return;
+    setSaving(true);
+    const result = await cancelPurchaseOrder(poId);
+    if (result.success) {
+      notify.success(`PO ${poNumber} berhasil dibatalkan`);
+      setDetailModal(null);
+      await load();
+    } else {
+      notify.error(result.error || 'Gagal membatalkan PO');
     }
     setSaving(false);
   };
@@ -596,7 +610,16 @@ export default function AdminPurchases() {
               </tfoot>
             </table>
 
-            <div className="flex gap-3 mt-6">
+            <div className="flex flex-wrap gap-2 mt-6">
+              {detailModal.status !== 'CANCELLED' && (
+                <button
+                  onClick={() => handleCancelPO(detailModal.id, detailModal.poNumber)}
+                  disabled={saving}
+                  className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 text-sm font-bold hover:bg-red-100 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <XCircle size={16} /> Batalkan PO
+                </button>
+              )}
               <Link
                 href={`/admin/purchases/add?duplicateFrom=${detailModal.id}`}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"

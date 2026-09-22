@@ -22,7 +22,7 @@ import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
 import { supabase } from '@/lib/supabase';
 
 import { Timestamp, addDoc, auth, collection, db, doc, getDoc, increment, onAuthStateChanged, runTransaction, updateDoc } from '@/lib/firebase';
-import { isAdminRole } from '@/lib/auth-helpers';
+import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 type DeliveryLocation = { lat: number; lng: number };
@@ -117,7 +117,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         return;
       }
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAdminRole(userDoc.data()?.role) && userDoc.data()?.role !== 'cashier') {
+      const userDocData = userDoc.exists() ? userDoc.data() : null;
+      const role = userDocData?.role || user.app_metadata?.role || user.user_metadata?.role;
+      if (!isAuthorizedAdmin(user, userDocData) && role !== 'cashier' && role !== 'kasir') {
         router.push('/profil');
         return;
       }

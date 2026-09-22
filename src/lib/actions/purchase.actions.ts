@@ -504,3 +504,65 @@ export async function updatePurchaseOrder(
   }
 }
 
+export async function cancelPurchaseOrder(id: string) {
+  try {
+    const { data: oldData, error: fetchErr } = await supabaseAdmin
+      .from('purchases')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !oldData) return { success: false, error: 'PO tidak ditemukan' };
+
+    const raw = oldData.raw_data || {};
+    const normStatus = normalizeStatus(raw.status || oldData.status);
+
+    if (normStatus === 'CANCELLED') {
+      return { success: false, error: 'PO sudah dibatalkan sebelumnya' };
+    }
+
+    // Jika PO sudah RECEIVED, kembalikan (kurangi) stok barang yang pernah masuk
+    if (normStatus === 'RECEIVED') {
+      const oldItems = raw.items || [];
+      const warehouseId = raw.warehouseId || 'gudang-utama';
+
+      for (const item of oldItems) {
+        const qty = Number(item.quantity || 1) * Number(item.conversion || 1);
+        try {
+          await deductStockFEFO({
+            productId: item.productId,
+            amount: qty,
+            warehouseId,
+            reference: id,
+            notes: `Pembatalan PO (${id}): Kurangi stok`,
+          });
+        } catch (e: any) {
+          throw new Error(`Gagal membatalkan PO. Stok produk ${item.productId} tidak mencukupi untuk dikurangi (${e.message}).`);
+        }
+      }
+    }
+
+    const updatedRaw = {
+      ...raw,
+      status: 'CANCELLED',
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await supabaseAdmin.from('purchases').update({
+      status: 'CANCELLED',
+      raw_data: updatedRaw,
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath('/admin/purchases');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Failed to cancel PO:', error);
+    return { success: false, error: error?.message || 'Gagal membatalkan PO' };
+  }
+}
+
