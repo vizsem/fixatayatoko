@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 function parseDate(val: any): Date {
   if (!val) return new Date();
@@ -18,11 +18,11 @@ function parseDate(val: any): Date {
 export async function getCapitalData() {
   try {
     const [txRes, loanRes, mpAccRes, mpTxRes, prodRes] = await Promise.all([
-      supabase.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(100),
-      supabase.from('loans').select('*').order('created_at', { ascending: false }),
-      supabase.from('marketplace_accounts').select('*').order('created_at', { ascending: true }),
-      supabase.from('marketplace_transactions').select('*').order('created_at', { ascending: false }).limit(50),
-      supabase.from('products').select('stock, cost_price, raw_data'),
+      supabaseAdmin.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(100),
+      supabaseAdmin.from('loans').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('marketplace_accounts').select('*').order('created_at', { ascending: true }),
+      supabaseAdmin.from('marketplace_transactions').select('*').order('created_at', { ascending: false }).limit(50),
+      supabaseAdmin.from('products').select('stock, cost_price, raw_data'),
     ]);
 
     const transactions = (txRes.data || []).map((t: any) => {
@@ -132,7 +132,7 @@ export async function addCapitalTransaction(data: {
       date: new Date().toISOString(),
     };
 
-    await supabase.from('capital_transactions').insert({
+    await supabaseAdmin.from('capital_transactions').insert({
       id,
       raw_data,
       created_at: new Date().toISOString(),
@@ -167,7 +167,7 @@ export async function recordLoan(data: {
       startDate: new Date().toISOString(),
     };
 
-    await supabase.from('loans').insert({
+    await supabaseAdmin.from('loans').insert({
       id,
       raw_data,
       created_at: new Date().toISOString(),
@@ -184,7 +184,7 @@ export async function recordLoan(data: {
 
 export async function repayLoan(loanId: string, repayAmount: number, interestExpense?: number) {
   try {
-    const { data: existing } = await supabase.from('loans').select('*').eq('id', loanId).single();
+    const { data: existing } = await supabaseAdmin.from('loans').select('*').eq('id', loanId).single();
     if (!existing) throw new Error('Pinjaman tidak ditemukan');
 
     const raw = existing.raw_data || {};
@@ -196,13 +196,13 @@ export async function repayLoan(loanId: string, repayAmount: number, interestExp
     raw.status = status;
     raw.updatedAt = new Date().toISOString();
 
-    await supabase.from('loans').update({
+    await supabaseAdmin.from('loans').update({
       raw_data: raw,
       updated_at: new Date().toISOString(),
     }).eq('id', loanId);
 
     if (interestExpense && interestExpense > 0) {
-      await supabase.from('operational_expenses').insert({
+      await supabaseAdmin.from('operational_expenses').insert({
         id: `exp_${Date.now()}`,
         raw_data: {
           category: 'Bunga Pinjaman',
@@ -234,7 +234,7 @@ export async function addMarketplaceAccount(name: string, storeName?: string) {
       updatedAt: new Date().toISOString(),
     };
 
-    await supabase.from('marketplace_accounts').insert({
+    await supabaseAdmin.from('marketplace_accounts').insert({
       id,
       raw_data,
       created_at: new Date().toISOString(),
@@ -257,7 +257,7 @@ export async function updateMarketplaceBalance(data: {
   recordedBy?: string
 }) {
   try {
-    const { data: existing } = await supabase.from('marketplace_accounts').select('*').eq('id', data.accountId).single();
+    const { data: existing } = await supabaseAdmin.from('marketplace_accounts').select('*').eq('id', data.accountId).single();
     if (!existing) throw new Error('Akun marketplace tidak ditemukan');
 
     const raw = existing.raw_data || {};
@@ -270,13 +270,13 @@ export async function updateMarketplaceBalance(data: {
     raw.pendingBalance = Number(data.pendingBalance);
     raw.lastUpdated = new Date().toISOString();
 
-    await supabase.from('marketplace_accounts').update({
+    await supabaseAdmin.from('marketplace_accounts').update({
       raw_data: raw,
       updated_at: new Date().toISOString(),
     }).eq('id', data.accountId);
 
     // Catat log transaksi marketplace
-    await supabase.from('marketplace_transactions').insert({
+    await supabaseAdmin.from('marketplace_transactions').insert({
       id: `mptx_${Date.now()}`,
       raw_data: {
         accountId: data.accountId,
