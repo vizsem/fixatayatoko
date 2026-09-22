@@ -549,7 +549,6 @@ export async function cancelPurchaseOrder(id: string) {
     };
 
     const { error: updateErr } = await supabaseAdmin.from('purchases').update({
-      status: 'CANCELLED',
       raw_data: updatedRaw,
       updated_at: new Date().toISOString()
     }).eq('id', id);
