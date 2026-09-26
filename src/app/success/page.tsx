@@ -179,139 +179,133 @@ function SuccessContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
-        <Loader2 className="animate-spin text-green-600" size={48} />
-        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Memuat Data Pesanan...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] gap-3">
+        <Loader2 className="animate-spin text-emerald-600" size={36} />
+        <p className="text-sm font-medium text-slate-500">Memuat data pesanan...</p>
       </div>
     );
   }
 
   if (!orderData && !loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-        <h1 className="text-xl font-bold text-gray-800">Maaf, Data Tidak Ditemukan</h1>
-        <p className="text-gray-500 mb-6 mt-2">Pesanan dengan ID <b>{orderId}</b> mungkin masih diproses atau tidak ada.</p>
-        <Link href="/" className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold">Kembali ke Toko</Link>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 text-center">
+        <h1 className="text-xl font-black text-slate-900 mb-2">Data Tidak Ditemukan</h1>
+        <p className="text-sm text-slate-500 mb-6">Pesanan dengan ID <b className="text-slate-700">{orderId}</b> mungkin masih diproses atau tidak ditemukan.</p>
+        <Link href="/" className="bg-emerald-600 text-white px-8 py-3 rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-colors">Kembali ke Toko</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden text-center p-6 md:p-10 relative">
-          <div className="flex justify-center mb-6">
-            <div className="bg-green-100 p-4 rounded-full text-green-600 animate-bounce">
-              <CheckCircle size={64} />
+    <div className="min-h-screen bg-[#F8FAFC] py-10 px-4">
+      <div className="max-w-2xl mx-auto space-y-4">
+        {/* Success Hero */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm text-center p-8">
+          <div className="flex justify-center mb-5">
+            <div className="bg-emerald-100 p-5 rounded-full text-emerald-600">
+              <CheckCircle size={48} />
             </div>
           </div>
-
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Pesanan Diterima!</h1>
-          <p className="text-gray-600 mb-6 text-sm md:text-base">
-            Terima kasih, <span className="font-semibold text-gray-900">{displayCustomer}</span>.
-            Pesanan Anda sedang diproses.
+          <h1 className="text-2xl font-black text-slate-900 mb-2">Pesanan Berhasil!</h1>
+          <p className="text-sm text-slate-600 mb-5">
+            Terima kasih, <span className="font-bold text-slate-900">{displayCustomer}</span>. Pesanan Anda sedang diproses.
           </p>
-
-          <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 flex flex-col items-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest mb-1 font-black">ID Transaksi</span>
-            <div className="flex items-center space-x-2">
-              <code className="text-base font-mono font-bold text-green-700 uppercase">{orderId || 'N/A'}</code>
-              <button onClick={copyOrderId} className="p-1.5 hover:bg-gray-200 rounded-md transition-colors">
-                {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 inline-flex flex-col items-center mx-auto">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">ID Transaksi</span>
+            <div className="flex items-center gap-2">
+              <code className="text-sm font-mono font-black text-emerald-700">{orderId || 'N/A'}</code>
+              <button onClick={copyOrderId} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-500">
+                {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
               </button>
             </div>
           </div>
+        </div>
 
-          <div className="text-left mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
-            <h3 className="font-black text-gray-400 text-[10px] uppercase tracking-widest border-b pb-2 mb-3">Rincian Pesanan</h3>
-            <div className="space-y-3">
-              {displayItems.map((item: OrderItem, idx: number) => (
-                <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-50 pb-2">
-                  <div className="pr-4">
-                    <p className="font-bold text-gray-800 uppercase text-[11px] leading-tight">{item.name}</p>
-                    <p className="text-[10px] text-gray-500">{item.quantity} x Rp{item.price?.toLocaleString()}</p>
-                  </div>
-                  <p className="font-bold text-gray-900 text-xs">Rp{((item.price || 0) * (item.quantity || 0)).toLocaleString()}</p>
+        {/* Rincian Produk */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Rincian Pesanan</h3>
+          <div className="space-y-3">
+            {displayItems.map((item: OrderItem, idx: number) => (
+              <div key={idx} className="flex justify-between items-start py-2.5 border-b border-slate-50 last:border-0">
+                <div className="flex-1 pr-4">
+                  <p className="text-sm font-bold text-slate-800 leading-snug">{item.name}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.quantity} × Rp{item.price?.toLocaleString('id-ID')}</p>
                 </div>
-              ))}
+                <p className="text-sm font-black text-slate-900">Rp{((item.price || 0) * (item.quantity || 0)).toLocaleString('id-ID')}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Info & Total */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+          <div className="grid grid-cols-2 gap-4 mb-5">
+            <div>
+              <p className="text-xs text-slate-400 font-bold mb-0.5">Metode Kirim</p>
+              <p className="text-sm font-bold text-slate-800">{displayMethod}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 font-bold mb-0.5">Pembayaran</p>
+              <p className="text-sm font-bold text-slate-800 uppercase">{displayPayment}</p>
             </div>
           </div>
-
-          <div className="text-left space-y-4 mb-8 bg-gray-50 p-5 rounded-2xl border border-dashed border-gray-300">
-            <div className="grid grid-cols-2 gap-y-4 text-sm pt-1">
-              <div>
-                <p className="text-gray-400 text-[10px] uppercase font-black">Metode Kirim</p>
-                <p className="font-bold text-gray-800 uppercase text-[11px]">{displayMethod}</p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-[10px] uppercase font-black">Pembayaran</p>
-                <p className="font-bold text-gray-800 uppercase text-[11px]">{displayPayment}</p>
-              </div>
-              <div className="col-span-2 pt-2 border-t">
-                <p className="text-gray-400 text-[10px] uppercase font-black">Total Transaksi</p>
-                <p className="text-2xl font-black text-green-600">Rp{displayTotal.toLocaleString()}</p>
-              </div>
-            </div>
+          <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+            <span className="text-sm font-bold text-slate-600">Total Transaksi</span>
+            <span className="text-2xl font-black text-emerald-600">Rp{displayTotal.toLocaleString('id-ID')}</span>
           </div>
+        </div>
 
-          {isQrisBri && !isPaid && (
-            <div className="bg-white rounded-2xl border border-emerald-100 p-6 mb-8 text-left">
-              <h3 className="font-black text-emerald-700 text-[10px] uppercase tracking-widest mb-2">Pembayaran QRIS</h3>
-              {qrisLoading && !qrisContent ? (
-                <div className="flex items-center gap-3 text-slate-500">
-                  <Loader2 className="animate-spin" size={18} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Menyiapkan QR...</span>
+        {isQrisBri && !isPaid && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 text-left">
+            <h3 className="text-sm font-bold text-emerald-800 mb-3">Pembayaran QRIS</h3>
+            {qrisLoading && !qrisContent ? (
+              <div className="flex items-center gap-3 text-slate-500">
+                <Loader2 className="animate-spin" size={18} />
+                <span className="text-sm font-medium">Menyiapkan kode QR...</span>
+              </div>
+            ) : qrisContent ? (
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="bg-white p-3 rounded-2xl border border-slate-100">
+                  <QRCodeSVG value={qrisContent} size={180} />
                 </div>
-              ) : qrisContent ? (
-                <div className="flex flex-col md:flex-row items-center gap-6">
-                  <div className="bg-white p-3 rounded-2xl border border-slate-100">
-                    <QRCodeSVG value={qrisContent} size={180} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-slate-600">Scan QR untuk bayar. Setelah berhasil, status akan otomatis berubah.</p>
-                    <div className="mt-4 flex gap-3">
-                      <button
-                        onClick={() => window.location.reload()}
-                        className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 active:scale-95 transition-all"
-                      >
-                        Refresh
-                      </button>
-                      <Link
-                        href={`/orders`}
-                        className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black active:scale-95 transition-all inline-flex items-center justify-center"
-                      >
-                        Lihat Pesanan
-                      </Link>
-                    </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-700 leading-relaxed">Scan QR untuk membayar. Status pesanan akan otomatis berubah setelah pembayaran berhasil.</p>
+                  <div className="mt-4 flex gap-3">
+                    <button onClick={() => window.location.reload()} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all">
+                      Refresh
+                    </button>
+                    <Link href="/orders" className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-black active:scale-95 transition-all inline-flex items-center justify-center">
+                      Lihat Pesanan
+                    </Link>
                   </div>
                 </div>
-              ) : (
-                <p className="text-xs font-bold text-rose-600">QR belum tersedia. Coba refresh.</p>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-rose-600">QR belum tersedia. Silakan refresh halaman.</p>
+            )}
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Action Buttons */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             <button
               onClick={saveInvoiceAsImage}
               disabled={isDownloading}
-              className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg active:scale-95 disabled:bg-gray-400"
+              className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-blue-700 shadow-md active:scale-95 transition-all disabled:opacity-50"
             >
-              {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <><Download size={18} /> <span>Simpan Gambar Nota</span></>}
+              {isDownloading ? <Loader2 className="animate-spin" size={17} /> : <><Download size={17} /> Simpan Nota</>}
             </button>
-            <button onClick={printThermal} className="flex items-center justify-center space-x-2 bg-gray-800 text-white py-3.5 rounded-xl font-bold hover:bg-black shadow-lg active:scale-95">
-              <Printer size={18} />
-              <span>Cetak Struk Thermal</span>
+            <button onClick={printThermal} className="flex items-center justify-center gap-2 bg-slate-800 text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-slate-900 shadow-md active:scale-95 transition-all">
+              <Printer size={17} /> Cetak Struk
             </button>
-            <Link href="/" className="md:col-span-2 flex items-center justify-center space-x-2 bg-green-600 text-white py-3.5 rounded-xl font-bold hover:bg-green-700 shadow-lg active:scale-95">
-              <ShoppingBag size={18} />
-              <span>Belanja Lagi</span>
-            </Link>
           </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <a href="https://wa.me/6285853161174" target="_blank" className="inline-flex items-center gap-2 text-green-600 font-bold hover:underline text-sm">
-              <MessageCircle size={18} /> Hubungi Admin Ataya
+          <Link href="/" className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-emerald-700 shadow-md shadow-emerald-600/20 active:scale-95 transition-all">
+            <ShoppingBag size={17} /> Belanja Lagi
+          </Link>
+          <div className="mt-5 pt-4 border-t border-slate-100 text-center">
+            <a href="https://wa.me/6285853161174" target="_blank" className="inline-flex items-center gap-2 text-emerald-600 font-bold hover:underline text-sm">
+              <MessageCircle size={17} /> Hubungi Admin Ataya Toko
             </a>
           </div>
         </div>
