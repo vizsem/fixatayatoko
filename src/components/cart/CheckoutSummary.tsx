@@ -23,8 +23,8 @@ export function CheckoutSummary({
   isSubmitting, onCheckout, canCheckout, validationMsg
 }: SummaryProps) {
   return (
-    <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-xl border border-slate-100 sticky top-24 space-y-6">
-      <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
+    <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 sm:p-7 md:p-8 shadow-lg md:shadow-xl border border-slate-100 sticky top-24 space-y-6">
+      <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2.5">
         <CreditCard size={18} className="text-emerald-600" /> Ringkasan Pembayaran
       </h2>
 
@@ -34,9 +34,9 @@ export function CheckoutSummary({
         {/* Shipping Line */}
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center gap-2">
-            <Truck size={14} className={shippingCost === 0 ? 'text-emerald-600' : 'text-slate-400'} />
+            <Truck size={15} className={shippingCost === 0 ? 'text-emerald-600' : 'text-slate-400'} />
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Ongkir {shippingMethodName ? `(${shippingMethodName})` : ''}
               </p>
             </div>
@@ -61,8 +61,8 @@ export function CheckoutSummary({
         <div className="h-px bg-slate-100 my-4" />
         
         <div className="flex justify-between items-end">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tagihan</p>
-          <p className="text-3xl font-black text-slate-900 tracking-tighter">Rp {total.toLocaleString('id-ID')}</p>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500">Total Tagihan</p>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Rp {total.toLocaleString('id-ID')}</p>
         </div>
       </div>
 
@@ -112,9 +112,9 @@ function SummaryLine({ label, value, color = 'text-slate-900', icon: Icon }: any
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-2">
         {Icon && <Icon size={14} className={color} />}
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
       </div>
-      <p className={`text-xs font-black ${color}`}>
+      <p className={`text-xs md:text-sm font-black ${color}`}>
         {value < 0 ? '-' : ''} Rp {Math.abs(value).toLocaleString('id-ID')}
       </p>
     </div>

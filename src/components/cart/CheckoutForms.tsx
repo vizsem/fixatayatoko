@@ -56,12 +56,12 @@ export function CheckoutForms({
   return (
     <div className="space-y-8">
       {/* 1. Address & Delivery Section */}
-      <section className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-slate-100">
+      <section className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 sm:p-8 shadow-sm border border-slate-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
+          <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2.5">
             <MapPin size={18} className="text-rose-500" /> Metode & Alamat Pengiriman
           </h3>
-          <span className="text-[10px] font-bold text-slate-400 hidden sm:inline">
+          <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">
             Gudang: {ATAYATOKO_WAREHOUSE.city}
           </span>
         </div>
@@ -152,42 +152,42 @@ export function CheckoutForms({
               {/* Recipient Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-3 mb-1.5 block">
-                    Nama Penerima *
+                  <label className="text-xs font-bold text-slate-700 ml-2 mb-1.5 block">
+                    Nama Penerima <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={customer.name}
                     onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
                     placeholder="Contoh: Bpk. Ahmad"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-3 mb-1.5 block">
-                    No. WhatsApp / HP *
+                  <label className="text-xs font-bold text-slate-700 ml-2 mb-1.5 block">
+                    No. WhatsApp / HP <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    type="text"
+                    type="tel"
                     required
                     value={customer.phone}
                     onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
                     placeholder="08xxxxxxxxxx"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-3 mb-1.5 block">
-                  Alamat Lengkap Pengiriman *
+                <label className="text-xs font-bold text-slate-700 ml-2 mb-1.5 block">
+                  Alamat Lengkap Pengiriman <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   required
                   value={customer.address}
                   onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all h-24 resize-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all h-24 resize-none leading-relaxed"
                   placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan, kecamatan, dan patokan..."
                 />
               </div>
@@ -195,12 +195,12 @@ export function CheckoutForms({
               {/* Courier & Zone Selector */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <Truck size={14} className="text-emerald-600" />
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Truck size={15} className="text-emerald-600" />
                     Pilih Layanan Kurir & Radius Pengantaran
                   </label>
-                  <span className="text-[10px] font-bold text-slate-400">
-                    Berdasarkan jarak dari Gudang Tamanan
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Dari Gudang Tamanan
                   </span>
                 </div>
 
@@ -269,9 +269,9 @@ export function CheckoutForms({
       </section>
 
       {/* 2. Payment Method Section */}
-      <section className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-slate-100">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-6 flex items-center gap-3">
-          <Banknote size={18} className="text-emerald-500" /> Metode Pembayaran
+      <section className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 sm:p-8 shadow-sm border border-slate-100">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-6 flex items-center gap-2.5">
+          <Banknote size={18} className="text-emerald-600" /> Metode Pembayaran
         </h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -286,12 +286,12 @@ export function CheckoutForms({
 
         {paymentMethod === 'tempo' && (
           <div className="mt-6 animate-in zoom-in-95">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Jatuh Tempo</label>
+            <label className="text-xs font-bold text-slate-700 ml-2 mb-2 block">Jatuh Tempo</label>
             <input
               type="date"
               value={tempoDueDate}
               onChange={(e) => setTempoDueDate(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-bold outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
         )}
@@ -305,14 +305,14 @@ function PaymentOption({ active, onClick, icon: Icon, label }: any) {
     <button
       type="button"
       onClick={onClick}
-      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 group ${
+      className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 group ${
         active
-          ? 'border-emerald-600 bg-emerald-50/40 shadow-sm'
-          : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'
+          ? 'border-emerald-600 bg-emerald-50/50 shadow-sm'
+          : 'border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-slate-300'
       }`}
     >
       <Icon size={20} className={active ? 'text-emerald-700' : 'text-slate-400 group-hover:text-slate-600'} />
-      <span className={`text-[10px] font-black uppercase tracking-tight text-center ${active ? 'text-emerald-900' : 'text-slate-400'}`}>
+      <span className={`text-[11px] font-bold uppercase tracking-tight text-center ${active ? 'text-emerald-900' : 'text-slate-500'}`}>
         {label}
       </span>
     </button>

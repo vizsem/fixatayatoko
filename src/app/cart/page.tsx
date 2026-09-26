@@ -242,12 +242,12 @@ export default function CartPage() {
             }}
           />
 
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
+          <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 sm:p-8 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2.5">
                 <ShoppingBag size={18} className="text-emerald-600" /> Daftar Belanja Anda
               </h2>
-              <span className="bg-slate-50 px-4 py-1.5 rounded-full text-[10px] font-black text-slate-400">{cart.length} item</span>
+              <span className="bg-slate-100 px-3.5 py-1 rounded-full text-xs font-black text-slate-600">{cart.length} item</span>
             </div>
 
             <div className="space-y-4">

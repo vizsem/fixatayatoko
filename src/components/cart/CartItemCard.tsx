@@ -81,21 +81,23 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
 
                 {/* Qty Counter */}
                 <div className="flex flex-col gap-1">
-                    <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl p-1">
+                    <div className="flex items-center bg-slate-50 border border-slate-200/80 rounded-xl p-1">
                        <button
                          disabled={quantity <= minPurchase}
                          onClick={() => handleUpdate(quantity - 1)}
-                         className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors disabled:opacity-20"
+                         className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-900 active:scale-95 transition-all disabled:opacity-20"
+                         aria-label="Kurangi jumlah"
                        >
-                         <Minus size={12} />
+                         <Minus size={14} />
                        </button>
-                       <span className="w-8 text-center text-[10px] font-black text-slate-900">{quantity}</span>
+                       <span className="w-9 text-center text-xs font-black text-slate-900">{quantity}</span>
                        <button
                          disabled={(maxPurchase > 0 && quantity >= maxPurchase) || quantity >= maxStockUnits}
                          onClick={() => handleUpdate(quantity + 1)}
-                         className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors disabled:opacity-20"
+                         className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-900 active:scale-95 transition-all disabled:opacity-20"
+                         aria-label="Tambah jumlah"
                        >
-                         <Plus size={12} />
+                         <Plus size={14} />
                        </button>
                     </div>
                     {minPurchase > 1 && (
@@ -109,7 +111,7 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
 
              <div className="text-right">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
-                <p className="text-sm font-black text-green-600">Rp {lineTotal.toLocaleString('id-ID')}</p>
+                <p className="text-sm md:text-base font-black text-emerald-600">Rp {lineTotal.toLocaleString('id-ID')}</p>
              </div>
           </div>
         </div>
