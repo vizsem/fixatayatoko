@@ -264,22 +264,22 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                     
                   />
                   {product.wholesalePrice > 0 && (
-                    <div className="absolute top-2 left-2 bg-blue-600 text-[7px] text-white font-black px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
-                      <Sparkles size={8} /> Grosir
+                    <div className="absolute top-2 left-2 bg-blue-600 text-[9px] text-white font-bold px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
+                      <Sparkles size={10} /> Grosir
                     </div>
                   )}
                 </Link>
 
                 {/* Info Container */}
                 <div className="flex-1 flex flex-col">
-                  <h3 className="text-[10px] font-black text-gray-800 uppercase line-clamp-2 leading-tight mb-1">{product.name}</h3>
+                  <h3 className="text-xs font-bold text-gray-800 uppercase line-clamp-2 leading-snug mb-1">{product.name}</h3>
                   <div className="mb-3 mt-auto">
-                    <p className="text-[14px] font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Per {product.unit}</p>
+                    <p className="text-sm font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
+                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tight">Per {product.unit}</p>
                   </div>
                   <button 
                     onClick={() => addToCart(product)} 
-                    className="w-full py-3 bg-gray-900 text-white text-[9px] font-black rounded-xl uppercase tracking-widest active:bg-green-600 shadow-md"
+                    className="w-full py-2.5 bg-gray-900 text-white text-[11px] font-bold rounded-xl uppercase tracking-wider active:bg-green-600 shadow-md"
                   >
                     + Keranjang
                   </button>

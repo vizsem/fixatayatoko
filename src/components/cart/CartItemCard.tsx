@@ -99,10 +99,10 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                        </button>
                     </div>
                     {minPurchase > 1 && (
-                      <p className="text-[7px] font-black text-blue-500 uppercase px-1">Min: {minPurchase}</p>
+                      <p className="text-[10px] font-bold text-blue-600 uppercase px-1">Min: {minPurchase}</p>
                     )}
                     {maxPurchase > 0 && (
-                      <p className="text-[7px] font-black text-rose-500 uppercase px-1">Max: {maxPurchase}</p>
+                      <p className="text-[10px] font-bold text-rose-600 uppercase px-1">Max: {maxPurchase}</p>
                     )}
                  </div>
              </div>

@@ -50,18 +50,18 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
              <div className="bg-white p-1.5 rounded-lg inline-block shadow-sm">
                 <QRCodeSVG value={memberId} size={48} className="md:w-10 md:h-10" />
              </div>
-             <p className="text-[7px] font-mono mt-0.5 opacity-80">{memberId}</p>
+             <p className="text-[10px] font-mono mt-0.5 opacity-90">{memberId}</p>
           </div>
 
           <div className="flex items-center gap-4">
             {typeof walletBalance === 'number' && (
               <div className="flex flex-col items-end">
-                <p className="text-[8px] font-medium uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Wallet size={8}/> Saldo</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Wallet size={10}/> Saldo</p>
                 <p className="text-lg font-bold tracking-tight">Rp{walletBalance.toLocaleString()}</p>
               </div>
             )}
             <div className="flex flex-col items-end">
-              <p className="text-[8px] font-medium uppercase tracking-widest opacity-60 mb-1 flex items-center gap-1"><Ticket size={8}/> Poin</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Ticket size={10}/> Poin</p>
               <p className="text-2xl md:text-xl font-bold tracking-tight">{points.toLocaleString()}</p>
             </div>
           </div>

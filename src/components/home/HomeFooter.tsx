@@ -77,25 +77,25 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
       </footer>
 
       {/* Mobile Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50">
-        <Link href="/" className="flex flex-col items-center gap-1 text-green-600">
-          <HomeIcon size={20} /><span className="text-[8px] font-black">Beranda</span>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-6 py-2.5 flex justify-between items-center z-50">
+        <Link href="/" className="flex flex-col items-center gap-0.5 text-green-600">
+          <HomeIcon size={20} /><span className="text-[10px] font-bold">Beranda</span>
         </Link>
-        <Link href="/semua-kategori" className="flex flex-col items-center gap-1 text-gray-400">
-          <Grid size={20} /><span className="text-[8px] font-black">Katalog</span>
+        <Link href="/semua-kategori" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <Grid size={20} /><span className="text-[10px] font-bold">Katalog</span>
         </Link>
-        <Link href="/cart" className="flex flex-col items-center gap-1 text-gray-400 relative">
+        <Link href="/cart" className="flex flex-col items-center gap-0.5 text-gray-400 relative">
           <div className="relative">
             <ShoppingCart size={20} />
-            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold rounded-full h-4 w-4 flex items-center justify-center animate-bounce">{cartCount}</span>}
+            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">{cartCount}</span>}
           </div>
-          <span className="text-[8px] font-black">Keranjang</span>
+          <span className="text-[10px] font-bold">Keranjang</span>
         </Link>
-        <Link href="/orders" className="flex flex-col items-center gap-1 text-gray-400">
-          <FileText size={20} /><span className="text-[8px] font-black">Pesanan</span>
+        <Link href="/orders" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <FileText size={20} /><span className="text-[10px] font-bold">Pesanan</span>
         </Link>
-        <Link href="/profil" className="flex flex-col items-center gap-1 text-gray-400">
-          <User size={20} /><span className="text-[8px] font-black">Akun</span>
+        <Link href="/profil" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <User size={20} /><span className="text-[10px] font-bold">Akun</span>
         </Link>
       </nav>
     </>

@@ -84,7 +84,7 @@ export default function MobileNav() {
                   </span>
                 )}
               </div>
-              <span className="text-[9px] font-black uppercase tracking-tight">
+              <span className="text-[10px] font-bold uppercase tracking-tight">
                 {item.label}
               </span>
             </Link>

@@ -199,7 +199,7 @@ export default function AdminMobileNav() {
                   className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all ${isActive ? 'text-green-600' : 'text-gray-400'}`}
                 >
                   <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[2]'} />
-                  <span className="text-[8px] font-black mt-1 uppercase tracking-tighter">{item.name}</span>
+                  <span className="text-[10px] font-bold mt-0.5 uppercase tracking-tight">{item.name}</span>
                 </Link>
               );
             }
@@ -223,7 +223,7 @@ export default function AdminMobileNav() {
                 className="flex flex-col items-center justify-center w-12 h-12 text-gray-400 active:scale-90 transition-transform"
               >
                 <Icon size={20} />
-                <span className="text-[8px] font-black mt-1 uppercase tracking-tighter">{item.name}</span>
+                <span className="text-[10px] font-bold mt-0.5 uppercase tracking-tight">{item.name}</span>
               </button>
             );
           })}

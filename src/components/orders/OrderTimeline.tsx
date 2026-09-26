@@ -45,7 +45,7 @@ export function OrderTimeline({ status }: TimelineProps) {
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 ${isCurrent ? 'bg-green-600 text-white shadow-lg scale-110' : isActive ? 'bg-green-50 text-green-600' : 'bg-white border border-slate-100 text-slate-300'}`}>
                  <Icon size={14} />
               </div>
-              <span className={`text-[8px] font-black uppercase tracking-tighter ${isCurrent ? 'text-green-700' : isActive ? 'text-green-600' : 'text-slate-300'}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-tight text-center ${isCurrent ? 'text-green-700' : isActive ? 'text-green-600' : 'text-slate-400'}`}>
                  {step.label}
               </span>
            </div>
