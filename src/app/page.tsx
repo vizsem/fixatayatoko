@@ -18,6 +18,7 @@ import { HomeFooter } from '@/components/home/HomeFooter';
 import { ProductCard } from '@/components/home/ProductCard';
 import { SkeletonCard } from '@/components/home/SkeletonCard';
 import { HomeSkeleton } from '@/components/home/HomeSkeleton';
+import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
 import { auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, signOut, where } from '@/lib/firebase';
@@ -344,6 +345,9 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {/* Jaminan Layanan & Hal Penting Diketahui Pelanggan */}
+      <CustomerGuarantees variant="cards" />
 
       <HomeFooter cartCount={cartCount} />
 

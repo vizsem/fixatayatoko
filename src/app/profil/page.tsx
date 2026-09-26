@@ -534,6 +534,53 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
+
+            {/* CARD BANTUAN & PANDUAN BELANJA PELANGGAN */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-xs uppercase tracking-wider">
+                <ShieldCheck size={16} className="text-emerald-600" />
+                <span>Panduan & Jaminan Belanja</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Seluruh pesanan Anda di ATAYATOKO dilindungi ketentuan resmi:
+              </p>
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/80 flex items-start gap-2.5">
+                  <Truck size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-slate-800 block text-[11px]">Gratis Ongkir Kediri Kota</strong>
+                    <span className="text-[10px] text-slate-500">Pesan-antar gratis langsung ke alamat Anda (S&K berlaku).</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/80 flex items-start gap-2.5">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-slate-800 block text-[11px]">Garansi Retur 1x24 Jam</strong>
+                    <span className="text-[10px] text-slate-500">Barang rusak, bocor, atau salah? Laporkan via WA dalam 1x24 jam.</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/80 flex items-start gap-2.5">
+                  <Star size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-slate-800 block text-[11px]">Harga Grosir Otomatis</strong>
+                    <span className="text-[10px] text-slate-500">Beli jumlah banyak otomatis dapat harga potongan grosir.</span>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2 text-[10px] font-bold text-emerald-700">
+                <Link href="/syarat-ketentuan" className="hover:underline flex items-center gap-1">
+                  Syarat & Ketentuan &rarr;
+                </Link>
+                <span className="text-slate-300">•</span>
+                <Link href="/kebijakan-privasi" className="hover:underline flex items-center gap-1">
+                  Kebijakan Privasi &rarr;
+                </Link>
+                <span className="text-slate-300">•</span>
+                <Link href="/kontak" className="hover:underline flex items-center gap-1">
+                  Hubungi Toko &rarr;
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* KOLOM KANAN: RIWAYAT PESANAN */}

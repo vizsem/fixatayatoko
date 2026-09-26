@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
 import toast, { Toaster } from 'react-hot-toast';
 import { ProductSkeleton } from '@/components/home/ProductSkeleton';
+import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
 import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, setDoc } from '@/lib/firebase';
@@ -516,6 +517,9 @@ export default function ProductDetailClient({
                     </div>
                   ))}
                 </div>
+
+                {/* 4 Jaminan Layanan Pelanggan */}
+                <CustomerGuarantees variant="compact" className="mt-3" />
             </div>
 
             {/* Review Section */}
