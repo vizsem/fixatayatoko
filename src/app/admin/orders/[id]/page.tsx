@@ -522,7 +522,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">
                 Detail Pesanan
               </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <p className="text-xs text-slate-400">
                 Kelola status dan cetak invoice
               </p>
             </div>
@@ -530,20 +530,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex gap-2">
             <button
               onClick={sendWhatsApp}
-              className="flex items-center gap-2 text-[10px] font-black uppercase bg-green-600 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-green-700 transition-all"
+              className="flex items-center gap-2 text-xs font-semibold bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-emerald-700 transition-all"
             >
               <MessageSquare size={14} /> WhatsApp
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 text-[10px] font-black uppercase bg-black text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-slate-800 transition-all"
+              className="flex items-center gap-2 text-xs font-semibold bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-all"
             >
               <Printer size={14} /> Cetak
             </button>
             {order.status === 'SELESAI' && (
               <button
                 onClick={() => setIsReturnModalOpen(true)}
-                className="flex items-center gap-2 text-[10px] font-black uppercase bg-purple-600 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-purple-700 transition-all"
+                className="flex items-center gap-2 text-xs font-semibold bg-purple-600 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-purple-700 transition-all"
               >
                 <RefreshCcw size={14} /> Retur
               </button>
@@ -557,14 +557,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">Retur Barang</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order #{order.id.slice(-8)}</p>
+                  <p className="text-xs text-slate-400">Order #{order.id.slice(-8)}</p>
                 </div>
                 <button onClick={() => setIsReturnModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><XCircle size={24} className="text-slate-300" /></button>
               </div>
 
               <div className="p-8 overflow-y-auto space-y-6">
                 <div className="space-y-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</p>
+                  <p className="text-xs font-semibold text-slate-500 px-1">Pilih Barang yang Dikembalikan</p>
                   {returnItems.map((item, idx) => (
                     <div key={idx} className={`p-4 rounded-2xl border transition-all ${item.selected ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
                       <div className="flex items-center gap-3">
@@ -580,11 +580,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         />
                         <div className="flex-1">
                           <p className="text-xs font-black uppercase">{item.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400">Rp {item.price.toLocaleString()}</p>
+                          <p className="text-xs text-slate-400">Rp {item.price.toLocaleString()}</p>
                         </div>
                         {item.selected && (
                           <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-purple-100">
-                            <span className="text-[9px] font-black text-slate-400 px-2 uppercase">Qty</span>
+                            <span className="text-xs font-semibold text-slate-400 px-2">Qty</span>
                             <input 
                               type="number" 
                               max={order.items.find(i => i.productId === item.productId)?.quantity || 1}
@@ -605,7 +605,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Pengembalian</label>
+                  <label className="text-xs font-semibold text-slate-500 px-1">Alasan Pengembalian</label>
                   <textarea 
                     value={returnReason}
                     onChange={e => setReturnReason(e.target.value)}
@@ -617,7 +617,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
               <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div className="text-right flex-1 px-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai</p>
+                  <p className="text-xs font-semibold text-slate-500">Total Nilai</p>
                   <p className="text-lg font-black text-slate-900">Rp {returnItems.filter(i => i.selected).reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()}</p>
                 </div>
                 <button 
@@ -639,16 +639,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-xs font-bold text-green-600 uppercase tracking-widest mb-1">
                 {storeSettings.name}
               </p>
-              <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
                 {storeSettings.address}
               </p>
-              <p className="text-[10px] text-slate-400 font-medium">
+              <p className="text-xs text-slate-500">
                 ☎ {storeSettings.phone} &nbsp;|&nbsp; ✉ {storeSettings.email}
               </p>
             </div>
             <div className="text-left md:text-right">
               <div
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase mb-4 shadow-sm ${getStatusColor(
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase mb-3 shadow-sm ${getStatusColor(
                   order.status
                 )}`}
               >
@@ -659,7 +659,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 #ORD-{order.id.substring(0, 12).toUpperCase()}
               </p>
               {order.externalOrderId && (
-                <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
+                <p className="text-xs font-semibold text-orange-600">
                   {order.channel && `${order.channel} • `}{order.externalOrderId}
                 </p>
               )}
@@ -673,7 +673,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
             <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Pelanggan
               </h4>
               <div className="p-6 bg-slate-50 rounded-[2rem]">
@@ -688,23 +688,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Metode
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-5 bg-indigo-50 rounded-3xl text-indigo-700">
                   <Truck size={20} className="mb-2" />
-                  <p className="text-[9px] font-black uppercase opacity-60">Kurir</p>
+                  <p className="text-xs font-semibold opacity-70">Kurir</p>
                   <p className="text-xs font-black uppercase">
                     {order.deliveryMethod?.replace('_', ' ')}
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                  <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">
                     Status Pembayaran
                   </h3>
                   <div
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold ${
                       order.status === 'SELESAI'
                         ? 'bg-green-100 text-green-700'
                         : order.status === 'BELUM_LUNAS'
@@ -720,7 +720,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       : order.status}
                   </div>
                   {order.dueDate && order.status === 'BELUM_LUNAS' && (
-                    <p className="mt-2 text-[10px] font-bold text-red-500 uppercase">
+                    <p className="mt-2 text-xs font-semibold text-red-600">
                       Jatuh Tempo: {new Date(order.dueDate).toLocaleDateString('id-ID')}
                     </p>
                   )}
@@ -730,7 +730,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <button
                     onClick={() => updateStatus('SELESAI')}
                     disabled={isUpdating}
-                    className="mt-2 w-full bg-green-600 text-white py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-700 transition-all shadow-lg shadow-green-200"
+                    className="mt-2 w-full bg-green-600 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-green-200"
                   >
                     {isUpdating ? 'Memproses...' : 'Tandai Lunas'}
                   </button>
@@ -792,8 +792,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-slate-50 p-3 rounded-2xl">
                       <div className="flex justify-between items-center mb-2">
-                        <p className="text-[10px] font-black uppercase text-slate-400">Qty Proc</p>
-                        <span className="text-[9px] text-slate-400">/ {item.originalQuantity}</span>
+                        <p className="text-xs font-semibold text-slate-400">Qty Proc</p>
+                        <span className="text-xs text-slate-400">/ {item.originalQuantity}</span>
                       </div>
                       {(order.status === 'MENUNGGU' || order.status === 'PENDING') ? (
                         <input
@@ -824,13 +824,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                     <div className="bg-slate-50 p-3 rounded-2xl flex flex-col justify-between">
                       <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Subtotal</p>
+                        <p className="text-xs font-semibold text-slate-400 mb-1">Subtotal</p>
                         <p className="text-sm font-black text-slate-900">
                           Rp {(item.quantity * item.price).toLocaleString()}
                         </p>
                       </div>
                       <div className="mt-2 text-right">
-                        <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider ${
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
                             item.quantity === item.originalQuantity ? 'bg-emerald-100 text-emerald-700' :
                             item.quantity > 0 ? 'bg-amber-100 text-amber-700' :
                             'bg-rose-100 text-rose-700'
@@ -881,11 +881,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="md:hidden px-4 pt-6">
                 <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                    <div className="flex justify-between text-xs font-medium text-slate-500">
                       <span>Subtotal Produk</span>
                       <span>Rp{(order.subtotal || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                    <div className="flex justify-between text-xs font-medium text-slate-500">
                       <span>Ongkos Kirim</span>
                       <span>Rp{(order.shippingCost || 0).toLocaleString()}</span>
                     </div>
@@ -901,7 +901,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
             <table className="w-full min-w-[600px] md:min-w-0">
               <thead>
-                <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
+                <tr className="text-xs font-bold uppercase text-slate-400 border-b tracking-wider">
                   <th className="px-3 md:px-0 py-3 md:py-4 text-left">Item</th>
                   <th className="px-3 md:px-0 py-3 md:py-4 text-center w-20">Req</th>
                   <th className="px-3 md:px-0 py-3 md:py-4 text-center w-24">Proc</th>
@@ -923,7 +923,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <p className="text-xs font-mono text-slate-400 font-medium normal-case">
                         Rp{item.price.toLocaleString()}
                         {item.unit && (
-                          <span className="ml-1 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase">
+                          <span className="ml-1 text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
                             / {item.unit.toUpperCase() === 'DUS' ? 'CTN' : item.unit.toUpperCase()}
                           </span>
                         )}
@@ -962,7 +962,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       )}
                     </td>
                     <td className="px-3 md:px-0 py-3 md:py-4 text-center">
-                      <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
                           item.quantity === item.originalQuantity ? 'bg-emerald-100 text-emerald-700' :
                           item.quantity > 0 ? 'bg-amber-100 text-amber-700' :
                           'bg-rose-100 text-rose-700'
@@ -1044,34 +1044,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <tr>
                     <td colSpan={3} className="pt-4 px-3 md:px-0">
                       <div className="ml-auto max-w-xs border-t border-slate-100 pt-4 space-y-2">
-                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                        <div className="flex justify-between text-xs font-medium text-slate-500">
                           <span>Subtotal Produk</span>
                           <span>Rp{(order.subtotal || 0).toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                        <div className="flex justify-between text-xs font-medium text-slate-500">
                           <span>Ongkos Kirim</span>
                           <span>Rp{(order.shippingCost || 0).toLocaleString()}</span>
                         </div>
                         {(order.discount || 0) > 0 && (
-                          <div className="flex justify-between text-[11px] font-bold text-rose-500">
+                          <div className="flex justify-between text-xs font-semibold text-rose-600">
                             <span>Diskon</span>
                             <span>- Rp{(order.discount || 0).toLocaleString()}</span>
                           </div>
                         )}
                         {(order.voucher || 0) > 0 && (
-                          <div className="flex justify-between text-[11px] font-bold text-rose-500">
+                          <div className="flex justify-between text-xs font-semibold text-rose-600">
                             <span>Voucher</span>
                             <span>- Rp{(order.voucher || 0).toLocaleString()}</span>
                           </div>
                         )}
                         {(order.pointsUsed || 0) > 0 && (
-                          <div className="flex justify-between text-[11px] font-bold text-violet-500">
+                          <div className="flex justify-between text-xs font-semibold text-violet-600">
                             <span>Poin Digunakan</span>
                             <span>- Rp{(order.pointsUsed || 0).toLocaleString()}</span>
                           </div>
                         )}
                         {(order.walletUsed || 0) > 0 && (
-                          <div className="flex justify-between text-[11px] font-bold text-blue-500">
+                          <div className="flex justify-between text-xs font-semibold text-blue-600">
                             <span>Saldo Dompet</span>
                             <span>- Rp{(order.walletUsed || 0).toLocaleString()}</span>
                           </div>
@@ -1092,28 +1092,28 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {/* Signature Box – visible only on print */}
           <div className="mt-12 grid grid-cols-2 gap-16 print-only">
             <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-16">Penerima / Customer</p>
+              <p className="text-xs font-semibold text-slate-500 mb-16">Penerima / Customer</p>
               <div className="border-t-2 border-slate-300 pt-2">
-                <p className="text-[9px] font-bold text-slate-400">(Tanda Tangan &amp; Nama Jelas)</p>
+                <p className="text-xs text-slate-400">(Tanda Tangan &amp; Nama Jelas)</p>
               </div>
             </div>
             <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-16">Hormat Kami / Kasir</p>
+              <p className="text-xs font-semibold text-slate-500 mb-16">Hormat Kami / Kasir</p>
               <div className="border-t-2 border-slate-300 pt-2">
-                <p className="text-[9px] font-bold text-slate-400">{storeSettings.name}</p>
+                <p className="text-xs text-slate-400">{storeSettings.name}</p>
               </div>
             </div>
           </div>
 
           {/* Footer message */}
           <div className="mt-8 pt-6 border-t border-dashed border-slate-200 text-center print-only-block">
-            <p className="text-[10px] font-bold text-slate-400 italic">{storeSettings.footerMsg || 'Terima kasih telah berbelanja!'}</p>
+            <p className="text-xs text-slate-400 italic">{storeSettings.footerMsg || 'Terima kasih telah berbelanja!'}</p>
           </div>
           {(order.status === 'MENUNGGU' || order.status === 'PENDING') && editableItems.length > 0 && (
             <div className="mt-8 p-6 bg-slate-50 rounded-[2rem] border border-slate-100 no-print">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <p className="text-xs font-bold text-slate-400">
                     Konfirmasi Stok & Edit Nota
                   </p>
                   <p className="text-xs font-bold text-slate-700">
@@ -1153,7 +1153,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       />
                       <div>
                         <p className="text-xs font-black uppercase text-slate-800">{item.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400">
+                        <p className="text-xs text-slate-400">
                           Rp{item.price.toLocaleString()} / pcs
                         </p>
                       </div>
@@ -1177,7 +1177,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         }}
                         className="w-16 text-right text-xs font-black border rounded-lg px-2 py-1"
                       />
-                      <span className="text-[10px] font-bold text-slate-400">
+                      <span className="text-xs text-slate-400">
                         dari {item.originalQuantity}
                       </span>
                     </div>
@@ -1189,7 +1189,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <button
                   disabled={isConfirmingItems || confirmedItems.length === 0}
                   onClick={handleConfirmItems}
-                  className="px-6 py-3 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  className="px-6 py-3 rounded-2xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
                   {isConfirmingItems ? 'Memproses...' : 'Konfirmasi & Proses Pesanan'}
                 </button>
