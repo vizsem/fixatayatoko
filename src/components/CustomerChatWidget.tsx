@@ -157,7 +157,7 @@ export default function CustomerChatWidget() {
             </div>
             <div>
               <h3 className="font-bold text-sm">Admin Support</h3>
-              <p className="text-[10px] text-emerald-100">Biasanya membalas dalam 1 jam</p>
+              <p className="text-xs text-emerald-100">Biasanya membalas dalam 1 jam</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -186,7 +186,7 @@ export default function CustomerChatWidget() {
                   }`}
                 >
                   <p>{msg.text}</p>
-                  <span className={`text-[9px] block mt-1 text-right ${isMe ? 'text-emerald-100' : 'text-slate-400'}`}>
+                  <span className={`text-xs block mt-1 text-right ${isMe ? 'text-emerald-100' : 'text-slate-400'}`}>
                     {msg.createdAt ? new Date((msg.createdAt as any).toDate ? (msg.createdAt as any).toDate() : msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                   </span>
                 </div>

@@ -188,7 +188,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
       <div className="w-12 h-12 border-4 border-green-100 border-t-green-600 rounded-full animate-spin mb-4"></div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-green-600">Menyiapkan Produk...</p>
+      <p className="text-xs font-black uppercase tracking-widest text-green-600">Menyiapkan Produk...</p>
     </div>
   );
 
@@ -205,8 +205,8 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                 <ArrowLeft size={18}/>
               </button>
               <div>
-                <h1 className="text-[11px] font-black text-green-600 uppercase tracking-tighter leading-none mb-1">{categoryName}</h1>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">{filteredProducts.length} Produk Tersedia</p>
+                <h1 className="text-xs font-black text-green-600 uppercase tracking-tighter leading-none mb-1">{categoryName}</h1>
+                <p className="text-xs font-bold text-gray-400 uppercase">{filteredProducts.length} Produk Tersedia</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -264,7 +264,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                     
                   />
                   {product.wholesalePrice > 0 && (
-                    <div className="absolute top-2 left-2 bg-blue-600 text-[9px] text-white font-bold px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
+                    <div className="absolute top-2 left-2 bg-blue-600 text-xs text-white font-bold px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
                       <Sparkles size={10} /> Grosir
                     </div>
                   )}
@@ -275,11 +275,11 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                   <h3 className="text-xs font-bold text-gray-800 uppercase line-clamp-2 leading-snug mb-1">{product.name}</h3>
                   <div className="mb-3 mt-auto">
                     <p className="text-sm font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
-                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tight">Per {product.unit}</p>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-tight">Per {product.unit}</p>
                   </div>
                   <button 
                     onClick={() => addToCart(product)} 
-                    className="w-full py-2.5 bg-gray-900 text-white text-[11px] font-bold rounded-xl uppercase tracking-wider active:bg-green-600 shadow-md"
+                    className="w-full py-2.5 bg-gray-900 text-white text-xs font-bold rounded-xl uppercase tracking-wider active:bg-green-600 shadow-md"
                   >
                     + Keranjang
                   </button>
@@ -304,9 +304,9 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
             </button>
             
             <div className="flex items-center gap-1">
-              <span className="text-[10px] font-black uppercase text-gray-400">Halaman</span>
+              <span className="text-xs font-black uppercase text-gray-400">Halaman</span>
               <span className="text-[12px] font-black text-green-600 mx-1">{currentPage}</span>
-              <span className="text-[10px] font-black uppercase text-gray-400">dari {totalPages}</span>
+              <span className="text-xs font-black uppercase text-gray-400">dari {totalPages}</span>
             </div>
 
             <button 

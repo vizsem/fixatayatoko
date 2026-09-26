@@ -145,7 +145,7 @@ export default function VoucherExchangePage() {
         <span className="flex flex-col gap-1">
           <b className="text-xs">Berhasil ditukar!</b>
 
-          <span className="text-[10px]">Kode <code className="bg-gray-100 px-1 font-black">{voucherCode}</code> telah disalin.</span>
+          <span className="text-xs">Kode <code className="bg-gray-100 px-1 font-black">{voucherCode}</code> telah disalin.</span>
           <button
             onClick={() => {
               navigator.clipboard.writeText(voucherCode);

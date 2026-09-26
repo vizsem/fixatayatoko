@@ -137,13 +137,13 @@ function SearchPageContent() {
               <div className="pt-2 pb-4 space-y-6">
                  {/* Categories */}
                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
                        <Package size={14} /> Kategori
                     </label>
                     <div className="flex flex-wrap gap-2">
                        <button
                          onClick={() => setCategoryFilter('')}
-                         className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!categoryFilter ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                         className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${!categoryFilter ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
                        >
                          Semua
                        </button>
@@ -151,7 +151,7 @@ function SearchPageContent() {
                          <button
                            key={cat}
                            onClick={() => setCategoryFilter(cat)}
-                           className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${categoryFilter === cat ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                           className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${categoryFilter === cat ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
                          >
                            {cat}
                          </button>
@@ -162,7 +162,7 @@ function SearchPageContent() {
                  {/* Price & Sort */}
                  <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex-1">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 block">
+                       <label className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 block">
                           Rentang Harga
                        </label>
                        <div className="flex items-center gap-3">
@@ -185,7 +185,7 @@ function SearchPageContent() {
                     </div>
                     
                     <div className="md:w-64">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 block">
+                       <label className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 block">
                           Urutkan Berdasarkan
                        </label>
                        <select 
@@ -205,7 +205,7 @@ function SearchPageContent() {
                       onClick={() => {
                         setCategoryFilter(''); setPriceMin(''); setPriceMax(''); setSortBy('name');
                       }}
-                      className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors px-4 py-2"
+                      className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors px-4 py-2"
                     >
                       Reset Filter
                     </button>
@@ -221,7 +221,7 @@ function SearchPageContent() {
            <h1 className="text-xl font-black uppercase tracking-tighter text-slate-800">
              {query ? `Hasil untuk "${query}"` : categoryFilter ? `Kategori: ${categoryFilter}` : 'Semua Produk'}
            </h1>
-           <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">
+           <span className="text-xs font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">
              {loading ? '...' : filteredProducts.length} Produk
            </span>
         </div>
@@ -254,7 +254,7 @@ function SearchPageContent() {
              </p>
              <button 
                onClick={() => { setQuery(''); setSearchInput(''); setCategoryFilter(''); setPriceMin(''); setPriceMax(''); router.replace('/search'); }}
-               className="bg-green-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-green-200 hover:scale-105 active:scale-95 transition-all"
+               className="bg-green-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-green-200 hover:scale-105 active:scale-95 transition-all"
              >
                Lihat Semua Produk
              </button>

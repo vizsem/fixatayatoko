@@ -21,7 +21,7 @@ export function OrderTimeline({ status }: TimelineProps) {
     return (
       <div className="flex items-center gap-3 bg-rose-50 p-4 rounded-2xl border border-rose-100">
          <XCircle className="text-rose-500" size={20} />
-         <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Pesanan Dibatalkan</p>
+         <p className="text-xs font-black text-rose-600 uppercase tracking-widest">Pesanan Dibatalkan</p>
       </div>
     );
   }
@@ -45,7 +45,7 @@ export function OrderTimeline({ status }: TimelineProps) {
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 ${isCurrent ? 'bg-green-600 text-white shadow-lg scale-110' : isActive ? 'bg-green-50 text-green-600' : 'bg-white border border-slate-100 text-slate-300'}`}>
                  <Icon size={14} />
               </div>
-              <span className={`text-[10px] font-bold uppercase tracking-tight text-center ${isCurrent ? 'text-green-700' : isActive ? 'text-green-600' : 'text-slate-400'}`}>
+              <span className={`text-xs font-bold uppercase tracking-tight text-center ${isCurrent ? 'text-green-700' : isActive ? 'text-green-600' : 'text-slate-400'}`}>
                  {step.label}
               </span>
            </div>

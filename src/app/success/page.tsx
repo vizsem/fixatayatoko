@@ -346,7 +346,7 @@ function SuccessContent() {
             <span>TOTAL</span>
             <span>Rp{displayTotal.toLocaleString()}</span>
           </div>
-          <div className="text-center mt-10 text-[10px] uppercase font-bold">
+          <div className="text-center mt-10 text-xs uppercase font-bold">
             *** Terima Kasih Telah Berbelanja ***
           </div>
         </div>

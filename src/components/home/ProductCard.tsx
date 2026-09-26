@@ -73,11 +73,11 @@ export const ProductCard = ({
         />
         {isOut && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
-            <span className="bg-white text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase">Habis</span>
+            <span className="bg-white text-black text-xs font-bold px-3 py-1 rounded-full uppercase">Habis</span>
           </div>
         )}
         {promoInfo.hasPromo && !isOut && (
-          <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-orange-600 to-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg uppercase animate-pulse shadow-lg flex items-center gap-1">
+          <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold px-2 py-1 rounded-lg uppercase animate-pulse shadow-lg flex items-center gap-1">
             <Sparkles size={11} /> Promo
           </div>
         )}
@@ -88,8 +88,8 @@ export const ProductCard = ({
           <h3 className="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 leading-snug hover:text-green-600 transition-colors">{product.name}</h3>
         </Link>
         <div className="mt-1 flex items-center justify-between">
-          <p className="text-[10px] font-medium text-gray-400">{product.category}</p>
-          <p className={`text-[10px] font-bold uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
+          <p className="text-xs font-medium text-gray-400">{product.category}</p>
+          <p className={`text-xs font-bold uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
             {isOut ? 'Habis' : `Stok ${product.stock}`}
           </p>
         </div>
@@ -97,14 +97,14 @@ export const ProductCard = ({
         <Link href={`/produk/${product.id}`} className="flex flex-col mb-3 block cursor-pointer">
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-base font-black text-green-600">Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
-            <span className="text-[10px] font-medium text-gray-400">/{baseUnit}</span>
+            <span className="text-xs font-medium text-gray-400">/{baseUnit}</span>
           </div>
           
           <div className="mt-2 flex flex-wrap gap-1.5">
             {unitList.filter(u => u.code !== baseUnit).slice(0, 4).map((u) => (
               <span
                 key={u.code}
-                className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-[9px] font-bold uppercase text-gray-700"
+                className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-700"
                 title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
               >
                 <span className="text-gray-900">{u.code}</span>
@@ -114,7 +114,7 @@ export const ProductCard = ({
             ))}
             {unitList.filter(u => u.code !== baseUnit).length > 4 && (
               <span
-                className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-[9px] font-bold uppercase text-gray-500"
+                className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-500"
                 title={unitList.filter(u => u.code !== baseUnit).slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
               >
                 +{unitList.filter(u => u.code !== baseUnit).length - 4}
@@ -130,12 +130,12 @@ export const ProductCard = ({
               return (
                 <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-blue-600 uppercase block leading-none mb-1 tracking-wider">Target Grosir</span>
-                    <span className="text-[10px] font-bold text-blue-700 uppercase leading-none flex items-center gap-1">
+                    <span className="text-xs font-bold text-blue-600 uppercase block leading-none mb-1 tracking-wider">Target Grosir</span>
+                    <span className="text-xs font-bold text-blue-700 uppercase leading-none flex items-center gap-1">
                       Min. {wQty} {baseUnit}
                     </span>
                   </div>
-                  <span className="text-blue-700 text-[11px] font-bold not-italic bg-blue-50 px-2 py-1 rounded-lg">
+                  <span className="text-blue-700 text-xs font-bold not-italic bg-blue-50 px-2 py-1 rounded-lg">
                     {wPrice > 0 ? `Rp${wPrice.toLocaleString('id-ID')}` : 'Tanya Admin'}
                   </span>
                 </div>
@@ -152,7 +152,7 @@ export const ProductCard = ({
             onAddToCart(product); 
           }} 
           disabled={isOut} 
-          className={`mt-auto w-full py-2.5 text-[11px] font-bold rounded-xl shadow-sm transition-all relative z-30 uppercase tracking-wider ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
+          className={`mt-auto w-full py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all relative z-30 uppercase tracking-wider ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
         >
           {isOut ? 'Stok Habis' : '+ Keranjang'}
         </button>

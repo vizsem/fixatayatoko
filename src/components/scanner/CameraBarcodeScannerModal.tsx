@@ -225,7 +225,7 @@ export default function CameraBarcodeScannerModal({
             </div>
             <div>
               <h3 className="text-sm font-black tracking-wide text-white">{title}</h3>
-              <p className="text-[10px] text-neutral-400 font-semibold">{description}</p>
+              <p className="text-xs text-neutral-400 font-semibold">{description}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -329,7 +329,7 @@ export default function CameraBarcodeScannerModal({
 
         {/* Footer / Controls */}
         <div className="p-4 bg-neutral-900 border-t border-white/10 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between text-[11px] text-neutral-400">
+          <div className="flex items-center justify-between text-xs text-neutral-400">
             <span className="flex items-center gap-1.5">
               <Volume2 size={13} className="text-emerald-400" />
               Nada dering aktif saat ter-scan

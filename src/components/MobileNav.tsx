@@ -79,12 +79,12 @@ export default function MobileNav() {
                   className={isActive ? 'stroke-[2.5]' : 'stroke-[2]'}
                 />
                 {item.href === '/cart' && cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-black text-white flex items-center justify-center border border-white">
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-xs font-black text-white flex items-center justify-center border border-white">
                     {cartCount > 9 ? '9+' : cartCount}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-tight">
+              <span className="text-xs font-bold uppercase tracking-tight">
                 {item.label}
               </span>
             </Link>

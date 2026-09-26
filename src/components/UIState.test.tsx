@@ -100,7 +100,7 @@ describe('UIState Components', () => {
     it('should have correct description styling', () => {
       render(<EmptyState {...defaultProps} />);
       const description = screen.getByText(defaultProps.description!);
-      expect(description).toHaveClass('text-[11px]');
+      expect(description).toHaveClass('text-xs');
       expect(description).toHaveClass('font-bold');
       expect(description).toHaveClass('text-slate-400');
       expect(description).toHaveClass('max-w-xs');

@@ -29,7 +29,7 @@ export const DEFAULT_CHIPS: ChipItem[] = [
 export function ChipFilter({ items, value, onChange, className }: ChipFilterProps) {
   const containerCls = `px-4 py-2 overflow-x-auto whitespace-nowrap scrollbar-hide ${className || ''}`;
   const baseBtn =
-    'inline-flex items-center rounded-full border border-neutral-200 px-3 py-1.5 text-[10px] font-medium mr-2';
+    'inline-flex items-center rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium mr-2';
   const inactive =
     'bg-[#EFF3F6] text-gray-700';
   const active =

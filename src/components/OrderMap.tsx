@@ -99,9 +99,9 @@ export default function OrderMap({
             <MapPin className="text-red-500 flex-shrink-0" size={18} />
           </div>
           <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Alamat Pengiriman</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Alamat Pengiriman</p>
             <p className="text-xs font-bold text-gray-900 leading-relaxed uppercase">{address || 'Alamat tidak tersedia'}</p>
-            <p className="text-[9px] text-gray-400 font-medium mt-1">
+            <p className="text-xs text-gray-400 font-medium mt-1">
               Koordinat: {lat}, {lng}
             </p>
           </div>

@@ -173,7 +173,7 @@ export default function BuyerHeaderActions() {
                 </div>
                 <div className="overflow-hidden">
                   <p className="font-bold text-gray-900 truncate">{greetingName}</p>
-                  <Link href="/profil" className="text-[10px] text-green-600 font-bold hover:underline">
+                  <Link href="/profil" className="text-xs text-green-600 font-bold hover:underline">
                     Lihat Profil Saya
                   </Link>
                 </div>
@@ -225,7 +225,7 @@ export default function BuyerHeaderActions() {
         >
           <Bell size={22} strokeWidth={1.8} />
           {activeCount > 0 && (
-            <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+            <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-xs flex items-center justify-center rounded-full font-bold border-2 border-white">
               {activeCount > 9 ? '9+' : activeCount}
             </span>
           )}
@@ -235,7 +235,7 @@ export default function BuyerHeaderActions() {
             <div className="px-4 py-4 text-sm font-bold border-b border-gray-100">Notifikasi</div>
             <div className="p-3 space-y-2 max-h-[360px] overflow-auto">
               {activeOrders.length === 0 ? (
-                <div className="p-4 text-[11px] font-semibold text-gray-500">Tidak ada notifikasi.</div>
+                <div className="p-4 text-xs font-semibold text-gray-500">Tidak ada notifikasi.</div>
               ) : (
                 activeOrders.map((o) => (
                   <Link
@@ -246,10 +246,10 @@ export default function BuyerHeaderActions() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-bold text-gray-900 truncate">{o.orderId || o.id}</div>
-                        <div className="text-[10px] font-bold text-gray-400 uppercase truncate">{String(o.status || '').toUpperCase()}</div>
+                        <div className="text-xs font-bold text-gray-900 truncate">{o.orderId || o.id}</div>
+                        <div className="text-xs font-bold text-gray-400 uppercase truncate">{String(o.status || '').toUpperCase()}</div>
                       </div>
-                      <div className="text-[11px] font-bold text-gray-900">
+                      <div className="text-xs font-bold text-gray-900">
                         {typeof o.total === 'number' ? `Rp${o.total.toLocaleString('id-ID')}` : ''}
                       </div>
                     </div>
@@ -258,7 +258,7 @@ export default function BuyerHeaderActions() {
               )}
             </div>
             <div className="p-3 border-t border-gray-100">
-              <Link href="/orders" className="block w-full text-center bg-gray-900 text-white py-2.5 rounded-xl text-[11px] font-bold hover:bg-gray-800 transition-colors" onClick={() => setNotifOpen(false)}>
+              <Link href="/orders" className="block w-full text-center bg-gray-900 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-gray-800 transition-colors" onClick={() => setNotifOpen(false)}>
                 Lihat Semua
               </Link>
             </div>
@@ -269,7 +269,7 @@ export default function BuyerHeaderActions() {
       <Link className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative" title="Keranjang" href="/cart">
         <ShoppingCart size={22} strokeWidth={1.8} />
         {cartCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 bg-red-600 text-white text-xs flex items-center justify-center rounded-full font-bold border-2 border-white">
             {cartCount > 9 ? '9+' : cartCount}
           </span>
         )}

@@ -34,11 +34,11 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-70 mb-1">ATAYATOKO MEMBER</h3>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] opacity-70 mb-1">ATAYATOKO MEMBER</h3>
             <h2 className="text-xl md:text-lg font-bold uppercase tracking-tight line-clamp-1">{name}</h2>
           </div>
           <div className="flex flex-col items-end">
-             <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 bg-white/20 backdrop-blur rounded-lg border border-white/10">
+             <span className="text-xs font-bold uppercase tracking-widest px-2 py-1 bg-white/20 backdrop-blur rounded-lg border border-white/10">
                {level}
              </span>
           </div>
@@ -50,18 +50,18 @@ export default function MemberCard({ name, memberId, points, walletBalance, leve
              <div className="bg-white p-1.5 rounded-lg inline-block shadow-sm">
                 <QRCodeSVG value={memberId} size={48} className="md:w-10 md:h-10" />
              </div>
-             <p className="text-[10px] font-mono mt-0.5 opacity-90">{memberId}</p>
+             <p className="text-xs font-mono mt-0.5 opacity-90">{memberId}</p>
           </div>
 
           <div className="flex items-center gap-4">
             {typeof walletBalance === 'number' && (
               <div className="flex flex-col items-end">
-                <p className="text-[10px] font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Wallet size={10}/> Saldo</p>
+                <p className="text-xs font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Wallet size={10}/> Saldo</p>
                 <p className="text-lg font-bold tracking-tight">Rp{walletBalance.toLocaleString()}</p>
               </div>
             )}
             <div className="flex flex-col items-end">
-              <p className="text-[10px] font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Ticket size={10}/> Poin</p>
+              <p className="text-xs font-semibold uppercase tracking-wider opacity-75 mb-1 flex items-center gap-1"><Ticket size={10}/> Poin</p>
               <p className="text-2xl md:text-xl font-bold tracking-tight">{points.toLocaleString()}</p>
             </div>
           </div>

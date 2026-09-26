@@ -238,7 +238,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       {thread.lastMessageTime ? new Date((thread.lastMessageTime as any).toDate ? (thread.lastMessageTime as any).toDate() : thread.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                     </span>
                     {!thread.isReadByAdmin && (
@@ -302,7 +302,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
                         </div>
                       )}
                       <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                      <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isAdmin ? 'text-emerald-100' : 'text-slate-400'}`}>
+                      <div className={`flex items-center justify-end gap-1 mt-1 text-xs ${isAdmin ? 'text-emerald-100' : 'text-slate-400'}`}>
                         <span>
                           {msg.createdAt ? new Date((msg.createdAt as any).toDate ? (msg.createdAt as any).toDate() : msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                         </span>

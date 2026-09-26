@@ -29,7 +29,7 @@ export default function TentangPage() {
             <ChevronLeft size={16} /> Kembali ke Beranda
           </Link>
           <div className="flex items-center justify-center md:justify-start gap-2.5 mb-3">
-            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-[11px] font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
+            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
               Pusat Grosir & Eceran Kediri
             </span>
           </div>

@@ -30,7 +30,7 @@ export default function FloatingChatButton() {
         )}
 
         {/* Notification Badge (optional - can be connected to unread count) */}
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center animate-pulse">
+        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center animate-pulse">
           1
         </span>
       </button>

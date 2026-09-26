@@ -73,7 +73,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
                 <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
                   <Sparkles size={16} />
                 </span>
-                <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">
+                <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">
                   Jaminan Transaksi ATAYATOKO
                 </span>
               </div>
@@ -100,7 +100,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
                       <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                         <Icon size={22} />
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-2.5 py-1 rounded-full border border-emerald-100/60">
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-2.5 py-1 rounded-full border border-emerald-100/60">
                         {item.tag}
                       </span>
                     </div>
@@ -138,7 +138,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
                   {React.createElement(activeModal.icon, { size: 24 })}
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                  <span className="text-xs font-black uppercase tracking-widest text-emerald-700">
                     {activeModal.tag}
                   </span>
                   <h3 className="text-lg font-black text-slate-900">{activeModal.title}</h3>
@@ -175,7 +175,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
   if (variant === 'compact') {
     return (
       <div className={`bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 space-y-2.5 ${className}`}>
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-1">
+        <p className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-1">
           <ShieldCheck size={14} className="text-emerald-600" /> Jaminan Layanan Belanja
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -207,7 +207,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
         <ShieldCheck size={16} className="text-emerald-600" />
         <span>Pesanan Anda Dilindungi 4 Jaminan Resmi:</span>
       </div>
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-slate-600">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-slate-600">
         <li className="flex items-center gap-1.5">
           <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
           <span>Gratis Ongkir Area Kediri Kota</span>

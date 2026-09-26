@@ -231,7 +231,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 text-black pb-24 page-fade">
       <div className="bg-green-700 text-white py-1.5 overflow-hidden whitespace-nowrap">
-        <div className="animate-marquee inline-block text-[10px] font-bold uppercase tracking-widest px-4">
+        <div className="animate-marquee inline-block text-xs font-bold uppercase tracking-widest px-4">
           {systemSettings?.store?.footerMsg || '🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYAMARKET 🚚'}
         </div>
       </div>
@@ -257,14 +257,14 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 mt-3 pt-3 border-t border-gray-100 animate-in slide-in-from-top-2">
           <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-gray-500 mb-1 block">Min Harga</label>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">Min Harga</label>
               <input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500" />
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-gray-500 mb-1 block">Max Harga</label>
+              <label className="text-xs font-bold text-gray-500 mb-1 block">Max Harga</label>
               <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Tak Terbatas" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500" />
             </div>
-            <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-black hover:bg-gray-200 transition-colors h-[34px]">Reset</button>
+            <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-black hover:bg-gray-200 transition-colors h-[34px]">Reset</button>
           </div>
         </div>
       )}
@@ -327,7 +327,7 @@ export default function Home() {
                       <div className="p-1.5 rounded-lg bg-green-100 text-green-600"><Package size={18} /></div>
                       <h2 className="text-sm font-black text-gray-800 tracking-tighter">{cat.name}</h2>
                     </div>
-                    <Link href={`/kategori/${cat.slug}`} className="text-[10px] font-bold text-gray-400">SEMUA <ArrowRight size={12} className="inline" /></Link>
+                    <Link href={`/kategori/${cat.slug}`} className="text-xs font-bold text-gray-400">SEMUA <ArrowRight size={12} className="inline" /></Link>
                   </div>
                   <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
                     {items.slice(0, 10).map(p => <ProductCard key={p.id} product={p} promoInfo={getDiscountedPrice(p)} isWish={wishlist.includes(p.id)} onWishlistToggle={onWishlistToggle} onAddToCart={addToCart} />)}

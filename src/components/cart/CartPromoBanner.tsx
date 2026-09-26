@@ -13,7 +13,7 @@ export function CartPromoBanner({ product, onTake }: PromoProps) {
     <div className="bg-gradient-to-br from-orange-500 via-red-600 to-rose-700 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden mb-8 group">
        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex-1 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4">
                <Sparkles size={14} className="text-yellow-300 animate-pulse" /> Limited Opportunity
             </div>
             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none mb-3">
@@ -24,7 +24,7 @@ export function CartPromoBanner({ product, onTake }: PromoProps) {
             </p>
             <button 
               onClick={onTake}
-              className="bg-white text-rose-600 px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
+              className="bg-white text-rose-600 px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
               Klaim Sekarang
             </button>

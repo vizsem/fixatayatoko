@@ -61,7 +61,7 @@ export function CheckoutForms({
           <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2.5">
             <MapPin size={18} className="text-rose-500" /> Metode & Alamat Pengiriman
           </h3>
-          <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">
+          <span className="text-xs font-bold text-slate-500 hidden sm:inline">
             Gudang: {ATAYATOKO_WAREHOUSE.city}
           </span>
         </div>
@@ -85,7 +85,7 @@ export function CheckoutForms({
                 <Store size={22} />
               </div>
               <span className="text-xs font-black uppercase tracking-wider text-slate-900">Ambil di Gudang</span>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-full">
                 100% GRATIS
               </span>
             </button>
@@ -108,7 +108,7 @@ export function CheckoutForms({
                 <Truck size={22} />
               </div>
               <span className="text-xs font-black uppercase tracking-wider text-slate-900">Kirim ke Alamat</span>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-bold text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded-full">
                 Kurir Toko / Ekspedisi
               </span>
             </button>
@@ -126,7 +126,7 @@ export function CheckoutForms({
                   <p className="text-xs text-slate-600 font-medium mt-1">
                     {ATAYATOKO_WAREHOUSE.address}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                  <p className="text-xs text-slate-400 font-bold mt-0.5">
                     Titik Presisi: ({ATAYATOKO_WAREHOUSE.latitude}, {ATAYATOKO_WAREHOUSE.longitude})
                   </p>
                 </div>
@@ -134,13 +134,13 @@ export function CheckoutForms({
                   href={ATAYATOKO_WAREHOUSE.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-white border border-slate-200 hover:border-emerald-500 text-emerald-700 rounded-xl text-[10px] font-black flex items-center gap-1.5 transition-all flex-shrink-0"
+                  className="px-3 py-1.5 bg-white border border-slate-200 hover:border-emerald-500 text-emerald-700 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all flex-shrink-0"
                 >
                   <span>Google Maps</span>
                   <ExternalLink size={11} />
                 </a>
               </div>
-              <div className="p-3 bg-emerald-50 text-emerald-800 rounded-2xl text-[11px] font-bold">
+              <div className="p-3 bg-emerald-50 text-emerald-800 rounded-2xl text-xs font-bold">
                 💡 Pesanan akan disiapkan oleh staf gudang dan siap diambil 1 jam setelah konfirmasi pembayaran.
               </div>
             </div>
@@ -199,7 +199,7 @@ export function CheckoutForms({
                     <Truck size={15} className="text-emerald-600" />
                     Pilih Layanan Kurir & Radius Pengantaran
                   </label>
-                  <span className="text-[11px] font-bold text-slate-500">
+                  <span className="text-xs font-bold text-slate-500">
                     Dari Gudang Tamanan
                   </span>
                 </div>
@@ -228,13 +228,13 @@ export function CheckoutForms({
                             {isSelected && <Check size={16} className="text-emerald-600 flex-shrink-0" />}
                           </div>
 
-                          <p className="text-[10px] text-slate-500 font-medium line-clamp-2 leading-relaxed mb-2">
+                          <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed mb-2">
                             {method.description}
                           </p>
                         </div>
 
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between mt-1">
-                          <span className="text-[10px] font-bold text-slate-400">
+                          <span className="text-xs font-bold text-slate-400">
                             ⏱️ {method.estimatedTime}
                           </span>
 
@@ -254,7 +254,7 @@ export function CheckoutForms({
 
                         {/* Remaining amount banner for free delivery */}
                         {!rate.isFree && rate.remainingForFree > 0 && (
-                          <div className="mt-2 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                          <div className="mt-2 text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
                             Belanja {idr(rate.remainingForFree)} lagi untuk Gratis Ongkir
                           </div>
                         )}
@@ -312,7 +312,7 @@ function PaymentOption({ active, onClick, icon: Icon, label }: any) {
       }`}
     >
       <Icon size={20} className={active ? 'text-emerald-700' : 'text-slate-400 group-hover:text-slate-600'} />
-      <span className={`text-[11px] font-bold uppercase tracking-tight text-center ${active ? 'text-emerald-900' : 'text-slate-500'}`}>
+      <span className={`text-xs font-bold uppercase tracking-tight text-center ${active ? 'text-emerald-900' : 'text-slate-500'}`}>
         {label}
       </span>
     </button>

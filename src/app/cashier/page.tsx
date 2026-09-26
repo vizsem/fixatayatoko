@@ -1440,32 +1440,32 @@ export default function CashierPOS() {
           <div className="flex md:hidden items-center gap-3">
             <button onClick={() => setShowChatModal(true)} className="relative p-1.5 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
               <MessageSquare size={18} className="group-hover:text-green-600" />
-              {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
+              {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
             </button>
             <button onClick={() => setIsDrawerOpen(true)} className="relative p-1.5 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
               <Bell size={18} className="group-hover:text-blue-600" />
-              {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
+              {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
             </button>
           </div>
         </div>
         
         <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pb-1 md:pb-0 w-full md:w-auto">
           {isOffline && (
-            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-bold animate-pulse flex items-center gap-2 shrink-0">
+            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 shrink-0">
               <span className="w-2 h-2 bg-red-600 rounded-full"></span> OFFLINE MODE
             </div>
           )}
           <div className="flex bg-gray-100 rounded-lg p-1 shrink-0">
-            <button onClick={() => setActiveTab('pos')} className={`px-3 md:px-4 py-1.5 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
-            <button onClick={() => setActiveTab('orders')} className={`px-3 md:px-4 py-1.5 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
+            <button onClick={() => setActiveTab('pos')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
+            <button onClick={() => setActiveTab('orders')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
           {currentShift && (
             <div className="flex items-center gap-2 shrink-0 md:ml-4 md:border-l md:pl-4">
               <div className="hidden md:flex flex-col text-right">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Shift Aktif</span>
+                <span className="text-xs font-bold text-gray-400 uppercase">Shift Aktif</span>
                 <span className="text-xs font-black text-gray-700">{currentShift.cashierName}</span>
               </div>
-              <button onClick={prepareCloseShift} className="px-3 py-1.5 md:py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-100 border border-red-100 uppercase shrink-0">
+              <button onClick={prepareCloseShift} className="px-3 py-1.5 md:py-2 bg-red-50 text-red-600 rounded-lg text-xs font-black hover:bg-red-100 border border-red-100 uppercase shrink-0">
                 Tutup Shift
               </button>
             </div>
@@ -1476,11 +1476,11 @@ export default function CashierPOS() {
         <div className="hidden md:flex items-center gap-4">
           <button onClick={() => setShowChatModal(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
             <MessageSquare size={20} className="group-hover:text-green-600" />
-            {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
+            {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
           </button>
           <button onClick={() => setIsDrawerOpen(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-blue-50 group transition-colors">
             <Bell size={20} className="group-hover:text-blue-600" />
-            {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
+            {newOrderCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{newOrderCount}</span>}
           </button>
         </div>
       </nav>
@@ -1506,7 +1506,7 @@ export default function CashierPOS() {
                   <button
                     type="button"
                     onClick={() => setShowScanner(!showScanner)}
-                    className="px-4 py-2 flex-1 md:flex-none justify-center bg-black text-white rounded-xl text-[10px] md:text-xs font-black uppercase flex items-center gap-2"
+                    className="px-4 py-2 flex-1 md:flex-none justify-center bg-black text-white rounded-xl text-xs md:text-xs font-black uppercase flex items-center gap-2"
                   >
                     <Camera size={14} /> Scan
                   </button>
@@ -1522,7 +1522,7 @@ export default function CashierPOS() {
                 <select 
                   value={selectedCategory} 
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-white border border-gray-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:ring-2 focus:ring-green-500 shadow-sm min-w-[120px]"
+                  className="bg-white border border-gray-100 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 outline-none focus:ring-2 focus:ring-green-500 shadow-sm min-w-[120px]"
                 >
                   <option value="SEMUA">SEMUA KATEGORI</option>
                   {categories.map(cat => (
@@ -1533,19 +1533,19 @@ export default function CashierPOS() {
                 <div className="flex bg-gray-100 p-1 rounded-xl">
                   <button 
                     onClick={() => setStockFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     SEMUA STOK
                   </button>
                   <button 
                     onClick={() => setStockFilter('instock')}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'instock' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'instock' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     READY
                   </button>
                   <button 
                     onClick={() => setStockFilter('outstock')}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${stockFilter === 'outstock' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'outstock' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     HABIS
                   </button>
@@ -1565,7 +1565,7 @@ export default function CashierPOS() {
                   </button>
                 )}
 
-                <span className="text-[10px] font-bold text-gray-400 shrink-0 ml-auto">
+                <span className="text-xs font-bold text-gray-400 shrink-0 ml-auto">
                   {filteredProducts.length} Produk
                 </span>
               </div>
@@ -1590,7 +1590,7 @@ export default function CashierPOS() {
                   className={`bg-white border shadow-sm hover:border-green-500 hover:shadow-md transition-all text-left flex relative cursor-pointer active:scale-95 ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'} ${(p.stock || 0) <= 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
                 >
                   {(p.stock || 0) <= 0 && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
+                    <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
                   )}
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
                   {p.image ? (
@@ -1606,8 +1606,8 @@ export default function CashierPOS() {
                     <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
                     <p className="text-green-600 font-black text-sm">Rp{p.price.toLocaleString()}</p>
                     <div className="mt-1 flex items-center justify-between flex-wrap gap-y-1">
-                      <span className="text-[10px] font-bold text-gray-400">{p.unit}</span>
-                      <span className={`text-[10px] font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
+                      <span className="text-xs font-bold text-gray-400">{p.unit}</span>
+                      <span className={`text-xs font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
                     </div>
                     {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).map(u => {
                       const contains = Number(u.contains);
@@ -1629,9 +1629,9 @@ export default function CashierPOS() {
                           }}
                           className="flex items-center justify-between mt-0.5 gap-1 hover:bg-blue-50/50 p-0.5 rounded cursor-pointer transition-colors"
                         >
-                          <span className="text-[9px] font-bold text-blue-400 shrink-0">{u.code} <span className="text-gray-300 font-medium">Isi {contains}</span></span>
-                          <span className="text-[9px] font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                          <span className="text-xs font-bold text-blue-400 shrink-0">{u.code} <span className="text-gray-300 font-medium">Isi {contains}</span></span>
+                          <span className="text-xs font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
+                          <span className={`text-xs font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
                             {unitStock} {u.code}
                           </span>
                         </div>
@@ -1673,11 +1673,11 @@ export default function CashierPOS() {
                 <button onClick={() => setIsMobileCartOpen(false)} className="flex items-center gap-2 text-gray-500 font-bold text-xs uppercase">
                   <X size={18} /> Kembali ke List Produk
                 </button>
-                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">Cart Mode</div>
+                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase">Cart Mode</div>
               </div>
             )}
             
-            <div className={`p-4 rounded-2xl text-white font-black text-center text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
+            <div className={`p-4 rounded-2xl text-white font-black text-center text-xs tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
               {transactionType === 'toko' && <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
 
               {transactionType === 'online' && <><Truck size={14} /> MODE PESANAN ONLINE</>}
@@ -1695,7 +1695,7 @@ export default function CashierPOS() {
                   <select
                     value={transactionType}
                     onChange={(e) => setTransactionType(e.target.value as 'toko' | 'online' | 'shopee' | 'tiktok')}
-                    className="text-[10px] font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300 outline-none cursor-pointer"
+                    className="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300 outline-none cursor-pointer"
                   >
                     <option value="toko">OFFLINE</option>
                     <option value="online">WEBSITE</option>
@@ -1712,7 +1712,7 @@ export default function CashierPOS() {
                     <div className="flex justify-between items-start">
                       <div className="flex flex-col">
                         <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
-                        <span className="text-[8px] font-black text-gray-400 uppercase">
+                        <span className="text-xs font-black text-gray-400 uppercase">
                           Harga channel: {item.channel || 'OFFLINE'}
                         </span>
                       </div>
@@ -1815,7 +1815,7 @@ export default function CashierPOS() {
                               return { ...ci, unit: code, contains, price: unitPrice, originalPrice: unitOriginalPrice, cost: unitCost, quantity: nextQty, channel };
                             }));
                           }}
-                          className="text-[10px] font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"
+                          className="text-xs font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"
                         >
                           {(products.find(p => p.id === item.id)?.units || [{ code: 'PCS', contains: 1 }]).map(u => (
                             <option key={u.code} value={u.code}>
@@ -1833,11 +1833,11 @@ export default function CashierPOS() {
                 {/* Pilihan Gudang Pengambilan Barang */}
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] font-black text-slate-700 uppercase flex items-center gap-1.5">
+                    <label className="text-xs font-black text-slate-700 uppercase flex items-center gap-1.5">
                       <Package size={13} className="text-emerald-600" />
                       Gudang Pengambilan Stok
                     </label>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                       {selectedWarehouse === 'auto' ? 'Otomatis Waterfall' : 'Gudang Terpilih'}
                     </span>
                   </div>
@@ -1869,7 +1869,7 @@ export default function CashierPOS() {
 
                 {paymentMethod === 'DOMPET' ? (
                   <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100 space-y-3 relative">
-                     <p className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2">
+                     <p className="text-xs font-black text-blue-600 uppercase flex items-center gap-2">
                        Pembayaran Dompet
                      </p>
                      <input
@@ -1909,20 +1909,20 @@ export default function CashierPOS() {
                   </div>
                 ) : paymentMethod === 'CASH' ? (
                   <div className="bg-gray-50 p-3 rounded-2xl">
-                    <label className="text-[10px] font-black text-gray-400 uppercase">Bayar Tunai</label>
+                    <label className="text-xs font-black text-gray-400 uppercase">Bayar Tunai</label>
                     <input type="number" value={cashGiven} onChange={e => setCashGiven(e.target.value)} className="w-full bg-transparent font-black text-lg outline-none" placeholder="0" />
-                    {change >= 0 && <p className="text-[10px] font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
+                    {change >= 0 && <p className="text-xs font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
                   </div>
                 ) : paymentMethod === 'TEMPO' ? (
                    <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100 space-y-3">
-                     <p className="text-[10px] font-black text-orange-600 uppercase flex items-center gap-2">
+                     <p className="text-xs font-black text-orange-600 uppercase flex items-center gap-2">
                        <History size={14}/> Pembayaran Tempo
                      </p>
-                     <p className="text-[9px] text-gray-500">Transaksi ini akan dicatat sebagai piutang pelanggan.</p>
+                     <p className="text-xs text-gray-500">Transaksi ini akan dicatat sebagai piutang pelanggan.</p>
                      
                      <div className="space-y-2">
                        <div>
-                         <label className="text-[9px] font-bold text-gray-500 uppercase">Nama Pelanggan</label>
+                         <label className="text-xs font-bold text-gray-500 uppercase">Nama Pelanggan</label>
                          <input 
                            type="text" 
                            value={customerName} 
@@ -1932,7 +1932,7 @@ export default function CashierPOS() {
                          />
                        </div>
                        <div>
-                         <label className="text-[9px] font-bold text-gray-500 uppercase">No. HP / WA</label>
+                         <label className="text-xs font-bold text-gray-500 uppercase">No. HP / WA</label>
                          <input 
                            type="tel" 
                            value={customerPhone} 
@@ -1942,7 +1942,7 @@ export default function CashierPOS() {
                          />
                        </div>
                        <div>
-                         <label className="text-[9px] font-bold text-gray-500 uppercase">Jatuh Tempo</label>
+                         <label className="text-xs font-bold text-gray-500 uppercase">Jatuh Tempo</label>
                          <input 
                            type="date" 
                            value={tempoDueDate} 
@@ -1961,13 +1961,13 @@ export default function CashierPOS() {
                           alt="Bukti Transfer"
                           className="w-full h-full object-cover"
                         />
-                      ) : <><Upload size={20} className="text-gray-300" /><span className="text-[10px] font-black text-gray-400 mt-1 uppercase">Upload Bukti</span></>}
+                      ) : <><Upload size={20} className="text-gray-300" /><span className="text-xs font-black text-gray-400 mt-1 uppercase">Upload Bukti</span></>}
                       <input type="file" className="hidden" accept="image/*" onChange={e => {
                         const file = e.target.files?.[0];
                         if (file) { setPaymentProof(file); setProofPreview(URL.createObjectURL(file)); }
                       }} />
                     </label>
-                    <p className="text-[8px] text-center text-gray-400 font-bold uppercase">Auto-Compress to 200KB</p>
+                    <p className="text-xs text-center text-gray-400 font-bold uppercase">Auto-Compress to 200KB</p>
                   </div>
                 )}
 
@@ -2025,7 +2025,7 @@ export default function CashierPOS() {
                     <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24} /></div>
                     <div>
                       <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">
+                      <p className="text-xs font-bold text-gray-400 uppercase">
                         {order.createdAt
                           ? (typeof order.createdAt === 'object' && order.createdAt !== null && 'seconds' in order.createdAt
                             ? new Date((order.createdAt as any).seconds * 1000).toLocaleString('id-ID')
@@ -2036,7 +2036,7 @@ export default function CashierPOS() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-black text-green-600">Rp{order.total?.toLocaleString()}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
                   </div>
                   <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18} /></button>
                 </div>
@@ -2060,9 +2060,9 @@ export default function CashierPOS() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-black text-xs uppercase">{o.customerName}</p>
-                      <p className="text-[10px] font-bold text-gray-400">{o.customerPhone}</p>
+                      <p className="text-xs font-bold text-gray-400">{o.customerPhone}</p>
                     </div>
-                    <span className="bg-red-100 text-red-600 text-[8px] font-black px-2 py-1 rounded uppercase">Masuk</span>
+                    <span className="bg-red-100 text-red-600 text-xs font-black px-2 py-1 rounded uppercase">Masuk</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
                     <p className="font-black text-blue-600 text-sm">Rp{o.total?.toLocaleString()}</p>
@@ -2076,7 +2076,7 @@ export default function CashierPOS() {
                           console.error('Error updating order:', error);
                           toast.error('Gagal memproses order');
                         }
-                      }} className="bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase">Proses</button>
+                      }} className="bg-blue-600 text-white text-xs font-black px-4 py-2 rounded-lg uppercase">Proses</button>
                     </div>
                   </div>
                 </div>
@@ -2188,10 +2188,10 @@ export default function CashierPOS() {
         >
           <div className="relative">
             <ShoppingCart size={24} />
-            <span className="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] w-6 h-6 flex items-center justify-center rounded-full border-2 border-white font-black">{cart.reduce((s, i) => s + i.quantity, 0)}</span>
+            <span className="absolute -top-3 -right-3 bg-red-600 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full border-2 border-white font-black">{cart.reduce((s, i) => s + i.quantity, 0)}</span>
           </div>
           <div className="text-left">
-            <p className="text-[10px] font-bold text-green-100 uppercase leading-none mb-1">Total Bayar</p>
+            <p className="text-xs font-bold text-green-100 uppercase leading-none mb-1">Total Bayar</p>
             <p className="text-sm font-black leading-none">Rp{total.toLocaleString()}</p>
           </div>
         </button>

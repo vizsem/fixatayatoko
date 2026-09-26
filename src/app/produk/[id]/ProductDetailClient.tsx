@@ -230,9 +230,9 @@ export default function ProductDetailClient({
           </button>
           <div className="flex flex-col items-center">
             <Link href="/" className="leading-none mb-0.5">
-              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-900 hover:text-emerald-600 transition-colors">ATAYATOKO</span>
+              <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 hover:text-emerald-600 transition-colors">ATAYATOKO</span>
             </Link>
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Detail Produk</span>
+            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Detail Produk</span>
           </div>
           <Link href="/cart" className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-all" aria-label="Keranjang">
             <ShoppingCart size={20} />
@@ -271,7 +271,7 @@ export default function ProductDetailClient({
                 </div>
               )}
               <div className="absolute top-4 left-4">
-                <span className="bg-white/90 backdrop-blur text-emerald-700 text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl border border-emerald-100 shadow-sm">{product.category}</span>
+                <span className="bg-white/90 backdrop-blur text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-xl border border-emerald-100 shadow-sm">{product.category}</span>
               </div>
             </div>
             <button
@@ -396,7 +396,7 @@ export default function ProductDetailClient({
                     <item.icon size={16} className={item.color} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider leading-none mb-1">{item.label}</span>
+                    <span className="text-xs font-bold text-slate-500 uppercase block tracking-wider leading-none mb-1">{item.label}</span>
                     <span className="text-xs font-black text-slate-800 uppercase leading-tight">{item.val}</span>
                   </div>
                 </div>
@@ -458,7 +458,7 @@ export default function ProductDetailClient({
                   <span className="text-sm font-black text-slate-800 block">{rev.userName}</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     <div className="flex gap-0.5">{[...Array(5)].map((_, i) => <Star key={i} size={12} className={i < rev.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-200'} />)}</div>
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1"><Clock size={11} /> {formatReviewDate(rev.createdAt)}</span>
+                    <span className="text-xs text-slate-400 flex items-center gap-1"><Clock size={11} /> {formatReviewDate(rev.createdAt)}</span>
                   </div>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed">{rev.comment}</p>

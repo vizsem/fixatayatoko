@@ -51,7 +51,7 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
               <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-2 leading-tight mb-1">
                 {item.name || (item as any).Nama}
               </h3>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 Stok: {Number(item.stock || 0).toLocaleString()} {item.baseUnit || 'PCS'}
               </p>
             </div>
@@ -71,7 +71,7 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                      value={unit}
                      disabled={item.promoType === 'TEBUS_MURAH'}
                      onChange={(e) => onUpdateUnit(itemId, e.target.value)}
-                     className="bg-transparent text-[10px] font-black text-slate-700 outline-none uppercase"
+                     className="bg-transparent text-xs font-black text-slate-700 outline-none uppercase"
                    >
                      {availableUnits.map((u) => (
                        <option key={u.code} value={u.code}>{u.code}</option>
@@ -101,16 +101,16 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                        </button>
                     </div>
                     {minPurchase > 1 && (
-                      <p className="text-[10px] font-bold text-blue-600 uppercase px-1">Min: {minPurchase}</p>
+                      <p className="text-xs font-bold text-blue-600 uppercase px-1">Min: {minPurchase}</p>
                     )}
                     {maxPurchase > 0 && (
-                      <p className="text-[10px] font-bold text-rose-600 uppercase px-1">Max: {maxPurchase}</p>
+                      <p className="text-xs font-bold text-rose-600 uppercase px-1">Max: {maxPurchase}</p>
                     )}
                  </div>
              </div>
 
              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                 <p className="text-sm md:text-base font-black text-emerald-600">Rp {lineTotal.toLocaleString('id-ID')}</p>
              </div>
           </div>

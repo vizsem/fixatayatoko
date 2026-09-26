@@ -202,7 +202,7 @@ export default function AdminMobileHeader() {
             >
               <Bell size={20} className="text-gray-700" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -243,7 +243,7 @@ export default function AdminMobileHeader() {
                     <item.icon size={18} className="text-gray-600" />
                     <div>
                       <div className="text-xs font-bold text-gray-900">{item.label}</div>
-                      <div className="text-[10px] text-gray-400">{item.category}</div>
+                      <div className="text-xs text-gray-400">{item.category}</div>
                     </div>
                   </Link>
                 ))}
@@ -289,15 +289,15 @@ export default function AdminMobileHeader() {
             <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-100">
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white rounded-xl p-3 shadow-sm">
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Orders</div>
+                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Orders</div>
                   <div className="text-lg font-black text-green-600">24</div>
                 </div>
                 <div className="bg-white rounded-xl p-3 shadow-sm">
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Revenue</div>
+                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Revenue</div>
                   <div className="text-lg font-black text-blue-600">Rp8.2M</div>
                 </div>
                 <div className="bg-white rounded-xl p-3 shadow-sm">
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock</div>
+                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Stock</div>
                   <div className="text-lg font-black text-orange-600">12</div>
                 </div>
               </div>
@@ -311,7 +311,7 @@ export default function AdminMobileHeader() {
 
                 return (
                   <div key={category} className="px-4 py-3">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2">
+                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-2 mb-2">
                       {category}
                     </h3>
                     <div className="space-y-1">

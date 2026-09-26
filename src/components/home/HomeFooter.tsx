@@ -33,7 +33,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Informasi & Perusahaan */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[11px] md:text-xs font-black tracking-widest text-slate-400 uppercase">
+            <h3 className="text-xs md:text-xs font-black tracking-widest text-slate-400 uppercase">
               Informasi Toko
             </h3>
             <ul className="space-y-2.5 text-xs md:text-sm">
@@ -62,7 +62,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Kebijakan & Legalitas (Wajib Google AdSense & Hukum) */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[11px] md:text-xs font-black tracking-widest text-slate-400 uppercase">
+            <h3 className="text-xs md:text-xs font-black tracking-widest text-slate-400 uppercase">
               Kebijakan & Bantuan
             </h3>
             <ul className="space-y-2.5 text-xs md:text-sm">
@@ -87,7 +87,7 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
           {/* Kontak & Lokasi */}
           <div className="space-y-3 md:space-y-4">
-            <h3 className="text-[11px] md:text-xs font-black tracking-widest text-slate-400 uppercase">
+            <h3 className="text-xs md:text-xs font-black tracking-widest text-slate-400 uppercase">
               Layanan Pelanggan
             </h3>
             <div className="space-y-2.5 text-xs md:text-sm">
@@ -114,10 +114,10 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
         {/* Bottom Legal Bar */}
         <div className="max-w-7xl mx-auto border-t border-slate-800/80 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-          <p className="text-[11px] text-slate-500 font-medium">
+          <p className="text-xs text-slate-500 font-medium">
             © {new Date().getFullYear()} <strong className="text-slate-300">ATAYATOKO</strong>. Seluruh hak cipta dilindungi undang-undang.
           </p>
-          <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-[11px] text-slate-400 font-medium">
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-xs text-slate-400 font-medium">
             <Link href="/tentang" className="hover:text-emerald-400 transition-colors">Tentang Kami</Link>
             <Link href="/kontak" className="hover:text-emerald-400 transition-colors">Kontak</Link>
             <Link href="/kebijakan-privasi" className="hover:text-emerald-400 transition-colors">Kebijakan Privasi</Link>
@@ -130,23 +130,23 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
       {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-6 py-2.5 flex justify-between items-center z-50">
         <Link href="/" className="flex flex-col items-center gap-0.5 text-emerald-600">
-          <HomeIcon size={20} /><span className="text-[10px] font-bold">Beranda</span>
+          <HomeIcon size={20} /><span className="text-xs font-bold">Beranda</span>
         </Link>
         <Link href="/semua-kategori" className="flex flex-col items-center gap-0.5 text-gray-400">
-          <Grid size={20} /><span className="text-[10px] font-bold">Katalog</span>
+          <Grid size={20} /><span className="text-xs font-bold">Katalog</span>
         </Link>
         <Link href="/cart" className="flex flex-col items-center gap-0.5 text-gray-400 relative">
           <div className="relative">
             <ShoppingCart size={20} />
-            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">{cartCount}</span>}
+            {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">{cartCount}</span>}
           </div>
-          <span className="text-[10px] font-bold">Keranjang</span>
+          <span className="text-xs font-bold">Keranjang</span>
         </Link>
         <Link href="/orders" className="flex flex-col items-center gap-0.5 text-gray-400">
-          <FileText size={20} /><span className="text-[10px] font-bold">Pesanan</span>
+          <FileText size={20} /><span className="text-xs font-bold">Pesanan</span>
         </Link>
         <Link href="/profil" className="flex flex-col items-center gap-0.5 text-gray-400">
-          <User size={20} /><span className="text-[10px] font-bold">Akun</span>
+          <User size={20} /><span className="text-xs font-bold">Akun</span>
         </Link>
       </nav>
     </>

@@ -128,7 +128,7 @@ export default function UnfoundBarcodeModal({
                 </div>
                 <div className="flex-1">
                   <h4 className="text-xs font-black text-blue-950 uppercase tracking-wide">1. Buat Produk Baru</h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">
                     Buka formulir input master produk baru. Barcode ini akan langsung otomatis terisi di kolom barcode.
                   </p>
                 </div>
@@ -147,7 +147,7 @@ export default function UnfoundBarcodeModal({
                   <h4 className="text-xs font-black text-gray-900 uppercase tracking-wide">
                     2. Tautkan ke Produk yang Sudah Ada
                   </h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">
                     Gunakan jika ini adalah barcode kemasan baru, atau barcode untuk satuan tertentu (seperti 1 Dus/Box atau Renceng).
                   </p>
                 </div>
@@ -164,13 +164,13 @@ export default function UnfoundBarcodeModal({
                 >
                   &larr; Kembali ke Pilihan
                 </button>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tautkan Barcode</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tautkan Barcode</span>
               </div>
 
               {/* Search Box */}
               {!selectedProduct ? (
                 <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400">
+                  <label className="text-xs font-black uppercase text-gray-400">
                     Cari Produk yang Sudah Ada di Toko
                   </label>
                   <div className="relative">
@@ -201,12 +201,12 @@ export default function UnfoundBarcodeModal({
                           <Package size={16} className="text-gray-400 group-hover:text-blue-600" />
                           <div>
                             <p className="text-xs font-black text-gray-800 group-hover:text-blue-900">{p.name}</p>
-                            <p className="text-[10px] text-gray-400 font-bold">
+                            <p className="text-xs text-gray-400 font-bold">
                               SKU: {p.sku || '-'} | Stok: {p.stock} {p.unit}
                             </p>
                           </div>
                         </div>
-                        <span className="text-[10px] font-black text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs font-black text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
                           Pilih &rarr;
                         </span>
                       </button>
@@ -222,9 +222,9 @@ export default function UnfoundBarcodeModal({
                   {/* Selected Product Card */}
                   <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between">
                     <div>
-                      <span className="text-[9px] font-black uppercase text-blue-600 tracking-wider">Produk Terpilih</span>
+                      <span className="text-xs font-black uppercase text-blue-600 tracking-wider">Produk Terpilih</span>
                       <h4 className="text-xs font-black text-gray-900">{selectedProduct.name}</h4>
-                      <p className="text-[10px] text-gray-500 font-bold">
+                      <p className="text-xs text-gray-500 font-bold">
                         SKU: {selectedProduct.sku} | Barcode Saat Ini: {selectedProduct.barcode || 'Belum Ada'}
                       </p>
                     </div>
@@ -239,7 +239,7 @@ export default function UnfoundBarcodeModal({
 
                   {/* Target Type Selector */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400">
+                    <label className="text-xs font-black uppercase text-gray-400">
                       Gunakan Barcode Ini Sebagai:
                     </label>
                     <div className="grid grid-cols-2 gap-2">
@@ -253,7 +253,7 @@ export default function UnfoundBarcodeModal({
                         }`}
                       >
                         <p className="text-xs font-black text-gray-900">Barcode Utama</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">Untuk satuan dasar ({selectedProduct.unit})</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Untuk satuan dasar ({selectedProduct.unit})</p>
                       </button>
 
                       <button
@@ -266,7 +266,7 @@ export default function UnfoundBarcodeModal({
                         }`}
                       >
                         <p className="text-xs font-black text-gray-900">Barcode Satuan</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">Misal BOX / RENCENG</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Misal BOX / RENCENG</p>
                       </button>
                     </div>
                   </div>
@@ -274,7 +274,7 @@ export default function UnfoundBarcodeModal({
                   {/* Unit Picker if targetType === 'unit' */}
                   {targetType === 'unit' && (
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black uppercase text-gray-400">Pilih Satuan:</label>
+                      <label className="text-xs font-black uppercase text-gray-400">Pilih Satuan:</label>
                       <div className="flex flex-wrap gap-1.5">
                         {['BOX', 'CTN', 'RENCENG', 'PACK', 'LUSIN'].map((u) => (
                           <button

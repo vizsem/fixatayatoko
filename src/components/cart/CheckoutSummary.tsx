@@ -36,14 +36,14 @@ export function CheckoutSummary({
           <div className="flex items-center gap-2">
             <Truck size={15} className={shippingCost === 0 ? 'text-emerald-600' : 'text-slate-400'} />
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Ongkir {shippingMethodName ? `(${shippingMethodName})` : ''}
               </p>
             </div>
           </div>
           <div>
             {shippingCost === 0 ? (
-              <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                 <Sparkles size={11} /> GRATIS
               </span>
             ) : (
@@ -71,7 +71,7 @@ export function CheckoutSummary({
 
       {!canCheckout && (
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-center">
-           <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest leading-relaxed">{validationMsg}</p>
+           <p className="text-xs font-black text-rose-600 uppercase tracking-widest leading-relaxed">{validationMsg}</p>
         </div>
       )}
 
@@ -92,7 +92,7 @@ export function CheckoutSummary({
         )}
       </button>
 
-      <p className="text-center text-[10px] text-slate-400 leading-relaxed px-2">
+      <p className="text-center text-xs text-slate-400 leading-relaxed px-2">
         Dengan menekan tombol, Anda menyetujui{' '}
         <Link href="/syarat-ketentuan" className="text-emerald-700 font-bold underline hover:text-emerald-800" target="_blank">
           Syarat & Ketentuan
@@ -112,7 +112,7 @@ function SummaryLine({ label, value, color = 'text-slate-900', icon: Icon }: any
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-2">
         {Icon && <Icon size={14} className={color} />}
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
       </div>
       <p className={`text-xs md:text-sm font-black ${color}`}>
         {value < 0 ? '-' : ''} Rp {Math.abs(value).toLocaleString('id-ID')}

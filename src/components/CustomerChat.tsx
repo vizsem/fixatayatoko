@@ -274,7 +274,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
                     </div>
                   )}
                   <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                  <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isCustomer ? 'text-emerald-100' : 'text-slate-400'}`}>
+                  <div className={`flex items-center justify-end gap-1 mt-1 text-xs ${isCustomer ? 'text-emerald-100' : 'text-slate-400'}`}>
                     <span>
                       {msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                     </span>

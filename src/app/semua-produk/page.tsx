@@ -125,7 +125,7 @@ function SemuaProdukContent() {
               <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight leading-none">
                 Semua Produk Sembako
               </h1>
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
                 Katalog Lengkap ATAYATOKO
               </p>
             </div>
@@ -138,7 +138,7 @@ function SemuaProdukContent() {
           >
             <ShoppingBag size={20} />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-black rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">
                 {cartCount}
               </span>
             )}
@@ -151,7 +151,7 @@ function SemuaProdukContent() {
         <div className="max-w-7xl mx-auto space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-white/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              <span className="text-xs font-black uppercase tracking-widest text-emerald-400 bg-white/10 px-3 py-1 rounded-full border border-emerald-500/20">
                 Pusat Grosir & Eceran Kediri
               </span>
               <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white mt-2">
@@ -209,7 +209,7 @@ function SemuaProdukContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <SlidersHorizontal size={12} /> Urutkan:
             </span>
             <select

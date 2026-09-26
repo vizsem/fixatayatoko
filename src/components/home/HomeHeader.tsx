@@ -65,14 +65,14 @@ export const HomeHeader = ({
     <header className="bg-white shadow-sm sticky top-0 z-50">
       {/* Top Notification Bar */}
       <div className="bg-gray-50 border-b border-gray-100 hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between text-[11px]">
+        <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-200">
               <Store size={14} className="text-gray-400" />
               <select 
                 value={selectedWarehouseId} 
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer"
               >
                 <option value="">Semua Gudang</option>
                 {warehouses.map(w => (
@@ -156,7 +156,7 @@ export const HomeHeader = ({
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-bold text-gray-900 truncate">{currentUserName}</p>
-                        <Link href="/profil" className="text-[10px] text-green-600 font-bold hover:underline">Lihat Profil Saya</Link>
+                        <Link href="/profil" className="text-xs text-green-600 font-bold hover:underline">Lihat Profil Saya</Link>
                       </div>
                     </div>
                     
@@ -203,7 +203,7 @@ export const HomeHeader = ({
                 className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
               >
                 <Bell size={22} strokeWidth={1.8} />
-                <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-xs flex items-center justify-center rounded-full font-bold border-2 border-white">
                   {notifications.length}
                 </span>
               </button>
@@ -216,7 +216,7 @@ export const HomeHeader = ({
                   </div>
                   <div className="p-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
                     {['Semua', 'Akun', 'Info', 'Promo', 'Kupon', 'Poin', 'Bantuan'].map((label) => (
-                      <button key={label} onClick={() => setNotifCategory(label)} className={`${notifCategory === label ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'} px-3 py-1.5 text-[10px] font-medium mr-2 rounded-full`}>{label}</button>
+                      <button key={label} onClick={() => setNotifCategory(label)} className={`${notifCategory === label ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'} px-3 py-1.5 text-xs font-medium mr-2 rounded-full`}>{label}</button>
                     ))}
                   </div>
                   <div className="max-h-[400px] overflow-y-auto">
@@ -226,8 +226,8 @@ export const HomeHeader = ({
                       filteredNotifications.map((n) => (
                         <div key={n.id} className="p-4 border-b border-gray-50">
                           <div className="flex justify-between mb-1">
-                            <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{n.category || n.type}</span>
-                            <span className="text-[10px] text-gray-400">{n.createdAt}</span>
+                            <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{n.category || n.type}</span>
+                            <span className="text-xs text-gray-400">{n.createdAt}</span>
                           </div>
                           <h4 className="text-sm font-bold">{n.title}</h4>
                           <p className="text-xs text-gray-500">{n.body}</p>
@@ -241,7 +241,7 @@ export const HomeHeader = ({
 
             <Link href="/cart" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative">
               <ShoppingCart size={22} strokeWidth={1.8} />
-              {cartCount > 0 && <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-[9px] flex items-center justify-center rounded-full font-bold border-2 border-white">{cartCount}</span>}
+              {cartCount > 0 && <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-xs flex items-center justify-center rounded-full font-bold border-2 border-white">{cartCount}</span>}
             </Link>
           </div>
         </div>

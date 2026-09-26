@@ -263,7 +263,7 @@ export default function AdminMobileNav() {
                   }`}
                 >
                   <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'} />
-                  <span className="text-[10px] font-bold mt-1 tracking-tight">{item.name}</span>
+                  <span className="text-xs font-bold mt-1 tracking-tight">{item.name}</span>
                 </Link>
               );
             }
@@ -288,7 +288,7 @@ export default function AdminMobileNav() {
                 className="flex flex-col items-center justify-center flex-1 h-14 text-gray-500 hover:text-gray-800 active:scale-95 transition-all"
               >
                 <Icon size={20} className="stroke-[1.8]" />
-                <span className="text-[10px] font-bold mt-1 tracking-tight">{item.name}</span>
+                <span className="text-xs font-bold mt-1 tracking-tight">{item.name}</span>
               </button>
             );
           })}
@@ -332,7 +332,7 @@ export default function AdminMobileNav() {
                   <ArrowDownLeft size={22} className="stroke-[2.5]" />
                 </div>
                 <span className="text-xs font-black tracking-wider text-emerald-800 uppercase">STOCK IN (PO)</span>
-                <span className="text-[11px] text-emerald-600/90 font-medium mt-1 leading-tight">Input Pembelian & Terima Barang PO</span>
+                <span className="text-xs text-emerald-600/90 font-medium mt-1 leading-tight">Input Pembelian & Terima Barang PO</span>
               </button>
 
               {/* Option 2: STOCK ADJUST */}
@@ -344,7 +344,7 @@ export default function AdminMobileNav() {
                   <ArrowUpRight size={22} className="stroke-[2.5]" />
                 </div>
                 <span className="text-xs font-black tracking-wider text-amber-800 uppercase">STOCK ADJUST</span>
-                <span className="text-[11px] text-amber-600/90 font-medium mt-1 leading-tight">Opname, Koreksi & Alokasi Gudang</span>
+                <span className="text-xs text-amber-600/90 font-medium mt-1 leading-tight">Opname, Koreksi & Alokasi Gudang</span>
               </button>
             </div>
 
@@ -398,7 +398,7 @@ export default function AdminMobileNav() {
             <div className="space-y-4">
               {/* Product Search Input */}
               <div className="relative">
-                <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
                   Cari Produk Toko
                 </label>
                 <div className="relative">
@@ -437,11 +437,11 @@ export default function AdminMobileNav() {
                       >
                         <div className="pr-2">
                           <p className="text-xs font-bold text-gray-800 line-clamp-1">{s.name}</p>
-                          <p className="text-[10px] text-gray-500 font-medium">
+                          <p className="text-xs text-gray-500 font-medium">
                             SKU: {s.sku || '-'} • Stok: <span className="font-bold text-blue-600">{s.stock ?? 0}</span>
                           </p>
                         </div>
-                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg shrink-0">
+                        <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg shrink-0">
                           Pilih
                         </span>
                       </button>
@@ -453,7 +453,7 @@ export default function AdminMobileNav() {
               {/* QTY & Channel Selector */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
                     Jumlah (QTY)
                   </label>
                   <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1">
@@ -478,7 +478,7 @@ export default function AdminMobileNav() {
                 </div>
                 
                 <div>
-                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
                     Marketplace
                   </label>
                   <select 
@@ -536,7 +536,7 @@ export default function AdminMobileNav() {
           <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
             {moreMenuGroups.map((group, gIdx) => (
               <div key={gIdx}>
-                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2.5 px-1">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2.5 px-1">
                   {group.title}
                 </h3>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -553,7 +553,7 @@ export default function AdminMobileNav() {
                           <Icon size={18} className="stroke-[2.2]" />
                         </div>
                         <span className="text-xs font-black text-gray-800">{item.name}</span>
-                        <span className="text-[10px] text-gray-500 font-medium mt-0.5 line-clamp-1">{item.desc}</span>
+                        <span className="text-xs text-gray-500 font-medium mt-0.5 line-clamp-1">{item.desc}</span>
                       </Link>
                     );
                   })}

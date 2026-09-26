@@ -42,7 +42,7 @@ export function EmptyState({
         {title}
       </p>
       {description && (
-        <p className="text-[11px] font-bold text-slate-400 max-w-xs mx-auto mb-4">
+        <p className="text-xs font-bold text-slate-400 max-w-xs mx-auto mb-4">
           {description}
         </p>
       )}
