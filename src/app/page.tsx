@@ -335,13 +335,20 @@ export default function Home() {
                 </div>
               );
             })}
-            {categories.length > 6 && (
-              <div className="mb-8 px-4 text-center">
-                <Link href="/semua-produk" className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-colors">
-                  Lihat Semua Kategori <ArrowRight size={14} />
-                </Link>
-              </div>
-            )}
+            <div className="mb-8 px-4 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/semua-produk"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 shadow-sm transition-all"
+              >
+                Lihat Semua Produk <ArrowRight size={14} />
+              </Link>
+              <Link
+                href="/semua-kategori"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition-all"
+              >
+                Lihat Semua Kategori <ArrowRight size={14} />
+              </Link>
+            </div>
           </>
         )}
       </main>
