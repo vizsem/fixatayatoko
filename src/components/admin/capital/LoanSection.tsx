@@ -17,10 +17,10 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
           </div>
           <div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">Hutang & Kewajiban</h3>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Status pinjaman dan pembayaran</p>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Status pinjaman dan pembayaran</p>
           </div>
         </div>
-        <button onClick={onRecord} className="px-6 py-3 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 flex items-center gap-2">
+        <button onClick={onRecord} className="px-6 py-3 bg-rose-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 flex items-center gap-2">
           Catat Pinjaman Baru
         </button>
       </div>
@@ -31,7 +31,7 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
              <div className="flex justify-between items-start mb-6">
                 <div>
                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{loan.lenderName}</h4>
-                   <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-1">{loan.loanType}</p>
+                   <p className="text-xs font-black text-rose-500 uppercase tracking-widest mt-1">{loan.loanType}</p>
                 </div>
                 <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
                    <Clock size={16} />
@@ -41,22 +41,22 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
              <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-end">
                    <div>
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Pokok Pinjaman</p>
+                      <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Pokok Pinjaman</p>
                       <p className="text-lg font-black text-slate-900">Rp {loan.amount.toLocaleString('id-ID')}</p>
                    </div>
                    <div className="text-right">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Bunga</p>
+                      <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Bunga</p>
                       <p className="text-sm font-black text-slate-600">{loan.interestRate}%</p>
                    </div>
                 </div>
 
                 <div className="bg-slate-50 p-4 rounded-2xl">
-                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Sisa Hutang</p>
+                   <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Sisa Hutang</p>
                    <p className="text-xl font-black text-rose-600">Rp {(loan.remainingAmount || 0).toLocaleString('id-ID')}</p>
                 </div>
              </div>
 
-             <button onClick={() => onRepay(loan)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 group">
+             <button onClick={() => onRepay(loan)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 group">
                 BAYAR CICILAN <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
              </button>
           </div>
@@ -66,7 +66,7 @@ export function LoanSection({ loans, onRepay, onRecord }: LoanProps) {
              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 size={32} />
              </div>
-             <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Tidak ada hutang aktif</p>
+             <p className="text-xs font-black uppercase text-slate-400 tracking-[0.2em]">Tidak ada hutang aktif</p>
           </div>
         )}
       </div>

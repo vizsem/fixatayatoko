@@ -32,7 +32,7 @@ export const ProductSearchList = ({ searchTerm, onSearchChange, products, onAddT
         {products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 opacity-30">
             <ShoppingBag size={48} />
-            <p className="text-[10px] font-black uppercase mt-2">Tidak ada produk</p>
+            <p className="text-xs font-black uppercase mt-2">Tidak ada produk</p>
           </div>
         ) : (
           products.map((p) => {
@@ -53,9 +53,9 @@ export const ProductSearchList = ({ searchTerm, onSearchChange, products, onAddT
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku}</p>
-                  <h4 className="text-[11px] font-black text-gray-800 line-clamp-1 uppercase leading-none">{p.name}</h4>
-                  <p className="text-[10px] font-black text-emerald-600 mt-1">Rp{(price || 0).toLocaleString()}</p>
+                  <p className="text-xs font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku}</p>
+                  <h4 className="text-xs font-black text-gray-800 line-clamp-1 uppercase leading-none">{p.name}</h4>
+                  <p className="text-xs font-black text-emerald-600 mt-1">Rp{(price || 0).toLocaleString()}</p>
                 </div>
                 <button
                   onClick={() => onAddToCart(p)}

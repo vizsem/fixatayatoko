@@ -183,10 +183,10 @@ export default function AdminSuppliers() {
 
                 {s._count && (
                   <div className="flex gap-3 mt-3 pt-3 border-t border-gray-100">
-                    <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
+                    <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
                       {s._count.purchaseOrders} PO
                     </span>
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
                       {s._count.products} Produk
                     </span>
                   </div>

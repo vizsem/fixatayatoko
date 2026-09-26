@@ -200,7 +200,7 @@ export default function PurchaseDetail() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Detail Pembelian</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -208,26 +208,26 @@ export default function PurchaseDetail() {
             <button
               onClick={handleReceive}
               disabled={receiving}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md disabled:opacity-50"
+              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md disabled:opacity-50"
             >
               <Truck size={16} /> {receiving ? 'Memproses...' : 'Terima Barang & Tambah Stok'}
             </button>
           )}
           <button
             onClick={() => router.push(`/admin/purchases/add?duplicateFrom=${purchase.id}`)}
-            className="bg-gray-800 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all"
+            className="bg-gray-800 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-black transition-all"
           >
             <RefreshCw size={16} /> Order Lagi
           </button>
           <button
             onClick={handleEditClick}
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"
+            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"
           >
             <Edit size={16} /> Edit
           </button>
           <button
             onClick={() => window.print()}
-            className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+            className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2"
           >
             <Printer size={16} /> Cetak
           </button>
@@ -240,10 +240,10 @@ export default function PurchaseDetail() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-8 py-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
                 <Package size={14} /> Itemized List
               </h3>
-              <span className="text-[10px] font-black uppercase px-3 py-1 bg-blue-50 text-blue-600 rounded-lg">
+              <span className="text-xs font-black uppercase px-3 py-1 bg-blue-50 text-blue-600 rounded-lg">
                 {purchase.items?.length || 0} Items
               </span>
             </div>
@@ -253,10 +253,10 @@ export default function PurchaseDetail() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-2">{item.name}</p>
-                      <p className="text-[10px] font-bold text-gray-400 mt-1">Product ID: {item.id.slice(0, 8)}</p>
+                      <p className="text-xs font-bold text-gray-400 mt-1">Product ID: {item.id.slice(0, 8)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
                       <p className="text-sm font-black text-gray-900">
                         Rp {(item.quantity * item.purchasePrice).toLocaleString()}
                       </p>
@@ -265,11 +265,11 @@ export default function PurchaseDetail() {
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Qty</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Qty</p>
                       <p className="text-sm font-black text-gray-900">{item.quantity} {item.unit}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Unit Price</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Unit Price</p>
                       <p className="text-sm font-black text-gray-900">Rp {item.purchasePrice.toLocaleString()}</p>
                     </div>
                   </div>
@@ -281,10 +281,10 @@ export default function PurchaseDetail() {
               <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead>
                   <tr className="border-b border-gray-50">
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Product Name</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Unit Price</th>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Product Name</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Unit Price</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -292,7 +292,7 @@ export default function PurchaseDetail() {
                     <tr key={idx} className="hover:bg-gray-50/50 transition-all">
                       <td className="px-3 md:px-8 py-3 md:py-5">
                         <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{item.name}</span>
-                        <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">Product ID: {item.id.slice(0, 8)}</p>
+                        <p className="text-xs text-gray-400 font-bold uppercase mt-0.5">Product ID: {item.id.slice(0, 8)}</p>
                       </td>
                       <td className="px-3 md:px-6 py-3 md:py-5 text-center">
                         <span className="text-xs font-black text-gray-700 bg-gray-100 px-3 py-1 rounded-lg">
@@ -333,7 +333,7 @@ export default function PurchaseDetail() {
             <div className="bg-white p-8 rounded-[2rem] border border-gray-100 flex gap-4 items-start">
               <AlertCircle size={20} className="text-gray-300" />
               <div>
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Order Notes</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Order Notes</h4>
                 <p className="text-xs text-gray-600 leading-relaxed font-medium">{purchase.notes}</p>
               </div>
             </div>
@@ -345,7 +345,7 @@ export default function PurchaseDetail() {
 
           {/* Status Card */}
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-2">
               <History size={14} /> Transaction Status
             </h3>
 
@@ -355,7 +355,7 @@ export default function PurchaseDetail() {
                   {purchase.status === 'DITERIMA' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Order Status</p>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Order Status</p>
                   <p className="text-sm font-black text-gray-800 uppercase">{purchase.status}</p>
                 </div>
               </div>
@@ -365,7 +365,7 @@ export default function PurchaseDetail() {
                   <CreditCard size={24} />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Payment ({purchase.paymentMethod})</p>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Payment ({purchase.paymentMethod})</p>
                   <p className="text-sm font-black text-gray-800 uppercase">{purchase.paymentStatus}</p>
                 </div>
               </div>
@@ -377,18 +377,18 @@ export default function PurchaseDetail() {
             <Receipt className="absolute -right-4 -top-4 opacity-10" size={120} />
             <div className="relative z-10 space-y-6">
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4 flex items-center gap-2">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-4 flex items-center gap-2">
                   <Store size={14} /> Supplier & Delivery
                 </h3>
                 <p className="text-lg font-black uppercase leading-tight">{purchase.supplierName}</p>
-                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest italic">{dateFormatted}</p>
+                <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest italic">{dateFormatted}</p>
               </div>
 
               <div className="pt-6 border-t border-white/10">
                 <div className="flex items-start gap-3">
                   <Truck size={18} className="text-blue-400" />
                   <div>
-                    <p className="text-[9px] font-black text-gray-500 uppercase">Target Warehouse</p>
+                    <p className="text-xs font-black text-gray-500 uppercase">Target Warehouse</p>
                     <p className="text-xs font-bold uppercase">{purchase.warehouseName}</p>
                   </div>
                 </div>
@@ -398,8 +398,8 @@ export default function PurchaseDetail() {
                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3">
                   <Calendar size={18} className="text-red-500" />
                   <div>
-                    <p className="text-[8px] font-black text-red-300 uppercase">Hutang Jatuh Tempo</p>
-                    <p className="text-[10px] font-black text-red-500 uppercase">{purchase.dueDate}</p>
+                    <p className="text-xs font-black text-red-300 uppercase">Hutang Jatuh Tempo</p>
+                    <p className="text-xs font-black text-red-500 uppercase">{purchase.dueDate}</p>
                   </div>
                 </div>
               )}
@@ -408,7 +408,7 @@ export default function PurchaseDetail() {
 
           {/* Log Info */}
           <div className="px-8 py-2">
-            <p className="text-[8px] font-bold text-gray-400 uppercase text-center tracking-[0.3em]">
+            <p className="text-xs font-bold text-gray-400 uppercase text-center tracking-[0.3em]">
               Verified by System on {dateFormatted}
             </p>
           </div>
@@ -433,7 +433,7 @@ export default function PurchaseDetail() {
               {/* Header Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Tanggal Transaksi</label>
+                  <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Tanggal Transaksi</label>
                   <input 
                     type="datetime-local" 
                     value={editDate}
@@ -442,7 +442,7 @@ export default function PurchaseDetail() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Metode Pembayaran</label>
+                  <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Metode Pembayaran</label>
                   <select 
                     value={editForm.paymentMethod}
                     onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}
@@ -458,7 +458,7 @@ export default function PurchaseDetail() {
               {/* Items List */}
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block tracking-widest">Item Produk ({editForm.items.length})</label>
+                  <label className="text-xs font-black uppercase text-gray-400 block tracking-widest">Item Produk ({editForm.items.length})</label>
                 </div>
                 
                 <div className="space-y-3">
@@ -466,12 +466,12 @@ export default function PurchaseDetail() {
                     <div key={idx} className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors group">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black uppercase truncate text-gray-800">{item.name}</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 bg-white inline-block px-2 py-0.5 rounded">{item.unit}</p>
+                        <p className="text-xs text-gray-400 font-bold uppercase mt-1 bg-white inline-block px-2 py-0.5 rounded">{item.unit}</p>
                       </div>
                       
                       <div className="flex items-center gap-3 w-full md:w-auto">
                         <div className="w-24">
-                          <label className="text-[8px] font-bold uppercase text-gray-400 block mb-1">Qty</label>
+                          <label className="text-xs font-bold uppercase text-gray-400 block mb-1">Qty</label>
                           <input 
                             type="number" 
                             value={item.quantity}
@@ -480,7 +480,7 @@ export default function PurchaseDetail() {
                           />
                         </div>
                         <div className="w-36">
-                          <label className="text-[8px] font-bold uppercase text-gray-400 block mb-1">Harga Beli</label>
+                          <label className="text-xs font-bold uppercase text-gray-400 block mb-1">Harga Beli</label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
                             <input 

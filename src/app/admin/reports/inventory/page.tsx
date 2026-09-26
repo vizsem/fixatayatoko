@@ -117,9 +117,9 @@ export default function InventoryReport() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Layers className="text-blue-600" size={32} /> Asset Intelligence
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Inventory valuation & turnover</p>
+          <p className="text-slate-400 text-xs font-black uppercase tracking-[0.3em] mt-1">Inventory valuation & turnover</p>
         </div>
-        <button onClick={handleExport} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl transition-all">
+        <button onClick={handleExport} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl transition-all">
            <Download size={18} /> EXPORT ASSETS
         </button>
       </div>
@@ -136,11 +136,11 @@ export default function InventoryReport() {
            <input type="text" placeholder="Filter by product name or category..." className="w-full pl-16 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={search} onChange={e => { setSearch(e.target.value); setPageIndex(0); }} />
         </div>
         <div className="flex gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar">
-           <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setPageIndex(0); }} className="bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none">
+           <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setPageIndex(0); }} className="bg-slate-50 border-none rounded-2xl px-6 py-4 text-xs font-black uppercase outline-none">
               <option value="ALL">ALL CATEGORIES</option>
               {categories.map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
            </select>
-           <select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPageIndex(0); }} className="bg-slate-50 border-none rounded-2xl px-6 py-4 text-[10px] font-black uppercase outline-none">
+           <select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPageIndex(0); }} className="bg-slate-50 border-none rounded-2xl px-6 py-4 text-xs font-black uppercase outline-none">
               <option value="ALL">ALL WAREHOUSES</option>
               {warehouses.map(w => <option key={w.id} value={w.id}>{w.name.toUpperCase()}</option>)}
            </select>
@@ -150,7 +150,7 @@ export default function InventoryReport() {
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-8">
         <div className="overflow-x-auto">
            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+              <thead className="bg-slate-50 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                  <tr>
                     <th className="px-8 py-5">Product SKU</th>
                     <th className="px-8 py-5">Stock Level</th>
@@ -168,33 +168,33 @@ export default function InventoryReport() {
                                <img src={i.imageUrl || '/logo-atayatoko.png'} alt={i.name} className="w-full h-full object-cover" loading="lazy" />
                             </div>
                             <div>
-                               <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{i.name}</p>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{i.category}</p>
+                               <p className="text-xs font-black text-slate-800 uppercase tracking-tight">{i.name}</p>
+                               <p className="text-xs font-bold text-slate-400 uppercase mt-1">{i.category}</p>
                             </div>
                          </div>
                       </td>
                       <td className="px-8 py-5">
                          <p className={`text-sm font-black ${i.currentStock <= 10 ? 'text-rose-600' : 'text-slate-900'}`}>{i.currentStock}</p>
                          <div className="flex gap-2 mt-1">
-                            <span className="text-[8px] font-black text-emerald-600 uppercase">IN: {i.stockIn}</span>
-                            <span className="text-[8px] font-black text-rose-500 uppercase">OUT: {i.stockOut}</span>
+                            <span className="text-xs font-black text-emerald-600 uppercase">IN: {i.stockIn}</span>
+                            <span className="text-xs font-black text-rose-500 uppercase">OUT: {i.stockOut}</span>
                          </div>
                       </td>
                       <td className="px-8 py-5">
                          <p className="text-xs font-black text-slate-900">Rp {i.stockValue.toLocaleString()}</p>
-                         <p className="text-[8px] font-black text-slate-400 uppercase mt-1">Avg Valuation</p>
+                         <p className="text-xs font-black text-slate-400 uppercase mt-1">Avg Valuation</p>
                       </td>
                       <td className="px-8 py-5">
                          <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full ${i.turnoverRate > 0.5 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, i.turnoverRate * 100)}%` }} />
                          </div>
-                         <p className="text-[9px] font-black text-slate-400 uppercase mt-2">{i.turnoverRate.toFixed(2)}x Points</p>
+                         <p className="text-xs font-black text-slate-400 uppercase mt-2">{i.turnoverRate.toFixed(2)}x Points</p>
                       </td>
                       <td className="px-8 py-5 text-right pr-12">
                          {i.turnoverRate > 0.5 ? (
-                           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl uppercase tracking-widest flex items-center gap-2 justify-end">HIGH FLOW <TrendingUp size={14}/></span>
+                           <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl uppercase tracking-widest flex items-center gap-2 justify-end">HIGH FLOW <TrendingUp size={14}/></span>
                          ) : (
-                           <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-4 py-2 rounded-xl uppercase tracking-widest flex items-center gap-2 justify-end">STAGNANT <TrendingDown size={14}/></span>
+                           <span className="text-xs font-black text-slate-400 bg-slate-50 px-4 py-2 rounded-xl uppercase tracking-widest flex items-center gap-2 justify-end">STAGNANT <TrendingDown size={14}/></span>
                          )}
                       </td>
                    </tr>
@@ -206,7 +206,7 @@ export default function InventoryReport() {
 
       <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm">
          <button onClick={() => setPageIndex(p => Math.max(0, p - 1))} disabled={pageIndex === 0} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 disabled:opacity-30 transition-all"><ChevronLeft size={20}/></button>
-         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Page {pageIndex + 1} of {Math.ceil(filtered.length / pageSize)}</span>
+         <span className="text-xs font-black uppercase tracking-widest text-slate-400">Page {pageIndex + 1} of {Math.ceil(filtered.length / pageSize)}</span>
          <button onClick={() => setPageIndex(p => p + 1)} disabled={(pageIndex + 1) * pageSize >= filtered.length} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 disabled:opacity-30 transition-all"><ChevronRight size={20}/></button>
       </div>
     </div>
@@ -217,7 +217,7 @@ function SummaryCard({ label, val, icon: Icon, color, bg }: any) {
   return (
     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between group">
        <div>
-          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
+          <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
           <p className={`text-2xl font-black ${color}`}>{val}</p>
        </div>
        <div className={`p-4 ${bg} ${color} rounded-[1.5rem] group-hover:rotate-12 transition-transform`}>

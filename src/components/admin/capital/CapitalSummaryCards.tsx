@@ -75,12 +75,12 @@ export function CapitalSummaryCards({
           <div className="p-2 bg-white/20 text-white rounded-xl backdrop-blur-sm">
             <TrendingUp size={16} />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Valuasi & Growth</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-white/90">Valuasi & Growth</span>
         </div>
         <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight relative z-10 truncate">
           {growth >= 0 ? '+' : ''}Rp {growth.toLocaleString('id-ID')}
         </h3>
-        <p className="text-[10px] font-medium text-white/80 mt-1 relative z-10">
+        <p className="text-xs font-medium text-white/80 mt-1 relative z-10">
           Net Worth - Modal Disetor
         </p>
       </div>
@@ -97,10 +97,10 @@ function SummaryCard({ label, val, subtext, badge, icon: Icon, color, bg }: any)
             <div className={`p-2 ${bg} ${color} rounded-xl`}>
               <Icon size={16} className="stroke-[2.2]" />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">{label}</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate">{label}</span>
           </div>
           {badge && (
-            <span className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-100/80 px-1.5 py-0.5 rounded-md shrink-0">
+            <span className="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100/80 px-1.5 py-0.5 rounded-md shrink-0">
               {badge}
             </span>
           )}
@@ -110,7 +110,7 @@ function SummaryCard({ label, val, subtext, badge, icon: Icon, color, bg }: any)
         </h3>
       </div>
       {subtext && (
-        <p className="text-[10px] font-medium text-slate-400 mt-2 truncate">
+        <p className="text-xs font-medium text-slate-400 mt-2 truncate">
           {subtext}
         </p>
       )}

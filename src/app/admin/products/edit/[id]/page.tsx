@@ -393,7 +393,7 @@ export default function EditProductPage() {
   const ProfitBadge = ({ profit, percentage }: { profit: number, percentage: number }) => {
     const isProfitable = profit >= 0;
     return (
-      <div className={`flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+      <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
         {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
         <span>
           {isProfitable ? '+' : ''}Rp{profit.toLocaleString('id-ID')} ({percentage.toFixed(1)}%)
@@ -705,7 +705,7 @@ export default function EditProductPage() {
             </Link>
             <div>
               <h1 className="text-xl font-black uppercase tracking-tighter">Edit Produk</h1>
-              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Update Data Inventaris</p>
+              <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Update Data Inventaris</p>
             </div>
           </div>
         </div>
@@ -719,7 +719,7 @@ export default function EditProductPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">ID Produk *</label>
                 <input
                   required
                   className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
@@ -730,7 +730,7 @@ export default function EditProductPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Parent ID</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Parent ID</label>
                 <input
                   className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
                   type="text"
@@ -740,15 +740,15 @@ export default function EditProductPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Nama Produk</label>
                 <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Lokasi} onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Kategori</label>
                 <div className="relative">
                   <input 
                     list="edit-category-suggestions"
@@ -766,11 +766,11 @@ export default function EditProductPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1 flex justify-between">
+                <label className="text-xs font-black uppercase text-gray-400 ml-1 flex justify-between">
                   <span>Barcode / SKU</span>
                   <button type="button" onClick={() => setScannerReady(true)} className="text-blue-500 hover:text-blue-700 flex items-center gap-1">
                     <Camera size={12} /> Scan Kamera
@@ -792,14 +792,14 @@ export default function EditProductPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
                 <div className="relative">
                   <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.Expired_Default} onChange={e => setFormData({ ...formData, Expired_Default: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
                 <div className="relative">
                   <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.tgl_masuk} onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} />
@@ -816,44 +816,44 @@ export default function EditProductPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Satuan</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Satuan</label>
                 <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Saat Ini</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Saat Ini</label>
                 <input required type="number" className="w-full p-4 bg-emerald-50 rounded-2xl border-none font-black text-emerald-700" value={formData.Stok} onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
                 <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Gudang</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Gudang</label>
                 <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.warehouseId} onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}>
                   <option value="">Pilih Gudang (Opsional)</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
-                <p className="text-[9px] text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
+                <p className="text-xs text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-2 gap-5 mt-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
                 <input type="number" min="1" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700" value={formData.minPurchase} onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} />
-                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
+                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
                 <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
-                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
+                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
               </div>
             </div>
 
             {/* DETAIL STOK PER GUDANG */}
             <div className="mt-6 pt-6 border-t border-gray-100">
-              <h4 className="text-[10px] font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
+              <h4 className="text-xs font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
               <div className="mb-3">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Alasan Perubahan</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Alasan Perubahan</label>
                 <select
                   className="w-full p-3 bg-gray-50 rounded-xl text-xs font-bold outline-none"
                   value={stockReason}
@@ -869,7 +869,7 @@ export default function EditProductPage() {
                   const qty = Number(formData.stockByWarehouse?.[w.id] || 0);
                   return (
                     <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">{w.name}</label>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{w.name}</label>
                       <input
                         type="number"
                         min={0}
@@ -901,7 +901,7 @@ export default function EditProductPage() {
             </div>
             <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
                 <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
                   const l = Number(e.target.value);
                   const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
@@ -909,7 +909,7 @@ export default function EditProductPage() {
                 }} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
                 <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
                   const w = Number(e.target.value);
                   const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
@@ -917,7 +917,7 @@ export default function EditProductPage() {
                 }} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
                 <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
                   const h = Number(e.target.value);
                   const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
@@ -925,9 +925,9 @@ export default function EditProductPage() {
                 }} />
               </div>
               <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Volume Setara</p>
-                <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-[10px] uppercase">CTN</span></p>
-                <p className="text-[7px] font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
+                <p className="text-xs font-black text-blue-400 uppercase mb-1">Volume Setara</p>
+                <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-xs uppercase">CTN</span></p>
+                <p className="text-xs font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
               </div>
             </div>
           </div>
@@ -940,12 +940,12 @@ export default function EditProductPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Modal</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Modal</label>
                 <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
                   {formData.Ecer > 0 && formData.Modal > 0 && (
                     <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
                   )}
@@ -953,7 +953,7 @@ export default function EditProductPage() {
                 <input required type="number" disabled={pricingMode === 'RECOMMENDED'} className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600 disabled:opacity-70" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Coret</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Coret</label>
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
             </div>
@@ -979,7 +979,7 @@ export default function EditProductPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
                     <div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${
+                      <p className={`text-xs font-black uppercase tracking-widest ${
                         !taxSettings.enabled ? 'text-gray-400' : breakdown.isExempt ? 'text-amber-700' : 'text-indigo-700'
                       }`}>Status Pajak</p>
                       <p className={`text-xs font-black ${
@@ -992,15 +992,15 @@ export default function EditProductPage() {
                       <div className="w-px h-8 bg-indigo-200 hidden md:block" />
                       <div className="grid grid-cols-3 gap-4 flex-1">
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
                           <p className="text-sm font-black text-indigo-900">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
                           <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
                           <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                             {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
                           </p>
@@ -1009,12 +1009,12 @@ export default function EditProductPage() {
                     </>
                   )}
                   {taxSettings.enabled && breakdown.isExempt && (
-                    <p className="text-[11px] font-bold text-amber-700">
+                    <p className="text-xs font-bold text-amber-700">
                       Kategori ini bebas PPN (0%) sesuai PP 49/2022 / UU HPP — tidak ada pajak yang dikenakan.
                     </p>
                   )}
                   {!taxSettings.enabled && (
-                    <p className="text-[11px] font-bold text-gray-400">
+                    <p className="text-xs font-bold text-gray-400">
                       Pajak belum diaktifkan. Aktifkan di <span className="underline">Pengaturan → Pajak</span> untuk melihat DPP & kewajiban pajak.
                     </p>
                   )}
@@ -1024,7 +1024,7 @@ export default function EditProductPage() {
             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Mode Harga</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Mode Harga</label>
                   <select
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm"
                     value={pricingMode}
@@ -1035,7 +1035,7 @@ export default function EditProductPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Profil Margin</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Profil Margin</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
@@ -1050,7 +1050,7 @@ export default function EditProductPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Margin (%)</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Margin (%)</label>
                   <input
                     type="number"
                     disabled={pricingMode !== 'RECOMMENDED'}
@@ -1061,7 +1061,7 @@ export default function EditProductPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Pembulatan</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Pembulatan</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
@@ -1081,7 +1081,7 @@ export default function EditProductPage() {
                   <div className="text-xs font-black text-slate-700">
                     Rekomendasi: Rp{pricingRec.recommendedPrice.toLocaleString('id-ID')} ({pricingRec.rule.label}, {pricingRec.rule.min}-{pricingRec.rule.max}%)
                   </div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <div className="text-xs font-black uppercase tracking-widest text-slate-400">
                     Efektif: {pricingRec.effectiveMarginPercent.toFixed(2)}%
                   </div>
                 </div>
@@ -1090,7 +1090,7 @@ export default function EditProductPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                  <label className="text-xs font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
                   {formData.Grosir > 0 && formData.Modal > 0 && (
                     <ProfitBadge {...calculateProfit(formData.Grosir, formData.Modal)} />
                   )}
@@ -1098,12 +1098,12 @@ export default function EditProductPage() {
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
+                <label className="text-xs font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
               </div>
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase text-gray-400">Status</span>
+              <span className="text-xs font-black uppercase text-gray-400">Status</span>
               <select className="p-3 bg-gray-50 rounded-xl text-xs font-bold" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
                 <option value={1}>Aktif</option>
                 <option value={0}>Arsip</option>
@@ -1114,13 +1114,13 @@ export default function EditProductPage() {
           {/* Riwayat Perubahan Modal */}
           {costHistory.length > 0 && (
             <div className="mt-8 pt-6 border-t border-gray-100">
-              <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
+              <h4 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
                 <HistoryIcon size={14} /> Riwayat Perubahan Modal (Average Cost)
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="text-[10px] text-gray-400 uppercase border-b">
+                    <tr className="text-xs text-gray-400 uppercase border-b">
                       <th className="py-2">Tanggal</th>
                       <th className="py-2">Admin</th>
                       <th className="py-2 text-right">Lama</th>
@@ -1195,7 +1195,7 @@ export default function EditProductPage() {
                     )}
                       <div className="flex items-center justify-between gap-3 mb-2">
                       <div className="flex-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">Kode Satuan</label>
+                        <label className="text-xs font-black text-gray-400 uppercase mb-1 block">Kode Satuan</label>
                         <input 
                            type="text" 
                            className="w-full bg-white p-2 rounded-xl text-xs font-black text-gray-800 outline-none border focus:ring-2 focus:ring-blue-500 uppercase"
@@ -1210,10 +1210,10 @@ export default function EditProductPage() {
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">Label</label>
+                        <label className="text-xs font-black text-gray-400 uppercase mb-1 block">Label</label>
                         <input
                           type="text"
-                          className="w-full bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                          className="w-full bg-white p-2 rounded-xl text-xs font-black text-gray-700 outline-none border"
                           placeholder="Nama satuan"
                           value={current.label || ''}
                           onChange={(e) => {
@@ -1226,9 +1226,9 @@ export default function EditProductPage() {
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga Dasar</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Harga Dasar</span>
                         {Number(current.price) > 0 && formData.Modal > 0 && (
-                           <span className={`text-[9px] font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                           <span className={`text-xs font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                              {calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? '+' : ''}
                              {((calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                            </span>
@@ -1248,13 +1248,13 @@ export default function EditProductPage() {
                       
                       {/* CHANNEL PRICING */}
                       <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-                        <p className="text-[9px] font-black text-blue-600 uppercase mb-2">Harga Khusus Channel</p>
+                        <p className="text-xs font-black text-blue-600 uppercase mb-2">Harga Khusus Channel</p>
                         <div className="grid grid-cols-2 gap-2">
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
+                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
                                 {current.prices?.offline && formData.Modal > 0 && (
-                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {((calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                                   </span>
                                 )}
@@ -1271,9 +1271,9 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
+                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
                                 {current.prices?.website && formData.Modal > 0 && (
-                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {((calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                                   </span>
                                 )}
@@ -1290,9 +1290,9 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
+                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
                                 {current.prices?.shopee && formData.Modal > 0 && (
-                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {((calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                                   </span>
                                 )}
@@ -1309,9 +1309,9 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-[9px] text-gray-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
+                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
                                 {current.prices?.tiktok && formData.Modal > 0 && (
-                                  <span className={`text-[8px] font-bold ${calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {((calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                                   </span>
                                 )}
@@ -1330,7 +1330,7 @@ export default function EditProductPage() {
                       </div>
 
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi (Konversi)</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Isi (Konversi)</span>
                         <input
                           type="number"
                           disabled={code === 'PCS'}
@@ -1345,7 +1345,7 @@ export default function EditProductPage() {
                         />
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Min Qty</span>
                         <input
                           type="number"
                           min="0"
@@ -1359,7 +1359,7 @@ export default function EditProductPage() {
                           }}
                         />
                       </div>
-                      <div className="text-[10px] font-black text-gray-500 pt-2 border-t border-gray-200">
+                      <div className="text-xs font-black text-gray-500 pt-2 border-t border-gray-200">
                         {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
                         <span className="mx-1 font-bold text-gray-800">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
                         / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )

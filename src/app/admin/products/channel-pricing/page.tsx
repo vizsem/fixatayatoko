@@ -280,7 +280,7 @@ export default function ChannelPricingPage() {
             <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
               Harga per Channel
             </h1>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
+            <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-1">
               Atur harga offline, website, Shopee & TikTok
             </p>
           </div>
@@ -317,7 +317,7 @@ export default function ChannelPricingPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="text-[10px] font-black uppercase text-gray-400 tracking-[0.25em] flex items-center gap-2">
+          <div className="text-xs font-black uppercase text-gray-400 tracking-[0.25em] flex items-center gap-2">
             <Tag size={14} />
             {filteredProducts.length} Produk Aktif
           </div>
@@ -415,14 +415,14 @@ export default function ChannelPricingPage() {
                               <div>
                                   <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
                                   <div className="flex flex-col gap-0.5 mt-1">
-                                    <p className="text-[10px] font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
-                                    <p className="text-[10px] font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
+                                    <p className="text-xs font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
+                                    <p className="text-xs font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
                                   </div>
                               </div>
                               <select
                                   value={currentUnit}
                                   onChange={(e) => setSelectedUnit(su => ({ ...su, [p.id]: e.target.value }))}
-                                  className="text-[10px] font-black bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
+                                  className="text-xs font-black bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none"
                               >
                                   {units.map(uc => (
                                       <option key={uc} value={uc}>{uc}</option>
@@ -449,9 +449,9 @@ export default function ChannelPricingPage() {
                                   return (
                                     <div key={key} className="flex flex-col gap-1">
                                       <div className="flex items-center justify-between">
-                                          <span className="text-[10px] font-bold text-gray-500 uppercase w-20">{key}</span>
+                                          <span className="text-xs font-bold text-gray-500 uppercase w-20">{key}</span>
                                           <div className="flex items-center justify-end gap-1 flex-1">
-                                              <span className="text-[10px] font-bold text-gray-400">Rp</span>
+                                              <span className="text-xs font-bold text-gray-400">Rp</span>
                                               <input
                                                   type="number"
                                                   className="w-full bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none border border-transparent focus:border-blue-500 focus:bg-white transition-all"
@@ -465,7 +465,7 @@ export default function ChannelPricingPage() {
                                           </div>
                                       </div>
                                       {(key === 'shopee' || key === 'tiktok') && price ? (
-                                        <div className="flex justify-end gap-3 text-[9px]">
+                                        <div className="flex justify-end gap-3 text-xs">
                                           <span className="text-gray-400">Fee: Rp{Math.round(fee).toLocaleString()}</span>
                                           <span className={`font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                                             Laba: Rp{Math.round(profit).toLocaleString()}
@@ -481,7 +481,7 @@ export default function ChannelPricingPage() {
                               type="button"
                               onClick={() => handleSave(p)}
                               disabled={savingId === p.id}
-                              className="w-full py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 disabled:opacity-50"
+                              className="w-full py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 disabled:opacity-50"
                           >
                               <Save size={14} />
                               {savingId === p.id ? 'Menyimpan...' : 'Simpan Perubahan'}
@@ -501,20 +501,20 @@ export default function ChannelPricingPage() {
               <table className="w-full text-left min-w-[720px] md:min-w-0">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                  <th className="px-4 py-4 text-[9px] font-black text-gray-400 uppercase text-right">
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase">Produk</th>
+                  <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     Offline
                   </th>
-                  <th className="px-4 py-4 text-[9px] font-black text-gray-400 uppercase text-right">
+                  <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     Website
                   </th>
-                  <th className="px-4 py-4 text-[9px] font-black text-gray-400 uppercase text-right">
+                  <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     Shopee
                   </th>
-                  <th className="px-4 py-4 text-[9px] font-black text-gray-400 uppercase text-right">
+                  <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     TikTok
                   </th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase text-right">
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     Aksi
                   </th>
                 </tr>
@@ -542,10 +542,10 @@ export default function ChannelPricingPage() {
                             {displayName}
                           </span>
                           <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-gray-400">
+                            <span className="text-xs font-bold text-gray-400">
                               Harga dasar: Rp {Number(currentDasar).toLocaleString()}
                             </span>
-                            <span className="text-[9px] font-bold text-blue-500">
+                            <span className="text-xs font-bold text-blue-500">
                               Modal: Rp {Number(currentModal).toLocaleString()}
                             </span>
                           </div>
@@ -553,7 +553,7 @@ export default function ChannelPricingPage() {
                             <select
                               value={currentUnit}
                               onChange={(e) => setSelectedUnit(su => ({ ...su, [p.id]: e.target.value }))}
-                              className="text-[10px] font-black bg-gray-50 border rounded-lg px-2 py-1"
+                              className="text-xs font-black bg-gray-50 border rounded-lg px-2 py-1"
                             >
                               {units.map(uc => (
                                 <option key={uc} value={uc}>{uc}</option>
@@ -581,7 +581,7 @@ export default function ChannelPricingPage() {
                           <td key={key} className="px-4 py-4">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-end gap-1">
-                                <span className="text-[9px] font-bold text-gray-400">Rp</span>
+                                <span className="text-xs font-bold text-gray-400">Rp</span>
                                 <input
                                   type="number"
                                   className="w-24 bg-gray-50 p-2 rounded-lg text-xs font-black text-right outline-none"
@@ -594,10 +594,10 @@ export default function ChannelPricingPage() {
                               </div>
                               {(key === 'shopee' || key === 'tiktok') && price ? (
                                 <div className="text-right space-y-0.5">
-                                  <p className="text-[9px] text-gray-400">
+                                  <p className="text-xs text-gray-400">
                                     Fee: -Rp{Math.round(fee).toLocaleString()}
                                   </p>
-                                  <p className={`text-[9px] font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                  <p className={`text-xs font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                                     Laba: Rp{Math.round(profit).toLocaleString()}
                                   </p>
                                 </div>
@@ -611,7 +611,7 @@ export default function ChannelPricingPage() {
                           type="button"
                           onClick={() => handleSave(p)}
                           disabled={savingId === p.id}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-black text-white text-xs font-black uppercase tracking-[0.2em] disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Save size={14} />
                           {savingId === p.id ? 'Menyimpan...' : 'Simpan'}
@@ -624,7 +624,7 @@ export default function ChannelPricingPage() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-10 text-center text-[11px] font-bold text-gray-400"
+                      className="px-6 py-10 text-center text-xs font-bold text-gray-400"
                     >
                       Tidak ada produk yang cocok dengan pencarian.
                     </td>

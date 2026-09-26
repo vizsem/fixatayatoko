@@ -174,7 +174,7 @@ export default function InventoryHistoryPage() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">Log Mutasi Gudang</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Riwayat Pemasukan &amp; Pengeluaran Barang</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Riwayat Pemasukan &amp; Pengeluaran Barang</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -198,7 +198,7 @@ export default function InventoryHistoryPage() {
               />
             </div>
             <select
-              className="bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase px-3 py-2.5 focus:ring-2 focus:ring-black outline-none shadow-sm"
+              className="bg-white border border-gray-200 rounded-xl text-xs font-black uppercase px-3 py-2.5 focus:ring-2 focus:ring-black outline-none shadow-sm"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
@@ -208,7 +208,7 @@ export default function InventoryHistoryPage() {
               <option value="MUTASI">Mutasi Antar Gudang</option>
             </select>
             <select
-              className="bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase px-3 py-2.5 focus:ring-2 focus:ring-black outline-none shadow-sm"
+              className="bg-white border border-gray-200 rounded-xl text-xs font-black uppercase px-3 py-2.5 focus:ring-2 focus:ring-black outline-none shadow-sm"
               value={filterSource}
               onChange={(e) => setFilterSource(e.target.value)}
             >
@@ -248,7 +248,7 @@ export default function InventoryHistoryPage() {
                     <div>
                       <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{log.productName}</h3>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${log.type === 'MASUK' ? 'bg-green-600 text-white' :
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${log.type === 'MASUK' ? 'bg-green-600 text-white' :
                             log.type === 'KELUAR' ? 'bg-red-600 text-white' :
                               'bg-purple-600 text-white'
                           }`}>
@@ -256,17 +256,17 @@ export default function InventoryHistoryPage() {
                         </span>
                         
                         {/* Source Badge */}
-                         <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider bg-gray-100 text-gray-600 flex items-center gap-1">
+                         <span className="text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider bg-gray-100 text-gray-600 flex items-center gap-1">
                           {getSourceIcon(log.source)} {getSourceLabel(log.source)}
                         </span>
 
-                        <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 uppercase">
+                        <span className="text-xs font-bold text-gray-400 flex items-center gap-1 uppercase">
                           <Calendar size={10} /> {log.date.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                       {/* Note / Reference */}
                       {(log.note || log.referenceId) && (
-                        <div className="mt-2 text-[10px] text-gray-500 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        <div className="mt-2 text-xs text-gray-500 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100">
                            {log.note && <p>Note: {log.note}</p>}
                            {log.referenceId && <p className="font-mono text-gray-400 mt-0.5">Ref: {log.referenceId}</p>}
                         </div>
@@ -276,22 +276,22 @@ export default function InventoryHistoryPage() {
 
                   <div className="flex items-center justify-between md:justify-end gap-8 border-t md:border-t-0 pt-4 md:pt-0">
                     <div className="text-left md:text-right">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Keterangan Lokasi</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Keterangan Lokasi</p>
                       {log.type === 'MUTASI' ? (
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-900 uppercase">
+                        <div className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase">
                           <span>{log.fromWarehouseName}</span>
                           <ArrowLeft size={10} className="rotate-180 text-gray-300" />
                           <span className="text-purple-600">{log.toWarehouseName}</span>
                         </div>
                       ) : (
-                        <p className="text-[10px] font-bold text-gray-900 uppercase">
+                        <p className="text-xs font-bold text-gray-900 uppercase">
                           {log.type === 'MASUK' ? `Masuk ke ${log.toWarehouseName}` : `Keluar dari ${log.fromWarehouseName}`}
                         </p>
                       )}
                     </div>
 
                     <div className="text-right min-w-[80px]">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Jumlah</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Jumlah</p>
                       <p className={`text-lg font-black tracking-tighter ${log.type === 'MASUK' ? 'text-green-600' :
                           log.type === 'KELUAR' ? 'text-red-600' :
                             'text-gray-900'
@@ -299,7 +299,7 @@ export default function InventoryHistoryPage() {
                         {log.type === 'MASUK' ? '+' : log.type === 'KELUAR' ? '-' : ''} {log.amount.toLocaleString()}
                       </p>
                       {(log.prevStock !== undefined && log.nextStock !== undefined) && (
-                        <p className="text-[9px] font-bold text-gray-400 mt-1">
+                        <p className="text-xs font-bold text-gray-400 mt-1">
                           {log.prevStock} → {log.nextStock}
                         </p>
                       )}

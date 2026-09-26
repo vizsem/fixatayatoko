@@ -194,10 +194,10 @@ export default function NotificationsPage() {
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-bold text-gray-800">{item.title}</h3>
-                                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase font-bold">{item.category}</span>
+                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase font-bold">{item.category}</span>
                             </div>
                             <p className="text-sm text-gray-600 mb-2">{item.body}</p>
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-xs text-gray-400">
                                 {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleString('id-ID') : 'Baru saja'}
                             </p>
                         </div>

@@ -43,7 +43,7 @@ const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blu
         <Icon size={20} />
       </div>
       <h3 className="font-bold text-xs text-gray-800 mb-1">{title}</h3>
-      <p className="text-[10px] text-gray-500 leading-tight">{description}</p>
+      <p className="text-xs text-gray-500 leading-tight">{description}</p>
     </div>
   </Link>
 );
@@ -58,14 +58,14 @@ const StatBox = ({ label, value, icon: Icon, color, bg, trend }: { label: string
         <Icon size={18} />
       </div>
       {trend && (
-        <span className="bg-green-50 text-green-600 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+        <span className="bg-green-50 text-green-600 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
           <TrendingUp size={10} /> {trend}
         </span>
       )}
     </div>
     <div className="z-10 mt-2">
       <p className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight mb-0.5">{value}</p>
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">{label}</p>
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-tight">{label}</p>
     </div>
   </div>
 );
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
               </div>
               <div className="text-right">
                 <p className="text-xl font-black text-gray-900">Rp{stats.weeklySales.toLocaleString('id-ID')}</p>
-                <p className="text-[9px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full inline-block">Minggu Ini</p>
+                <p className="text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full inline-block">Minggu Ini</p>
               </div>
             </div>
 
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
                 return (
                   <div key={idx} className="flex flex-col items-center flex-1 group relative">
                     {/* Tooltip */}
-                    <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] py-1 px-2 rounded-lg whitespace-nowrap z-10 pointer-events-none">
+                    <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs py-1 px-2 rounded-lg whitespace-nowrap z-10 pointer-events-none">
                       Rp{data.amount.toLocaleString('id-ID')}
                     </div>
 
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
                       className={`w-full max-w-[32px] rounded-t-lg transition-all duration-500 ease-out hover:opacity-80 ${idx === salesChartData.length - 1 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gray-100 hover:bg-emerald-200'}`}
                       style={{ height: `${heightPercentage}%` }}
                     ></div>
-                    <span className={`text-[9px] font-bold mt-2 ${idx === salesChartData.length - 1 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    <span className={`text-xs font-bold mt-2 ${idx === salesChartData.length - 1 ? 'text-emerald-600' : 'text-gray-400'}`}>
                       {data.dayName}
                     </span>
                   </div>
@@ -265,7 +265,7 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">{order.customerName || 'Pelanggan Tamu'}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
+                        <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
                           <span>{order.orderId || `#${order.id.substring(0, 8)}`}</span>
                           <span>•</span>
                           <span>{new Date(order.createdAt).toLocaleDateString('id-ID')}</span>
@@ -274,7 +274,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-gray-900">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
-                      <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-md mt-1 ${
+                      <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-md mt-1 ${
                         order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
                         order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
                         'bg-yellow-100 text-yellow-700'
@@ -312,12 +312,12 @@ export default function AdminDashboard() {
               ) : (
                 topProducts.map((product, idx) => (
                   <div key={product.id} className="flex items-center gap-3">
-                    <span className={`w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-bold ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
                       {idx + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
-                      <p className="text-[10px] text-gray-400">{product.sales} terjual</p>
+                      <p className="text-xs text-gray-400">{product.sales} terjual</p>
                     </div>
                     <p className="text-xs font-bold text-gray-900">Rp{product.price.toLocaleString('id-ID')}</p>
                   </div>

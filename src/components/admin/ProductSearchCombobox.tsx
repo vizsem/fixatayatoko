@@ -228,7 +228,7 @@ export default function ProductSearchCombobox({
                   >
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-xs font-semibold text-gray-800">{p.name}</p>
-                      <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
                         {p.barcode && <span className="font-mono bg-gray-100 px-1 py-0.2 rounded">{p.barcode}</span>}
                         {p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
                           <span className="text-emerald-600 font-medium">

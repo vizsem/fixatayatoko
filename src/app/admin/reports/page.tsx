@@ -155,7 +155,7 @@ export default function ReportsDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight mb-0.5">Business Analytics</h1>
-          <p className="text-[10px] md:text-sm text-gray-400 font-medium uppercase tracking-widest">Overview performa & kesehatan bisnis</p>
+          <p className="text-xs md:text-sm text-gray-400 font-medium uppercase tracking-widest">Overview performa & kesehatan bisnis</p>
         </div>
 
         <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
@@ -163,7 +163,7 @@ export default function ReportsDashboard() {
             <Calendar size={14} className="text-gray-400 group-focus-within:text-blue-600" />
             <input
               type="date"
-              className="text-[10px] font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
+              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
             />
@@ -172,7 +172,7 @@ export default function ReportsDashboard() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 group focus-within:ring-2 ring-blue-100 transition-all">
             <input
               type="date"
-              className="text-[10px] font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
+              className="text-xs font-bold outline-none bg-transparent text-gray-700 w-24 cursor-pointer"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
@@ -194,7 +194,7 @@ export default function ReportsDashboard() {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-gray-900 font-extrabold text-lg">Tren Penjualan</h3>
-                  <p className="text-gray-400 text-[10px] font-medium mt-0.5">Pendapatan harian periode ini</p>
+                  <p className="text-gray-400 text-xs font-medium mt-0.5">Pendapatan harian periode ini</p>
                 </div>
                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><BarChart3 size={18} /></div>
               </div>
@@ -225,12 +225,12 @@ export default function ReportsDashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-rose-50 rounded-xl"><Activity size={16} className="text-rose-500" /></div>
-                  <h3 className="text-gray-400 text-[9px] font-bold uppercase tracking-wider">Piutang Berjalan</h3>
+                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Piutang Berjalan</h3>
                 </div>
                 <p className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Rp{summary.outstandingDebt.toLocaleString('id-ID')}</p>
                 <div className="mt-4 space-y-3">
                   <div>
-                    <div className="flex justify-between text-[9px] font-bold text-gray-400 mb-1">
+                    <div className="flex justify-between text-xs font-bold text-gray-400 mb-1">
                       <span>Rasio Piutang</span>
                       <span>{((summary.outstandingDebt / (summary.totalSales || 1)) * 100).toFixed(1)}%</span>
                     </div>
@@ -241,7 +241,7 @@ export default function ReportsDashboard() {
                 </div>
               </div>
 
-              <button onClick={handleExportSummary} disabled={isExporting} className="mt-6 w-full bg-gray-900 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200">
+              <button onClick={handleExportSummary} disabled={isExporting} className="mt-6 w-full bg-gray-900 text-white px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200">
                 {isExporting ? <Activity className="animate-spin" size={16} /> : <Download size={16} />}
                 Export Excel
               </button>
@@ -275,12 +275,12 @@ function StatCard({ label, value, icon: Icon, color, bg, borderColor, trend, sub
         <div className={`${bg} ${color} p-2.5 md:p-3.5 rounded-xl border ${borderColor} group-hover:scale-110 transition-transform duration-300`}>
           <Icon size={18} className="md:size-[22px]" />
         </div>
-        {trend && <span className="hidden md:flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full"><ArrowUpRight size={12} /> {trend}</span>}
+        {trend && <span className="hidden md:flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full"><ArrowUpRight size={12} /> {trend}</span>}
       </div>
       <div className="relative z-10">
-        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
         <h3 className="text-sm md:text-2xl font-black text-gray-900 tracking-tight">{value}</h3>
-        {subValue && <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gray-50 text-[9px] font-bold text-gray-400"><AlertTriangle size={10} /> {subValue}</div>}
+        {subValue && <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gray-50 text-xs font-bold text-gray-400"><AlertTriangle size={10} /> {subValue}</div>}
       </div>
       <div className={`absolute inset-0 bg-gradient-to-br ${bg} opacity-0 group-hover:opacity-20 transition-opacity duration-500`}></div>
     </div>
@@ -296,8 +296,8 @@ function ReportLink({ title, desc, icon: Icon, href, color, bg, hoverBorder }: a
           <div className="bg-gray-50 p-1.5 rounded-full group-hover:bg-gray-100 transition-colors"><ChevronRight size={14} className="text-gray-300 group-hover:text-gray-600" /></div>
         </div>
         <div className="mt-auto">
-          <h4 className="font-black text-gray-900 text-[11px] md:text-sm uppercase tracking-tight mb-1">{title}</h4>
-          <p className="text-[9px] md:text-xs text-gray-400 font-medium leading-tight">{desc}</p>
+          <h4 className="font-black text-gray-900 text-xs md:text-sm uppercase tracking-tight mb-1">{title}</h4>
+          <p className="text-xs md:text-xs text-gray-400 font-medium leading-tight">{desc}</p>
         </div>
       </div>
     </Link>

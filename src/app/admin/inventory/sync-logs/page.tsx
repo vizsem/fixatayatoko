@@ -153,7 +153,7 @@ export default function SyncLogsPage() {
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">
                 Logs Sinkronisasi Stok
               </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
                 History dan detail sinkronisasi
               </p>
             </div>

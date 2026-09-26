@@ -322,7 +322,7 @@ function AddPurchaseFormContent() {
           </Link>
           <div>
             <h1 className="text-base sm:text-2xl font-black text-gray-800 uppercase tracking-tighter">Pembelian Baru</h1>
-            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mt-0.5 hidden sm:block">Input stok masuk dari supplier</p>
+            <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-0.5 hidden sm:block">Input stok masuk dari supplier</p>
           </div>
         </div>
       </div>
@@ -379,7 +379,7 @@ function AddPurchaseFormContent() {
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all shadow-sm"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all shadow-sm"
                 >
                   <Camera size={13} />
                   <span>Scan</span>
@@ -403,7 +403,7 @@ function AddPurchaseFormContent() {
                       >
                         <div>
                           <p className="text-xs font-black uppercase text-gray-800">{p.name}</p>
-                          <p className="text-[9px] font-bold text-gray-400">STOK SAAT INI: {p.stock} {p.unit}</p>
+                          <p className="text-xs font-bold text-gray-400">STOK SAAT INI: {p.stock} {p.unit}</p>
                         </div>
                         <Plus size={16} className="text-gray-300 group-hover:text-black" />
                       </button>
@@ -421,13 +421,13 @@ function AddPurchaseFormContent() {
                       <button
                         type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="mt-1 text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1"
+                        className="mt-1 text-xs font-black text-red-600 uppercase tracking-widest flex items-center gap-1"
                       >
                         <Trash2 size={12} /> Hapus
                       </button>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
                       <p className="text-sm font-black text-gray-900">
                         Rp {(item.quantity * item.purchasePrice).toLocaleString()}
                       </p>
@@ -436,7 +436,7 @@ function AddPurchaseFormContent() {
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Qty</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Qty</p>
                       <input
                         id={`qty-${item.id}`}
                         name={`qty-${item.id}`}
@@ -447,7 +447,7 @@ function AddPurchaseFormContent() {
                       />
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Satuan</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Satuan</p>
                       <select
                         id={`unit-${item.id}`}
                         name={`unit-${item.id}`}
@@ -473,7 +473,7 @@ function AddPurchaseFormContent() {
                       </select>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Isi (Pcs)</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Isi (Pcs)</p>
                       <input
                         id={`conv-${item.id}`}
                         name={`conv-${item.id}`}
@@ -484,7 +484,7 @@ function AddPurchaseFormContent() {
                       />
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
+                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
                       <input
                         id={`price-${item.id}`}
                         name={`price-${item.id}`}
@@ -503,12 +503,12 @@ function AddPurchaseFormContent() {
               <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead className="bg-gray-50/50">
                   <tr>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase">Produk</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Qty</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Satuan</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-center">Harga Beli</th>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-[9px] font-black text-gray-400 uppercase text-right">Subtotal</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Produk</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Satuan</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Harga Beli</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -517,7 +517,7 @@ function AddPurchaseFormContent() {
                       <td className="px-3 md:px-8 py-3 md:py-4">
                         <div className="flex flex-col">
                           <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>
-                          <button type="button" onClick={() => removeFromCart(item.id)} className="text-[9px] text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline">
+                          <button type="button" onClick={() => removeFromCart(item.id)} className="text-xs text-red-500 font-black uppercase mt-1 flex items-center gap-1 hover:underline">
                             <Trash2 size={10} /> Hapus
                           </button>
                         </div>
@@ -592,7 +592,7 @@ function AddPurchaseFormContent() {
             {cart.length === 0 && (
               <div className="p-20 text-center flex flex-col items-center gap-2">
                 <Package size={40} className="text-gray-100" />
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Keranjang Kosong</p>
+                <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Keranjang Kosong</p>
               </div>
             )}
           </div>
@@ -601,7 +601,7 @@ function AddPurchaseFormContent() {
         {/* RIGHT: SUMMARY & ACTIONS */}
         <div className="space-y-6">
           <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl space-y-6">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
               <Calculator size={14} /> Order Summary
             </h3>
 
@@ -624,7 +624,7 @@ function AddPurchaseFormContent() {
             </div>
 
             <div className="flex justify-between items-end">
-              <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Grand Total</span>
+              <span className="text-xs font-black uppercase tracking-widest opacity-60">Grand Total</span>
               <span className="text-2xl font-black text-green-400 italic">Rp {total.toLocaleString()}</span>
             </div>
 
@@ -633,14 +633,14 @@ function AddPurchaseFormContent() {
                 <button
                   type="button"
                   onClick={() => setPaymentStatus('LUNAS')}
-                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
                 >
                   Paid
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentStatus('HUTANG')}
-                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
                 >
                   Debt
                 </button>
@@ -649,7 +649,7 @@ function AddPurchaseFormContent() {
               <select
                 id="payment-method"
                 name="payment-method"
-                className="w-full bg-white/5 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none"
+                className="w-full bg-white/5 p-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
@@ -666,14 +666,14 @@ function AddPurchaseFormContent() {
 
             <button
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
               <Save size={18} /> {loading ? 'Saving Order...' : 'Post Purchase Order'}
             </button>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
               <Info size={14} /> Additional Notes
             </h3>
             <textarea

@@ -116,7 +116,7 @@ function WarehouseFormContent() {
           <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">
             {editId ? 'Edit' : 'Tambah'} Gudang
           </h1>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kelola lokasi penyimpanan stok</p>
+          <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Kelola lokasi penyimpanan stok</p>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ function WarehouseFormContent() {
               />
             </div>
             <div className="flex-1 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-              <label className="block text-blue-600 text-[10px] font-black uppercase tracking-widest mb-2">
+              <label className="block text-blue-600 text-xs font-black uppercase tracking-widest mb-2">
                 CTN Calculator (34x20x24 cm)
               </label>
               <div className="flex items-center gap-2">
@@ -192,14 +192,14 @@ function WarehouseFormContent() {
                   }}
                   className="w-full bg-white px-3 py-2 rounded-xl text-xs font-black outline-none border border-blue-200 text-blue-700"
                 />
-                <span className="text-[10px] font-black text-blue-400 uppercase">CTN</span>
+                <span className="text-xs font-black text-blue-400 uppercase">CTN</span>
               </div>
-              <p className="text-[8px] font-bold text-blue-400 mt-2 uppercase tracking-tight">
+              <p className="text-xs font-bold text-blue-400 mt-2 uppercase tracking-tight">
                 * 1 CTN dihitung sebagai 1 unit kapasitas volume standar (34x20x24 cm)
               </p>
             </div>
           </div>
-          <p className="text-[9px] font-bold text-gray-400 mt-2 uppercase tracking-widest px-1">
+          <p className="text-xs font-bold text-gray-400 mt-2 uppercase tracking-widest px-1">
             Jumlah maksimal item yang bisa disimpan di gudang ini (berdasarkan unit/box)
           </p>
         </div>

@@ -118,12 +118,12 @@ export default function AdminPointsDashboard() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Loyalty Points Control</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Keamanan & Audit Poin</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Keamanan & Audit Poin</p>
             </div>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg"
+            className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg"
           >
             <AlertTriangle size={16} /> Penyesuaian Manual
           </button>
@@ -133,15 +133,15 @@ export default function AdminPointsDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-white">
           <div className="bg-black p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
             <Coins className="absolute right-[-10px] bottom-[-10px] text-white/10" size={120} />
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Total In-Flow</p>
+            <p className="text-xs font-black uppercase tracking-widest opacity-60 mb-2">Total In-Flow</p>
             <h2 className="text-4xl font-black italic">{stats.totalPoints.toLocaleString()}</h2>
           </div>
           <div className="bg-white text-black border border-gray-100 p-8 rounded-[2.5rem] shadow-sm">
-            <p className="text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">Total Out-Flow</p>
+            <p className="text-xs font-black uppercase text-gray-400 mb-2 tracking-widest">Total Out-Flow</p>
             <h2 className="text-4xl font-black italic text-red-600">{stats.totalRedeemed.toLocaleString()}</h2>
           </div>
           <div className="bg-blue-600 p-8 rounded-[2.5rem] shadow-lg">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Saldo Aktif Beredar</p>
+            <p className="text-xs font-black uppercase tracking-widest opacity-60 mb-2">Saldo Aktif Beredar</p>
             <h2 className="text-4xl font-black italic">{(stats.totalPoints - stats.totalRedeemed).toLocaleString()}</h2>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function AdminPointsDashboard() {
                       {user.isPointsFrozen ? <Snowflake size={18} /> : <UserIcon size={18} />}
                     </div>
                     <div className="overflow-hidden">
-                      <p className="text-[10px] font-black uppercase truncate">{user.displayName || user.email?.split('@')[0]}</p>
+                      <p className="text-xs font-black uppercase truncate">{user.displayName || user.email?.split('@')[0]}</p>
 
                       {/* BAGIAN UID PELANGGAN */}
                       <div
@@ -171,13 +171,13 @@ export default function AdminPointsDashboard() {
                           toast.success("UID Berhasil disalin!");
                         }}
                       >
-                        <p className="text-[8px] font-bold text-blue-500 uppercase font-mono tracking-tighter">
+                        <p className="text-xs font-bold text-blue-500 uppercase font-mono tracking-tighter">
                           UID: {user.id}
                         </p>
-                        <span className="text-[7px] bg-blue-100 text-blue-600 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">Copy</span>
+                        <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">Copy</span>
                       </div>
 
-                      <p className={`text-[8px] font-bold uppercase mt-1 ${user.isPointsFrozen ? 'text-red-500' : 'text-gray-400'}`}>
+                      <p className={`text-xs font-bold uppercase mt-1 ${user.isPointsFrozen ? 'text-red-500' : 'text-gray-400'}`}>
                         {user.isPointsFrozen ? 'Status: Dibekukan' : 'Status: Aktif'}
                       </p>
                     </div>
@@ -186,7 +186,7 @@ export default function AdminPointsDashboard() {
                   <div className="flex items-center gap-4 ml-2">
                     <div className="text-right">
                       <p className="text-xs font-black text-blue-600">{user.points?.toLocaleString()}</p>
-                      <p className="text-[8px] font-bold text-gray-300 uppercase italic">Points</p>
+                      <p className="text-xs font-bold text-gray-300 uppercase italic">Points</p>
                     </div>
                     <button
                       onClick={() => toggleFreeze(user.id, user.isPointsFrozen)}
@@ -218,10 +218,10 @@ export default function AdminPointsDashboard() {
                     <div key={log.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                       <div className="flex justify-between items-start mb-2">
                          <div>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase">
+                            <p className="text-xs font-bold text-gray-400 uppercase">
                               {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM HH:mm', { locale: localeID }) : '...'}
                             </p>
-                            <p className="text-[10px] font-black uppercase mt-0.5">UID: {log.userId?.slice(0, 8)}</p>
+                            <p className="text-xs font-black uppercase mt-0.5">UID: {log.userId?.slice(0, 8)}</p>
                          </div>
                          <div className={`font-black text-xs ${log.pointsChanged > 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {log.pointsChanged > 0 ? `+${log.pointsChanged}` : log.pointsChanged}
@@ -229,12 +229,12 @@ export default function AdminPointsDashboard() {
                       </div>
                       
                       <div className="space-y-2">
-                         <span className={`inline-block px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${
+                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-black uppercase tracking-tighter ${
                             log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                           }`}>
                             {log.type}
                          </span>
-                         <p className="text-[10px] text-gray-600 font-bold uppercase italic leading-tight">{log.description}</p>
+                         <p className="text-xs text-gray-600 font-bold uppercase italic leading-tight">{log.description}</p>
                       </div>
                     </div>
                   ))
@@ -247,17 +247,17 @@ export default function AdminPointsDashboard() {
                   {logs.map((log) => (
                     <tr key={log.id} className="group">
                       <td className="py-4">
-                        <p className="text-[9px] font-bold text-gray-400 uppercase">
+                        <p className="text-xs font-bold text-gray-400 uppercase">
                           {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM HH:mm', { locale: localeID }) : '...'}
                         </p>
-                        <p className="text-[10px] font-black uppercase">UID: {log.userId?.slice(0, 8)}</p>
+                        <p className="text-xs font-black uppercase">UID: {log.userId?.slice(0, 8)}</p>
                       </td>
                       <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter ${log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                        <span className={`px-2 py-0.5 rounded text-xs font-black uppercase tracking-tighter ${log.type === 'EARN' || log.type === 'BONUS' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                           }`}>
                           {log.type}
                         </span>
-                        <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase italic leading-tight">{log.description}</p>
+                        <p className="text-xs text-gray-400 font-bold mt-1 uppercase italic leading-tight">{log.description}</p>
                       </td>
                       <td className="py-4 text-right">
                         <div className={`font-black text-xs ${log.pointsChanged > 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -279,7 +279,7 @@ export default function AdminPointsDashboard() {
               <h2 className="text-xl font-black uppercase italic mb-6">Point Adjustment</h2>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="target-user-id" className="text-[10px] font-black uppercase text-gray-400">Target User ID</label>
+                  <label htmlFor="target-user-id" className="text-xs font-black uppercase text-gray-400">Target User ID</label>
                   <input
                     id="target-user-id"
                     type="text"
@@ -290,28 +290,28 @@ export default function AdminPointsDashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <button onClick={() => setAdjustData({ ...adjustData, type: 'BONUS' })}
-                    className={`p-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${adjustData.type === 'BONUS' ? 'bg-green-50 border-green-600 text-green-600' : 'border-gray-100 text-gray-400'}`}>
+                    className={`p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${adjustData.type === 'BONUS' ? 'bg-green-50 border-green-600 text-green-600' : 'border-gray-100 text-gray-400'}`}>
                     <PlusCircle className="mx-auto mb-1" size={18} /> Bonus
                   </button>
                   <button onClick={() => setAdjustData({ ...adjustData, type: 'PENALTY' })}
-                    className={`p-4 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${adjustData.type === 'PENALTY' ? 'bg-red-50 border-red-600 text-red-600' : 'border-gray-100 text-gray-400'}`}>
+                    className={`p-4 rounded-2xl font-black text-xs uppercase border-2 transition-all ${adjustData.type === 'PENALTY' ? 'bg-red-50 border-red-600 text-red-600' : 'border-gray-100 text-gray-400'}`}>
                     <MinusCircle className="mx-auto mb-1" size={18} /> Penalti
                   </button>
                 </div>
                 <div>
-                  <label htmlFor="nominal-points" className="text-[10px] font-black uppercase text-gray-400">Nominal Poin</label>
+                  <label htmlFor="nominal-points" className="text-xs font-black uppercase text-gray-400">Nominal Poin</label>
                   <input id="nominal-points" type="number" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-black outline-none" placeholder="0"
                     onChange={(e) => setAdjustData({ ...adjustData, amount: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <label htmlFor="adjustment-reason" className="text-[10px] font-black uppercase text-gray-400">Alasan Penyesuaian</label>
+                  <label htmlFor="adjustment-reason" className="text-xs font-black uppercase text-gray-400">Alasan Penyesuaian</label>
                   <textarea id="adjustment-reason" className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold outline-none resize-none" rows={3}
                     placeholder="Contoh: Temuan transaksi fiktif..."
                     onChange={(e) => setAdjustData({ ...adjustData, reason: e.target.value })} />
                 </div>
                 <div className="flex gap-4 mt-6">
-                  <button onClick={() => setShowModal(false)} className="flex-1 p-4 font-black text-[10px] uppercase text-gray-400 hover:text-black">Batal</button>
-                  <button onClick={handleAdjustment} className="flex-1 p-4 bg-black text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:shadow-blue-200 transition-all">Konfirmasi</button>
+                  <button onClick={() => setShowModal(false)} className="flex-1 p-4 font-black text-xs uppercase text-gray-400 hover:text-black">Batal</button>
+                  <button onClick={handleAdjustment} className="flex-1 p-4 bg-black text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:shadow-blue-200 transition-all">Konfirmasi</button>
                 </div>
               </div>
             </div>

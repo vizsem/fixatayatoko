@@ -141,7 +141,7 @@ export default function SyncConfigPage() {
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">
                 Konfigurasi Sinkronisasi
               </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
                 Pengaturan sinkronisasi stok
               </p>
             </div>

@@ -296,7 +296,7 @@ export default function AddProductPage() {
             </Link>
             <div>
               <h1 className="text-base sm:text-xl font-black uppercase tracking-tighter">Tambah Produk</h1>
-              <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest hidden sm:block">Database Inventaris Ataya</p>
+              <p className="text-xs text-gray-400 font-black uppercase tracking-widest hidden sm:block">Database Inventaris Ataya</p>
             </div>
           </div>
           {/* Quick save for mobile */}
@@ -304,7 +304,7 @@ export default function AddProductPage() {
             type="submit"
             form="add-product-form"
             disabled={loading}
-            className="sm:hidden px-3 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+            className="sm:hidden px-3 py-2 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
           >
             {loading ? '...' : 'Simpan'}
           </button>
@@ -328,7 +328,7 @@ export default function AddProductPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">ID Produk *</label>
                 <div className="flex gap-2">
                   <input
                     required
@@ -341,14 +341,14 @@ export default function AddProductPage() {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, ID: `PRD-${Date.now().toString().slice(-6)}` })}
-                    className="px-3 py-2 bg-blue-50 text-blue-600 text-[9px] font-black rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    className="px-3 py-2 bg-blue-50 text-blue-600 text-xs font-black rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
                   >
                     Auto ID
                   </button>
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Parent ID</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Parent ID</label>
                 <input
                   className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
                   type="text"
@@ -358,15 +358,15 @@ export default function AddProductPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nama Produk <span className="text-red-500">*</span></label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Nama Produk <span className="text-red-500">*</span></label>
                 <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-400" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} placeholder="Masukkan nama produk..." />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Lokasi} onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Kategori</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Kategori</label>
                 <div className="relative">
                   <input 
                     list="category-suggestions"
@@ -384,11 +384,11 @@ export default function AddProductPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
                 <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1 flex justify-between">
+                <label className="text-xs font-black uppercase text-gray-400 ml-1 flex justify-between">
                   <span>Barcode / SKU</span>
                   <button type="button" onClick={() => setScannerReady(true)} className="text-blue-500 hover:text-blue-700 flex items-center gap-1">
                     <Camera size={12} /> Scan Kamera
@@ -410,7 +410,7 @@ export default function AddProductPage() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
                 <div className="relative">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" aria-hidden="true">
                     <path d="M8 2v4"></path>
@@ -422,7 +422,7 @@ export default function AddProductPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
                 <div className="relative">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" aria-hidden="true">
                     <path d="M8 2v4"></path>
@@ -444,19 +444,19 @@ export default function AddProductPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Satuan</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Satuan</label>
                 <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Awal</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Awal</label>
                 <input required type="number" className="w-full p-4 bg-emerald-50 rounded-2xl border-none font-black text-emerald-700" value={formData.Stok} onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
                 <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Gudang</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Gudang</label>
                 <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.warehouseId} onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}>
                   <option value="">Pilih Gudang</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -465,14 +465,14 @@ export default function AddProductPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-2 gap-5 mt-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
                 <input type="number" min="1" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700" value={formData.minPurchase} onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} />
-                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
+                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
                 <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
-                <p className="text-[8px] text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
+                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
               </div>
             </div>
           </div>
@@ -486,7 +486,7 @@ export default function AddProductPage() {
             >
               <div className="flex items-center gap-2">
                 <Package size={18} />
-                <h3 className="text-xs font-black uppercase tracking-widest">Dimensi &amp; Volume <span className="text-[9px] text-gray-400">(Opsional)</span></h3>
+                <h3 className="text-xs font-black uppercase tracking-widest">Dimensi &amp; Volume <span className="text-xs text-gray-400">(Opsional)</span></h3>
               </div>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${collapsedDim ? '' : 'rotate-180'}`}>
                 <path d="m6 9 6 6 6-6"/>
@@ -496,7 +496,7 @@ export default function AddProductPage() {
               <div className="px-5 md:px-6 pb-6">
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
+                    <label className="text-xs font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
                     <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
                       const l = Number(e.target.value);
                       const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
@@ -504,7 +504,7 @@ export default function AddProductPage() {
                     }} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
+                    <label className="text-xs font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
                     <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
                       const w = Number(e.target.value);
                       const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
@@ -512,7 +512,7 @@ export default function AddProductPage() {
                     }} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
+                    <label className="text-xs font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
                     <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
                       const h = Number(e.target.value);
                       const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
@@ -520,9 +520,9 @@ export default function AddProductPage() {
                     }} />
                   </div>
                   <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                    <p className="text-[8px] font-black text-blue-400 uppercase mb-1">Volume Setara</p>
-                    <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-[10px] uppercase">CTN</span></p>
-                    <p className="text-[7px] font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
+                    <p className="text-xs font-black text-blue-400 uppercase mb-1">Volume Setara</p>
+                    <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-xs uppercase">CTN</span></p>
+                    <p className="text-xs font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
                   </div>
                 </div>
               </div>
@@ -537,15 +537,15 @@ export default function AddProductPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Modal</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Modal</label>
                 <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
                 <input required type="number" disabled={pricingMode === 'RECOMMENDED'} className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600 disabled:opacity-70" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Harga Coret</label>
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Coret</label>
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
             </div>
@@ -571,7 +571,7 @@ export default function AddProductPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
                     <div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${
+                      <p className={`text-xs font-black uppercase tracking-widest ${
                         !taxSettings.enabled ? 'text-gray-400' : breakdown.isExempt ? 'text-amber-700' : 'text-indigo-700'
                       }`}>Status Pajak</p>
                       <p className={`text-xs font-black ${
@@ -584,15 +584,15 @@ export default function AddProductPage() {
                       <div className="w-px h-8 bg-indigo-200 hidden md:block" />
                       <div className="grid grid-cols-3 gap-4 flex-1">
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
                           <p className="text-sm font-black text-indigo-900">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
                           <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
                           <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                             {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
                           </p>
@@ -601,12 +601,12 @@ export default function AddProductPage() {
                     </>
                   )}
                   {taxSettings.enabled && breakdown.isExempt && (
-                    <p className="text-[11px] font-bold text-amber-700">
+                    <p className="text-xs font-bold text-amber-700">
                       Kategori ini bebas PPN (0%) sesuai PP 49/2022 / UU HPP — tidak ada pajak yang dikenakan.
                     </p>
                   )}
                   {!taxSettings.enabled && (
-                    <p className="text-[11px] font-bold text-gray-400">
+                    <p className="text-xs font-bold text-gray-400">
                       Pajak belum diaktifkan. Aktifkan di <span className="underline">Pengaturan → Pajak</span> untuk melihat DPP & kewajiban pajak.
                     </p>
                   )}
@@ -616,7 +616,7 @@ export default function AddProductPage() {
             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Mode Harga</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Mode Harga</label>
                   <select
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm"
                     value={pricingMode}
@@ -627,7 +627,7 @@ export default function AddProductPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Profil Margin</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Profil Margin</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
@@ -642,7 +642,7 @@ export default function AddProductPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Margin (%)</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Margin (%)</label>
                   <input
                     type="number"
                     disabled={pricingMode !== 'RECOMMENDED'}
@@ -653,7 +653,7 @@ export default function AddProductPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Pembulatan</label>
+                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Pembulatan</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
                     className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
@@ -674,7 +674,7 @@ export default function AddProductPage() {
                   <div className="text-xs font-black text-slate-700">
                     Rekomendasi: Rp{pricingRec.recommendedPrice.toLocaleString('id-ID')} ({pricingRec.rule.label}, {pricingRec.rule.min}-{pricingRec.rule.max}%)
                   </div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <div className="text-xs font-black uppercase tracking-widest text-slate-400">
                     Efektif: {pricingRec.effectiveMarginPercent.toFixed(2)}%
                   </div>
                 </div>
@@ -682,16 +682,16 @@ export default function AddProductPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                <label className="text-xs font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
+                <label className="text-xs font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
                 <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
               </div>
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase text-gray-400">Status</span>
+              <span className="text-xs font-black uppercase text-gray-400">Status</span>
               <select className="p-3 bg-gray-50 rounded-xl text-xs font-bold" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
                 <option value={1}>Aktif</option>
                 <option value={0}>Arsip</option>
@@ -749,10 +749,10 @@ export default function AddProductPage() {
                       </button>
                     )}
                     <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="text-[10px] font-black uppercase text-gray-400">{code}</div>
+                      <div className="text-xs font-black uppercase text-gray-400">{code}</div>
                       <input
                         type="text"
-                        className="w-32 bg-white p-2 rounded-xl text-[10px] font-black text-gray-700 outline-none border"
+                        className="w-32 bg-white p-2 rounded-xl text-xs font-black text-gray-700 outline-none border"
                         placeholder="Nama satuan"
                         value={current.label || ''}
                         onChange={(e) => {
@@ -764,7 +764,7 @@ export default function AddProductPage() {
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Harga</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Harga</span>
                         <input
                           type="number"
                           className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
@@ -778,7 +778,7 @@ export default function AddProductPage() {
                         />
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Isi</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Isi</span>
                         <input
                           type="number"
                           disabled={code === 'PCS'}
@@ -793,7 +793,7 @@ export default function AddProductPage() {
                         />
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-black text-gray-500 uppercase">Min Qty</span>
+                        <span className="text-xs font-black text-gray-500 uppercase">Min Qty</span>
                         <input
                           type="number"
                           min="0"
@@ -807,7 +807,7 @@ export default function AddProductPage() {
                           }}
                         />
                       </div>
-                      <div className="text-[10px] font-black text-gray-500 pt-2 border-t border-gray-200">
+                      <div className="text-xs font-black text-gray-500 pt-2 border-t border-gray-200">
                         {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
                         <span className="mx-1 font-bold text-gray-800">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
                         / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
@@ -871,7 +871,7 @@ export default function AddProductPage() {
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-2xl px-4 py-3">
         <div className="max-w-4xl mx-auto">
           {errorMsg && (
-            <div className="mb-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-2 text-[11px] font-black uppercase">
+            <div className="mb-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-2 text-xs font-black uppercase">
               <AlertCircle size={14} /> {errorMsg}
             </div>
           )}

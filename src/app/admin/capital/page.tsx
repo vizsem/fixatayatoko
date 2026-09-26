@@ -440,7 +440,7 @@ export default function CapitalPage() {
             
             <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-4 text-xs text-purple-800">
               <p className="font-bold mb-1">Modal Total Saat Ini: Rp {totals.currentCapital.toLocaleString('id-ID')}</p>
-              <p className="text-[11px] text-purple-600">
+              <p className="text-xs text-purple-600">
                 Masukkan nilai modal total yang sebenarnya. Sistem akan otomatis menghitung selisih dan mencatat transaksi penyesuaian secara rapi.
               </p>
             </div>

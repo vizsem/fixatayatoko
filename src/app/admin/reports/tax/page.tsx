@@ -217,7 +217,7 @@ export default function TaxReportPage() {
             <ShieldCheck size={24} />
           </div>
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status Pengenaan Pajak Toko</span>
+            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Status Pengenaan Pajak Toko</span>
             <h3 className="text-base font-black text-slate-800">
               {taxSettings.enabled
                 ? (taxSettings.mode === 'PT_PKP' ? '🏢 PT / Badan Usaha (PKP PPN 11%)' : '👤 Perorangan / UMKM (PPh Final 0.5%)')
@@ -235,27 +235,27 @@ export default function TaxReportPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Perolehan (Omzet)</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Perolehan (Omzet)</p>
           <p className="text-2xl font-black text-slate-900 tracking-tight">Rp {summary.totalOmzet.toLocaleString('id-ID')}</p>
-          <p className="text-[10px] text-slate-400 font-bold mt-2">Seluruh transaksi selesai</p>
+          <p className="text-xs text-slate-400 font-bold mt-2">Seluruh transaksi selesai</p>
         </div>
 
         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Dasar Pengenaan Pajak (DPP)</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Dasar Pengenaan Pajak (DPP)</p>
           <p className="text-2xl font-black text-blue-600 tracking-tight">Rp {summary.totalDPP.toLocaleString('id-ID')}</p>
-          <p className="text-[10px] text-slate-400 font-bold mt-2">Nilai bersih sebelum PPN</p>
+          <p className="text-xs text-slate-400 font-bold mt-2">Nilai bersih sebelum PPN</p>
         </div>
 
         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pajak Terutang</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Pajak Terutang</p>
           <p className="text-2xl font-black text-emerald-600 tracking-tight">Rp {summary.totalPajak.toLocaleString('id-ID')}</p>
-          <p className="text-[10px] text-slate-400 font-bold mt-2">PPN 11% / PPh Final 0,5%</p>
+          <p className="text-xs text-slate-400 font-bold mt-2">PPN 11% / PPh Final 0,5%</p>
         </div>
 
         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bebas PPN (Sembako 0%)</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Bebas PPN (Sembako 0%)</p>
           <p className="text-2xl font-black text-amber-600 tracking-tight">Rp {summary.totalSembakoExempt.toLocaleString('id-ID')}</p>
-          <p className="text-[10px] text-slate-400 font-bold mt-2">PP No. 49/2022 (Sembako)</p>
+          <p className="text-xs text-slate-400 font-bold mt-2">PP No. 49/2022 (Sembako)</p>
         </div>
       </div>
 
@@ -270,7 +270,7 @@ export default function TaxReportPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
-            <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <thead className="bg-slate-50 border-b border-slate-100 text-xs font-black uppercase tracking-widest text-slate-400">
               <tr>
                 <th className="p-4 pl-6">Waktu / No. Nota</th>
                 <th className="p-4">Pembeli</th>
@@ -293,18 +293,18 @@ export default function TaxReportPage() {
                   <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-4 pl-6">
                       <p className="text-slate-800 font-black">{r.orderId}</p>
-                      <p className="text-[10px] text-slate-400 font-normal">{r.date}</p>
+                      <p className="text-xs text-slate-400 font-normal">{r.date}</p>
                     </td>
                     <td className="p-4 text-slate-700">{r.customerName}</td>
                     <td className="p-4">
                       <p className="text-slate-800 font-black">{r.productName}</p>
-                      <span className="text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">{r.category}</span>
+                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">{r.category}</span>
                     </td>
                     <td className="p-4 text-right text-slate-900 font-black">Rp {r.totalSales.toLocaleString('id-ID')}</td>
                     <td className="p-4 text-right text-blue-600 font-black">Rp {r.dpp.toLocaleString('id-ID')}</td>
                     <td className="p-4 text-right text-emerald-600 font-black">Rp {r.taxAmount.toLocaleString('id-ID')}</td>
                     <td className="p-4 text-center pr-6">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider ${r.isExempt ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-black tracking-wider ${r.isExempt ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
                         {r.taxLabel}
                       </span>
                     </td>

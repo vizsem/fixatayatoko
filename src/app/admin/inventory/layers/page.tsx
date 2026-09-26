@@ -204,7 +204,7 @@ export default function InventoryLayersPage() {
             </div>
             <button 
               onClick={() => setShowOnlyActive(!showOnlyActive)}
-              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
                 showOnlyActive 
                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
                 : 'bg-gray-50 text-gray-400 border-gray-100'
@@ -222,7 +222,7 @@ export default function InventoryLayersPage() {
                 onChange={(e) => setDateRange(r => ({ ...r, startDate: e.target.value }))}
                 className="bg-white rounded-lg px-3 py-2 text-xs font-bold outline-none ring-1 ring-gray-200 focus:ring-gray-900"
               />
-              <span className="text-[10px] font-black text-gray-400">-</span>
+              <span className="text-xs font-black text-gray-400">-</span>
               <input
                 type="date"
                 value={dateRange.endDate}
@@ -231,38 +231,38 @@ export default function InventoryLayersPage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleExport} className="px-4 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              <button onClick={handleExport} className="px-4 py-2 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
                 <Download size={14} /> Export Produk
               </button>
-              <button onClick={handleExportWarehouses} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              <button onClick={handleExportWarehouses} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
                 <Download size={14} /> Export Gudang
               </button>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-              <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Stok Lama</div>
+              <div className="text-xs font-black text-indigo-600 uppercase tracking-widest">Stok Lama</div>
               <div className="text-xs font-black text-slate-900">Qty: {summary.oldQty.toLocaleString('id-ID')}</div>
               <div className="text-xs font-black text-slate-900">Nilai: Rp{summary.oldValue.toLocaleString('id-ID')}</div>
             </div>
             <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-              <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Stok Baru</div>
+              <div className="text-xs font-black text-emerald-600 uppercase tracking-widest">Stok Baru</div>
               <div className="text-xs font-black text-slate-900">Qty: {summary.newQty.toLocaleString('id-ID')}</div>
               <div className="text-xs font-black text-slate-900">Nilai: Rp{summary.newValue.toLocaleString('id-ID')}</div>
             </div>
             <div className="p-3 bg-white rounded-xl border border-gray-100">
-              <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Ringkasan per Gudang</div>
+              <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Ringkasan per Gudang</div>
               <div className="space-y-2 max-h-40 overflow-auto">
                 {Object.keys(warehouseSummary).length === 0 ? (
-                  <div className="text-[10px] font-bold text-gray-400">Tidak ada data</div>
+                  <div className="text-xs font-bold text-gray-400">Tidak ada data</div>
                 ) : Object.entries(warehouseSummary).map(([wid, v]) => {
                   const oldAvg = v.oldQty > 0 ? v.oldValue / v.oldQty : 0;
                   const newAvg = v.newQty > 0 ? v.newValue / v.newQty : 0;
                   return (
                     <div key={wid} className="bg-gray-50 p-2 rounded-lg border border-gray-100">
-                      <div className="text-[10px] font-black text-gray-700">{wid}</div>
-                      <div className="text-[9px] font-bold text-gray-500">Lama: Qty {v.oldQty.toLocaleString('id-ID')} • Avg Rp{Math.round(oldAvg).toLocaleString('id-ID')} • Nilai Rp{Math.round(v.oldValue).toLocaleString('id-ID')}</div>
-                      <div className="text-[9px] font-bold text-gray-500">Baru: Qty {v.newQty.toLocaleString('id-ID')} • Avg Rp{Math.round(newAvg).toLocaleString('id-ID')} • Nilai Rp{Math.round(v.newValue).toLocaleString('id-ID')}</div>
+                      <div className="text-xs font-black text-gray-700">{wid}</div>
+                      <div className="text-xs font-bold text-gray-500">Lama: Qty {v.oldQty.toLocaleString('id-ID')} • Avg Rp{Math.round(oldAvg).toLocaleString('id-ID')} • Nilai Rp{Math.round(v.oldValue).toLocaleString('id-ID')}</div>
+                      <div className="text-xs font-bold text-gray-500">Baru: Qty {v.newQty.toLocaleString('id-ID')} • Avg Rp{Math.round(newAvg).toLocaleString('id-ID')} • Nilai Rp{Math.round(v.newValue).toLocaleString('id-ID')}</div>
                     </div>
                   );
                 })}
@@ -275,10 +275,10 @@ export default function InventoryLayersPage() {
           <table className="w-full text-left">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Produk</th>
-                <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Stok</th>
-                <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Layer Aktif</th>
-                <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 text-right">Total Nilai</th>
+                <th className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-500">Produk</th>
+                <th className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-500">Stok</th>
+                <th className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-500">Layer Aktif</th>
+                <th className="px-6 py-3 text-xs font-black uppercase tracking-widest text-gray-500 text-right">Total Nilai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -296,10 +296,10 @@ export default function InventoryLayersPage() {
                         <Box size={18} className="text-gray-400" />
                         <div>
                           <div className="text-xs font-black uppercase">{p.name}</div>
-                          <div className="text-[10px] font-bold text-gray-400">{p.unit}</div>
+                          <div className="text-xs font-bold text-gray-400">{p.unit}</div>
                         </div>
                         {!p.isActive && (
-                          <span className="text-[8px] font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full uppercase">Non-Aktif</span>
+                          <span className="text-xs font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full uppercase">Non-Aktif</span>
                         )}
                       </div>
                     </td>
@@ -312,14 +312,14 @@ export default function InventoryLayersPage() {
                     <td className="px-6 py-4">
                       <div className="space-y-2">
                         {layers.length === 0 ? (
-                          <span className="text-[10px] font-bold text-gray-400">Tidak ada layer</span>
+                          <span className="text-xs font-bold text-gray-400">Tidak ada layer</span>
                         ) : layers.map((l, idx) => (
                           <div key={idx} className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black text-gray-600">Qty: {Number(l.qty || 0).toLocaleString('id-ID')}</span>
-                              <span className="text-[10px] font-black text-indigo-600">Rp{Number(l.costPerPcs || 0).toLocaleString('id-ID')}</span>
+                              <span className="text-xs font-black text-gray-600">Qty: {Number(l.qty || 0).toLocaleString('id-ID')}</span>
+                              <span className="text-xs font-black text-indigo-600">Rp{Number(l.costPerPcs || 0).toLocaleString('id-ID')}</span>
                             </div>
-                            <div className="mt-1 text-[9px] font-bold text-gray-400 flex items-center justify-between gap-4">
+                            <div className="mt-1 text-xs font-bold text-gray-400 flex items-center justify-between gap-4">
                               <span>Supplier: {l.supplierName || '-'}</span>
                               <span>PO: {l.purchaseId ? l.purchaseId.slice(-6) : '-'}</span>
                               <span>Gudang: {l.warehouseId || '-'}</span>
@@ -341,7 +341,7 @@ export default function InventoryLayersPage() {
         {/* PAGINATION */}
         {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            <div className="text-xs font-black text-gray-400 uppercase tracking-widest">
               Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} produk
             </div>
             <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ export default function InventoryLayersPage() {
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded-xl text-[10px] font-black transition-all ${
+                        className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${
                           currentPage === page ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-100 text-gray-400 hover:bg-gray-50'
                         }`}
                       >
@@ -378,7 +378,7 @@ export default function InventoryLayersPage() {
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
+                className="px-4 py-2 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md"
               >
                 Next Page
               </button>

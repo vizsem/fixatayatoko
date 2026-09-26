@@ -48,7 +48,7 @@ function StockUnitDisplay({ stock, units }: { stock: number; units?: { code: str
   return (
     <div className="flex flex-wrap items-center gap-1 mt-1">
       {conversions.map(c => (
-        <span key={c.code} className="text-[9px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-md px-1.5 py-0.5 uppercase tracking-wider">
+        <span key={c.code} className="text-xs font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-md px-1.5 py-0.5 uppercase tracking-wider">
           {c.qty} {c.code}
         </span>
       ))}
@@ -416,7 +416,7 @@ export default function StockReconciliationPage() {
                     <ClipboardCheck className="text-blue-600" size={26} />
                     <span>Rekonsiliasi Stok</span>
                   </h1>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                  <span className="text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
                     Stock Opname
                   </span>
                 </div>
@@ -455,51 +455,51 @@ export default function StockReconciliationPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow transition-all">
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider">Total Produk</span>
+              <span className="text-xs font-black uppercase tracking-wider">Total Produk</span>
               <Package size={16} />
             </div>
             <div className="text-2xl font-black text-slate-900">{stats.total}</div>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">Item di katalog aktif</p>
+            <p className="text-xs text-slate-400 font-medium mt-1">Item di katalog aktif</p>
           </div>
 
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow transition-all">
             <div className="flex items-center justify-between text-emerald-500 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Cocok</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Cocok</span>
               <CheckCircle2 size={16} />
             </div>
             <div className="text-2xl font-black text-emerald-600">{stats.matched}</div>
-            <p className="text-[10px] text-emerald-600/80 font-semibold mt-1">Stok 100% akurat</p>
+            <p className="text-xs text-emerald-600/80 font-semibold mt-1">Stok 100% akurat</p>
           </div>
 
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow transition-all">
             <div className="flex items-center justify-between text-blue-500 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Surplus</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Surplus</span>
               <TrendingUp size={16} />
             </div>
             <div className="text-2xl font-black text-blue-600">+{stats.surplus}</div>
-            <p className="text-[10px] text-blue-600/80 font-semibold mt-1">
+            <p className="text-xs text-blue-600/80 font-semibold mt-1">
               +Rp {stats.surplusVal.toLocaleString('id-ID')}
             </p>
           </div>
 
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow transition-all">
             <div className="flex items-center justify-between text-rose-500 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Defisit</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Defisit</span>
               <TrendingDown size={16} />
             </div>
             <div className="text-2xl font-black text-rose-600">-{stats.deficit}</div>
-            <p className="text-[10px] text-rose-600/80 font-semibold mt-1">
+            <p className="text-xs text-rose-600/80 font-semibold mt-1">
               -Rp {stats.deficitVal.toLocaleString('id-ID')}
             </p>
           </div>
 
           <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-3xl shadow-sm hover:shadow transition-all">
             <div className="flex items-center justify-between text-slate-300 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider">Perlu Aksi</span>
+              <span className="text-xs font-black uppercase tracking-wider">Perlu Aksi</span>
               <AlertCircle size={16} className={stats.mismatched > 0 ? 'text-amber-400' : 'text-slate-400'} />
             </div>
             <div className="text-2xl font-black text-amber-400">{stats.mismatched}</div>
-            <p className="text-[10px] text-slate-300 font-medium mt-1 truncate">
+            <p className="text-xs text-slate-300 font-medium mt-1 truncate">
               Net: Rp {stats.netVariance.toLocaleString('id-ID')}
             </p>
           </div>
@@ -581,7 +581,7 @@ export default function StockReconciliationPage() {
             <span className="font-medium">
               Menampilkan <span className="font-bold text-slate-900">{filteredItems.length}</span> dari {reconciliationItems.length} produk di <span className="font-bold text-blue-600">{selectedWhName}</span>
             </span>
-            <div className="flex items-center gap-1 text-[11px]">
+            <div className="flex items-center gap-1 text-xs">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Status Cocok
               <span className="inline-block w-2 h-2 rounded-full bg-blue-500 ml-2"></span> Status Surplus
               <span className="inline-block w-2 h-2 rounded-full bg-rose-500 ml-2"></span> Status Defisit
@@ -594,7 +594,7 @@ export default function StockReconciliationPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs font-black text-slate-500 uppercase tracking-wider">
                   <th className="px-5 py-4 w-5/12">Informasi Produk</th>
                   <th className="px-4 py-4 text-right w-2/12">Stok Sistem ({selectedWhName})</th>
                   <th className="px-4 py-4 text-right w-2.5/12">Fisik Opname</th>
@@ -632,16 +632,16 @@ export default function StockReconciliationPage() {
                           <div className="min-w-0 flex-1">
                             <div className="font-black text-slate-900 truncate">{item.product.name}</div>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                                 {(item.product as any).sku || item.product.barcode || item.product.id.slice(0, 8)}
                               </span>
                               {item.product.category && (
-                                <span className="text-[10px] font-semibold text-slate-500">
+                                <span className="text-xs font-semibold text-slate-500">
                                   {item.product.category}
                                 </span>
                               )}
                               {costPrice > 0 && (
-                                <span className="text-[10px] text-slate-400 font-medium">
+                                <span className="text-xs text-slate-400 font-medium">
                                   HPP: Rp {costPrice.toLocaleString('id-ID')}
                                 </span>
                               )}
@@ -655,7 +655,7 @@ export default function StockReconciliationPage() {
                         <div className="flex flex-col items-end">
                           <div className="text-sm font-black text-slate-900">
                             {item.systemStock.toLocaleString('id-ID')}{' '}
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">{item.product.unit || 'pcs'}</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase">{item.product.unit || 'pcs'}</span>
                           </div>
                           <StockUnitDisplay stock={item.systemStock} units={item.product.units} />
                         </div>
@@ -680,14 +680,14 @@ export default function StockReconciliationPage() {
                               <select
                                 value={item.physicalInputUnit}
                                 onChange={(e) => updatePhysicalStock(item.product.id, item.physicalInputQty, e.target.value)}
-                                className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-[10px] font-bold outline-none cursor-pointer uppercase text-slate-700 transition-colors"
+                                className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold outline-none cursor-pointer uppercase text-slate-700 transition-colors"
                               >
                                 {item.product.units.map(u => (
                                   <option key={u.code} value={u.code}>{u.code}</option>
                                 ))}
                               </select>
                             ) : (
-                              <span className="text-[11px] font-bold text-slate-500 uppercase px-1">
+                              <span className="text-xs font-bold text-slate-500 uppercase px-1">
                                 {item.product.unit || 'pcs'}
                               </span>
                             )}
@@ -696,7 +696,7 @@ export default function StockReconciliationPage() {
                           {/* Conversion Preview & quick sync */}
                           <div className="flex items-center justify-end gap-2">
                             {item.physicalInputUnit.toUpperCase() !== (item.product.unit || 'PCS').toUpperCase() && (
-                              <span className="text-[10px] font-bold text-blue-600">
+                              <span className="text-xs font-bold text-blue-600">
                                 = {item.physicalStock} {item.product.unit || 'pcs'}
                               </span>
                             )}
@@ -705,7 +705,7 @@ export default function StockReconciliationPage() {
                                 type="button"
                                 onClick={() => resetSingleItem(item.product.id)}
                                 title="Setel sama dengan sistem"
-                                className="text-[9px] font-bold text-slate-400 hover:text-blue-600 hover:underline"
+                                className="text-xs font-bold text-slate-400 hover:text-blue-600 hover:underline"
                               >
                                 Cocokkan
                               </button>
@@ -724,11 +724,11 @@ export default function StockReconciliationPage() {
                             {item.difference > 0 ? <TrendingUp size={14} /> :
                              item.difference < 0 ? <TrendingDown size={14} /> : null}
                             {item.difference > 0 ? '+' : ''}{item.difference}{' '}
-                            <span className="text-[9px] font-semibold uppercase">{item.product.unit || 'pcs'}</span>
+                            <span className="text-xs font-semibold uppercase">{item.product.unit || 'pcs'}</span>
                           </div>
 
                           {item.difference !== 0 && (
-                            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                            <div className="text-xs font-semibold text-slate-500 mt-0.5">
                               {item.differenceValue > 0 ? '+' : ''}Rp {item.differenceValue.toLocaleString('id-ID')}
                             </div>
                           )}
@@ -741,7 +741,7 @@ export default function StockReconciliationPage() {
 
                       {/* Status badge */}
                       <td className="px-4 py-3.5 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
                           item.status === 'matched' ? 'bg-emerald-100/80 text-emerald-800 border border-emerald-200' :
                           item.status === 'surplus' ? 'bg-blue-100/80 text-blue-800 border border-blue-200' :
                           'bg-rose-100/80 text-rose-800 border border-rose-200'

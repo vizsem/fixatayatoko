@@ -127,7 +127,7 @@ export default function StockLogsPage() {
             </button>
             <div>
               <h1 className="text-2xl font-black uppercase italic tracking-tighter">Audit Stok</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Riwayat Perubahan Inventaris</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Riwayat Perubahan Inventaris</p>
             </div>
           </div>
 
@@ -138,7 +138,7 @@ export default function StockLogsPage() {
               placeholder="CARI PRODUK ATAU ADMIN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl font-black text-[10px] uppercase shadow-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl font-black text-xs uppercase shadow-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
             />
           </div>
           <div className="flex gap-2 w-full md:w-auto">
@@ -147,26 +147,26 @@ export default function StockLogsPage() {
               placeholder="Filter Admin"
               value={adminFilter}
               onChange={(e) => setAdminFilter(e.target.value)}
-              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-3 bg-white rounded-2xl text-xs font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
             />
             <input
               type="text"
               placeholder="Filter Gudang"
               value={warehouseFilter}
               onChange={(e) => setWarehouseFilter(e.target.value)}
-              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-3 bg-white rounded-2xl text-xs font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
             />
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-3 bg-white rounded-2xl text-xs font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
             />
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-3 bg-white rounded-2xl text-[10px] font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-3 bg-white rounded-2xl text-xs font-black shadow-sm outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
         </div>
@@ -176,12 +176,12 @@ export default function StockLogsPage() {
           {loading ? (
             <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-              <p className="text-[10px] font-black text-gray-400 tracking-widest">MEMUAT RIWAYAT...</p>
+              <p className="text-xs font-black text-gray-400 tracking-widest">MEMUAT RIWAYAT...</p>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div className="p-8 text-center bg-white rounded-3xl border border-gray-100 shadow-lg">
               <Package className="mx-auto text-gray-200 mb-4" size={40} />
-              <p className="text-[10px] font-black text-gray-400 tracking-widest">BELUM ADA RIWAYAT</p>
+              <p className="text-xs font-black text-gray-400 tracking-widest">BELUM ADA RIWAYAT</p>
             </div>
           ) : (
             filteredLogs.map((log) => (
@@ -192,16 +192,16 @@ export default function StockLogsPage() {
                           <User size={14} />
                        </div>
                        <div>
-                          <p className="text-[10px] font-black uppercase text-gray-800">{log.adminEmail?.split('@')[0]}</p>
+                          <p className="text-xs font-black uppercase text-gray-800">{log.adminEmail?.split('@')[0]}</p>
                           <div className="flex items-center gap-1 mt-0.5 text-gray-400">
                              <Clock size={10} />
-                             <span className="text-[9px] font-bold uppercase">
+                             <span className="text-xs font-bold uppercase">
                                 {formatDateVal(log.createdAt)}
                              </span>
                           </div>
                        </div>
                     </div>
-                    <span className="px-2 py-1 bg-gray-100 rounded-lg text-[8px] font-black uppercase text-gray-500 tracking-tighter">
+                    <span className="px-2 py-1 bg-gray-100 rounded-lg text-xs font-black uppercase text-gray-500 tracking-tighter">
                        {log.type || 'SYSTEM'}
                     </span>
                  </div>
@@ -210,21 +210,21 @@ export default function StockLogsPage() {
                     <div className="flex justify-between items-center">
                        <div className="flex items-center gap-2 text-gray-500">
                           <Package size={12} />
-                          <span className="text-[10px] font-bold uppercase">{log.productName}</span>
+                          <span className="text-xs font-bold uppercase">{log.productName}</span>
                        </div>
                     </div>
                     <div className="flex justify-between items-center">
                        <div className="flex items-center gap-2 text-gray-500">
                           <Warehouse size={12} />
-                          <span className="text-[10px] font-bold uppercase">{log.warehouseName}</span>
+                          <span className="text-xs font-bold uppercase">{log.warehouseName}</span>
                        </div>
                     </div>
                  </div>
 
                  <div className="flex items-center justify-between border-t border-gray-50 pt-3">
-                     <span className="text-[10px] font-black text-gray-400 uppercase">Perubahan Stok</span>
+                     <span className="text-xs font-black text-gray-400 uppercase">Perubahan Stok</span>
                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-gray-300 uppercase">{log.previousStock} → {log.newStock}</span>
+                        <span className="text-xs font-bold text-gray-300 uppercase">{log.previousStock} → {log.newStock}</span>
                         <div className={`flex items-center gap-1 font-black text-xs ${log.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
                            {log.change > 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
                            {log.change > 0 ? `+${log.change}` : log.change}
@@ -242,11 +242,11 @@ export default function StockLogsPage() {
             <table className="w-full text-left min-w-[680px] md:min-w-0">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Waktu & Admin</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Produk</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Gudang</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Perubahan</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Status</th>
+                  <th className="p-6 text-xs font-black uppercase text-gray-400 tracking-widest">Waktu & Admin</th>
+                  <th className="p-6 text-xs font-black uppercase text-gray-400 tracking-widest">Produk</th>
+                  <th className="p-6 text-xs font-black uppercase text-gray-400 tracking-widest">Gudang</th>
+                  <th className="p-6 text-xs font-black uppercase text-gray-400 tracking-widest text-center">Perubahan</th>
+                  <th className="p-6 text-xs font-black uppercase text-gray-400 tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -263,8 +263,8 @@ export default function StockLogsPage() {
                             <User size={14} />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black uppercase">{log.adminEmail?.split('@')[0]}</p>
-                            <p className="text-[9px] text-gray-400 font-bold">
+                            <p className="text-xs font-black uppercase">{log.adminEmail?.split('@')[0]}</p>
+                            <p className="text-xs text-gray-400 font-bold">
                               {formatDateVal(log.createdAt)}
                             </p>
                           </div>
@@ -273,13 +273,13 @@ export default function StockLogsPage() {
                       <td className="p-6">
                         <div className="flex items-center gap-2">
                           <Package size={14} className="text-gray-300" />
-                          <p className="text-[10px] font-black uppercase text-gray-700">{log.productName}</p>
+                          <p className="text-xs font-black uppercase text-gray-700">{log.productName}</p>
                         </div>
                       </td>
                       <td className="p-6">
                         <div className="flex items-center gap-2">
                           <Warehouse size={14} className="text-gray-300" />
-                          <p className="text-[10px] font-bold uppercase text-gray-500">{log.warehouseName}</p>
+                          <p className="text-xs font-bold uppercase text-gray-500">{log.warehouseName}</p>
                         </div>
                       </td>
                       <td className="p-6">
@@ -288,13 +288,13 @@ export default function StockLogsPage() {
                             {log.change > 0 ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
                             {log.change > 0 ? `+${log.change}` : log.change}
                           </div>
-                          <p className="text-[8px] font-black text-gray-300 uppercase mt-1">
+                          <p className="text-xs font-black text-gray-300 uppercase mt-1">
                             {log.previousStock} → {log.newStock}
                           </p>
                         </div>
                       </td>
                       <td className="p-6">
-                        <span className="px-3 py-1 bg-gray-100 rounded-full text-[8px] font-black uppercase text-gray-500 tracking-tighter">
+                        <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-black uppercase text-gray-500 tracking-tighter">
                           {log.type || 'SYSTEM'}
                         </span>
                       </td>

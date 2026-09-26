@@ -364,12 +364,12 @@ export default function MarketplaceOrdersPage() {
                 <ShoppingBag className="text-orange-500" /> Marketplace Input
               </h1>
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-10">Manual Marketplace Entry</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest ml-10">Manual Marketplace Entry</p>
           </div>
 
           <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
-            <button onClick={() => setChannel('SHOPEE')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${channel === 'SHOPEE' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}>SHOPEE</button>
-            <button onClick={() => setChannel('TIKTOK')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${channel === 'TIKTOK' ? 'bg-black text-white shadow-lg shadow-gray-200' : 'text-gray-400 hover:bg-gray-50'}`}>TIKTOK</button>
+            <button onClick={() => setChannel('SHOPEE')} className={`px-6 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${channel === 'SHOPEE' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}>SHOPEE</button>
+            <button onClick={() => setChannel('TIKTOK')} className={`px-6 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${channel === 'TIKTOK' ? 'bg-black text-white shadow-lg shadow-gray-200' : 'text-gray-400 hover:bg-gray-50'}`}>TIKTOK</button>
           </div>
         </div>
 
@@ -377,7 +377,7 @@ export default function MarketplaceOrdersPage() {
           <div className="lg:col-span-8 space-y-6">
             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
                   <Hash size={12} /> Order ID Marketplace
                 </label>
                 <input 
@@ -389,7 +389,7 @@ export default function MarketplaceOrdersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
                   <User size={12} /> Nama Pembeli (Opsional)
                 </label>
                 <input 
@@ -401,11 +401,11 @@ export default function MarketplaceOrdersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
                   <Truck size={12} /> Ongkos Kirim
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400">Rp</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">Rp</span>
                   <input 
                     type="number" 
                     value={shippingCost}
@@ -443,11 +443,11 @@ export default function MarketplaceOrdersPage() {
               </div>
               <div className="relative z-10 space-y-4">
                 <div className="flex justify-between items-center text-gray-400">
-                  <span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span>
+                  <span className="text-xs font-black uppercase tracking-widest">Subtotal</span>
                   <span className="text-xs font-black">Rp{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-gray-400">
-                  <span className="text-[10px] font-black uppercase tracking-widest">Shipping</span>
+                  <span className="text-xs font-black uppercase tracking-widest">Shipping</span>
                   <span className="text-xs font-black">Rp{shippingCost.toLocaleString()}</span>
                 </div>
                 <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
@@ -460,7 +460,7 @@ export default function MarketplaceOrdersPage() {
                   <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-200">
                     <Warehouse className="text-blue-500 shrink-0" size={18} />
                     <div className="flex-1">
-                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Gudang Stok *</p>
+                      <p className="text-xs font-black text-blue-400 uppercase tracking-widest mb-0.5">Gudang Stok *</p>
                       <select
                         value={warehouseId}
                         onChange={e => setWarehouseId(e.target.value)}
@@ -480,7 +480,7 @@ export default function MarketplaceOrdersPage() {
                     <select
                       value={paymentMethod}
                       onChange={e => setPaymentMethod(e.target.value)}
-                      className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none w-full"
+                      className="bg-transparent text-xs font-black uppercase tracking-widest outline-none w-full"
                     >
                       <option value="TRANSFER">Transfer Bank</option>
                       <option value="CASH">Saldo Marketplace</option>
@@ -491,7 +491,7 @@ export default function MarketplaceOrdersPage() {
                   <button
                     onClick={handleSaveOrder}
                     disabled={loading || cart.length === 0 || !warehouseId}
-                    className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:pointer-events-none"
+                    className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:pointer-events-none"
                   >
                     {loading ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
                     Simpan Pesanan

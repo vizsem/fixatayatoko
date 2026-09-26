@@ -684,7 +684,7 @@ export default function FinanceReport() {
             </div>
             <div>
               <h1 className="text-lg font-black text-slate-900">Laporan Keuangan Eksekutif</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{dateRange.startDate} — {dateRange.endDate}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{dateRange.startDate} — {dateRange.endDate}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 no-print">
@@ -720,7 +720,7 @@ export default function FinanceReport() {
               <button
                 key={p}
                 onClick={() => setQuickPeriod(p)}
-                className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-slate-50 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all"
+                className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-slate-50 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all"
               >
                 {p === 'today' ? 'Hari Ini' : p === '7days' ? '7 Hari' : p === '30days' ? '30 Hari' : 'Bulan Ini'}
               </button>
@@ -766,17 +766,17 @@ export default function FinanceReport() {
                 if (card.highlight) return (
                   <div key={card.label} className={`p-5 rounded-3xl border shadow-sm ${IS.netIncome >= 0 ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-500' : 'bg-gradient-to-br from-red-600 to-rose-700 border-red-500'}`}>
                     <div className="p-2 bg-white/20 rounded-2xl w-fit mb-3"><Icon size={16} className="text-white" /></div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-1">{card.label}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-white/70 mb-1">{card.label}</p>
                     <p className="text-xl font-black text-white leading-tight">{idr(card.value)}</p>
-                    <p className="text-[10px] font-bold text-white/60 mt-1">{card.note}</p>
+                    <p className="text-xs font-bold text-white/60 mt-1">{card.note}</p>
                   </div>
                 );
                 return (
                   <div key={card.label} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className={`p-2 ${card.bg} rounded-2xl w-fit mb-3`}><Icon size={16} className={card.cl} /></div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{card.label}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">{card.label}</p>
                     <p className="text-xl font-black text-slate-800 leading-tight">{idr(card.value)}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1">{card.note}</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">{card.note}</p>
                   </div>
                 );
               })}
@@ -832,20 +832,20 @@ export default function FinanceReport() {
                       </div>
                       <div>
                         <h3 className="font-extrabold text-slate-800 text-sm md:text-base">Distribusi Penjualan per Channel</h3>
-                        <p className="text-[11px] text-slate-400 font-medium">Berdasarkan data pesanan selesai</p>
+                        <p className="text-xs text-slate-400 font-medium">Berdasarkan data pesanan selesai</p>
                       </div>
                     </div>
                     {/* View Switcher: Profit vs Omset */}
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                       <button
                         onClick={() => setChannelViewMode('profit')}
-                        className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${channelViewMode === 'profit' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all ${channelViewMode === 'profit' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       >
                         Profit
                       </button>
                       <button
                         onClick={() => setChannelViewMode('revenue')}
-                        className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${channelViewMode === 'revenue' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all ${channelViewMode === 'revenue' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                       >
                         Omset
                       </button>
@@ -887,7 +887,7 @@ export default function FinanceReport() {
                     )}
                     {/* Center Stat */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">
                         {channelViewMode === 'profit' ? 'Total Profit' : 'Total Omset'}
                       </span>
                       <span className="text-sm font-black text-slate-800">
@@ -903,10 +903,10 @@ export default function FinanceReport() {
                     <div key={ch.channel} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getChannelColor(ch.channel, idx) }} />
-                        <span className="text-[11px] font-black text-slate-700 truncate">{ch.channel}</span>
+                        <span className="text-xs font-black text-slate-700 truncate">{ch.channel}</span>
                       </div>
                       <p className="text-xs font-black text-slate-900">{idr(channelViewMode === 'profit' ? ch.profit : ch.revenue)}</p>
-                      <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 mt-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-400 mt-1">
                         <span>Margin: <strong className="text-slate-600">{ch.margin.toFixed(0)}%</strong></span>
                         <span>{ch.count} PO</span>
                       </div>
@@ -925,7 +925,7 @@ export default function FinanceReport() {
                       </div>
                       <div>
                         <h3 className="font-extrabold text-slate-800 text-sm md:text-base">Struktur Beban & Pengeluaran</h3>
-                        <p className="text-[11px] text-slate-400 font-medium">HPP vs Belanja Stok vs Beban Operasional</p>
+                        <p className="text-xs text-slate-400 font-medium">HPP vs Belanja Stok vs Beban Operasional</p>
                       </div>
                     </div>
                     <span className="text-xs font-black text-rose-600 px-2.5 py-1 bg-rose-50 rounded-xl">
@@ -967,7 +967,7 @@ export default function FinanceReport() {
                       </ResponsiveContainer>
                     )}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Beban</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total Beban</span>
                       <span className="text-sm font-black text-rose-600">{idr(expenseBreakdown.total)}</span>
                     </div>
                   </div>
@@ -985,7 +985,7 @@ export default function FinanceReport() {
                         </div>
                         <div className="text-right">
                           <span className="font-black text-slate-900">{idr(item.value)}</span>
-                          <span className="text-[10px] font-bold text-slate-400 ml-2">({pct.toFixed(1)}%)</span>
+                          <span className="text-xs font-bold text-slate-400 ml-2">({pct.toFixed(1)}%)</span>
                         </div>
                       </div>
                     );
@@ -1002,7 +1002,7 @@ export default function FinanceReport() {
                     <div className="p-2 bg-slate-100 text-slate-600 rounded-xl"><FileText size={16} /></div>
                     <div>
                       <h3 className="font-extrabold text-slate-800">Daftar Transaksi Keuangan</h3>
-                      <p className="text-[11px] text-slate-400 font-medium">Filter berdasarkan channel, kategori, tipe, atau metode pembayaran</p>
+                      <p className="text-xs text-slate-400 font-medium">Filter berdasarkan channel, kategori, tipe, atau metode pembayaran</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1096,7 +1096,7 @@ export default function FinanceReport() {
                   <thead className="bg-slate-50/50">
                     <tr>
                       {['Tanggal', 'Keterangan', 'Pendapatan', 'HPP / Beban', 'Laba Bersih', 'Kategori & Channel'].map(h => (
-                        <th key={h} className={`px-5 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 ${['Pendapatan', 'HPP / Beban', 'Laba Bersih'].includes(h) ? 'text-right' : ''}`}>
+                        <th key={h} className={`px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400 ${['Pendapatan', 'HPP / Beban', 'Laba Bersih'].includes(h) ? 'text-right' : ''}`}>
                           {h}
                         </th>
                       ))}
@@ -1113,14 +1113,14 @@ export default function FinanceReport() {
                       <tr key={r.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-5 py-3.5">
                           <p className="text-xs font-bold text-slate-700">{new Date(r.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p>
-                          <p className="text-[10px] text-slate-400">{new Date(r.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-xs text-slate-400">{new Date(r.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
                         </td>
                         <td className="px-5 py-3.5 max-w-xs">
                           <p className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-emerald-700">{r.description}</p>
                           <div className="flex gap-1.5 mt-1">
-                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[9px] font-black text-slate-500 uppercase">{r.paymentMethod}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-xs font-black text-slate-500 uppercase">{r.paymentMethod}</span>
                             {r.channel && (
-                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-[9px] font-black text-indigo-500 uppercase">{r.channel}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-xs font-black text-indigo-500 uppercase">{r.channel}</span>
                             )}
                           </div>
                         </td>
@@ -1146,7 +1146,7 @@ export default function FinanceReport() {
                           )}
                         </td>
                         <td className="px-5 py-3.5">
-                          <span className="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                             {r.category}
                           </span>
                         </td>
@@ -1159,7 +1159,7 @@ export default function FinanceReport() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="p-4 border-t border-slate-50 flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-slate-400">
+                  <p className="text-xs font-bold text-slate-400">
                     Menampilkan {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredRecords.length)} dari {filteredRecords.length}
                   </p>
                   <div className="flex gap-2">
@@ -1196,12 +1196,12 @@ export default function FinanceReport() {
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-7 text-white relative overflow-hidden">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Laporan Laba Rugi Komprehensif</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-2">Laporan Laba Rugi Komprehensif</p>
                     <h2 className="text-2xl font-black mb-1">Income Statement (P&L)</h2>
                     <p className="text-sm text-white/60 font-medium">{dateRange.startDate} — {dateRange.endDate}</p>
                   </div>
                   <div className={`text-right px-5 py-3 rounded-2xl ${isProfit ? 'bg-emerald-500/20 border border-emerald-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Laba Bersih</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-white/60">Laba Bersih</p>
                     <p className={`text-2xl font-black mt-1 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>{idr(netIncome)}</p>
                     <p className={`text-xs font-bold mt-0.5 ${isProfit ? 'text-emerald-300/70' : 'text-red-300/70'}`}>Net Margin {netMargin.toFixed(1)}%</p>
                   </div>
@@ -1213,7 +1213,7 @@ export default function FinanceReport() {
                     { label: 'Laba Kotor', value: grossProfit, color: 'text-blue-400' }
                   ].map(s => (
                     <div key={s.label} className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-1">{s.label}</p>
+                      <p className="text-xs font-black uppercase tracking-widest text-white/50 mb-1">{s.label}</p>
                       <p className={`text-lg font-black ${s.color}`}>{idr(s.value)}</p>
                     </div>
                   ))}
@@ -1226,7 +1226,7 @@ export default function FinanceReport() {
                     <h3 className="font-extrabold text-slate-800 flex items-center gap-2"><FileText size={16} />Struktur Laba Rugi</h3>
                   </div>
                   <div className="p-6 space-y-1">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 pt-2 pb-1">Pendapatan</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-2 pb-1">Pendapatan</div>
                     {[
                       { label: 'Penjualan Barang', value: salesRev },
                       { label: 'Pendapatan Ongkir', value: ongkir },
@@ -1242,19 +1242,19 @@ export default function FinanceReport() {
                       <span className="text-sm font-black text-emerald-700">{idr(netRevenue)}</span>
                     </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 pt-4 pb-1">Harga Pokok Penjualan (HPP)</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-4 pb-1">Harga Pokok Penjualan (HPP)</div>
                     <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50">
                       <span className="text-sm pl-3 text-slate-600 font-medium">Modal Produk Terjual (COGS)</span>
                       <span className="text-sm font-bold text-rose-600">{idr(-cogs)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-100 mt-2">
                       <span className="text-sm font-black text-blue-800">
-                        Laba Kotor <span className="text-[10px] font-bold text-blue-500 ml-1">GPM {grossMargin.toFixed(1)}%</span>
+                        Laba Kotor <span className="text-xs font-bold text-blue-500 ml-1">GPM {grossMargin.toFixed(1)}%</span>
                       </span>
                       <span className="text-sm font-black text-blue-700">{idr(grossProfit)}</span>
                     </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 pt-4 pb-1">Beban Operasional</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-4 pb-1">Beban Operasional</div>
                     {[
                       { label: 'Biaya Operasional Toko', value: -opex },
                       { label: 'Pembelian Stok (Kas Keluar)', value: -stockPurchases }
@@ -1267,7 +1267,7 @@ export default function FinanceReport() {
                     <div className={`flex items-center justify-between py-3.5 px-4 rounded-2xl mt-3 ${isProfit ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-red-600 to-rose-600'}`}>
                       <div>
                         <span className="text-sm font-black text-white">Laba Bersih</span>
-                        <span className="text-[10px] font-black text-white/70 ml-2">NPM {netMargin.toFixed(1)}%</span>
+                        <span className="text-xs font-black text-white/70 ml-2">NPM {netMargin.toFixed(1)}%</span>
                       </div>
                       <span className="text-lg font-black text-white">{idr(netIncome)}</span>
                     </div>
@@ -1292,7 +1292,7 @@ export default function FinanceReport() {
                           <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full transition-all duration-700 ${m.color === 'emerald' ? 'bg-emerald-500' : m.color === 'blue' ? 'bg-blue-500' : m.color === 'amber' ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, Math.max(0, m.value))}%` }} />
                           </div>
-                          <p className="text-[10px] font-bold text-slate-400 mt-1">{m.desc}</p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">{m.desc}</p>
                         </div>
                       ))}
                     </div>
@@ -1327,12 +1327,12 @@ export default function FinanceReport() {
               <div className="bg-gradient-to-br from-blue-900 to-indigo-900 rounded-3xl p-7 text-white relative overflow-hidden">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Laporan Arus Kas Nyata</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-2">Laporan Arus Kas Nyata</p>
                     <h2 className="text-2xl font-black mb-1">Cash Flow Statement</h2>
                     <p className="text-sm text-white/60 font-medium">{dateRange.startDate} — {dateRange.endDate}</p>
                   </div>
                   <div className={`text-right px-5 py-3 rounded-2xl ${isPos ? 'bg-emerald-500/20 border border-emerald-400/30' : 'bg-red-500/20 border border-red-400/30'}`}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Saldo Akhir Kas</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-white/60">Saldo Akhir Kas</p>
                     <p className={`text-2xl font-black mt-1 ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>{idr(closingBalance)}</p>
                   </div>
                 </div>
@@ -1344,7 +1344,7 @@ export default function FinanceReport() {
                     { label: 'Net Arus Kas', value: netCash, cl: isPos ? 'text-emerald-400' : 'text-red-400' }
                   ].map(s => (
                     <div key={s.label} className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-1">{s.label}</p>
+                      <p className="text-xs font-black uppercase tracking-widest text-white/50 mb-1">{s.label}</p>
                       <p className={`text-base font-black ${s.cl}`}>{idr(s.value)}</p>
                     </div>
                   ))}
@@ -1392,7 +1392,7 @@ export default function FinanceReport() {
                       <span className="text-sm font-black text-slate-800">{idr(openingBalance)}</span>
                     </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 pt-2 pb-1">Aktivitas Operasi & Kas Masuk</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-2 pb-1">Aktivitas Operasi & Kas Masuk</div>
                     {[
                       { label: 'Penerimaan Penjualan', value: salesCash },
                       { label: 'Suntikan Modal (Ekuitas)', value: capitalIn }
@@ -1407,7 +1407,7 @@ export default function FinanceReport() {
                       <span className="text-xs font-black text-emerald-700">+{idr(totalIn)}</span>
                     </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 pt-3 pb-1">Pengeluaran Kas</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-3 pb-1">Pengeluaran Kas</div>
                     {[
                       { label: 'Pembelian Stok ke Supplier', value: stockOut },
                       { label: 'Biaya Operasional Toko', value: opexOut },
@@ -1444,7 +1444,7 @@ export default function FinanceReport() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="font-extrabold text-slate-800">Detail Mutasi Arus Kas</h3>
-                          <p className="text-[11px] text-slate-400 font-medium">Lacak setiap aliran kas masuk dan keluar beserta sumbernya</p>
+                          <p className="text-xs text-slate-400 font-medium">Lacak setiap aliran kas masuk dan keluar beserta sumbernya</p>
                         </div>
                         <div className="flex items-center gap-2">
                           {hasActiveCfFilters && (
@@ -1518,7 +1518,7 @@ export default function FinanceReport() {
 
                       {/* Filter subtotal badge */}
                       {hasActiveCfFilters && (
-                        <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-bold">
+                        <div className="flex flex-wrap gap-2 pt-1 text-xs font-bold">
                           <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg">
                             Masuk Terfilter: +{idr(filteredInTotal)}
                           </span>
@@ -1535,7 +1535,7 @@ export default function FinanceReport() {
                         <thead className="bg-slate-50/90 sticky top-0 z-10 backdrop-blur-sm">
                           <tr>
                             {['Tanggal', 'Deskripsi', 'Kategori', 'Arah', 'Jumlah'].map(h => (
-                              <th key={h} className={`px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ${h === 'Jumlah' ? 'text-right' : ''}`}>
+                              <th key={h} className={`px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-400 ${h === 'Jumlah' ? 'text-right' : ''}`}>
                                 {h}
                               </th>
                             ))}
@@ -1556,12 +1556,12 @@ export default function FinanceReport() {
                               <td className="px-5 py-3">
                                 <p className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-blue-700">{c.description}</p>
                                 <div className="flex gap-1.5 mt-0.5">
-                                  <span className="text-[9px] font-black text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded">{c.paymentMethod}</span>
-                                  {c.reference && <span className="text-[9px] font-mono text-slate-400">Ref: #{c.reference.slice(-6)}</span>}
+                                  <span className="text-xs font-black text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded">{c.paymentMethod}</span>
+                                  {c.reference && <span className="text-xs font-mono text-slate-400">Ref: #{c.reference.slice(-6)}</span>}
                                 </div>
                               </td>
                               <td className="px-5 py-3">
-                                <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-600">
+                                <span className="text-xs font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-600">
                                   {c.category}
                                 </span>
                               </td>
@@ -1587,7 +1587,7 @@ export default function FinanceReport() {
                   <div className="p-4 border-t border-slate-50 space-y-3">
                     {totalCfPages > 1 && (
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold text-slate-400">Hal {cfPage} dari {totalCfPages}</p>
+                        <p className="text-xs font-bold text-slate-400">Hal {cfPage} dari {totalCfPages}</p>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setCfPage(p => Math.max(1, p - 1))}

@@ -138,14 +138,14 @@ export default function AdminCategories() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Layers className="text-blue-600" size={32} /> Category Matrix
           </h1>
-          <p className="text-slate-400 text-[10px] font-bold tracking-[0.3em] uppercase mt-1">Struktur organisasi inventaris</p>
+          <p className="text-slate-400 text-xs font-bold tracking-[0.3em] uppercase mt-1">Struktur organisasi inventaris</p>
         </div>
 
         <div className="flex gap-2">
           <button onClick={handleExport} className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 transition-all shadow-sm">
             <Download size={20} />
           </button>
-          <button onClick={() => { setEditId(null); setFormData({ name: '', description: '' }); setShowModal(true); }} className="bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl active:scale-95 transition-all">
+          <button onClick={() => { setEditId(null); setFormData({ name: '', description: '' }); setShowModal(true); }} className="bg-slate-900 text-white px-8 py-4 rounded-2xl text-xs font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl active:scale-95 transition-all">
             <Plus size={18} /> NEW CATEGORY
           </button>
         </div>
@@ -178,15 +178,15 @@ export default function AdminCategories() {
 
               <div className="relative z-10">
                 <h3 className="text-xl font-black text-slate-900 tracking-tight mb-1">{cat.name}</h3>
-                <p className="text-[9px] font-black text-slate-300 tracking-widest uppercase mb-4">slug: {cat.slug}</p>
+                <p className="text-xs font-black text-slate-300 tracking-widest uppercase mb-4">slug: {cat.slug}</p>
                 <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-6 h-9 leading-relaxed">{cat.description || 'No description provided.'}</p>
 
                 <div className="flex items-center justify-between pt-6 border-t border-slate-50">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-slate-50 rounded-lg"><Package size={14} className="text-slate-400" /></div>
-                    <span className="text-xs font-black text-slate-900">{cat.productCount} <span className="text-slate-400 font-bold text-[9px] uppercase ml-1">Products</span></span>
+                    <span className="text-xs font-black text-slate-900">{cat.productCount} <span className="text-slate-400 font-bold text-xs uppercase ml-1">Products</span></span>
                   </div>
-                  <Link href={`/admin/products?category=${cat.name}`} className="text-[10px] font-black text-blue-600 tracking-widest flex items-center gap-1 hover:gap-3 transition-all">
+                  <Link href={`/admin/products?category=${cat.name}`} className="text-xs font-black text-blue-600 tracking-widest flex items-center gap-1 hover:gap-3 transition-all">
                     VIEW SKU <ChevronRight size={14} />
                   </Link>
                 </div>
@@ -207,24 +207,24 @@ export default function AdminCategories() {
             <div className="flex justify-between items-center mb-10">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">{editId ? 'Edit Matrix' : 'New Matrix'}</h2>
-                <p className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase mt-1">Classification management</p>
+                <p className="text-xs font-bold text-slate-400 tracking-[0.2em] uppercase mt-1">Classification management</p>
               </div>
               <button onClick={() => setShowModal(false)} className="p-3 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-all"><X size={24} /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase ml-1">Category Name</label>
+                <label className="text-xs font-black text-slate-400 tracking-[0.2em] uppercase ml-1">Category Name</label>
                 <input required placeholder="e.g. Beverages, Electronics..." className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase ml-1">Description</label>
+                <label className="text-xs font-black text-slate-400 tracking-[0.2em] uppercase ml-1">Description</label>
                 <textarea rows={3} placeholder="Brief details about this category..." className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 transition-all resize-none" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-5 text-[10px] font-black tracking-widest text-slate-400 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all">CANCEL</button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-5 text-xs font-black tracking-widest text-slate-400 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all">CANCEL</button>
+                <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-xs font-black tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2">
                   {isSaving ? <Activity className="animate-spin" size={16} /> : <><Save size={16} /> SAVE CHANGES</>}
                 </button>
               </div>

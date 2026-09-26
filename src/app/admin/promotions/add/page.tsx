@@ -387,7 +387,7 @@ function AddPromotionContent() {
             <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
               {editId ? 'Edit Program Promosi' : 'Buat Program Promosi Baru'}
             </h1>
-            <p className="text-[11px] font-bold text-slate-400">
+            <p className="text-xs font-bold text-slate-400">
               Dilengkapi pengaman modal (HPP) & guardrail anti-boncos
             </p>
           </div>
@@ -434,7 +434,7 @@ function AddPromotionContent() {
                   </div>
                   <div>
                     <h3 className="text-xs font-black text-slate-900">{t.label}</h3>
-                    <p className="text-[10px] text-slate-400 font-medium line-clamp-2 mt-0.5">{t.desc}</p>
+                    <p className="text-xs text-slate-400 font-medium line-clamp-2 mt-0.5">{t.desc}</p>
                   </div>
                 </button>
               );
@@ -512,7 +512,7 @@ function AddPromotionContent() {
                     placeholder="HEMAT50 / GAJIAN"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black font-mono text-emerald-700 uppercase outline-none focus:ring-2 focus:ring-emerald-500"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                     Hanya huruf & angka
                   </span>
                 </div>
@@ -523,7 +523,7 @@ function AddPromotionContent() {
             {formData.type === 'buy-x-get-y' && (
               <div className="grid grid-cols-2 gap-3 p-4 bg-amber-50/50 rounded-2xl border border-amber-200">
                 <div>
-                  <label className="block text-[11px] font-black text-amber-800 mb-1">Jumlah Beli (X)</label>
+                  <label className="block text-xs font-black text-amber-800 mb-1">Jumlah Beli (X)</label>
                   <input
                     type="number"
                     min={1}
@@ -533,7 +533,7 @@ function AddPromotionContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black text-amber-800 mb-1">Jumlah Gratis (Y)</label>
+                  <label className="block text-xs font-black text-amber-800 mb-1">Jumlah Gratis (Y)</label>
                   <input
                     type="number"
                     min={1}
@@ -608,7 +608,7 @@ function AddPromotionContent() {
                           ? '⚠️ PERHATIAN: Margin Sangat Tipis (< 10%)'
                           : '✅ PROFIT AMAN: Margin Sehat & Terkendali'}
                       </h4>
-                      <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">
                         Simulasi langsung berdasarkan data modal produk di gudang
                       </p>
                     </div>
@@ -626,19 +626,19 @@ function AddPromotionContent() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-black/5 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Harga Normal</span>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Normal</span>
                     <strong className="text-slate-800">{idr(marginSimulation.normalPrice)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Modal Produk (HPP)</span>
+                    <span className="text-xs text-slate-400 font-bold block">Modal Produk (HPP)</span>
                     <strong className="text-slate-800">{idr(marginSimulation.modalHPP)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Harga Setelah Diskon</span>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Setelah Diskon</span>
                     <strong className="text-blue-600">{idr(marginSimulation.promoPrice)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Laba Bersih / Pcs</span>
+                    <span className="text-xs text-slate-400 font-bold block">Laba Bersih / Pcs</span>
                     <strong className={marginSimulation.isBoncos ? 'text-rose-600' : 'text-emerald-600'}>
                       {marginSimulation.isBoncos ? '−' : '+'}{idr(marginSimulation.labaBersihPerUnit)}
                     </strong>
@@ -653,7 +653,7 @@ function AddPromotionContent() {
                       onChange={(e) => setFormData({ ...formData, allowLossLeader: e.target.checked })}
                       className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
                     />
-                    <span className="text-[11px] font-bold text-rose-800">
+                    <span className="text-xs font-bold text-rose-800">
                       Saya sadar dan mengonfirmasi ini adalah strategi <em>Loss Leader</em> (diskon di bawah modal untuk pancingan pelanggan baru).
                     </span>
                   </label>
@@ -669,7 +669,7 @@ function AddPromotionContent() {
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
               <ShieldCheck size={16} className="text-emerald-600" />Pengaman Finansial (Anti-Boncos)
             </h2>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
               Kunci Profit Toko
             </span>
           </div>
@@ -688,7 +688,7 @@ function AddPromotionContent() {
                 placeholder="0 = Tanpa minimal"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Contoh: Min. Rp50.000 baru kupon aktif</span>
+              <span className="text-xs text-slate-400 mt-1 block">Contoh: Min. Rp50.000 baru kupon aktif</span>
             </div>
 
             {/* Max Discount Cap (Crucial for Percentage) */}
@@ -704,7 +704,7 @@ function AddPromotionContent() {
                 placeholder="0 = Tanpa batas"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Cegah borongan diskon jutaan rupiah</span>
+              <span className="text-xs text-slate-400 mt-1 block">Cegah borongan diskon jutaan rupiah</span>
             </div>
 
             {/* Quota Total */}
@@ -720,7 +720,7 @@ function AddPromotionContent() {
                 placeholder="Contoh: 100 pengguna"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Habis kuota promo otomatis berakhir</span>
+              <span className="text-xs text-slate-400 mt-1 block">Habis kuota promo otomatis berakhir</span>
             </div>
 
             {/* Max per user */}
@@ -735,7 +735,7 @@ function AddPromotionContent() {
                 onChange={(e) => setFormData({ ...formData, maxUsagePerUser: Math.max(1, Number(e.target.value)) })}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Mencegah reseller mengeksploitasi promo</span>
+              <span className="text-xs text-slate-400 mt-1 block">Mencegah reseller mengeksploitasi promo</span>
             </div>
 
             {/* Khusus Flash Sale: Kuota Stok Promo */}
@@ -751,7 +751,7 @@ function AddPromotionContent() {
                   onChange={(e) => setFormData({ ...formData, promoStockQuota: Math.max(1, Number(e.target.value)) })}
                   className="w-full px-3.5 py-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs font-black text-orange-900 outline-none focus:ring-2 focus:ring-orange-500"
                 />
-                <span className="text-[10px] text-orange-600 mt-1 block">Setelah 20 pcs habis, harga kembali normal</span>
+                <span className="text-xs text-orange-600 mt-1 block">Setelah 20 pcs habis, harga kembali normal</span>
               </div>
             )}
           </div>
@@ -760,7 +760,7 @@ function AddPromotionContent() {
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-slate-800">Proteksi Anti-Stacking (Cegah Diskon Bertumpuk)</p>
-              <p className="text-[10px] text-slate-400 font-medium">
+              <p className="text-xs text-slate-400 font-medium">
                 Jika diaktifkan, promo ini tidak dapat digabung dengan kupon lain atau harga grosir
               </p>
             </div>

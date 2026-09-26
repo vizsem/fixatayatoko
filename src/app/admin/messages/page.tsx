@@ -114,7 +114,7 @@ export default function AdminMessages() {
            >
              Belum Dibaca
              {unreadCount > 0 && (
-               <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+               <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                  {unreadCount}
                </span>
              )}
@@ -165,7 +165,7 @@ export default function AdminMessages() {
                           {msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'dd MMM yyyy HH:mm', { locale: id }) : '-'}
                         </span>
                         {msg.status === 'unread' && (
-                          <span className="text-blue-600 font-bold bg-blue-100 px-2 py-0.5 rounded-full text-[10px]">BARU</span>
+                          <span className="text-blue-600 font-bold bg-blue-100 px-2 py-0.5 rounded-full text-xs">BARU</span>
                         )}
                       </div>
                     </div>

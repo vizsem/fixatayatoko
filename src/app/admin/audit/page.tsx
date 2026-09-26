@@ -214,13 +214,13 @@ function AuditPageContent() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <History className="text-blue-600" size={32} /> Audit Terpusat
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Pencatatan & Riwayat Sistem</p>
+          <p className="text-slate-400 text-xs font-black uppercase tracking-[0.3em] mt-1">Pencatatan & Riwayat Sistem</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
            <div className="bg-white p-1 rounded-2xl border border-slate-100 flex gap-1 shadow-sm overflow-x-auto no-scrollbar">
               {tabs.map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === t.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === t.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>
                    <t.icon size={14}/> {t.label}
                 </button>
               ))}
@@ -235,13 +235,13 @@ function AuditPageContent() {
               <input type="text" placeholder="Cari data..." className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
            </div>
            <div className="flex bg-slate-50 rounded-2xl p-1 gap-1">
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black p-2 outline-none" />
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-xs font-black p-2 outline-none" />
               <div className="w-[1px] bg-slate-200 my-2" />
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black p-2 outline-none" />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-xs font-black p-2 outline-none" />
            </div>
         </div>
         <div className="flex-1" />
-        <button onClick={handleExport} className="px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-all">
+        <button onClick={handleExport} className="px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-all">
            <Download size={14}/> EXPORT DATA
         </button>
       </div>
@@ -252,7 +252,7 @@ function AuditPageContent() {
            <Stat label="Total HPP" val={profitSummary.cost} color="text-rose-600" prefix="-" />
            <Stat label="Biaya Operasional" val={profitSummary.expenses} color="text-amber-600" prefix="-" />
            <div className={`p-6 rounded-[2rem] border ${profitSummary.netProfit >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'} shadow-xl`}>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Laba Bersih</p>
+              <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-2">Laba Bersih</p>
               <p className="text-2xl font-black">Rp {profitSummary.netProfit.toLocaleString()}</p>
            </div>
         </div>
@@ -261,19 +261,19 @@ function AuditPageContent() {
       {activeTab === 'tax' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-in fade-in slide-in-from-top-4">
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Total Omzet (Termasuk Pajak)</p>
+            <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Total Omzet (Termasuk Pajak)</p>
             <p className="text-2xl font-black text-slate-900">Rp {taxSummary.totalSales.toLocaleString('id-ID')}</p>
-            <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{taxLogs.length} item terjual</p>
+            <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">{taxLogs.length} item terjual</p>
           </div>
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">DPP (Dasar Pengenaan Pajak)</p>
+            <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">DPP (Dasar Pengenaan Pajak)</p>
             <p className="text-2xl font-black text-blue-700">Rp {taxSummary.dpp.toLocaleString('id-ID')}</p>
-            <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">Harga sebelum pajak</p>
+            <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">Harga sebelum pajak</p>
           </div>
           <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-xl text-white">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Total Pajak Terutang</p>
+            <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-2">Total Pajak Terutang</p>
             <p className="text-2xl font-black">Rp {taxSummary.taxAmount.toLocaleString('id-ID')}</p>
-            <p className="text-[9px] opacity-60 font-bold mt-1 uppercase tracking-widest">PPN / PPh yang harus disetorkan</p>
+            <p className="text-xs opacity-60 font-bold mt-1 uppercase tracking-widest">PPN / PPh yang harus disetorkan</p>
           </div>
         </div>
       )}
@@ -282,7 +282,7 @@ function AuditPageContent() {
         {loading ? <div className="p-8"><TableSkeleton rows={10} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-               <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+               <thead className="bg-slate-50 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                   {activeTab === 'stock' && (
                     <tr>
                       <th className="px-8 py-5">Waktu</th>
@@ -358,8 +358,8 @@ function AuditPageContent() {
                     return (
                       <tr key={l.id} className="hover:bg-slate-50/50 transition-all group">
                         <td className="px-8 py-5">
-                            <p className="text-[11px] font-black text-slate-800">{l.date && format(l.date.toDate(), 'HH:mm')}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{l.date && format(l.date.toDate(), 'd MMM yyyy')}</p>
+                            <p className="text-xs font-black text-slate-800">{l.date && format(l.date.toDate(), 'HH:mm')}</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{l.date && format(l.date.toDate(), 'd MMM yyyy')}</p>
                         </td>
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
@@ -367,26 +367,26 @@ function AuditPageContent() {
                               <Package size={16} />
                             </div>
                             <div>
-                              <p className="text-[11px] font-black text-slate-800 uppercase line-clamp-1">{l.productName}</p>
+                              <p className="text-xs font-black text-slate-800 uppercase line-clamp-1">{l.productName}</p>
                               {refId ? (
-                                <Link href={refUrl || '#'} className="text-[9px] font-black text-blue-600 hover:underline flex items-center gap-1 mt-1 uppercase italic leading-none">
+                                <Link href={refUrl || '#'} className="text-xs font-black text-blue-600 hover:underline flex items-center gap-1 mt-1 uppercase italic leading-none">
                                   #{refId} <ChevronRight size={8} />
                                 </Link>
                               ) : (
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 italic">{l.source}</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase mt-1 italic">{l.source}</p>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="px-8 py-5">
-                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${l.type === 'MASUK' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${l.type === 'MASUK' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                               {l.type === 'MASUK' ? '+' : '-'}{l.amount}
                             </span>
                         </td>
                         <td className="px-8 py-5 text-xs font-black text-slate-500">{l.prevStock} &rarr; <span className="text-slate-900">{l.nextStock}</span></td>
                         <td className="px-8 py-5 text-right">
                             <div className="flex items-center justify-end gap-2 text-slate-400">
-                              <User size={12}/> <span className="text-[10px] font-black uppercase">{l.adminId?.substring(0,8)}</span>
+                              <User size={12}/> <span className="text-xs font-black uppercase">{l.adminId?.substring(0,8)}</span>
                             </div>
                         </td>
                       </tr>
@@ -395,8 +395,8 @@ function AuditPageContent() {
                   {activeTab === 'transaction' && transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
                     <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{t.createdAt && format(t.createdAt.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.createdAt && format(t.createdAt.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{t.createdAt && format(t.createdAt.toDate(), 'HH:mm')}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.createdAt && format(t.createdAt.toDate(), 'd MMM yyyy')}</p>
                        </td>
                        <td className="px-8 py-5">
                           <Link href={`/admin/orders/${t.id}`} className="flex items-center gap-3 group/ref">
@@ -404,8 +404,8 @@ function AuditPageContent() {
                               <Package size={16} />
                             </div>
                             <div>
-                              <p className="text-[11px] font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{t.id?.substring(0,8)}</p>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
+                              <p className="text-xs font-black text-slate-800 uppercase italic leading-none group-hover/ref:text-blue-600 transition-colors">#{t.id?.substring(0,8)}</p>
+                              <p className="text-xs font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
                                 Lihat Detail <ChevronRight size={10} />
                               </p>
                             </div>
@@ -414,7 +414,7 @@ function AuditPageContent() {
                        <td className="px-8 py-5 text-xs font-bold text-slate-600">{t.customerName || 'Walk-in'}</td>
                        <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {t.total?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${['SELESAI', 'SUCCESS'].includes(String(t.status).toUpperCase()) ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${['SELESAI', 'SUCCESS'].includes(String(t.status).toUpperCase()) ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                              {t.status}
                           </span>
                        </td>
@@ -423,21 +423,21 @@ function AuditPageContent() {
                   {activeTab === 'finance' && shifts.map(s => (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{s.openedAt && format(s.openedAt.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.openedAt && format(s.openedAt.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{s.openedAt && format(s.openedAt.toDate(), 'HH:mm')}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{s.openedAt && format(s.openedAt.toDate(), 'd MMM yyyy')}</p>
                        </td>
                        <td className="px-8 py-5">
                           {s.closedAt ? (
                             <>
-                              <p className="text-[11px] font-black text-slate-800">{format(s.closedAt.toDate(), 'HH:mm')}</p>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(s.closedAt.toDate(), 'd MMM yyyy')}</p>
+                              <p className="text-xs font-black text-slate-800">{format(s.closedAt.toDate(), 'HH:mm')}</p>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{format(s.closedAt.toDate(), 'd MMM yyyy')}</p>
                             </>
-                          ) : <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">AKTIF</span>}
+                          ) : <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">AKTIF</span>}
                        </td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-600 uppercase">{s.cashierName}</td>
                        <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {s.expectedCash?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.difference === 0 ? 'bg-slate-50 text-slate-400' : s.difference > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${s.difference === 0 ? 'bg-slate-50 text-slate-400' : s.difference > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                              {s.difference > 0 ? '+' : ''}{s.difference?.toLocaleString()}
                           </span>
                        </td>
@@ -448,30 +448,30 @@ function AuditPageContent() {
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
                          <td className="px-8 py-5">
-                            <p className="text-[11px] font-black text-slate-800">{format(dateObj, 'HH:mm')}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(dateObj, 'd MMM yyyy')}</p>
+                            <p className="text-xs font-black text-slate-800">{format(dateObj, 'HH:mm')}</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{format(dateObj, 'd MMM yyyy')}</p>
                          </td>
                          <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.referenceId || '-'}</td>
                          <td className="px-8 py-5">
-                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{c.type}</span>
+                            <span className="text-xs font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{c.type}</span>
                          </td>
                          <td className={`px-8 py-5 font-black text-xs ${c.transactionType === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {c.transactionType === 'IN' ? '+' : '-'}Rp {c.amount?.toLocaleString()}
                          </td>
-                         <td className="px-8 py-5 text-right font-bold text-[10px] text-slate-400 uppercase">{c.executorName || 'Admin'}</td>
+                         <td className="px-8 py-5 text-right font-bold text-xs text-slate-400 uppercase">{c.executorName || 'Admin'}</td>
                       </tr>
                     );
                   })}
                   {activeTab === 'tax' && taxLogs.filter(t => t.product?.toLowerCase().includes(searchTerm.toLowerCase()) || t.orderId?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
                     <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{format(t.date, 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(t.date, 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{format(t.date, 'HH:mm')}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{format(t.date, 'd MMM yyyy')}</p>
                        </td>
-                       <td className="px-8 py-5 font-mono text-[10px] font-black text-slate-600 uppercase">{t.orderId?.substring(0,12)}</td>
+                       <td className="px-8 py-5 font-mono text-xs font-black text-slate-600 uppercase">{t.orderId?.substring(0,12)}</td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-700">
                           <p className="font-black text-slate-900 line-clamp-1">{t.product}</p>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{t.category}</span>
+                          <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">{t.category}</span>
                        </td>
                        <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {t.sales?.toLocaleString('id-ID')}</td>
                        <td className="px-8 py-5 text-xs font-bold text-blue-700">Rp {t.dpp?.toLocaleString('id-ID')}</td>
@@ -479,21 +479,21 @@ function AuditPageContent() {
                           <p className={`font-black text-sm ${t.isExempt ? 'text-amber-500' : 'text-indigo-600'}`}>
                             {t.isExempt ? 'Rp 0' : `Rp ${t.taxAmount?.toLocaleString('id-ID')}`}
                           </p>
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.isExempt ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-500'}`}>{t.taxLabel}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${t.isExempt ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-500'}`}>{t.taxLabel}</span>
                        </td>
                     </tr>
                   ))}
                   {activeTab === 'cost' && costLogs.filter(c => c.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(c => (
                     <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{c.changeDate && format(c.changeDate.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.changeDate && format(c.changeDate.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{c.changeDate && format(c.changeDate.toDate(), 'HH:mm')}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{c.changeDate && format(c.changeDate.toDate(), 'd MMM yyyy')}</p>
                        </td>
                        <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.productName}</td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-400">Rp {c.oldCost?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {c.newCost?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${(c.newCost - c.oldCost) >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${(c.newCost - c.oldCost) >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                              {(c.newCost - c.oldCost) > 0 ? '+' : ''}{(c.newCost - c.oldCost)?.toLocaleString()}
                           </span>
                        </td>
@@ -502,10 +502,10 @@ function AuditPageContent() {
                   {activeTab === 'profit' && profitLogs.map(p => (
                     <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{p.date && format(p.date.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.date && format(p.date.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{p.date && format(p.date.toDate(), 'HH:mm')}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{p.date && format(p.date.toDate(), 'd MMM yyyy')}</p>
                        </td>
-                       <td className="px-8 py-5 font-black text-[10px] text-slate-500 uppercase">#{p.id?.substring(0,8)}</td>
+                       <td className="px-8 py-5 font-black text-xs text-slate-500 uppercase">#{p.id?.substring(0,8)}</td>
                        <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {p.sales?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-xs font-bold text-rose-500">-Rp {p.cost?.toLocaleString()}</td>
                        <td className="px-8 py-5 text-right font-black text-emerald-600">
@@ -525,7 +525,7 @@ function AuditPageContent() {
 function Stat({ label, val, color, prefix = '' }: any) {
   return (
     <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{label}</p>
+       <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-2">{label}</p>
        <p className={`text-2xl font-black ${color}`}>{prefix}Rp {val.toLocaleString()}</p>
     </div>
   );

@@ -115,9 +115,9 @@ export default function OperationsReport() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Activity className="text-blue-600" size={32} /> Real-time Ops
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Live organizational metrics</p>
+          <p className="text-slate-400 text-xs font-black uppercase tracking-[0.3em] mt-1">Live organizational metrics</p>
         </div>
-        <button onClick={handleExport} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl transition-all">
+        <button onClick={handleExport} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black tracking-widest flex items-center gap-2 hover:bg-black shadow-xl transition-all">
            <Download size={18} /> EXPORT DATA
         </button>
       </div>
@@ -136,7 +136,7 @@ export default function OperationsReport() {
              <div key={cat} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center gap-3 mb-6">
                    <div className="h-[2px] flex-1 bg-slate-100" />
-                   <h2 className="text-[10px] font-black uppercase text-slate-300 tracking-[0.5em]">{cat} Analysis</h2>
+                   <h2 className="text-xs font-black uppercase text-slate-300 tracking-[0.5em]">{cat} Analysis</h2>
                    <div className="h-[2px] flex-1 bg-slate-100" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -146,16 +146,16 @@ export default function OperationsReport() {
                            <div className={`p-2 rounded-xl ${m.status === 'good' ? 'bg-emerald-50 text-emerald-600' : m.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                               {m.status === 'good' ? <Activity size={14}/> : m.status === 'warning' ? <Clock size={14}/> : <AlertTriangle size={14}/>}
                            </div>
-                           <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg ${m.status === 'good' ? 'bg-emerald-50 text-emerald-600' : m.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+                           <span className={`text-xs font-black uppercase px-2 py-1 rounded-lg ${m.status === 'good' ? 'bg-emerald-50 text-emerald-600' : m.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                               {m.status}
                            </span>
                         </div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{m.name}</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{m.name}</p>
                         <div className="flex items-baseline gap-1 mb-2">
                            <span className="text-2xl font-black text-slate-900">{typeof m.value === 'number' && m.unit === 'Rp' ? `Rp ${m.value.toLocaleString()}` : m.value}</span>
-                           <span className="text-[10px] font-bold text-slate-400 uppercase">{m.unit !== 'Rp' ? m.unit : ''}</span>
+                           <span className="text-xs font-bold text-slate-400 uppercase">{m.unit !== 'Rp' ? m.unit : ''}</span>
                         </div>
-                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed">{m.description}</p>
+                        <p className="text-xs font-medium text-slate-400 leading-relaxed">{m.description}</p>
                      </div>
                    ))}
                 </div>
@@ -170,7 +170,7 @@ export default function OperationsReport() {
             <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Diagnostic Data Intelligence</h3>
             <p className="text-xs text-slate-400 leading-relaxed max-w-2xl font-medium">This dashboard aggregates real-time data across employees, users, logistics, and financials to provide a comprehensive health check of the business operations. Status alerts are triggered based on predefined organizational thresholds.</p>
          </div>
-         <button className="px-8 py-4 bg-slate-50 text-slate-900 rounded-2xl text-[10px] font-black tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2 group">
+         <button className="px-8 py-4 bg-slate-50 text-slate-900 rounded-2xl text-xs font-black tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2 group">
             LEARN THRESHOLDS <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
          </button>
       </div>
@@ -182,7 +182,7 @@ function SummaryCard({ label, val, icon: Icon, color, bg }: any) {
   return (
     <div className={`bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-slate-200 transition-all`}>
        <div>
-          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
+          <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
           <p className={`text-3xl font-black ${color}`}>{val}</p>
        </div>
        <div className={`p-4 ${bg} ${color} rounded-[1.5rem] group-hover:scale-110 transition-transform`}>

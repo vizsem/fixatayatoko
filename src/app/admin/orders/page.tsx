@@ -111,9 +111,9 @@ export default function AdminOrders() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders Pipeline</h1>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Transaction flow management · PostgreSQL</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mt-1">Transaction flow management · PostgreSQL</p>
         </div>
-        <button onClick={loadOrders} className="px-4 py-2.5 bg-white border border-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
+        <button onClick={loadOrders} className="px-4 py-2.5 bg-white border border-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
           <RefreshCcw size={14} /> Refresh
         </button>
       </div>
@@ -127,7 +127,7 @@ export default function AdminOrders() {
         ].map(stat => (
           <div key={stat.label} className="bg-white p-2 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
             <span className={`text-lg md:text-2xl font-black ${stat.color}`}>{stat.count}</span>
-            <span className="text-[8px] md:text-[9px] font-black uppercase text-slate-400 tracking-wider md:tracking-widest mt-0.5 md:mt-1 text-center select-none">{stat.label}</span>
+            <span className="text-xs md:text-xs font-black uppercase text-slate-400 tracking-wider md:tracking-widest mt-0.5 md:mt-1 text-center select-none">{stat.label}</span>
           </div>
         ))}
       </div>
@@ -149,7 +149,7 @@ export default function AdminOrders() {
             <button
               key={tab}
               onClick={() => { setActiveTab(tab as any); setCurrentPage(1); }}
-              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
+              className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
             >
               {tab}
             </button>
@@ -178,18 +178,18 @@ export default function AdminOrders() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <Link href={`/admin/orders/${order.id}`} className="font-black text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-colors">
+                    <Link href={`/admin/orders/${order.id}`} className="font-black text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-colors">
                       {order.soNumber}
                     </Link>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(order.status)}`}>{order.status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(order.status)}`}>{order.status}</span>
                     {order.invoice && (
-                      <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase border ${order.invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-lg font-black uppercase border ${order.invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
                         {order.invoice.status}
                       </span>
                     )}
                   </div>
                   <h3 className="font-black text-slate-800 text-sm uppercase truncate">{order.customer?.name || 'Walk-in Customer'}</h3>
-                  <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 mt-1">
+                  <div className="flex items-center gap-3 text-xs font-bold text-slate-400 mt-1">
                     <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(order.createdAt).toLocaleDateString('id-ID')}</span>
                     <span className="flex items-center gap-1"><Clock size={12} /> {new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                     <span className="flex items-center gap-1"><LayoutDashboard size={12} /> {order.items.length} item</span>
@@ -197,12 +197,12 @@ export default function AdminOrders() {
                 </div>
 
                 <div className="flex flex-col md:items-end md:text-right">
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">Total</p>
+                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest leading-none">Total</p>
                   <p className="text-lg font-black text-slate-900 leading-tight">Rp {order.totalAmount.toLocaleString('id-ID')}</p>
                 </div>
 
                 <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-none border-slate-50">
-                  <Link href={`/admin/orders/${order.id}`} className="flex-1 md:flex-none px-5 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest text-center">Detail</Link>
+                  <Link href={`/admin/orders/${order.id}`} className="flex-1 md:flex-none px-5 py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest text-center">Detail</Link>
                   <button onClick={() => handlePrint(order.id)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-900 transition-all"><Printer size={16} /></button>
                 </div>
               </div>
@@ -221,11 +221,11 @@ export default function AdminOrders() {
 
       {selectedOrders.length > 0 && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 p-2 rounded-[2.5rem] shadow-2xl flex items-center gap-2 z-[100] animate-in slide-in-from-bottom-10">
-          <div className="px-4 py-2 bg-white/10 rounded-full text-[10px] font-black text-white">{selectedOrders.length} SELECTED</div>
-          <button onClick={handleBulkCancel} className="px-5 py-2.5 bg-rose-600 text-white rounded-full text-[10px] font-black uppercase">Cancel</button>
-          <button onClick={() => handleBulkUpdate('PICKING')} className="px-5 py-2.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase">Process</button>
-          <button onClick={() => handleBulkUpdate('DELIVERING')} className="px-5 py-2.5 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase">Ship</button>
-          <button onClick={() => handleBulkUpdate('COMPLETED')} className="px-5 py-2.5 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase">Done</button>
+          <div className="px-4 py-2 bg-white/10 rounded-full text-xs font-black text-white">{selectedOrders.length} SELECTED</div>
+          <button onClick={handleBulkCancel} className="px-5 py-2.5 bg-rose-600 text-white rounded-full text-xs font-black uppercase">Cancel</button>
+          <button onClick={() => handleBulkUpdate('PICKING')} className="px-5 py-2.5 bg-amber-500 text-white rounded-full text-xs font-black uppercase">Process</button>
+          <button onClick={() => handleBulkUpdate('DELIVERING')} className="px-5 py-2.5 bg-blue-600 text-white rounded-full text-xs font-black uppercase">Ship</button>
+          <button onClick={() => handleBulkUpdate('COMPLETED')} className="px-5 py-2.5 bg-emerald-600 text-white rounded-full text-xs font-black uppercase">Done</button>
         </div>
       )}
     </div>

@@ -135,7 +135,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              <Users size={22} />
            </div>
            <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Edit Supplier</h1>
-           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Perbarui informasi pemasok</p>
+           <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Perbarui informasi pemasok</p>
          </div>
        </div>
  
@@ -148,7 +148,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
        <form onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            <div>
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Nama Supplier</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2">Nama Supplier</label>
              <input
                type="text"
                required
@@ -159,7 +159,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div>
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Penanggung Jawab</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2">Penanggung Jawab</label>
              <input
                type="text"
                required
@@ -170,7 +170,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div>
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><Phone size={14} className="text-gray-400" /> Telepon</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><Phone size={14} className="text-gray-400" /> Telepon</label>
              <input
                type="tel"
                required
@@ -181,7 +181,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div>
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><Mail size={14} className="text-gray-400" /> Email</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><Mail size={14} className="text-gray-400" /> Email</label>
              <input
                type="email"
                value={supplier.email}
@@ -191,7 +191,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div className="md:col-span-2">
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><MapPin size={14} className="text-gray-400" /> Alamat</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><MapPin size={14} className="text-gray-400" /> Alamat</label>
              <textarea
                rows={3}
                value={supplier.address}
@@ -201,7 +201,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div>
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Kategori Produk</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2">Kategori Produk</label>
              <input
                type="text"
                value={supplier.category}
@@ -211,7 +211,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
              />
            </div>
            <div className="md:col-span-2">
-             <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Catatan</label>
+             <label className="block text-xs font-black uppercase text-gray-400 tracking-widest mb-2">Catatan</label>
              <textarea
                rows={2}
                value={supplier.notes}
@@ -229,7 +229,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
            <button
              type="submit"
              disabled={isSubmitting}
-             className="px-6 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-slate-900 active:scale-95"
+             className="px-6 py-3 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-slate-900 active:scale-95"
            >
              <Save size={16} /> {isSubmitting ? 'Menyimpan...' : 'Simpan'}
            </button>

@@ -85,7 +85,7 @@ export default function AuditLogsPage() {
             <h1 className="text-2xl font-black text-gray-800 tracking-tighter flex items-center gap-3">
               <Shield className="text-blue-600" size={28} /> Audit Trails
             </h1>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">
+            <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-1">
               Admin Activity & System Logs
             </p>
           </div>
@@ -109,7 +109,7 @@ export default function AuditLogsPage() {
             <div className="p-4 bg-gray-50 rounded-full">
               <AlertCircle size={32} className="text-gray-300" />
             </div>
-            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No Activity Logs Found</p>
+            <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">No Activity Logs Found</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -123,18 +123,18 @@ export default function AuditLogsPage() {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-black text-gray-800 uppercase tracking-tight">{log.adminName}</span>
+                      <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{log.adminName}</span>
                       <span className="h-1 w-1 bg-gray-200 rounded-full" />
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                         {log.timestamp ? format(log.timestamp.toDate(), 'HH:mm • d MMM yyyy', { locale: id }) : 'Just now'}
                       </span>
                     </div>
-                    <p className="text-[11px] font-medium text-gray-600 line-clamp-1">{log.description}</p>
+                    <p className="text-xs font-medium text-gray-600 line-clamp-1">{log.description}</p>
                   </div>
 
                   <div className="hidden md:flex flex-col items-end shrink-0">
-                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-1">TYPE</span>
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase ${TYPE_COLORS[log.type] || 'bg-gray-100 text-gray-400'}`}>
+                    <span className="text-xs font-black text-gray-300 uppercase tracking-widest mb-1">TYPE</span>
+                    <span className={`text-xs font-black px-2 py-1 rounded-lg uppercase ${TYPE_COLORS[log.type] || 'bg-gray-100 text-gray-400'}`}>
                       {log.type.replace(/_/g, ' ')}
                     </span>
                   </div>

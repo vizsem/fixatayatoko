@@ -27,7 +27,7 @@ export function ExpensesTable({ expenses, onDelete }: TableProps) {
     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+          <thead className="bg-slate-50/50 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
             <tr>
               <th className="px-8 py-5">Date</th>
               <th className="px-8 py-5">Category</th>
@@ -43,7 +43,7 @@ export function ExpensesTable({ expenses, onDelete }: TableProps) {
                   {formatDate(expense.date)}
                 </td>
                 <td className="px-8 py-5">
-                  <span className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-slate-100 text-slate-600">
+                  <span className="px-3 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg bg-slate-100 text-slate-600">
                     {expense.category}
                   </span>
                 </td>
@@ -51,7 +51,7 @@ export function ExpensesTable({ expenses, onDelete }: TableProps) {
                   <div className="flex flex-col">
                      <span className="text-xs font-bold text-slate-800">{expense.description}</span>
                      {expense.proofOfPayment && (
-                       <a href={expense.proofOfPayment} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-blue-600 uppercase mt-1 flex items-center gap-1 hover:underline">
+                       <a href={expense.proofOfPayment} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 uppercase mt-1 flex items-center gap-1 hover:underline">
                          View Attachment <ExternalLink size={10} />
                        </a>
                      )}

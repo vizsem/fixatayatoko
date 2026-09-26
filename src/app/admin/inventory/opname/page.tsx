@@ -156,7 +156,7 @@ export default function StockOpnamePage() {
 
             {/* CARI PRODUK */}
             <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Cari Produk yang akan dicek</label>
+              <label className="block text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Cari Produk yang akan dicek</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                 <input
@@ -174,7 +174,7 @@ export default function StockOpnamePage() {
                     <button key={p.id} type="button" onClick={() => { setSelectedProduct(p); setSearchTerm(p.name); setPhysicalStock(p.stock); }}
                       className="w-full text-left px-5 py-4 text-sm hover:bg-orange-50 flex justify-between items-center border-b border-gray-50">
                       <span className="font-black text-gray-800">{p.name}</span>
-                      <span className="text-[10px] bg-gray-100 px-3 py-1 rounded-full font-bold">Sistem: {p.stock}</span>
+                      <span className="text-xs bg-gray-100 px-3 py-1 rounded-full font-bold">Sistem: {p.stock}</span>
                     </button>
                   ))}
                 </div>
@@ -186,11 +186,11 @@ export default function StockOpnamePage() {
                 {/* Info Komparasi */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <p className="text-[9px] font-black text-gray-400 uppercase">Stok di Sistem</p>
+                    <p className="text-xs font-black text-gray-400 uppercase">Stok di Sistem</p>
                     <p className="text-xl font-black">{selectedProduct.stock} <span className="text-xs">{selectedProduct.unit}</span></p>
                   </div>
                   <div className={`p-4 rounded-2xl border ${diff === 0 ? 'bg-gray-50 border-gray-100' : diff > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                    <p className="text-[9px] font-black text-gray-400 uppercase">Selisih Fisik</p>
+                    <p className="text-xs font-black text-gray-400 uppercase">Selisih Fisik</p>
                     <p className={`text-xl font-black flex items-center gap-1 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-600' : 'text-gray-900'}`}>
                       {diff > 0 && <Plus size={16} />} {diff} <span className="text-xs">{selectedProduct.unit}</span>
                     </p>
@@ -199,7 +199,7 @@ export default function StockOpnamePage() {
 
                 {/* Input Fisik */}
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Masukkan Jumlah Fisik Sebenarnya</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Masukkan Jumlah Fisik Sebenarnya</label>
                   <input
                     type="number"
                     required
@@ -211,7 +211,7 @@ export default function StockOpnamePage() {
 
                 {/* Catatan */}
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Keterangan Selisih (Opsional)</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Keterangan Selisih (Opsional)</label>
                   <textarea
                     placeholder="Contoh: Barang pecah di rak, atau bonus dari supplier..."
                     className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-medium outline-none focus:ring-2 focus:ring-black h-24"

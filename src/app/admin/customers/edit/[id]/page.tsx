@@ -120,7 +120,7 @@ export default function EditCustomer() {
                 <User size={22} />
               </div>
               <h1 className="text-2xl font-black uppercase tracking-tighter">Edit Client</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Update informasi pelanggan</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Update informasi pelanggan</p>
             </div>
           </div>
         </div>
@@ -131,12 +131,12 @@ export default function EditCustomer() {
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
             <div className="flex items-center gap-2 mb-2 text-green-600">
               <User size={18} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Identitas Dasar</span>
+              <span className="text-xs font-black uppercase tracking-widest">Identitas Dasar</span>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1">Nama Lengkap</label>
+                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">Nama Lengkap</label>
                 <input
                   required
                   value={formData.name}
@@ -147,7 +147,7 @@ export default function EditCustomer() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 text-green-500 flex items-center gap-1">
+                  <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1 text-green-500 flex items-center gap-1">
                     <Phone size={10} /> WhatsApp
                   </label>
                   <input
@@ -158,7 +158,7 @@ export default function EditCustomer() {
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
+                  <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
                     <Mail size={10} /> Email
                   </label>
                   <input
@@ -171,7 +171,7 @@ export default function EditCustomer() {
               </div>
 
               <div>
-                <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
+                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1 flex items-center gap-1">
                   <MapPin size={10} /> Alamat Pengiriman
                 </label>
                 <textarea
@@ -187,7 +187,7 @@ export default function EditCustomer() {
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 mb-6 text-blue-600">
               <FileText size={18} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Catatan Tambahan</span>
+              <span className="text-xs font-black uppercase tracking-widest">Catatan Tambahan</span>
             </div>
             <textarea
               placeholder="Tambahkan info spesifik pelanggan di sini..."
@@ -204,12 +204,12 @@ export default function EditCustomer() {
           <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl">
             <div className="flex items-center gap-2 mb-8 text-green-400">
               <CreditCard size={18} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Financial Settings</span>
+              <span className="text-xs font-black uppercase tracking-widest">Financial Settings</span>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Tipe Member</label>
+                <label className="text-xs font-black uppercase text-gray-500 tracking-widest">Tipe Member</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as 'ecer' | 'grosir' })}
@@ -222,14 +222,14 @@ export default function EditCustomer() {
               </div>
 
               <div>
-                <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Limit Kredit (IDR)</label>
+                <label className="text-xs font-black uppercase text-gray-500 tracking-widest">Limit Kredit (IDR)</label>
                 <input
                   type="number"
                   value={formData.creditLimit}
                   onChange={(e) => setFormData({ ...formData, creditLimit: Number(e.target.value) })}
                   className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-xs font-bold mt-2 outline-none focus:bg-white/20"
                 />
-                <p className="text-[8px] text-gray-500 mt-2 italic font-bold uppercase tracking-tighter">* Set 0 jika pembayaran harus cash</p>
+                <p className="text-xs text-gray-500 mt-2 italic font-bold uppercase tracking-tighter">* Set 0 jika pembayaran harus cash</p>
               </div>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function EditCustomer() {
           <button
             type="submit"
             disabled={saving}
-            className={`w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all font-black text-[10px] uppercase tracking-[0.2em] shadow-lg ${success
+            className={`w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-lg ${success
               ? 'bg-green-500 text-white'
               : 'bg-green-600 hover:bg-green-700 text-white shadow-green-100'
               }`}

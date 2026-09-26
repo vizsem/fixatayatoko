@@ -48,7 +48,7 @@ function StockUnitDisplay({ stock, baseUnit, units }: { stock: number; baseUnit:
   return (
     <div className="flex flex-wrap gap-0.5 mt-0.5">
       {conversions.map(c => (
-        <span key={c.code} className="text-[7px] font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
+        <span key={c.code} className="text-xs font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
           {c.qty} {c.code}
         </span>
       ))}
@@ -167,7 +167,7 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
           <input type="number" placeholder="Jumlah Stok Masuk" className="w-full p-4 bg-gray-50 rounded-2xl font-bold border" onChange={e => setStokMasuk(Number(e.target.value))} />
           <input type="number" placeholder="Harga Beli Satuan Baru" className="w-full p-4 bg-gray-50 rounded-2xl font-bold border" onChange={e => setHargaBaru(Number(e.target.value))} />
           <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
-            <p className="text-[9px] font-black text-blue-600 mb-1">Estimasi modal baru</p>
+            <p className="text-xs font-black text-blue-600 mb-1">Estimasi modal baru</p>
 
             <p className="text-xl font-black text-gray-900">Rp {simulasiHargaAvg.toLocaleString()}</p>
           </div>
@@ -691,7 +691,7 @@ export default function AdminProducts() {
           </div>
           <div>
             <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight leading-none">Produk</h1>
-            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Inventory Management</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Inventory Management</p>
           </div>
         </div>
 
@@ -705,9 +705,9 @@ export default function AdminProducts() {
             >
               <RefreshCw size={13} />
             </button>
-            <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
-            <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
+            <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
+            <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
+            <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
           </div>
           {/* Sync icon always visible on mobile */}
           <button
@@ -718,15 +718,15 @@ export default function AdminProducts() {
             <RefreshCw size={13} />
           </button>
           {/* NEW SKU selalu tampil */}
-          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> <span className="hidden xs:inline">NEW</span> SKU</button>
+          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> <span className="hidden xs:inline">NEW</span> SKU</button>
         </div>
       </div>
 
       {/* Mobile extra actions row */}
       <div className="sm:hidden flex gap-1.5 mb-3">
-        <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
-        <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
-        <button onClick={downloadTemplate} className="flex-1 bg-white border border-gray-200 px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1"><FileSpreadsheet size={11} /> Template</button>
+        <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
+        <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
+        <button onClick={downloadTemplate} className="flex-1 bg-white border border-gray-200 px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1"><FileSpreadsheet size={11} /> Template</button>
       </div>
 
       {/* STATS */}
@@ -734,7 +734,7 @@ export default function AdminProducts() {
         <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:shadow-md transition-all">
           <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Package size={16} /></div>
           <div>
-            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total SKU</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total SKU</p>
             <p className="text-sm font-black text-gray-900 leading-none">{stats.totalJenis}</p>
           </div>
         </div>
@@ -744,9 +744,9 @@ export default function AdminProducts() {
             <Banknote size={16} />
           </div>
           <div>
-            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total Value</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total Value</p>
             <p className="text-sm font-black text-emerald-700 leading-none">
-              <span className="text-[10px] font-bold mr-0.5">Rp</span>
+              <span className="text-xs font-bold mr-0.5">Rp</span>
               {stats.totalAset.toLocaleString('id-ID')}
             </p>
           </div>
@@ -767,7 +767,7 @@ export default function AdminProducts() {
           >
             <Eye size={15} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
             <span>Produk Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
               !showInactive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.active || stats.totalJenis}
@@ -784,7 +784,7 @@ export default function AdminProducts() {
           >
             <Archive size={15} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
             <span>Arsip / Non-Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
               showInactive ? 'bg-rose-100 text-rose-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.inactive || 0}
@@ -831,7 +831,7 @@ export default function AdminProducts() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-[10px] font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
+              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
             >
               <option value="createdAt">URUTKAN: TERBARU</option>
               <option value="updatedAt">URUTKAN: DIUPDATE</option>
@@ -841,7 +841,7 @@ export default function AdminProducts() {
             {/* Tombol Pilih Semua Halaman Ini */}
             <button
               onClick={toggleSelectAll}
-              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+              className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
                 selectedIds.length === currentItems.length && currentItems.length > 0
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
@@ -867,25 +867,25 @@ export default function AdminProducts() {
                   const idsParam = selectedIds.join(',');
                   window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
                 }}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
                 <Printer size={13} /> Cetak Label ({selectedIds.length})
               </button>
               <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
                 <CheckSquare size={13} /> {showInactive ? 'Pulihkan (Aktifkan)' : 'Arsipkan'}
               </button>
               <button
                 onClick={handleBulkDelete}
-                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
               >
                 <Trash2 size={13} /> Hapus Permanen
               </button>
               <button
                 onClick={() => setSelectedIds([])}
-                className="ml-auto text-gray-500 hover:text-gray-800 text-[10px] font-bold uppercase tracking-wider underline"
+                className="ml-auto text-gray-500 hover:text-gray-800 text-xs font-bold uppercase tracking-wider underline"
               >
                 Batalkan Pilihan
               </button>
@@ -915,23 +915,23 @@ export default function AdminProducts() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku || 'N/A'}</span>
-                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        <span className="text-xs font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku || 'N/A'}</span>
+                        <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
                           p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                         }`}>
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
                       </div>
-                      <h3 className="font-black text-gray-900 text-[10px] uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
-                      <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
+                      <h3 className="font-black text-gray-900 text-xs uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 py-1.5 px-2 border-y border-gray-50 bg-gray-50/30 rounded-lg">
                     <div className="space-y-0.5">
-                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Stock</p>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Stock</p>
                       <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                        {p.stock} <span className="text-[9px] uppercase">{p.unit}</span>
+                        {p.stock} <span className="text-xs uppercase">{p.unit}</span>
                       </p>
                       <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
                       <div className="flex flex-wrap gap-1 mt-0.5">
@@ -939,25 +939,25 @@ export default function AdminProducts() {
                           Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
                             const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
                             return (
-                              <span key={whId} className="text-[7px] font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
+                              <span key={whId} className="text-xs font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
                                 {wName}: {qty}
                               </span>
                             );
                           })
                         ) : (
-                          <span className="text-[7px] font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
+                          <span className="text-xs font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
                             {whName}: {p.stock}
                           </span>
                         )}
                       </div>
                     </div>
                     <div className="space-y-0.5 text-right">
-                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
                       <p className="text-xs font-black text-emerald-600 leading-none">
-                        <span className="text-[9px] mr-0.5">Rp</span>
+                        <span className="text-xs mr-0.5">Rp</span>
                         {(p.priceEcer || 0).toLocaleString('id-ID')}
                       </p>
-                      <p className="text-[8px] font-bold text-blue-500/70 italic mt-0.5">
+                      <p className="text-xs font-bold text-blue-500/70 italic mt-0.5">
                         Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                       </p>
                     </div>
@@ -965,7 +965,7 @@ export default function AdminProducts() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                      <p className={`text-[9px] font-black uppercase tracking-tight flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
+                      <p className={`text-xs font-black uppercase tracking-tight flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
                         {isExpired && <AlertTriangle size={10} className="animate-pulse" />}
                         Exp: {p.expired_date || '-'}
                       </p>
@@ -1010,7 +1010,7 @@ export default function AdminProducts() {
         {/* DESKTOP TABLE */}
         <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[640px] md:min-w-0">
-            <thead className="bg-gray-50 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+            <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
               <tr>
                 <th className="px-2 py-2.5 w-8 sticky left-0 bg-gray-50 z-10 text-center">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
@@ -1052,28 +1052,28 @@ export default function AdminProducts() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <p className="text-[8px] font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
-                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                            <p className="text-xs font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
+                            <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
                               p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                             }`}>
                               {p.isActive === false ? 'Arsip' : 'Aktif'}
                             </span>
                           </div>
-                          <h3 className="font-black text-gray-900 text-[10px] leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
-                          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
+                          <h3 className="font-black text-gray-900 text-xs leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
+                          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <p className={`font-black text-[10px] leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {p.stock} <span className="text-[8px] uppercase">{p.unit}</span>
+                          <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                            {p.stock} <span className="text-xs uppercase">{p.unit}</span>
                           </p>
                         </div>
                         <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
                         {Number(p.stock) <= Number(p.minStock) && (
-                          <p className="text-[7px] font-bold text-red-500 uppercase">
+                          <p className="text-xs font-bold text-red-500 uppercase">
                             Min: {p.minStock}
                           </p>
                         )}
@@ -1082,13 +1082,13 @@ export default function AdminProducts() {
                             Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
                               const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
                               return (
-                                <span key={whId} className="text-[7px] font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                                <span key={whId} className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
                                   {wName}: {qty}
                                </span>
                               );
                             })
                           ) : (
-                            <span className="text-[7px] font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                            <span className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
                               {whName}: {p.stock}
                             </span>
                           )}
@@ -1097,14 +1097,14 @@ export default function AdminProducts() {
                     </td>
                     <td className="hidden md:table-cell px-2 py-2">
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[8px] font-bold text-blue-500 italic">
+                        <p className="text-xs font-bold text-blue-500 italic">
                           Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                         </p>
-                        <p className="text-[10px] font-black text-emerald-600 leading-none">
+                        <p className="text-xs font-black text-emerald-600 leading-none">
                           Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                         </p>
                         {Number(p.priceGrosir || 0) > 0 && (
-                          <p className="text-[8px] font-black text-purple-600">
+                          <p className="text-xs font-black text-purple-600">
                             Gros: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
                           </p>
                         )}
@@ -1112,10 +1112,10 @@ export default function AdminProducts() {
                     </td>
                     <td className="hidden md:table-cell px-2 py-2">
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-[8px] font-bold text-gray-400">
+                        <p className="text-xs font-bold text-gray-400">
                           M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                         </p>
-                        <p className={`text-[8px] font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
+                        <p className={`text-xs font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
                           {isExpired && <AlertTriangle size={8} />} 
                           E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
                         </p>
@@ -1170,15 +1170,15 @@ export default function AdminProducts() {
 
         {/* PAGINATION */}
         <div className="px-3 py-2 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
-          <div className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Page {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Items</div>
+          <div className="text-xs font-black text-gray-400 tracking-widest uppercase">Page {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Items</div>
 
           <div className="flex gap-1.5 items-center">
-            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mr-1">Tampilan</span>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest mr-1">Tampilan</span>
             {[100, 500, 1000].map(n => (
               <button
                 key={n}
                 onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
-                className={`px-2 py-1 bg-white border rounded-lg text-[9px] font-black shadow-sm transition-all ${
+                className={`px-2 py-1 bg-white border rounded-lg text-xs font-black shadow-sm transition-all ${
                   itemsPerPage === n ? 'bg-black text-white border-black' : 'hover:bg-gray-50'
                 }`}
               >
@@ -1238,7 +1238,7 @@ export default function AdminProducts() {
               ></div>
             </div>
 
-            <div className="flex justify-between w-full text-[11px] font-black uppercase text-gray-400 mb-4">
+            <div className="flex justify-between w-full text-xs font-black uppercase text-gray-400 mb-4">
               <span>{bulkProgress.current} dari {bulkProgress.total} Produk</span>
               <span className="text-gray-900 font-black">{bulkProgress.percent}%</span>
             </div>

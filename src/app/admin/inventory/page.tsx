@@ -28,7 +28,7 @@ function StockUnitDisplay({ stock, units }: { stock: number; units?: { code: str
   return (
     <div className="flex flex-wrap gap-0.5 mt-0.5">
       {conversions.map(c => (
-        <span key={c.code} className="text-[7px] font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
+        <span key={c.code} className="text-xs font-bold bg-blue-50 border border-blue-100 text-blue-600 rounded px-1 py-0.5 uppercase">
           {c.qty} {c.code}
         </span>
       ))}
@@ -349,7 +349,7 @@ export default function AdminInventory() {
                           <div>
                             <div className="flex items-center gap-2">
                               <p className={`font-bold text-sm ${isActive ? 'text-gray-800' : 'text-gray-600 line-through'}`}>{p.name}</p>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                                 isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
                               }`}>
                                 {isActive ? 'Aktif' : 'Tidak Aktif'}

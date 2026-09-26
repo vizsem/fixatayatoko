@@ -188,7 +188,7 @@ export default function PromotionsPage() {
             <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
               Marketing Center & Promosi
             </h1>
-            <p className="text-[11px] font-bold text-slate-400">
+            <p className="text-xs font-bold text-slate-400">
               Kelola diskon, kupon, flash sale, dan bundel dengan pengaman modal anti-boncos
             </p>
           </div>
@@ -223,38 +223,38 @@ export default function PromotionsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Program</p>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Total Program</p>
             <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600"><Gift size={14} /></div>
           </div>
           <p className="text-2xl font-black text-slate-900">{stats.total}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-0.5">Semua jenis promosi</p>
+          <p className="text-xs font-bold text-slate-400 mt-0.5">Semua jenis promosi</p>
         </div>
 
         <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Sedang Berjalan</p>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Sedang Berjalan</p>
             <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600"><Clock size={14} /></div>
           </div>
           <p className="text-2xl font-black text-emerald-600">{stats.running}</p>
-          <p className="text-[10px] font-bold text-emerald-600/70 mt-0.5">Aktif dan dalam periode</p>
+          <p className="text-xs font-bold text-emerald-600/70 mt-0.5">Aktif dan dalam periode</p>
         </div>
 
         <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proteksi Anti-Boncos</p>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Proteksi Anti-Boncos</p>
             <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600"><ShieldCheck size={14} /></div>
           </div>
           <p className="text-2xl font-black text-blue-600">{stats.guarded}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-0.5">Dibatasi Min. Belanja/Cap</p>
+          <p className="text-xs font-bold text-slate-400 mt-0.5">Dibatasi Min. Belanja/Cap</p>
         </div>
 
         <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Penggunaan</p>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Total Penggunaan</p>
             <div className="p-1.5 bg-purple-50 rounded-lg text-purple-600"><CheckCircle2 size={14} /></div>
           </div>
           <p className="text-2xl font-black text-purple-600">{stats.totalUsage}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-0.5">Kali promo ditukarkan</p>
+          <p className="text-xs font-bold text-slate-400 mt-0.5">Kali promo ditukarkan</p>
         </div>
       </div>
 
@@ -317,34 +317,34 @@ export default function PromotionsPage() {
                     <div>
                       <h4 className="text-sm font-black text-slate-900">{promo.name}</h4>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-slate-100 text-slate-600">
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-600">
                           {promo.type}
                         </span>
                         {promo.code && (
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
                             {promo.code}
                           </span>
                         )}
                       </div>
                     </div>
                     {expired ? (
-                      <span className="px-2 py-0.5 text-[9px] font-black bg-rose-50 text-rose-600 rounded-lg">
+                      <span className="px-2 py-0.5 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">
                         Kedaluwarsa
                       </span>
                     ) : activeNow ? (
-                      <span className="px-2 py-0.5 text-[9px] font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1">
+                      <span className="px-2 py-0.5 text-xs font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                         Berjalan
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 text-[9px] font-black bg-orange-50 text-orange-600 rounded-lg">
+                      <span className="px-2 py-0.5 text-xs font-black bg-orange-50 text-orange-600 rounded-lg">
                         Terjadwal
                       </span>
                     )}
                   </div>
 
                   {/* Guardrail Badges */}
-                  <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                  <div className="flex flex-wrap gap-1.5 text-xs font-bold">
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg">
                       Potongan: {promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue)}
                     </span>
@@ -368,7 +368,7 @@ export default function PromotionsPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-slate-50 text-xs">
                     <button
                       onClick={() => handleToggleActive(promo)}
-                      className={`px-3 py-1.5 rounded-xl font-black text-[10px] flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 ${
                         promo.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
                       }`}
                     >
@@ -402,7 +402,7 @@ export default function PromotionsPage() {
             <thead className="bg-slate-50/70">
               <tr>
                 {['Program Promosi', 'Model & Target', 'Diskon', 'Pengaman Finansial (Guardrail)', 'Periode', 'Status', 'Aksi'].map((h) => (
-                  <th key={h} className="px-5 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <th key={h} className="px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400">
                     {h}
                   </th>
                 ))}
@@ -426,7 +426,7 @@ export default function PromotionsPage() {
                         <div className="text-xs font-black text-slate-900">{promo.name}</div>
                         {promo.code && (
                           <div className="mt-1">
-                            <span className="px-2 py-0.5 rounded-lg text-[9px] font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
                               KODE: {promo.code}
                             </span>
                           </div>
@@ -435,11 +435,11 @@ export default function PromotionsPage() {
 
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-slate-100 text-slate-700">
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-700">
                             {promo.type}
                           </span>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-500 mt-1 line-clamp-1">
+                        <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">
                           {promo.targetName || (promo.type === 'coupon' ? 'Semua Belanja' : '—')}
                         </p>
                       </td>
@@ -455,7 +455,7 @@ export default function PromotionsPage() {
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <div className="flex flex-col gap-1 text-[10px]">
+                        <div className="flex flex-col gap-1 text-xs">
                           {promo.minPurchase && promo.minPurchase > 0 ? (
                             <span className="text-blue-700 font-bold">🛡️ Min. Belanja {idr(promo.minPurchase)}</span>
                           ) : (
@@ -478,7 +478,7 @@ export default function PromotionsPage() {
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <div className="text-[10px] font-bold text-slate-500">
+                        <div className="text-xs font-bold text-slate-500">
                           <div>{new Date(promo.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
                           <div className="text-slate-400">s/d {new Date(promo.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
                         </div>
@@ -486,16 +486,16 @@ export default function PromotionsPage() {
 
                       <td className="px-5 py-3.5">
                         {expired ? (
-                          <span className="px-2 py-1 text-[9px] font-black bg-rose-50 text-rose-600 rounded-lg">
+                          <span className="px-2 py-1 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">
                             Kedaluwarsa
                           </span>
                         ) : activeNow ? (
-                          <span className="px-2 py-1 text-[9px] font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1 w-fit">
+                          <span className="px-2 py-1 text-xs font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1 w-fit">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                             Berjalan
                           </span>
                         ) : (
-                          <span className="px-2 py-1 text-[9px] font-black bg-orange-50 text-orange-600 rounded-lg">
+                          <span className="px-2 py-1 text-xs font-black bg-orange-50 text-orange-600 rounded-lg">
                             Terjadwal
                           </span>
                         )}

@@ -304,7 +304,7 @@ export default function SalesReport() {
                   </p>
                   <h3 className="text-sm font-bold text-gray-900 line-clamp-1">{sale.productName}</h3>
                 </div>
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
                   sale.paymentMethod === 'CASH' 
                     ? 'bg-green-100 text-green-700'
                     : sale.paymentMethod === 'QRIS'
@@ -317,11 +317,11 @@ export default function SalesReport() {
               
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-gray-50 p-3 rounded-xl">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Kuantitas</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Kuantitas</p>
                   <p className="text-sm font-black text-gray-900">{sale.quantity}</p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Total</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total</p>
                   <p className="text-sm font-black text-green-600">Rp {sale.total.toLocaleString('id-ID')}</p>
                 </div>
               </div>

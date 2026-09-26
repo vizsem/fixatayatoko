@@ -361,15 +361,15 @@ export default function AdminSettings() {
               <h2 className="font-black text-xs tracking-widest text-slate-400 uppercase flex items-center gap-2 mb-6"><Store size={16} /> Identitas Toko</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500">Nama Toko</label>
+                  <label className="text-xs font-bold text-slate-500">Nama Toko</label>
                   <input type="text" value={settings.store.name} onChange={e => setSettings({ ...settings, store: { ...settings.store, name: e.target.value } })} className="w-full p-3.5 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 focus:ring-slate-900 font-bold text-sm outline-none" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500">WhatsApp / Telepon</label>
+                  <label className="text-xs font-bold text-slate-500">WhatsApp / Telepon</label>
                   <input type="text" value={settings.store.phone} onChange={e => setSettings({ ...settings, store: { ...settings.store, phone: e.target.value } })} className="w-full p-3.5 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 focus:ring-slate-900 font-bold text-sm outline-none" />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500">Alamat Lengkap</label>
+                  <label className="text-xs font-bold text-slate-500">Alamat Lengkap</label>
                   <textarea value={settings.store.address} onChange={e => setSettings({ ...settings, store: { ...settings.store, address: e.target.value } })} className="w-full p-3.5 rounded-xl bg-slate-50 border-none ring-1 ring-slate-100 focus:ring-slate-900 font-bold text-sm outline-none h-20 resize-none" />
                 </div>
               </div>
@@ -380,10 +380,10 @@ export default function AdminSettings() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {['shopee', 'tiktok', 'tokopedia', 'lazada'].map(m => (
                   <div key={m} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{m}</p>
+                    <p className="text-xs font-black text-slate-400 uppercase mb-1">{m}</p>
                     <div className="flex items-center gap-1">
                       <input type="number" value={(settings.marketplaceFees as any)?.[m] || 0} onChange={e => setSettings({ ...settings, marketplaceFees: { ...settings.marketplaceFees!, [m]: Number(e.target.value) } })} className="w-full bg-transparent font-black text-sm outline-none" />
-                      <span className="text-[10px] font-bold text-slate-400">%</span>
+                      <span className="text-xs font-bold text-slate-400">%</span>
                     </div>
                   </div>
                 ))}
@@ -398,7 +398,7 @@ export default function AdminSettings() {
               <h2 className="font-black text-xs tracking-widest text-slate-500 uppercase mb-6 flex items-center gap-2"><Printer size={16} /> Printer Kasir</h2>
               <div className="space-y-4">
                 <div className="space-y-1">
-                    <label className="text-[9px] text-slate-400 font-bold uppercase">Paper Width</label>
+                    <label className="text-xs text-slate-400 font-bold uppercase">Paper Width</label>
                     <select value={settings.printer.paperWidth} onChange={e => setSettings({ ...settings, printer: { ...settings.printer, paperWidth: Number(e.target.value) } })} className="w-full bg-white/10 p-3 rounded-xl font-bold text-xs outline-none">
                       <option value={58} className="text-black">58mm</option>
                       <option value={80} className="text-black">80mm</option>
@@ -448,7 +448,7 @@ export default function AdminSettings() {
               <div className="space-y-6">
                 {/* Mode Pilihan: PT PKP vs Perorangan UMKM */}
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-3">Opsi Skema Pajak</label>
+                  <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-3">Opsi Skema Pajak</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div
                       onClick={() => setSettings({
@@ -461,7 +461,7 @@ export default function AdminSettings() {
                         <span className="text-xs font-black uppercase tracking-wider text-slate-800">👤 Perorangan / UMKM (PP 55/2022)</span>
                         {settings.tax.mode === 'UMKM_FINAL' && <CheckCircle2 size={18} className="text-indigo-600" />}
                       </div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                      <p className="text-xs text-slate-500 leading-relaxed font-medium">
                         PPh Final <strong>0,5%</strong> dari total omzet tahunan di atas Rp 500 Juta. Pajak diikutsertakan di HPP toko.
                       </p>
                     </div>
@@ -477,7 +477,7 @@ export default function AdminSettings() {
                         <span className="text-xs font-black uppercase tracking-wider text-slate-800">🏢 PT / Badan Usaha (PKP PPN)</span>
                         {settings.tax.mode === 'PT_PKP' && <CheckCircle2 size={18} className="text-indigo-600" />}
                       </div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                      <p className="text-xs text-slate-500 leading-relaxed font-medium">
                         PPN resmi <strong>11%</strong> (DPP Nilai Lain 11/12 UU HPP). Bebas PPN (0%) otomatis untuk produk kategori Sembako.
                       </p>
                     </div>
@@ -487,7 +487,7 @@ export default function AdminSettings() {
                 {/* Mode Tampilan Harga: Inclusive vs Exclusive */}
                 {settings.tax.mode === 'PT_PKP' && (
                   <div className="pt-4 border-t border-slate-100">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-3">Mekanisme Tampilan Harga Produk</label>
+                    <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-3">Mekanisme Tampilan Harga Produk</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div
                         onClick={() => setSettings({
@@ -497,7 +497,7 @@ export default function AdminSettings() {
                         className={`p-4 rounded-2xl border cursor-pointer transition-all ${settings.tax.pricingMode === 'INCLUSIVE' ? 'border-emerald-500 bg-emerald-50/40' : 'border-slate-100'}`}
                       >
                         <p className="text-xs font-black text-slate-800 mb-1">⭐ Harga Sudah Termasuk Pajak (Inclusive)</p>
-                        <p className="text-[10px] text-slate-500">Harga etalase = harga bayar akhir. Pembeli tidak kaget di checkout.</p>
+                        <p className="text-xs text-slate-500">Harga etalase = harga bayar akhir. Pembeli tidak kaget di checkout.</p>
                       </div>
 
                       <div
@@ -508,7 +508,7 @@ export default function AdminSettings() {
                         className={`p-4 rounded-2xl border cursor-pointer transition-all ${settings.tax.pricingMode === 'EXCLUSIVE' ? 'border-blue-500 bg-blue-50/40' : 'border-slate-100'}`}
                       >
                         <p className="text-xs font-black text-slate-800 mb-1">➕ Pajak Ditambahkan di Checkout (Exclusive)</p>
-                        <p className="text-[10px] text-slate-500">PPN 11% dihitung secara terpisah di rincian tagihan akhir.</p>
+                        <p className="text-xs text-slate-500">PPN 11% dihitung secara terpisah di rincian tagihan akhir.</p>
                       </div>
                     </div>
                   </div>
@@ -556,7 +556,7 @@ export default function AdminSettings() {
             <AlertTriangle className="text-amber-500 shrink-0" size={24} />
             <div>
               <p className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">Penting</p>
-              <p className="text-[11px] text-amber-700 leading-relaxed font-medium">Backup dilakukan secara manual. Kami menyarankan untuk melakukan backup setiap hari atau sebelum melakukan perubahan besar pada data produk. File restore harus menggunakan format Excel (.xlsx) yang dihasilkan dari fitur Export di atas.</p>
+              <p className="text-xs text-amber-700 leading-relaxed font-medium">Backup dilakukan secara manual. Kami menyarankan untuk melakukan backup setiap hari atau sebelum melakukan perubahan besar pada data produk. File restore harus menggunakan format Excel (.xlsx) yang dihasilkan dari fitur Export di atas.</p>
             </div>
           </div>
         </div>
@@ -569,7 +569,7 @@ export default function AdminSettings() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-black uppercase tracking-wider">
                     Titik Gudang Pusat Terverifikasi
                   </span>
                 </div>
@@ -577,7 +577,7 @@ export default function AdminSettings() {
                 <p className="text-xs text-slate-300 font-medium mt-1">
                   {ATAYATOKO_WAREHOUSE.address}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400">
                   <span className="bg-white/10 px-2.5 py-1 rounded-lg">
                     Lat: {ATAYATOKO_WAREHOUSE.latitude}
                   </span>
@@ -607,24 +607,24 @@ export default function AdminSettings() {
             {/* ZONES STRATEGY GUIDE */}
             <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-black uppercase text-emerald-400 block mb-0.5">Ring 1 (0 – 3 km)</span>
+                <span className="text-xs font-black uppercase text-emerald-400 block mb-0.5">Ring 1 (0 – 3 km)</span>
                 <strong className="text-white text-xs block">Dalam Kota Dekat</strong>
-                <span className="text-[10px] text-slate-400">Gratis Min. Rp50.000</span>
+                <span className="text-xs text-slate-400">Gratis Min. Rp50.000</span>
               </div>
               <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-black uppercase text-blue-400 block mb-0.5">Ring 2 (3 – 7 km)</span>
+                <span className="text-xs font-black uppercase text-blue-400 block mb-0.5">Ring 2 (3 – 7 km)</span>
                 <strong className="text-white text-xs block">Sekitar Kota Kediri</strong>
-                <span className="text-[10px] text-slate-400">Subsidi / Min. Rp120.000</span>
+                <span className="text-xs text-slate-400">Subsidi / Min. Rp120.000</span>
               </div>
               <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-black uppercase text-purple-400 block mb-0.5">Ring 3 (7 – 12 km)</span>
+                <span className="text-xs font-black uppercase text-purple-400 block mb-0.5">Ring 3 (7 – 12 km)</span>
                 <strong className="text-white text-xs block">Pinggiran / Grosir</strong>
-                <span className="text-[10px] text-slate-400">Armada / Min. Rp300.000</span>
+                <span className="text-xs text-slate-400">Armada / Min. Rp300.000</span>
               </div>
               <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                <span className="text-[10px] font-black uppercase text-amber-400 block mb-0.5">Luar Kota (&gt; 12 km)</span>
+                <span className="text-xs font-black uppercase text-amber-400 block mb-0.5">Luar Kota (&gt; 12 km)</span>
                 <strong className="text-white text-xs block">JNE / J&T / Kargo</strong>
-                <span className="text-[10px] text-slate-400">Nasional & Partai Bal</span>
+                <span className="text-xs text-slate-400">Nasional & Partai Bal</span>
               </div>
             </div>
           </section>
@@ -634,9 +634,9 @@ export default function AdminSettings() {
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-xl font-black flex items-center gap-2"><Truck className="text-slate-900" /> Pengaturan Metode Pengiriman</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Atur kurir toko, radius, dan ekspedisi luar kota</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Atur kurir toko, radius, dan ekspedisi luar kota</p>
               </div>
-              <button onClick={handleSaveSystem} className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+              <button onClick={handleSaveSystem} className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
                 Simpan Perubahan
               </button>
             </div>
@@ -655,11 +655,11 @@ export default function AdminSettings() {
                     <div>
                       <p className="text-xs font-black text-slate-900">{method.name}</p>
                       <div className="flex gap-1.5 mt-0.5">
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
+                        <span className="text-xs font-black px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
                           {method.type || 'KURIR'}
                         </span>
                         {method.zone && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
+                          <span className="text-xs font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
                             {method.zone}
                           </span>
                         )}
@@ -667,15 +667,15 @@ export default function AdminSettings() {
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-500 font-medium mb-3 leading-relaxed">
+                  <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">
                     {method.description}
                   </p>
 
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Biaya Standar</span>
+                      <span className="text-xs font-black text-slate-400 uppercase">Biaya Standar</span>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-slate-400">Rp</span>
+                        <span className="text-xs font-bold text-slate-400">Rp</span>
                         <input
                           type="number"
                           value={method.cost}
@@ -691,9 +691,9 @@ export default function AdminSettings() {
                     </div>
 
                     <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Min. Belanja Gratis</span>
+                      <span className="text-xs font-black text-slate-400 uppercase">Min. Belanja Gratis</span>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-slate-400">Rp</span>
+                        <span className="text-xs font-bold text-slate-400">Rp</span>
                         <input
                           type="number"
                           value={method.minSpendFree || 0}
@@ -710,7 +710,7 @@ export default function AdminSettings() {
                     </div>
 
                     <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Status Aktif</span>
+                      <span className="text-xs font-black text-slate-400 uppercase">Status Aktif</span>
                       <input
                         type="checkbox"
                         checked={method.enabled}
@@ -730,7 +730,7 @@ export default function AdminSettings() {
 
             {/* ADD NEW DELIVERY METHOD */}
             <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Tambah Layanan Kurir / Ekspedisi Baru</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Tambah Layanan Kurir / Ekspedisi Baru</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <input
                   type="text"
@@ -755,7 +755,7 @@ export default function AdminSettings() {
                 />
                 <button
                   onClick={handleAddDelivery}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest py-3 transition-all"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-xs uppercase tracking-widest py-3 transition-all"
                 >
                   Tambah Layanan
                 </button>
@@ -780,30 +780,30 @@ export default function AdminSettings() {
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <div>
                   <p className="text-xs font-black">Status Loyalty</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Aktifkan sistem poin</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase">Aktifkan sistem poin</p>
                 </div>
                 <input type="checkbox" checked={pointConfig.isActive} onChange={e => setPointConfig({...pointConfig, isActive: e.target.checked})} className="w-6 h-6 rounded-lg accent-amber-500" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase px-2">1 Poin per Belanja</label>
+                  <label className="text-xs font-black text-slate-400 uppercase px-2">1 Poin per Belanja</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">Rp</span>
                     <input type="number" value={pointConfig.earningRate} onChange={e => setPointConfig({...pointConfig, earningRate: Number(e.target.value)})} className="w-full bg-slate-50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase px-2">Nilai Tukar 1 Poin</label>
+                  <label className="text-xs font-black text-slate-400 uppercase px-2">Nilai Tukar 1 Poin</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">Rp</span>
                     <input type="number" value={pointConfig.redemptionValue} onChange={e => setPointConfig({...pointConfig, redemptionValue: Number(e.target.value)})} className="w-full bg-slate-50 p-4 pl-10 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-2">Minimal Tukar Poin</label>
+                <label className="text-xs font-black text-slate-400 uppercase px-2">Minimal Tukar Poin</label>
                 <input type="number" value={pointConfig.minRedeem} onChange={e => setPointConfig({...pointConfig, minRedeem: Number(e.target.value)})} className="w-full bg-slate-50 p-4 rounded-2xl text-sm font-black outline-none border border-transparent focus:border-amber-500 transition-all" />
               </div>
 
@@ -822,7 +822,7 @@ export default function AdminSettings() {
             
             <div className="flex gap-2 mb-8">
               <input type="text" placeholder="Nama Kategori Baru..." value={newCat} onChange={e => setNewCat(e.target.value)} className="flex-1 bg-slate-50 p-4 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-slate-900 transition-all" />
-              <button onClick={handleAddCategory} className="px-8 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">Tambah</button>
+              <button onClick={handleAddCategory} className="px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Tambah</button>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -830,7 +830,7 @@ export default function AdminSettings() {
                 <div key={cat.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
                   <div>
                     <p className="text-xs font-black uppercase tracking-tight">{cat.name}</p>
-                    <p className="text-[9px] font-bold text-slate-400">slug: {cat.slug}</p>
+                    <p className="text-xs font-bold text-slate-400">slug: {cat.slug}</p>
                   </div>
                   <button onClick={() => handleDeleteCategory(cat.id!)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
                     <Trash2 size={16} />
@@ -848,7 +848,7 @@ export default function AdminSettings() {
             <h2 className="text-xl font-black mb-8 flex items-center gap-2"><Users className="text-slate-900" /> Kelola Staff</h2>
 
             <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-8">
-              <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 px-2">Tambah Staff Baru</h3>
+              <h3 className="text-xs font-black uppercase text-slate-400 mb-4 px-2">Tambah Staff Baru</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <input type="text" placeholder="Nama Lengkap" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
                 <input type="email" placeholder="Email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
@@ -856,7 +856,7 @@ export default function AdminSettings() {
                   <option value="kasir">Kasir</option>
                   <option value="admin">Admin</option>
                 </select>
-                <button onClick={handleAddEmployee} className="bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest py-4">Tambah</button>
+                <button onClick={handleAddEmployee} className="bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest py-4">Tambah</button>
               </div>
             </div>
 
@@ -867,7 +867,7 @@ export default function AdminSettings() {
                     <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100"><Users size={20} /></div>
                     <div>
                       <p className="text-xs font-black uppercase">{emp.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{emp.role} • {emp.email}</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{emp.role} • {emp.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -887,13 +887,13 @@ export default function AdminSettings() {
             <h2 className="text-xl font-black mb-8 flex items-center gap-2"><Sparkles className="text-slate-900" /> Homepage Banners</h2>
 
             <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white mb-12 shadow-2xl">
-              <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest">Desain Banner Baru</h3>
+              <h3 className="text-xs font-black uppercase text-slate-500 mb-6 tracking-widest">Desain Banner Baru</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Judul</label><input type="text" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
-                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Subjudul</label><input type="text" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
-                <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Link URL</label><input type="text" value={newBanner.linkUrl} onChange={e => setNewBanner({...newBanner, linkUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
-                <div className="md:col-span-2 space-y-1.5"><label className="text-[9px] font-black uppercase text-slate-500">Image URL</label><input type="text" value={newBanner.imageUrl} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
-                <div className="flex items-end"><button onClick={handleAddBanner} className="w-full bg-white text-slate-900 h-[52px] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all">Publish Banner</button></div>
+                <div className="space-y-1.5"><label className="text-xs font-black uppercase text-slate-500">Judul</label><input type="text" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="space-y-1.5"><label className="text-xs font-black uppercase text-slate-500">Subjudul</label><input type="text" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="space-y-1.5"><label className="text-xs font-black uppercase text-slate-500">Link URL</label><input type="text" value={newBanner.linkUrl} onChange={e => setNewBanner({...newBanner, linkUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="md:col-span-2 space-y-1.5"><label className="text-xs font-black uppercase text-slate-500">Image URL</label><input type="text" value={newBanner.imageUrl} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} className="w-full bg-white/10 p-4 rounded-2xl text-xs font-bold outline-none" /></div>
+                <div className="flex items-end"><button onClick={handleAddBanner} className="w-full bg-white text-slate-900 h-[52px] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all">Publish Banner</button></div>
               </div>
             </div>
 
@@ -903,12 +903,12 @@ export default function AdminSettings() {
                   {banner.imageUrl && <img src={banner.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:scale-110 transition-transform duration-700" alt="" />}
                   <div className="relative z-10">
                     <div className="flex justify-between items-start mb-4">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${banner.isActive ? 'bg-emerald-500' : 'bg-slate-700'}`}>{banner.isActive ? 'Active' : 'Draft'}</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${banner.isActive ? 'bg-emerald-500' : 'bg-slate-700'}`}>{banner.isActive ? 'Active' : 'Draft'}</span>
                       <button onClick={() => handleDeleteBanner(banner.id!)} className="p-2 bg-white/10 rounded-xl hover:bg-rose-500 transition-colors"><Trash2 size={16} /></button>
                     </div>
                     <h3 className="text-xl font-black mb-1">{banner.title}</h3>
                     <p className="text-xs font-bold opacity-80 mb-6">{banner.subtitle}</p>
-                    <button className="px-6 py-2.5 bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest">{banner.buttonText}</button>
+                    <button className="px-6 py-2.5 bg-white text-slate-900 rounded-xl text-xs font-black uppercase tracking-widest">{banner.buttonText}</button>
                   </div>
                 </div>
               ))}

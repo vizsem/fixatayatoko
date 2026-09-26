@@ -131,7 +131,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
               <Warehouse size={24} />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informasi Gudang</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Informasi Gudang</p>
               <h2 className="text-lg font-black uppercase tracking-tight italic">ID: {id.substring(0, 8)}</h2>
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Nama Gudang */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Nama Gudang</label>
+              <label className="text-xs font-black uppercase text-slate-400 ml-2">Nama Gudang</label>
               <div className="relative">
                 <Package className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                 <input
@@ -156,7 +156,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Contact Person */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Penanggung Jawab</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-2">Penanggung Jawab</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input
@@ -172,7 +172,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
               {/* No Telepon */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">WhatsApp / Telp</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-2">WhatsApp / Telp</label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input
@@ -189,7 +189,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
             {/* Alamat Lengkap */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Alamat Lengkap</label>
+              <label className="text-xs font-black uppercase text-slate-400 ml-2">Alamat Lengkap</label>
               <div className="relative">
                 <MapPin className="absolute left-4 top-6 text-slate-300" size={18} />
                 <textarea
@@ -207,7 +207,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Kapasitas Gudang */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Kapasitas Maksimal</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-2">Kapasitas Maksimal</label>
                 <div className="relative">
                   <Database className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input
@@ -223,7 +223,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
               {/* Status Gudang */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Status Operasional</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-2">Status Operasional</label>
                 <select
                   value={formData?.status || 'AKTIF'}
                   onChange={(e) => setFormData(prev => prev ? { ...prev, status: e.target.value as 'AKTIF' | 'NONAKTIF' } : null)}

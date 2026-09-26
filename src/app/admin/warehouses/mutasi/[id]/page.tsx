@@ -139,7 +139,7 @@ export default function MutasiGudangPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Mutasi Stok Gudang</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{sourceWarehouse?.name || 'Gudang Asal'}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{sourceWarehouse?.name || 'Gudang Asal'}</p>
           </div>
           <div className="flex-1" />
         </div>
@@ -149,14 +149,14 @@ export default function MutasiGudangPage() {
             <div className="w-12 h-12 bg-gray-900 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-xl shadow-gray-200">
               <WarehouseIcon size={20} />
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-900">{sourceWarehouse?.name}</span>
+            <span className="text-xs font-black uppercase text-gray-900">{sourceWarehouse?.name}</span>
           </div>
           <ArrowRightLeft className="text-gray-300 animate-pulse" size={24} />
           <div className="text-center">
             <div className="w-12 h-12 bg-green-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-xl shadow-green-100">
               <WarehouseIcon size={20} />
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400">Gudang Tujuan</span>
+            <span className="text-xs font-black uppercase text-gray-400">Gudang Tujuan</span>
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export default function MutasiGudangPage() {
         <form onSubmit={handleMutation} className="space-y-6">
           {/* PILIH PRODUK DARI INVENTORY */}
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">1. Pilih Produk dari {sourceWarehouse?.name}</label>
+            <label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">1. Pilih Produk dari {sourceWarehouse?.name}</label>
 
             <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
@@ -187,7 +187,7 @@ export default function MutasiGudangPage() {
                 >
                   <div>
                     <p className="text-xs font-black uppercase text-gray-900">{p.name}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Tersedia: {p.stock} {p.unit}</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Tersedia: {p.stock} {p.unit}</p>
                   </div>
                   {selectedProductId === p.id && <Package className="text-green-600" size={18} />}
                 </div>
@@ -197,12 +197,12 @@ export default function MutasiGudangPage() {
 
           {/* PILIH TUJUAN & JUMLAH */}
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">2. Tujuan & Volume</label>
+            <label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4 block">2. Tujuan & Volume</label>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <select
-                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-green-600"
+                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-black uppercase focus:ring-2 focus:ring-green-600"
                   value={targetWarehouseId}
                   onChange={(e) => setTargetWarehouseId(e.target.value)}
                 >
@@ -216,7 +216,7 @@ export default function MutasiGudangPage() {
                 <input
                   type="number"
                   placeholder="Jumlah"
-                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[10px] font-black uppercase focus:ring-2 focus:ring-green-600"
+                  className="w-full p-4 bg-gray-50 border-none rounded-2xl text-xs font-black uppercase focus:ring-2 focus:ring-green-600"
                   value={amount || ''}
                   onChange={(e) => setAmount(Number(e.target.value))}
                 />
@@ -228,7 +228,7 @@ export default function MutasiGudangPage() {
           <button
             type="submit"
             disabled={submitting || !selectedProductId || !targetWarehouseId}
-            className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.3em] text-[11px] shadow-2xl shadow-gray-200 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
+            className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-gray-200 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
           >
             {submitting ? <Loader2 className="animate-spin" size={20} /> : 'Eksekusi Mutasi'}
           </button>
@@ -236,7 +236,7 @@ export default function MutasiGudangPage() {
 
         <div className="mt-8 flex items-start gap-4 p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
           <AlertTriangle className="text-orange-600 shrink-0" size={20} />
-          <p className="text-[10px] font-bold text-orange-800 uppercase leading-relaxed tracking-wider">
+          <p className="text-xs font-bold text-orange-800 uppercase leading-relaxed tracking-wider">
             Pastikan stok fisik sudah dipindahkan ke unit kendaraan atau kurir sebelum menekan tombol eksekusi. Data inventory akan langsung terupdate.
           </p>
         </div>

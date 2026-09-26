@@ -38,10 +38,10 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-xl border-b border-slate-100">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Waktu</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Klasifikasi</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nilai</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Keterangan</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Waktu</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Klasifikasi</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400 text-right">Nilai</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Keterangan</th>
                 <th className="px-8 py-5 text-center"></th>
               </tr>
             </thead>
@@ -53,7 +53,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
                 return (
                   <tr key={t.id} className="group hover:bg-slate-50/80 transition-all">
                     <td className="px-8 py-5">
-                      <p className="text-[11px] font-black text-slate-700">
+                      <p className="text-xs font-black text-slate-700">
                         {dateObj ? dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                       </p>
                     </td>
@@ -64,7 +64,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
                         ) : (
                           <ArrowDownCircle className="text-rose-500" size={14} />
                         )}
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${isInjection ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className={`text-xs font-black uppercase tracking-widest ${isInjection ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {t.type === 'INJECTION' ? 'MASUK' : 'KELUAR'}
                         </span>
                       </div>
@@ -75,7 +75,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
                       </span>
                     </td>
                     <td className="px-8 py-5">
-                      <span className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                      <span className="text-xs font-bold text-slate-500 leading-relaxed">
                         {t.description}
                       </span>
                     </td>

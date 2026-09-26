@@ -37,11 +37,11 @@ export function MarketplaceLogsTable({ logs }: { logs: MarketplaceLog[] }) {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 sticky top-0 z-10 backdrop-blur-xl border-b border-slate-100">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Waktu</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Profil Toko</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Operasi</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Keterangan</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Waktu</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Profil Toko</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Operasi</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Keterangan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -57,21 +57,21 @@ export function MarketplaceLogsTable({ logs }: { logs: MarketplaceLog[] }) {
                 return (
                   <tr key={lg.id} className="group hover:bg-slate-50/80 transition-all">
                     <td className="px-8 py-5">
-                      <p className="text-[11px] font-black text-slate-700">
+                      <p className="text-xs font-black text-slate-700">
                         {dateObj ? dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                       </p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                      <p className="text-xs font-bold text-slate-400 mt-1 uppercase">
                         {dateObj ? dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}
                       </p>
                     </td>
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{lg.name}</span>
-                        {lg.storeName && <span className="text-[9px] font-black text-purple-600 uppercase mt-0.5 tracking-tighter">{lg.storeName}</span>}
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{lg.name}</span>
+                        {lg.storeName && <span className="text-xs font-black text-purple-600 uppercase mt-0.5 tracking-tighter">{lg.storeName}</span>}
                       </div>
                     </td>
                     <td className="px-8 py-5">
-                       <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${isAdjust ? 'bg-slate-100 text-slate-600' : lg.type === 'WITHDRAWAL' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                       <span className={`text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${isAdjust ? 'bg-slate-100 text-slate-600' : lg.type === 'WITHDRAWAL' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                           {lg.type}
                        </span>
                     </td>
@@ -81,7 +81,7 @@ export function MarketplaceLogsTable({ logs }: { logs: MarketplaceLog[] }) {
                       </span>
                     </td>
                     <td className="px-8 py-5">
-                      <span className="text-[10px] font-medium text-slate-400 leading-relaxed max-w-[200px] block truncate">
+                      <span className="text-xs font-medium text-slate-400 leading-relaxed max-w-[200px] block truncate">
                         {isAdjust ? adjustText : (lg.note || '-')}
                       </span>
                     </td>

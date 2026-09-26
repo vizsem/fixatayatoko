@@ -360,7 +360,7 @@ export default function EditPromotionPage() {
             <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
               Edit Program Promosi
             </h1>
-            <p className="text-[11px] font-bold text-slate-400">
+            <p className="text-xs font-bold text-slate-400">
               Ubah konfigurasi & periksa kalkulasi modal produk (HPP)
             </p>
           </div>
@@ -411,7 +411,7 @@ export default function EditPromotionPage() {
                   </div>
                   <div>
                     <h3 className="text-xs font-black text-slate-900">{t.label}</h3>
-                    <p className="text-[10px] text-slate-400 font-medium line-clamp-2 mt-0.5">{t.desc}</p>
+                    <p className="text-xs text-slate-400 font-medium line-clamp-2 mt-0.5">{t.desc}</p>
                   </div>
                 </button>
               );
@@ -551,7 +551,7 @@ export default function EditPromotionPage() {
                           ? '⚠️ PERHATIAN: Margin Sangat Tipis (< 10%)'
                           : '✅ PROFIT AMAN: Margin Sehat & Terkendali'}
                       </h4>
-                      <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">
                         Simulasi langsung terhadap modal produk di gudang
                       </p>
                     </div>
@@ -569,19 +569,19 @@ export default function EditPromotionPage() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-black/5 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Harga Normal</span>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Normal</span>
                     <strong className="text-slate-800">{idr(marginSimulation.normalPrice)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Modal Produk (HPP)</span>
+                    <span className="text-xs text-slate-400 font-bold block">Modal Produk (HPP)</span>
                     <strong className="text-slate-800">{idr(marginSimulation.modalHPP)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Harga Setelah Diskon</span>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Setelah Diskon</span>
                     <strong className="text-blue-600">{idr(marginSimulation.promoPrice)}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-bold block">Laba Bersih / Pcs</span>
+                    <span className="text-xs text-slate-400 font-bold block">Laba Bersih / Pcs</span>
                     <strong className={marginSimulation.isBoncos ? 'text-rose-600' : 'text-emerald-600'}>
                       {marginSimulation.isBoncos ? '−' : '+'}{idr(marginSimulation.labaBersihPerUnit)}
                     </strong>
@@ -596,7 +596,7 @@ export default function EditPromotionPage() {
                       onChange={(e) => setFormData({ ...formData, allowLossLeader: e.target.checked })}
                       className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
                     />
-                    <span className="text-[11px] font-bold text-rose-800">
+                    <span className="text-xs font-bold text-rose-800">
                       Saya sadar dan mengonfirmasi ini adalah strategi <em>Loss Leader</em> (diskon di bawah modal untuk pancingan pelanggan).
                     </span>
                   </label>
@@ -612,7 +612,7 @@ export default function EditPromotionPage() {
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
               <ShieldCheck size={16} className="text-emerald-600" />Pengaman Finansial (Anti-Boncos)
             </h2>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
               Kunci Profit Toko
             </span>
           </div>
@@ -679,7 +679,7 @@ export default function EditPromotionPage() {
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
             <div>
               <p className="text-xs font-black text-slate-800">Proteksi Anti-Stacking (Cegah Diskon Bertumpuk)</p>
-              <p className="text-[10px] text-slate-400 font-medium">
+              <p className="text-xs text-slate-400 font-medium">
                 Cegah diskon ditumpuk dengan voucher lain atau harga grosir
               </p>
             </div>

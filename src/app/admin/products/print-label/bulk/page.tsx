@@ -64,7 +64,7 @@ function BulkPrintContent() {
             </button>
             <div>
               <h1 className="text-xl font-black uppercase tracking-tighter">Cetak Label Rak Masal</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{products.length} Stiker disiapkan</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{products.length} Stiker disiapkan</p>
             </div>
           </div>
           <button onClick={() => typeof window !== 'undefined' && window.print()} className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800">
@@ -110,7 +110,7 @@ function BulkPrintContent() {
                 <div className="flex flex-col flex-1">
                   {/* Nama Produk */}
                   <div>
-                    <h2 className="text-[9px] font-black leading-tight uppercase line-clamp-2">
+                    <h2 className="text-xs font-black leading-tight uppercase line-clamp-2">
                       {product.name || product.Nama}
                     </h2>
                   </div>

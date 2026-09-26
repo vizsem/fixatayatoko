@@ -128,7 +128,7 @@ export default function AdminCustomers() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 text-sm">{c.name}</h3>
-                      {c.type && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${TYPE_COLOR[c.type] || 'bg-gray-100 text-gray-600'}`}>{c.type}</span>}
+                      {c.type && <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${TYPE_COLOR[c.type] || 'bg-gray-100 text-gray-600'}`}>{c.type}</span>}
                     </div>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -143,7 +143,7 @@ export default function AdminCustomers() {
                 </div>
                 {c._count && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
-                    <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
+                    <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
                       <ShoppingBag size={10} className="inline mr-1" />{c._count.salesOrders} Transaksi
                     </span>
                   </div>

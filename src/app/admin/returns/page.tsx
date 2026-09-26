@@ -182,11 +182,11 @@ export default function ReturnsPage() {
             <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <RefreshCcw size={22} className="text-purple-600" /> Manajemen Retur
             </h1>
-            <p className="text-[10px] uppercase font-bold text-slate-500 mt-1">Kelola pengembalian barang dari Penjualan dan ke Pembelian.</p>
+            <p className="text-xs uppercase font-bold text-slate-500 mt-1">Kelola pengembalian barang dari Penjualan dan ke Pembelian.</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             <Plus size={16} /> Buat Retur Manual
           </button>
@@ -198,7 +198,7 @@ export default function ReturnsPage() {
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">Buat Permintaan Retur</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Input manual barang kembali</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Input manual barang kembali</p>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><XCircle size={24} className="text-slate-300" /></button>
               </div>
@@ -206,7 +206,7 @@ export default function ReturnsPage() {
               <div className="p-8 overflow-y-auto space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tipe Retur</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Tipe Retur</label>
                     <select 
                       value={newReturn.type}
                       onChange={e => setNewReturn({...newReturn, type: e.target.value as any})}
@@ -217,7 +217,7 @@ export default function ReturnsPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">No. Referensi (ID Order/Beli)</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">No. Referensi (ID Order/Beli)</label>
                     <input 
                       type="text"
                       placeholder="Contoh: ORD-123..."
@@ -229,7 +229,7 @@ export default function ReturnsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nama Customer / Supplier</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Nama Customer / Supplier</label>
                   <input 
                     type="text"
                     placeholder="Nama lengkap..."
@@ -240,7 +240,7 @@ export default function ReturnsPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Produk</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Pilih Produk</label>
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
@@ -259,7 +259,7 @@ export default function ReturnsPage() {
                             className="w-full p-4 text-left hover:bg-slate-50 transition-all flex justify-between items-center"
                           >
                             <span className="text-xs font-black text-slate-800 uppercase">{p.name}</span>
-                            <span className="text-[10px] font-bold text-slate-400">Rp {p.price?.toLocaleString()}</span>
+                            <span className="text-xs font-bold text-slate-400">Rp {p.price?.toLocaleString()}</span>
                           </button>
                         ))}
                       </div>
@@ -267,7 +267,7 @@ export default function ReturnsPage() {
                   </div>
 
                   <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-[10px]">
+                    <table className="w-full text-left text-xs">
                       <thead className="bg-slate-100/50">
                         <tr>
                           <th className="px-4 py-3 font-black text-slate-400 uppercase">Produk</th>
@@ -306,7 +306,7 @@ export default function ReturnsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Retur</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Alasan Retur</label>
                   <textarea 
                     placeholder="Contoh: Barang cacat produksi / Salah kirim..."
                     value={newReturn.reason}
@@ -318,7 +318,7 @@ export default function ReturnsPage() {
 
               <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai Retur</p>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Nilai Retur</p>
                   <p className="text-xl font-black text-slate-900">Rp {newReturn.totalValue?.toLocaleString()}</p>
                 </div>
                 <button 
@@ -336,34 +336,34 @@ export default function ReturnsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tanggal</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tipe / Ref</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Pihak</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Alasan</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Total (Rp)</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                <th className="px-3 py-2 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Aksi</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Tanggal</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Tipe / Ref</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Pihak</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Alasan</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Total (Rp)</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest">Status</th>
+                <th className="px-3 py-2 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {returns.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada data retur.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-10 text-center text-xs font-black text-slate-400 uppercase tracking-widest">Tidak ada data retur.</td></tr>
               ) : returns.map(ret => (
                 <tr key={ret.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2 text-[10px] font-bold text-slate-600">{ret.createdAt ? new Date(ret.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '-'}</td>
+                  <td className="px-3 py-2 text-xs font-bold text-slate-600">{ret.createdAt ? new Date(ret.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '-'}</td>
                   <td className="px-3 py-2">
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${ret.type === 'SALES_RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                    <span className={`text-xs font-black uppercase px-2 py-0.5 rounded-lg ${ret.type === 'SALES_RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                       {ret.type === 'SALES_RETURN' ? 'RETUR JUAL' : 'RETUR BELI'}
                     </span>
-                    <Link href={`/admin/orders/${ret.refId}`} className="mt-0.5 text-[10px] font-mono font-bold text-blue-600 block hover:underline">
+                    <Link href={`/admin/orders/${ret.refId}`} className="mt-0.5 text-xs font-mono font-bold text-blue-600 block hover:underline">
                       #{ret.refId.slice(-8)}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-[11px] font-black text-slate-800">{ret.customerOrSupplierName}</td>
-                  <td className="px-3 py-2 text-[10px] font-medium text-slate-600 max-w-xs">{ret.reason}</td>
-                  <td className="px-3 py-2 text-[11px] font-black text-slate-900">Rp {ret.totalValue.toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-2 text-xs font-black text-slate-800">{ret.customerOrSupplierName}</td>
+                  <td className="px-3 py-2 text-xs font-medium text-slate-600 max-w-xs">{ret.reason}</td>
+                  <td className="px-3 py-2 text-xs font-black text-slate-900">Rp {ret.totalValue.toLocaleString('id-ID')}</td>
                   <td className="px-3 py-2">
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${
+                    <span className={`text-xs font-black uppercase px-2 py-0.5 rounded-lg ${
                       ret.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                       ret.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>

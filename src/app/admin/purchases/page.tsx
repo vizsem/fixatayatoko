@@ -307,17 +307,17 @@ export default function AdminPurchases() {
                 <div key={po.id} className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${STATUS_COLOR[po.status]}`}>
+                    <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${STATUS_COLOR[po.status]}`}>
                       {STATUS_LABEL[po.status] || po.status}
                     </span>
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-sm">{po.supplier.name}</p>
-                    <p className="text-[11px] text-gray-400">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
+                    <p className="text-xs text-gray-400">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <div>
-                      <p className="text-[9px] uppercase font-bold text-gray-400">Total Nilai</p>
+                      <p className="text-xs uppercase font-bold text-gray-400">Total Nilai</p>
                       <p className="font-black text-sm text-gray-900">Rp{po.totalAmount.toLocaleString('id-ID')}</p>
                     </div>
                     <div className="flex gap-1.5">
@@ -538,7 +538,7 @@ export default function AdminPurchases() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran *</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran *</label>
                     <select
                       value={form.paymentMethod}
                       onChange={e => {
@@ -564,7 +564,7 @@ export default function AdminPurchases() {
 
                   {(form.paymentStatus === 'HUTANG' || form.paymentMethod === 'TEMPO' || form.paymentMethod === 'KREDIT') && (
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tgl Jatuh Tempo</label>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tgl Jatuh Tempo</label>
                       <input
                         type="date"
                         value={form.dueDate}
@@ -709,25 +709,25 @@ export default function AdminPurchases() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase">Supplier</p>
+                <p className="text-xs text-gray-400 font-bold uppercase">Supplier</p>
                 <p className="font-bold text-gray-800 text-xs truncate">{detailModal.supplier.name}</p>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase">Status PO</p>
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${STATUS_COLOR[detailModal.status]}`}>
+                <p className="text-xs text-gray-400 font-bold uppercase">Status PO</p>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLOR[detailModal.status]}`}>
                   {STATUS_LABEL[detailModal.status] || detailModal.status}
                 </span>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase">Pembayaran</p>
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                <p className="text-xs text-gray-400 font-bold uppercase">Pembayaran</p>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                   detailModal.paymentStatus === 'HUTANG' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                 }`}>
                   {detailModal.paymentStatus || 'LUNAS'}
                 </span>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase">Metode</p>
+                <p className="text-xs text-gray-400 font-bold uppercase">Metode</p>
                 <p className="font-bold text-gray-800 text-xs uppercase">{detailModal.paymentMethod || 'CASH'}</p>
               </div>
             </div>

@@ -78,10 +78,10 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
                 <Printer size={22} />
               </div>
               <h1 className="text-2xl font-black uppercase tracking-tighter">Print Invoice</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Struk thermal siap cetak</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Struk thermal siap cetak</p>
             </div>
           </div>
-          <button onClick={() => typeof window !== 'undefined' && window.print()} className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+          <button onClick={() => typeof window !== 'undefined' && window.print()} className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
             <Printer size={16} /> Cetak
           </button>
         </div>
@@ -92,12 +92,12 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
         {/* Header Struk */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-black tracking-tighter uppercase italic">Ataya Toko</h1>
-          <p className="text-[10px] font-bold uppercase tracking-widest">Official Store Invoice</p>
+          <p className="text-xs font-bold uppercase tracking-widest">Official Store Invoice</p>
           <div className="border-b border-black border-double my-2"></div>
         </div>
 
         {/* Info Order */}
-        <div className="text-[11px] space-y-1 mb-4">
+        <div className="text-xs space-y-1 mb-4">
           <div className="flex justify-between">
             <span>NO:</span>
             <span className="font-black">#ORD-{order.id.substring(0, 8).toUpperCase()}</span>
@@ -117,7 +117,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
         {/* Tabel Barang */}
         <div className="space-y-3 mb-4">
           {order.items?.map((item, idx) => (
-            <div key={idx} className="text-[11px]">
+            <div key={idx} className="text-xs">
               <div className="uppercase font-black">{item.name}</div>
               <div className="flex justify-between">
                 <span>{item.quantity} x {item.price.toLocaleString()}</span>
@@ -130,7 +130,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
         <div className="border-b border-black border-dashed my-4"></div>
 
         {/* Total & Metode */}
-        <div className="space-y-1 text-[11px]">
+        <div className="space-y-1 text-xs">
           <div className="flex justify-between">
             <span>Subtotal:</span>
             <span>Rp{(order.total - (order.deliveryAddress ? 0 : 0)).toLocaleString()}</span> 
@@ -145,11 +145,11 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
                <span className="font-black uppercase">BELUM LUNAS (TEMPO)</span>
              </div>
           )}
-          <div className="flex justify-between uppercase text-[10px]">
+          <div className="flex justify-between uppercase text-xs">
             <span>BAYAR:</span>
             <span>{order.paymentMethod || '-'}</span>
           </div>
-          <div className="flex justify-between uppercase text-[10px]">
+          <div className="flex justify-between uppercase text-xs">
             <span>KURIR:</span>
             {/* Perbaikan Error: Optional Chaining digunakan di sini */}
             <span>{order.deliveryMethod?.replace('_', ' ') || '-'}</span>
@@ -159,16 +159,16 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
         {/* Alamat Jika Ada */}
         {order.deliveryAddress && (
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-[9px] font-bold uppercase text-gray-400 mb-1">Alamat:</p>
-            <p className="text-[10px] leading-tight uppercase italic">{order.deliveryAddress}</p>
+            <p className="text-xs font-bold uppercase text-gray-400 mb-1">Alamat:</p>
+            <p className="text-xs leading-tight uppercase italic">{order.deliveryAddress}</p>
           </div>
         )}
 
         {/* Footer Struk */}
         <div className="text-center mt-10 space-y-1">
           <div className="border-b border-black border-double mb-2"></div>
-          <p className="text-[10px] font-black uppercase italic tracking-tighter">Terima Kasih</p>
-          <p className="text-[8px] font-bold text-gray-400">Barang yang sudah dibeli tidak dapat ditukar</p>
+          <p className="text-xs font-black uppercase italic tracking-tighter">Terima Kasih</p>
+          <p className="text-xs font-bold text-gray-400">Barang yang sudah dibeli tidak dapat ditukar</p>
         </div>
       </div>
 
@@ -176,7 +176,7 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
       <div className="fixed bottom-6 right-6 no-print">
         <button
           onClick={() => router.back()}
-          className="bg-black text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-emerald-600 transition-all"
+          className="bg-black text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-2xl hover:bg-emerald-600 transition-all"
         >
           Kembali
         </button>

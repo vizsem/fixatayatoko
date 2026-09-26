@@ -221,7 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         <div className="p-4 border-b border-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-green-600 rounded-lg flex items-center justify-center text-white font-black text-[10px]">AT</div>
+            <div className="w-7 h-7 bg-green-600 rounded-lg flex items-center justify-center text-white font-black text-xs">AT</div>
             <span className="font-black text-gray-800 tracking-tighter text-sm">AtayaToko Admin</span>
           </div>
           <button className="md:hidden p-2 text-gray-400" onClick={() => setIsOpen(false)}>
@@ -231,7 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="p-3 space-y-5 overflow-y-auto h-[calc(100vh-80px)]">
           {menuItems.map((group, idx) => (
             <div key={idx}>
-              <p className="text-[10px] font-bold text-gray-400 tracking-widest mb-3 px-3">{group.group}</p>
+              <p className="text-xs font-bold text-gray-400 tracking-widest mb-3 px-3">{group.group}</p>
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const isActive = pathname === item.href;
@@ -248,7 +248,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <Icon size={16} strokeWidth={isActive ? 3 : 2} />
                       <span className="flex-1">{item.name}</span>
                       {(badge ?? 0) > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                           {badge}
                         </span>
                       )}
@@ -277,17 +277,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <span className="text-gray-800">{t.productName}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-black ${isIn ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-xs font-black ${isIn ? 'text-green-600' : 'text-red-600'}`}>
                         {isIn ? `+${t.change}` : t.change}
                       </span>
-                      <span className="text-[9px] font-bold text-gray-400">unit</span>
-                      <span className="text-[9px] font-bold text-gray-400">•</span>
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500">
+                      <span className="text-xs font-bold text-gray-400">unit</span>
+                      <span className="text-xs font-bold text-gray-400">•</span>
+                      <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
                         <Warehouse size={12} className="text-gray-300" />
                         {t.warehouseName}
                       </div>
                     </div>
-                    <div className="text-[8px] font-bold text-gray-400">
+                    <div className="text-xs font-bold text-gray-400">
                       {t.type || 'STOCK'}
                       {t.adminEmail ? ` • ${t.adminEmail.split('@')[0]}` : ''}
                     </div>

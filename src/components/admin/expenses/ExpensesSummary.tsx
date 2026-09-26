@@ -44,7 +44,7 @@ function SummaryCard({ label, val, icon: Icon, color, bg }: any) {
         <div className={`p-2.5 ${bg} ${color} rounded-2xl`}>
           <Icon size={20} />
         </div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+        <span className="text-xs font-black uppercase tracking-widest text-slate-400">{label}</span>
       </div>
       <h3 className="text-2xl font-black text-slate-800 tracking-tight relative z-10">
         {val}

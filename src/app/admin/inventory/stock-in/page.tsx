@@ -229,7 +229,7 @@ function StockInContent() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Stok Masuk</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tambah stok dari supplier</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Tambah stok dari supplier</p>
           </div>
         </div>
       </div>
@@ -320,7 +320,7 @@ function StockInContent() {
             />
           </div>
         </div>
-        <div className="mb-6 text-[10px] font-black text-gray-500 uppercase">
+        <div className="mb-6 text-xs font-black text-gray-500 uppercase">
           {(() => {
             const prod = products.find(p => p.id === formData.productId);
             const contains = prod?.units?.find(u => u.code === formData.unitCode)?.contains || 1;

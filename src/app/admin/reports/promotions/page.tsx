@@ -185,7 +185,7 @@ export default function PromotionsReport() {
             <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
               Laporan Efektivitas & ROI Promosi
             </h1>
-            <p className="text-[11px] font-bold text-slate-400">
+            <p className="text-xs font-bold text-slate-400">
               Evaluasi perbandingan diskon yang dikeluarkan vs omset pesanan riil
             </p>
           </div>
@@ -203,32 +203,32 @@ export default function PromotionsReport() {
       {/* KPI METRIC CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Total Diskon Diberikan</p>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Total Diskon Diberikan</p>
           <p className="text-xl font-black text-rose-600">{idr(totals.totalDiscountGiven)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1">{totals.totalUsed} kali pemakaian</p>
+          <p className="text-xs font-bold text-slate-400 mt-1">{totals.totalUsed} kali pemakaian</p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Omset yang Dihasilkan</p>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Omset yang Dihasilkan</p>
           <p className="text-xl font-black text-emerald-600">{idr(totals.totalRev)}</p>
-          <p className="text-[10px] font-bold text-emerald-600/80 mt-1">Dari pesanan promo</p>
+          <p className="text-xs font-bold text-emerald-600/80 mt-1">Dari pesanan promo</p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Efisiensi Multiplier (ROI)</p>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Efisiensi Multiplier (ROI)</p>
           <p className="text-xl font-black text-blue-600">
             {totals.roiMultiplier > 0 ? `${totals.roiMultiplier.toFixed(1)}x` : '—'}
           </p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1">Setiap Rp1 diskon hasilkan omset</p>
+          <p className="text-xs font-bold text-slate-400 mt-1">Setiap Rp1 diskon hasilkan omset</p>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Status Keuangan Promo</p>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Status Keuangan Promo</p>
           <div className="flex items-center gap-1.5 mt-1">
             <ShieldCheck className="text-emerald-600" size={18} />
             <span className="text-sm font-black text-emerald-700">Terkendali</span>
           </div>
-          <p className="text-[10px] font-bold text-slate-400 mt-1">Dilindungi Guardrail</p>
+          <p className="text-xs font-bold text-slate-400 mt-1">Dilindungi Guardrail</p>
         </div>
       </div>
 
@@ -244,7 +244,7 @@ export default function PromotionsReport() {
             <thead className="bg-slate-50/70">
               <tr>
                 {['Nama Promosi', 'Model', 'Diskon', 'Penggunaan', 'Total Diskon', 'Omset Dihasilkan', 'Efisiensi (ROI)', 'Pengaman'].map((h) => (
-                  <th key={h} className="px-5 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <th key={h} className="px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400">
                     {h}
                   </th>
                 ))}
@@ -266,7 +266,7 @@ export default function PromotionsReport() {
                         <span className="text-xs font-black text-slate-900">{p.name}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-slate-100 text-slate-700">
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-700">
                           {p.type}
                         </span>
                       </td>
@@ -278,7 +278,7 @@ export default function PromotionsReport() {
                       <td className="px-5 py-3.5">
                         <span className="text-xs font-black text-slate-800">{p.usageCount}x</span>
                         {p.quota ? (
-                          <span className="text-[10px] text-slate-400 ml-1">/ {p.quota}</span>
+                          <span className="text-xs text-slate-400 ml-1">/ {p.quota}</span>
                         ) : null}
                       </td>
                       <td className="px-5 py-3.5">
@@ -289,7 +289,7 @@ export default function PromotionsReport() {
                       </td>
                       <td className="px-5 py-3.5">
                         {roi > 0 ? (
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${
                             roi >= 5 ? 'bg-emerald-50 text-emerald-700' : roi >= 2 ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
                           }`}>
                             {roi.toFixed(1)}x ROI
@@ -299,7 +299,7 @@ export default function PromotionsReport() {
                         )}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="flex flex-col gap-0.5 text-[9px] font-bold text-slate-500">
+                        <div className="flex flex-col gap-0.5 text-xs font-bold text-slate-500">
                           {p.minPurchase ? <span>Min: {idr(p.minPurchase)}</span> : null}
                           {p.maxDiscount ? <span>Cap: {idr(p.maxDiscount)}</span> : null}
                           {!p.minPurchase && !p.maxDiscount && <span className="text-slate-300">Tanpa Batas</span>}

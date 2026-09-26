@@ -1425,7 +1425,7 @@ export default function EmployeesPage() {
                  </div>
                  <div>
                     <h1 className="text-lg font-black text-gray-800 tracking-tighter leading-none">Human Capital</h1>
-                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mt-0.5">Staff & Payroll Engine</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400 mt-0.5">Staff & Payroll Engine</p>
                  </div>
               </div>
 
@@ -1435,14 +1435,14 @@ export default function EmployeesPage() {
                   <input
                     type="text"
                     placeholder="Search Staff..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border-none rounded-lg text-[10px] font-bold outline-none"
+                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border-none rounded-lg text-xs font-bold outline-none"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <button
                   onClick={() => { resetForm(); setIsModalOpen(true); }}
-                  className="bg-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm transition-transform active:scale-95"
+                  className="bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-sm transition-transform active:scale-95"
                 >
                   <Plus size={12} /> NEW STAFF
                 </button>
@@ -1454,7 +1454,7 @@ export default function EmployeesPage() {
       <main className="max-w-7xl mx-auto px-2 py-3 md:px-4 md:py-4">
         {!authorized ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Verifying session...</p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Verifying session...</p>
           </div>
         ) : loading ? (
           <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-600" size={20} /></div>
@@ -1466,7 +1466,7 @@ export default function EmployeesPage() {
                   <button
                     key={t.key}
                     onClick={() => setActiveTab(t.key)}
-                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
                       activeTab === t.key ? 'bg-black text-white shadow-sm' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
                     }`}
                   >
@@ -1482,17 +1482,17 @@ export default function EmployeesPage() {
                   <table className="w-full text-left min-w-[640px]">
                     <thead className="bg-gray-50/50 border-b border-gray-100">
                       <tr>
-                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Profile</th>
-                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Position</th>
-                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Schedule & Auth</th>
-                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400">Salary & Attendance</th>
-                        <th className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Profile</th>
+                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Position</th>
+                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Schedule & Auth</th>
+                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Salary & Attendance</th>
+                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filteredEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-3 py-8 text-center text-gray-300 text-[9px] font-black uppercase tracking-widest">
+                          <td colSpan={5} className="px-3 py-8 text-center text-gray-300 text-xs font-black uppercase tracking-widest">
                             No matching records
                           </td>
                         </tr>
@@ -1501,27 +1501,27 @@ export default function EmployeesPage() {
                           <tr key={emp.id} className="group hover:bg-gray-50/50 transition-colors">
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-black text-[9px] border border-blue-100 shrink-0">
+                                <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-black text-xs border border-blue-100 shrink-0">
                                   {emp.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[9px] font-black text-gray-800 uppercase leading-none truncate">{emp.name}</p>
-                                  <p className="text-[8px] text-gray-400 font-bold mt-0.5 tracking-tighter truncate">{emp.phone || '-'}</p>
+                                  <p className="text-xs font-black text-gray-800 uppercase leading-none truncate">{emp.name}</p>
+                                  <p className="text-xs text-gray-400 font-bold mt-0.5 tracking-tighter truncate">{emp.phone || '-'}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="px-3 py-2">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-indigo-100 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-tighter">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-indigo-100 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-tighter">
                                 <ShieldCheck size={8} /> {emp.role}
                               </span>
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-500 uppercase tracking-tighter">
+                                <div className="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-tighter">
                                   <Clock size={10} className="text-gray-300" />
                                   {emp.workSchedule}
                                 </div>
-                                <span className={`inline-flex self-start px-1 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${
+                                <span className={`inline-flex self-start px-1 py-0.5 rounded text-xs font-black uppercase tracking-widest ${
                                   emp.status === 'AKTIF'
                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                     : 'bg-rose-50 text-rose-600 border border-rose-100'
@@ -1532,11 +1532,11 @@ export default function EmployeesPage() {
                             </td>
                             <td className="px-3 py-2">
                               <div className="space-y-0.5">
-                                <p className="text-[9px] font-black text-gray-800 leading-none">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                                <p className="text-xs font-black text-gray-800 leading-none">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
                                 {emp.dailySalary > 0 && (
-                                  <p className="text-[7px] font-black text-indigo-600 uppercase tracking-tighter leading-none">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
+                                  <p className="text-xs font-black text-indigo-600 uppercase tracking-tighter leading-none">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
                                 )}
-                                <div className="flex items-center gap-1 text-[8px] font-bold text-gray-400 uppercase tracking-tighter">
+                                <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-tighter">
                                   <CheckCircle2 size={8} className="text-emerald-500" />
                                   Att: {emp.totalAttendance || 0}d
                                 </div>
@@ -1590,8 +1590,8 @@ export default function EmployeesPage() {
                       <Calendar size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Shift Manager</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Daily Rostering & Rules</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Shift Manager</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Daily Rostering & Rules</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1599,12 +1599,12 @@ export default function EmployeesPage() {
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-[10px] font-black outline-none"
+                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => { fetchShiftTemplates(); fetchShiftAssignmentsByDate(selectedDate); }}
-                      className="px-4 py-2 rounded-xl text-[9px] font-black bg-black text-white active:scale-95"
+                      className="px-4 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
                     >
                       REFRESH
                     </button>
@@ -1618,11 +1618,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Assigned Shift</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Window</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Grace</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Assigned Shift</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Window</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center">Grace</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -1631,14 +1631,14 @@ export default function EmployeesPage() {
                           return (
                             <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-3 py-2">
-                                <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{emp.name}</p>
-                                <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
+                                <p className="text-xs font-black text-gray-800 uppercase leading-none">{emp.name}</p>
+                                <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
                               </td>
                               <td className="px-3 py-2">
                                 <select
                                   value={s.shiftId}
                                   onChange={(e) => upsertShiftAssignment(emp, selectedDate, e.target.value)}
-                                  className="bg-gray-50 border-none rounded-lg px-3 py-1.5 text-[10px] font-black outline-none w-32"
+                                  className="bg-gray-50 border-none rounded-lg px-3 py-1.5 text-xs font-black outline-none w-32"
                                 >
                                   <option value="DEFAULT">Default</option>
                                   {shiftTemplates.map((t) => (
@@ -1646,10 +1646,10 @@ export default function EmployeesPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase leading-none">
+                              <td className="px-3 py-2 text-xs font-black text-gray-700 uppercase leading-none">
                                 {s.startTime} - {s.endTime}
                               </td>
-                              <td className="px-3 py-2 text-center text-[10px] font-black text-gray-500 uppercase leading-none truncate">
+                              <td className="px-3 py-2 text-center text-xs font-black text-gray-500 uppercase leading-none truncate">
                                 {Number(s.graceMinutes || 0)} min
                               </td>
                               <td className="px-3 py-2">
@@ -1657,7 +1657,7 @@ export default function EmployeesPage() {
                                   <button
                                     type="button"
                                     onClick={() => upsertShiftAssignment(emp, selectedDate, s.shiftId)}
-                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95 shadow-sm shadow-emerald-200"
+                                    className="px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95 shadow-sm shadow-emerald-200"
                                   >
                                     UPDATE
                                   </button>
@@ -1681,8 +1681,8 @@ export default function EmployeesPage() {
                       <Calendar size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Daily Presence</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Auditing Logs & Alpha Penalties</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Daily Presence</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Auditing Logs & Alpha Penalties</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1690,19 +1690,19 @@ export default function EmployeesPage() {
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-[10px] font-black outline-none"
+                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
                     />
                     <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Alpha Penalty</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-gray-400">Alpha Penalty</span>
                       <input
                         type="number"
                         min={0}
                         max={100}
                         value={alphaDeductionPercent}
                         onChange={(e) => setAlphaDeductionPercent(Number(e.target.value || 0))}
-                        className="w-10 bg-transparent border-none text-[10px] font-black outline-none text-center"
+                        className="w-10 bg-transparent border-none text-xs font-black outline-none text-center"
                       />
-                      <span className="text-[9px] font-black text-gray-300">%</span>
+                      <span className="text-xs font-black text-gray-300">%</span>
                     </div>
                   </div>
                 </div>
@@ -1714,11 +1714,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff Profile</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Log Status</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-in</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Check-out</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Staff Profile</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Log Status</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Check-in</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Check-out</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -1731,17 +1731,17 @@ export default function EmployeesPage() {
                               <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
                                 <td className="px-3 py-2">
                                   <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black text-[10px] border border-blue-100">
+                                    <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black text-xs border border-blue-100">
                                       {emp.name.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                      <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{emp.name}</p>
-                                      <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
+                                      <p className="text-xs font-black text-gray-800 uppercase leading-none">{emp.name}</p>
+                                      <p className="text-xs text-gray-400 font-bold mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
                                     </div>
                                   </div>
                                 </td>
                                 <td className="px-3 py-2">
-                                  <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${
+                                  <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-widest border ${
                                     status === 'HADIR'
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                       : status === 'ALPHA'
@@ -1755,10 +1755,10 @@ export default function EmployeesPage() {
                                     {status}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase">
+                                <td className="px-3 py-2 text-xs font-black text-gray-700 uppercase">
                                   {rec?.checkInAt ? new Date(rec.checkInAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                 </td>
-                                <td className="px-3 py-2 text-[10px] font-black text-gray-700 uppercase">
+                                <td className="px-3 py-2 text-xs font-black text-gray-700 uppercase">
                                   {rec?.checkOutAt ? new Date(rec.checkOutAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                 </td>
                                 <td className="px-3 py-2">
@@ -1766,14 +1766,14 @@ export default function EmployeesPage() {
                                     <button
                                       type="button"
                                       onClick={() => markAttendance(emp, 'HADIR', selectedDate)}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95"
                                     >
                                       IN
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => checkOutAttendance(emp, selectedDate)}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest bg-black text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black uppercase tracking-widest bg-black text-white active:scale-95"
                                     >
                                       OUT
                                     </button>
@@ -1781,21 +1781,21 @@ export default function EmployeesPage() {
                                     <button
                                       type="button"
                                       onClick={() => markAttendance(emp, 'ALPHA', selectedDate)}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest bg-rose-600 text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black uppercase tracking-widest bg-rose-600 text-white active:scale-95"
                                     >
                                       ALP
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => markAttendance(emp, 'CUTI', selectedDate)}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest bg-indigo-600 text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black uppercase tracking-widest bg-indigo-600 text-white active:scale-95"
                                     >
                                       LV
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => markAttendance(emp, 'SAKIT', selectedDate)}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest bg-amber-600 text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black uppercase tracking-widest bg-amber-600 text-white active:scale-95"
                                     >
                                       SK
                                     </button>
@@ -1819,8 +1819,8 @@ export default function EmployeesPage() {
                       <FileText size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Payroll Engine</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Monthly Slips & Adjustments</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Payroll Engine</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Monthly Slips & Adjustments</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1828,9 +1828,9 @@ export default function EmployeesPage() {
                       type="month"
                       value={payrollMonth}
                       onChange={(e) => setPayrollMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-[10px] font-black outline-none"
+                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
                     />
-                    <span className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                    <span className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border ${
                       payrollRun?.status === 'APPROVED'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         : payrollRun?.status === 'PAID'
@@ -1843,19 +1843,19 @@ export default function EmployeesPage() {
                     </span>
                     <label className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 cursor-pointer active:scale-95">
                       <input type="checkbox" checked={includeTHR} onChange={(e) => setIncludeTHR(e.target.checked)} className="rounded border-gray-300 text-black focus:ring-black" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">THR</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-gray-400">THR</span>
                     </label>
                     <button
                       type="button"
                       onClick={savePayrollRunOptions}
-                      className="px-3 py-2 rounded-xl text-[9px] font-black bg-black text-white active:scale-95"
+                      className="px-3 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
                     >
                       SAVE
                     </button>
                     <button
                       type="button"
                       onClick={downloadBankExportCsv}
-                      className="px-3 py-2 rounded-xl text-[9px] font-black bg-emerald-600 text-white active:scale-95 flex items-center gap-1.5"
+                      className="px-3 py-2 rounded-xl text-xs font-black bg-emerald-600 text-white active:scale-95 flex items-center gap-1.5"
                     >
                       <Download size={14} /> EXPORT
                     </button>
@@ -1864,21 +1864,21 @@ export default function EmployeesPage() {
                         <button
                           type="button"
                           onClick={() => setPayrollRunStatus('SUBMITTED')}
-                          className="px-3 py-2 rounded-xl text-[9px] font-black bg-amber-500 text-white active:scale-95 shadow-sm"
+                          className="px-3 py-2 rounded-xl text-xs font-black bg-amber-500 text-white active:scale-95 shadow-sm"
                         >
                           SUBMIT
                         </button>
                         <button
                           type="button"
                           onClick={() => setPayrollRunStatus('APPROVED')}
-                          className="px-3 py-2 rounded-xl text-[9px] font-black bg-slate-900 text-white active:scale-95 shadow-sm"
+                          className="px-3 py-2 rounded-xl text-xs font-black bg-slate-900 text-white active:scale-95 shadow-sm"
                         >
                           APPROVE
                         </button>
                         <button
                           type="button"
                           onClick={() => setPayrollRunStatus('PAID')}
-                          className="px-3 py-2 rounded-xl text-[9px] font-black bg-indigo-600 text-white active:scale-95 shadow-sm"
+                          className="px-3 py-2 rounded-xl text-xs font-black bg-indigo-600 text-white active:scale-95 shadow-sm"
                         >
                           PAID
                         </button>
@@ -1894,48 +1894,48 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[1400px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Base</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Att</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-rose-400">Alp</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-indigo-400">Lv</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center text-amber-400">Lt</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">OT Pay</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">BPJS</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">PPh21</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Loan</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THR</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">KPI</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Allow Adj</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Ded Adj</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">THP</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Slip</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Base</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center">Att</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center text-rose-400">Alp</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center text-indigo-400">Lv</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center text-amber-400">Lt</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">OT Pay</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">BPJS</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">PPh21</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Loan</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">THR</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">KPI</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Allow Adj</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Ded Adj</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">THP</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Slip</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {payrollRows.length === 0 ? (
                           <tr>
-                            <td colSpan={16} className="px-5 py-12 text-center text-gray-300 text-[10px] font-black uppercase tracking-widest">No active staff records</td>
+                            <td colSpan={16} className="px-5 py-12 text-center text-gray-300 text-xs font-black uppercase tracking-widest">No active staff records</td>
                           </tr>
                         ) : (
                           payrollRows.map((r: any) => (
                             <tr key={r.employeeId} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-3 py-2">
-                                <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
-                                <p className="text-[8px] text-gray-400 font-bold mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
+                                <p className="text-xs font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
+                                <p className="text-xs text-gray-400 font-bold mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
                               </td>
                               <td className="px-3 py-2 text-right">
-                                <p className="text-[10px] font-black text-gray-700 leading-none">Rp {Number(r.baseSalary || 0).toLocaleString('id-ID')}</p>
+                                <p className="text-xs font-black text-gray-700 leading-none">Rp {Number(r.baseSalary || 0).toLocaleString('id-ID')}</p>
                               </td>
-                              <td className="px-3 py-2 text-center text-[10px] font-black text-gray-600">{r.attendanceDays}d</td>
-                              <td className="px-3 py-2 text-center text-[10px] font-black text-rose-600">{r.alphaDays}d</td>
-                              <td className="px-3 py-2 text-center text-[9px] font-black text-indigo-600">{r.paidLeaveDays}/{r.unpaidLeaveDays}</td>
-                              <td className="px-3 py-2 text-center text-[10px] font-black text-amber-600">{r.lateMinutes}m</td>
-                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-700">Rp {Number(r.overtimePay || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-center text-xs font-black text-gray-600">{r.attendanceDays}d</td>
+                              <td className="px-3 py-2 text-center text-xs font-black text-rose-600">{r.alphaDays}d</td>
+                              <td className="px-3 py-2 text-center text-xs font-black text-indigo-600">{r.paidLeaveDays}/{r.unpaidLeaveDays}</td>
+                              <td className="px-3 py-2 text-center text-xs font-black text-amber-600">{r.lateMinutes}m</td>
+                              <td className="px-3 py-2 text-right text-xs font-black text-gray-700">Rp {Number(r.overtimePay || 0).toLocaleString('id-ID')}</td>
                               <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
-                                  className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
+                                  className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-right outline-none"
                                   value={payrollAdjustments[r.employeeId]?.bpjsEmployee ?? r.bpjsEmployee}
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { bpjsEmployee: Number(e.target.value || 0) })}
                                 />
@@ -1943,18 +1943,18 @@ export default function EmployeesPage() {
                               <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
-                                  className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
+                                  className="w-16 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-right outline-none"
                                   value={payrollAdjustments[r.employeeId]?.pph21 ?? r.pph21}
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { pph21: Number(e.target.value || 0) })}
                                 />
                               </td>
-                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-600">Rp {Number(r.loanDeduction || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-3 py-2 text-right text-[10px] font-black text-indigo-600">Rp {Number(r.thr || 0).toLocaleString('id-ID')}</td>
-                              <td className="px-3 py-2 text-right text-[10px] font-black text-emerald-600">Rp {Number(r.kpiBonus || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right text-xs font-black text-gray-600">Rp {Number(r.loanDeduction || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right text-xs font-black text-indigo-600">Rp {Number(r.thr || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-right text-xs font-black text-emerald-600">Rp {Number(r.kpiBonus || 0).toLocaleString('id-ID')}</td>
                               <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
-                                  className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
+                                  className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-right outline-none"
                                   value={payrollAdjustments[r.employeeId]?.allowances ?? 0}
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { allowances: Number(e.target.value || 0) })}
                                 />
@@ -1962,13 +1962,13 @@ export default function EmployeesPage() {
                               <td className="px-3 py-2 text-right">
                                 <input
                                   type="number"
-                                  className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-[9px] font-black text-right outline-none"
+                                  className="w-20 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-right outline-none"
                                   value={payrollAdjustments[r.employeeId]?.deductions ?? 0}
                                   onChange={(e) => savePayrollAdjustment(r.employeeId, { deductions: Number(e.target.value || 0) })}
                                 />
                               </td>
                               <td className="px-3 py-2 text-right">
-                                <p className="text-[11px] font-black text-gray-900">Rp {Number(r.takeHomePay || 0).toLocaleString('id-ID')}</p>
+                                <p className="text-xs font-black text-gray-900">Rp {Number(r.takeHomePay || 0).toLocaleString('id-ID')}</p>
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center justify-end gap-1">
@@ -2007,14 +2007,14 @@ export default function EmployeesPage() {
                       <Calendar size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Leave Board</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Approvals & Archive</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Leave Board</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Approvals & Archive</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setLeaveModalOpen(true)}
-                    className="bg-black text-white px-3 py-2 rounded-xl text-[9px] font-black active:scale-95 flex items-center gap-1.5"
+                    className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
                   >
                     <Plus size={14} /> NEW REQUEST
                   </button>
@@ -2027,31 +2027,31 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Type</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Timeline</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Paid</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Status</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Type</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Timeline</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Paid</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Status</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {leaveRequests.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="px-5 py-12 text-center text-gray-300 text-[10px] font-black uppercase tracking-widest">No pending requests</td>
+                            <td colSpan={6} className="px-5 py-12 text-center text-gray-300 text-xs font-black uppercase tracking-widest">No pending requests</td>
                           </tr>
                         ) : (
                           leaveRequests.map((r) => (
                             <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-3 py-2">
-                                <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
-                                <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
+                                <p className="text-xs font-black text-gray-800 uppercase leading-none">{r.employeeName}</p>
+                                <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{r.employeeId}</p>
                               </td>
-                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{r.type}</td>
-                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{r.startDate} → {r.endDate}</td>
-                              <td className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase leading-none">{r.paid ? 'YES' : 'NO'}</td>
+                              <td className="px-3 py-2 text-xs font-black text-gray-600 uppercase leading-none">{r.type}</td>
+                              <td className="px-3 py-2 text-xs font-black text-gray-600 uppercase leading-none">{r.startDate} → {r.endDate}</td>
+                              <td className="px-3 py-2 text-xs font-black text-gray-400 uppercase leading-none">{r.paid ? 'YES' : 'NO'}</td>
                               <td className="px-3 py-2">
-                                <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${
+                                <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-widest border ${
                                   r.status === 'APPROVED'
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                     : r.status === 'REJECTED'
@@ -2068,14 +2068,14 @@ export default function EmployeesPage() {
                                       <button
                                         type="button"
                                         onClick={() => setLeaveStatus(r, 'APPROVED')}
-                                        className="px-2 py-1 rounded-md text-[8px] font-black bg-emerald-600 text-white active:scale-95"
+                                        className="px-2 py-1 rounded-md text-xs font-black bg-emerald-600 text-white active:scale-95"
                                       >
                                         ALLOW
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => setLeaveStatus(r, 'REJECTED')}
-                                        className="px-2 py-1 rounded-md text-[8px] font-black bg-rose-600 text-white active:scale-95"
+                                        className="px-2 py-1 rounded-md text-xs font-black bg-rose-600 text-white active:scale-95"
                                       >
                                         DENY
                                       </button>
@@ -2084,7 +2084,7 @@ export default function EmployeesPage() {
                                     <button
                                       type="button"
                                       onClick={() => setLeaveStatus(r, 'PENDING')}
-                                      className="px-2 py-1 rounded-md text-[8px] font-black bg-black text-white active:scale-95"
+                                      className="px-2 py-1 rounded-md text-xs font-black bg-black text-white active:scale-95"
                                     >
                                       RESET
                                     </button>
@@ -2109,8 +2109,8 @@ export default function EmployeesPage() {
                       <Target size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Performance Score</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Monthly KPIs & Bonuses</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Performance Score</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Monthly KPIs & Bonuses</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2118,12 +2118,12 @@ export default function EmployeesPage() {
                       type="month"
                       value={kpiMonth}
                       onChange={(e) => setKpiMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-[10px] font-black outline-none"
+                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => fetchKpiInputs(kpiMonth)}
-                      className="px-3 py-2 rounded-xl text-[9px] font-black bg-black text-white active:scale-95"
+                      className="px-3 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
                     >
                       REFRESH
                     </button>
@@ -2137,11 +2137,11 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Score</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Bonus Amt</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Internal Notes</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Staff</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-center">Score</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Bonus Amt</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Internal Notes</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -2150,8 +2150,8 @@ export default function EmployeesPage() {
                           return (
                             <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-3 py-2">
-                                <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{emp.name}</p>
-                                <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
+                                <p className="text-xs font-black text-gray-800 uppercase leading-none">{emp.name}</p>
+                                <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{emp.role}</p>
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <input
@@ -2160,7 +2160,7 @@ export default function EmployeesPage() {
                                   max={100}
                                   value={row.score}
                                   onChange={(e) => setKpiScores((p) => ({ ...p, [emp.id]: { ...row, score: Number(e.target.value || 0) } }))}
-                                  className="w-14 bg-gray-50 border-none rounded-lg px-2 py-1 text-[10px] font-black text-center outline-none"
+                                  className="w-14 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-center outline-none"
                                 />
                               </td>
                               <td className="px-3 py-2 text-right">
@@ -2169,14 +2169,14 @@ export default function EmployeesPage() {
                                   min={0}
                                   value={row.bonusAmount}
                                   onChange={(e) => setKpiScores((p) => ({ ...p, [emp.id]: { ...row, bonusAmount: Number(e.target.value || 0) } }))}
-                                  className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-[10px] font-black text-right outline-none"
+                                  className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black text-right outline-none"
                                 />
                               </td>
                               <td className="px-3 py-2">
                                 <input
                                   value={row.notes}
                                   onChange={(e) => setKpiScores((p) => ({ ...p, [emp.id]: { ...row, notes: e.target.value } }))}
-                                  className="w-full bg-gray-50 border-none rounded-lg px-3 py-1.5 text-[10px] font-black outline-none placeholder:text-gray-200"
+                                  className="w-full bg-gray-50 border-none rounded-lg px-3 py-1.5 text-xs font-black outline-none placeholder:text-gray-200"
                                   placeholder="AUDIT LOG"
                                 />
                               </td>
@@ -2185,7 +2185,7 @@ export default function EmployeesPage() {
                                   <button
                                     type="button"
                                     onClick={() => saveKpi(emp)}
-                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95"
+                                    className="px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95"
                                   >
                                     UPDATE
                                   </button>
@@ -2209,14 +2209,14 @@ export default function EmployeesPage() {
                       <Briefcase size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Talent Pipeline</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Candidates & Hiring Stages</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Talent Pipeline</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Candidates & Hiring Stages</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setCandidateModalOpen(true)}
-                    className="bg-black text-white px-3 py-2 rounded-xl text-[9px] font-black active:scale-95 flex items-center gap-1.5"
+                    className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
                   >
                     <Plus size={14} /> ADD CANDIDATE
                   </button>
@@ -2229,32 +2229,32 @@ export default function EmployeesPage() {
                     <table className="w-full text-left border-collapse min-w-[820px]">
                       <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Candidate</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Position</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Expectation</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Status Stage</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Candidate</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Position</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Expectation</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Status Stage</th>
+                          <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {candidates.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-5 py-12 text-center text-gray-300 text-[10px] font-black uppercase tracking-widest">No active candidates</td>
+                            <td colSpan={5} className="px-5 py-12 text-center text-gray-300 text-xs font-black uppercase tracking-widest">No active candidates</td>
                           </tr>
                         ) : (
                           candidates.map((c) => (
                             <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-3 py-2">
-                                <p className="text-[11px] font-black text-gray-800 uppercase leading-none">{c.name}</p>
-                                <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter truncate max-w-[200px]">{c.phone || '-'} • {c.email || '-'}</p>
+                                <p className="text-xs font-black text-gray-800 uppercase leading-none">{c.name}</p>
+                                <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter truncate max-w-[200px]">{c.phone || '-'} • {c.email || '-'}</p>
                               </td>
-                              <td className="px-3 py-2 text-[10px] font-black text-gray-600 uppercase leading-none">{c.position || '-'}</td>
-                              <td className="px-3 py-2 text-right text-[10px] font-black text-gray-700">Rp {Number(c.expectedSalary || 0).toLocaleString('id-ID')}</td>
+                              <td className="px-3 py-2 text-xs font-black text-gray-600 uppercase leading-none">{c.position || '-'}</td>
+                              <td className="px-3 py-2 text-right text-xs font-black text-gray-700">Rp {Number(c.expectedSalary || 0).toLocaleString('id-ID')}</td>
                               <td className="px-3 py-2">
                                 <select
                                   value={c.stage}
                                   onChange={(e) => updateCandidateStage(c, e.target.value as CandidateStage)}
-                                  className="bg-gray-50 border-none rounded-lg px-2 py-1.5 text-[9px] font-black outline-none w-28 uppercase"
+                                  className="bg-gray-50 border-none rounded-lg px-2 py-1.5 text-xs font-black outline-none w-28 uppercase"
                                 >
                                   <option value="APPLIED">APPLIED</option>
                                   <option value="INTERVIEW">INTERVIEW</option>
@@ -2268,7 +2268,7 @@ export default function EmployeesPage() {
                                   <button
                                     type="button"
                                     onClick={() => convertCandidateToEmployee(c)}
-                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95 shadow-sm shadow-emerald-200"
+                                    className="px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest bg-emerald-600 text-white active:scale-95 shadow-sm shadow-emerald-200"
                                   >
                                     ACTIVATE
                                   </button>
@@ -2292,8 +2292,8 @@ export default function EmployeesPage() {
                       <Wallet size={16} />
                     </div>
                     <div>
-                      <h2 className="text-[11px] font-black text-gray-800 tracking-tight uppercase">Petty Cash</h2>
-                      <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">Balances & History</p>
+                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Petty Cash</h2>
+                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Balances & History</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2301,12 +2301,12 @@ export default function EmployeesPage() {
                       type="month"
                       value={pettyCashMonth}
                       onChange={(e) => setPettyCashMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-[10px] font-black outline-none"
+                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => setPettyModalOpen(true)}
-                      className="bg-black text-white px-3 py-2 rounded-xl text-[9px] font-black active:scale-95 flex items-center gap-1.5"
+                      className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
                     >
                       <Plus size={14} /> NEW RECORD
                     </button>
@@ -2318,15 +2318,15 @@ export default function EmployeesPage() {
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 p-4">
                     <div className="xl:col-span-1 bg-gray-50/50 rounded-xl p-3 border border-gray-100">
-                      <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Balance Summary</h3>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Balance Summary</h3>
                       <div className="space-y-1.5">
                         {employees.filter((e) => String(e.status || '').toUpperCase() === 'AKTIF').map((e) => (
                           <div key={e.id} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
                             <div>
-                              <p className="text-[10px] font-black text-gray-800 uppercase leading-none">{e.name}</p>
-                              <p className="text-[7px] font-bold text-gray-400 mt-1 uppercase leading-none">{e.role}</p>
+                              <p className="text-xs font-black text-gray-800 uppercase leading-none">{e.name}</p>
+                              <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none">{e.role}</p>
                             </div>
-                            <div className="text-[10px] font-black text-gray-900 leading-none">
+                            <div className="text-xs font-black text-gray-900 leading-none">
                               Rp{Number(pettyCashBalances[e.id] || 0).toLocaleString('id-ID')}
                             </div>
                           </div>
@@ -2336,37 +2336,37 @@ export default function EmployeesPage() {
 
                     <div className="xl:col-span-3 bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
                       <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/30">
-                        <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400">Ledger History</h3>
+                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Ledger History</h3>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[620px]">
                           <thead className="bg-gray-50/50 border-b border-gray-100">
                             <tr>
-                              <th className="px-4 py-2.5 text-[8px] font-black uppercase tracking-widest text-gray-400">Date</th>
-                              <th className="px-4 py-2.5 text-[8px] font-black uppercase tracking-widest text-gray-400">Staff</th>
-                              <th className="px-4 py-2.5 text-[8px] font-black uppercase tracking-widest text-gray-400">Type</th>
-                              <th className="px-4 py-2.5 text-[8px] font-black uppercase tracking-widest text-gray-400 text-right">Amount</th>
-                              <th className="px-4 py-2.5 text-[8px] font-black uppercase tracking-widest text-gray-400">Notes</th>
+                              <th className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-400">Date</th>
+                              <th className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-400">Staff</th>
+                              <th className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-400">Type</th>
+                              <th className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Amount</th>
+                              <th className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-gray-400">Notes</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                             {pettyCashTx.length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="px-4 py-12 text-center text-gray-300 text-[10px] font-black uppercase">No entries</td>
+                                <td colSpan={5} className="px-4 py-12 text-center text-gray-300 text-xs font-black uppercase">No entries</td>
                               </tr>
                             ) : (
                               pettyCashTx.map((t) => (
                                 <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                                  <td className="px-4 py-2.5 text-[10px] font-black text-gray-600 uppercase tabular-nums">{t.date}</td>
+                                  <td className="px-4 py-2.5 text-xs font-black text-gray-600 uppercase tabular-nums">{t.date}</td>
                                   <td className="px-4 py-2.5">
-                                    <p className="text-[10px] font-black text-gray-800 uppercase leading-none">{t.employeeName}</p>
-                                    <p className="text-[7px] font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{t.employeeId}</p>
+                                    <p className="text-xs font-black text-gray-800 uppercase leading-none">{t.employeeName}</p>
+                                    <p className="text-xs font-bold text-gray-400 mt-1 uppercase leading-none tracking-tighter">{t.employeeId}</p>
                                   </td>
-                                  <td className="px-4 py-2.5 text-[9px] font-black text-gray-600 uppercase leading-none">{t.type}</td>
-                                  <td className={`px-4 py-2.5 text-right text-[10px] font-black tabular-nums ${t.type === 'TOPUP' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                  <td className="px-4 py-2.5 text-xs font-black text-gray-600 uppercase leading-none">{t.type}</td>
+                                  <td className={`px-4 py-2.5 text-right text-xs font-black tabular-nums ${t.type === 'TOPUP' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                     Rp{Number(t.amount || 0).toLocaleString('id-ID')}
                                   </td>
-                                  <td className="px-4 py-2.5 text-[10px] font-black text-gray-600 truncate max-w-[120px] uppercase leading-none">{t.description || '-'}</td>
+                                  <td className="px-4 py-2.5 text-xs font-black text-gray-600 truncate max-w-[120px] uppercase leading-none">{t.description || '-'}</td>
                                 </tr>
                               ))
                             )}
@@ -2389,7 +2389,7 @@ export default function EmployeesPage() {
             <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
               <div>
                 <h2 className="text-base font-black text-gray-800 tracking-tight uppercase">{editingId ? 'Modify Staff' : 'Onboard Staff'}</h2>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Personnel Registration Module</p>
+                <p className="text-xs text-gray-400 font-black uppercase tracking-widest mt-0.5">Personnel Registration Module</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
@@ -2399,23 +2399,23 @@ export default function EmployeesPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="staff-name" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <label htmlFor="staff-name" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                   <input 
                     id="staff-name"
                     required 
                     value={formData.name} 
                     onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase" 
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase" 
                     placeholder="..." 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="staff-phone" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile (WA)</label>
+                  <label htmlFor="staff-phone" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Mobile (WA)</label>
                   <input 
                     id="staff-phone"
                     value={formData.phone} 
                     onChange={e => setFormData({ ...formData, phone: e.target.value })} 
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
                     placeholder="08..." 
                   />
                 </div>
@@ -2423,12 +2423,12 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="staff-role" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Position</label>
+                  <label htmlFor="staff-role" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Position</label>
                   <select 
                     id="staff-role"
                     value={formData.role} 
                     onChange={e => setFormData({ ...formData, role: e.target.value })} 
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option>Karyawan Toko</option>
                     <option>Kasir</option>
@@ -2437,12 +2437,12 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="staff-status" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
+                  <label htmlFor="staff-status" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
                   <select 
                     id="staff-status"
                     value={formData.status} 
                     onChange={e => setFormData({ ...formData, status: e.target.value as 'AKTIF' | 'NON-AKTIF' })} 
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="AKTIF">AKTIF</option>
                     <option value="NON-AKTIF">NON-AKTIF</option>
@@ -2452,29 +2452,29 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                   <label htmlFor="staff-salary" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Base Salary</label>
+                   <label htmlFor="staff-salary" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Base Salary</label>
                    <div className="relative">
-                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-black">Rp</span>
                      <input 
                        id="staff-salary"
                        type="number" 
                        required 
                        value={formData.manualSalary} 
                        onChange={e => setFormData({ ...formData, manualSalary: Number(e.target.value) })} 
-                       className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
+                       className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
                      />
                    </div>
                 </div>
                 <div className="space-y-1">
-                   <label htmlFor="staff-daily-rate" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Daily Rate</label>
+                   <label htmlFor="staff-daily-rate" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Daily Rate</label>
                    <div className="relative">
-                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-black">Rp</span>
                      <input 
                        id="staff-daily-rate"
                        type="number" 
                        value={formData.dailySalary} 
                        onChange={e => setFormData({ ...formData, dailySalary: Number(e.target.value) })} 
-                       className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
+                       className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none" 
                        placeholder="Opt."
                      />
                    </div>
@@ -2482,7 +2482,7 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="staff-work-schedule" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Work Shift</label>
+                <label htmlFor="staff-work-schedule" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Work Shift</label>
                 <div className="relative">
                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                    <input 
@@ -2490,7 +2490,7 @@ export default function EmployeesPage() {
                      required 
                      value={formData.workSchedule} 
                      onChange={e => setFormData({ ...formData, workSchedule: e.target.value })} 
-                     className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase" 
+                     className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase" 
                      placeholder="E.G. 08:00 - 16:00" 
                    />
                 </div>
@@ -2498,22 +2498,22 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="staff-bank" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Bank</label>
+                  <label htmlFor="staff-bank" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Bank</label>
                   <input
                     id="staff-bank"
                     value={formData.bankName}
                     onChange={e => setFormData({ ...formData, bankName: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                     placeholder="BCA/..."
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="staff-account" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">A/C Number</label>
+                  <label htmlFor="staff-account" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">A/C Number</label>
                   <input
                     id="staff-account"
                     value={formData.bankAccount}
                     onChange={e => setFormData({ ...formData, bankAccount: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                     placeholder="..."
                   />
                 </div>
@@ -2521,12 +2521,12 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                  <label htmlFor="staff-contract-type" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Contract</label>
+                  <label htmlFor="staff-contract-type" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Contract</label>
                   <select
                     id="staff-contract-type"
                     value={formData.contractType}
                     onChange={e => setFormData({ ...formData, contractType: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="Tetap">PERMANENT</option>
                     <option value="Kontrak">CONTRACT</option>
@@ -2534,14 +2534,14 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="staff-contract-start" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Term</label>
+                  <label htmlFor="staff-contract-start" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Term</label>
                   <div className="grid grid-cols-2 gap-1">
                     <input
                       id="staff-contract-start"
                       type="date"
                       value={formData.contractStart}
                       onChange={e => setFormData({ ...formData, contractStart: e.target.value })}
-                      className="px-2 py-2 bg-gray-50 border-none rounded-lg text-[9px] font-black text-gray-700 outline-none"
+                      className="px-2 py-2 bg-gray-50 border-none rounded-lg text-xs font-black text-gray-700 outline-none"
                     />
                     <input
                       id="staff-contract-end"
@@ -2549,13 +2549,13 @@ export default function EmployeesPage() {
                       type="date"
                       value={formData.contractEnd}
                       onChange={e => setFormData({ ...formData, contractEnd: e.target.value })}
-                      className="px-2 py-2 bg-gray-50 border-none rounded-lg text-[9px] font-black text-gray-700 outline-none"
+                      className="px-2 py-2 bg-gray-50 border-none rounded-lg text-xs font-black text-gray-700 outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
                 <Save size={14} /> {editingId ? 'COMMIT CHANGES' : 'EXECUTE REGISTRATION'}
               </button>
             </form>
@@ -2569,7 +2569,7 @@ export default function EmployeesPage() {
             <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
               <div>
                 <h2 className="text-base font-black text-gray-800 tracking-tight uppercase">Commit Request</h2>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Leave & Absence Entry</p>
+                <p className="text-xs text-gray-400 font-black uppercase tracking-widest mt-0.5">Leave & Absence Entry</p>
               </div>
               <button onClick={() => setLeaveModalOpen(false)} className="p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
@@ -2578,12 +2578,12 @@ export default function EmployeesPage() {
 
             <form onSubmit={submitLeave} className="space-y-4">
               <div className="space-y-1">
-                <label htmlFor="leave-staff" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
+                <label htmlFor="leave-staff" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
                 <select
                   id="leave-staff"
                   value={leaveForm.employeeId}
                   onChange={(e) => setLeaveForm((p) => ({ ...p, employeeId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                 >
                   <option value="">SELECT...</option>
                   {employees
@@ -2596,12 +2596,12 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="leave-category" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
+                  <label htmlFor="leave-category" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
                   <select
                     id="leave-category"
                     value={leaveForm.type}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, type: e.target.value as LeaveRequestType }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="CUTI">CUTI</option>
                     <option value="IZIN">IZIN</option>
@@ -2609,12 +2609,12 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="leave-paid" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Remuneration</label>
+                  <label htmlFor="leave-paid" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Remuneration</label>
                   <select
                     id="leave-paid"
                     value={leaveForm.paid ? 'YA' : 'TIDAK'}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, paid: e.target.value === 'YA' }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="YA">PAID</option>
                     <option value="TIDAK">UNPAID</option>
@@ -2624,39 +2624,39 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="leave-start" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Date</label>
+                  <label htmlFor="leave-start" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Start Date</label>
                   <input
                     id="leave-start"
                     type="date"
                     value={leaveForm.startDate}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, startDate: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="leave-end" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">End Date</label>
+                  <label htmlFor="leave-end" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">End Date</label>
                   <input
                     id="leave-end"
                     type="date"
                     value={leaveForm.endDate}
                     onChange={(e) => setLeaveForm((p) => ({ ...p, endDate: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="leave-reason" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason (Internal)</label>
+                <label htmlFor="leave-reason" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Reason (Internal)</label>
                 <input
                   id="leave-reason"
                   value={leaveForm.reason}
                   onChange={(e) => setLeaveForm((p) => ({ ...p, reason: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                   placeholder="..."
                 />
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
                 <Save size={14} /> COMMIT REQUEST
               </button>
             </form>
@@ -2670,7 +2670,7 @@ export default function EmployeesPage() {
             <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
               <div>
                 <h2 className="text-base font-black text-gray-800 tracking-tight uppercase">Talent Entry</h2>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Pipeline Registration</p>
+                <p className="text-xs text-gray-400 font-black uppercase tracking-widest mt-0.5">Pipeline Registration</p>
               </div>
               <button onClick={() => setCandidateModalOpen(false)} className="p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
@@ -2679,35 +2679,35 @@ export default function EmployeesPage() {
 
             <form onSubmit={createCandidate} className="space-y-4">
               <div className="space-y-1">
-                <label htmlFor="candidate-name" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <label htmlFor="candidate-name" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                 <input
                   id="candidate-name"
                   required
                   value={candidateForm.name}
                   onChange={(e) => setCandidateForm((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                   placeholder="..."
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="candidate-phone" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile</label>
+                  <label htmlFor="candidate-phone" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Mobile</label>
                   <input
                     id="candidate-phone"
                     value={candidateForm.phone}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, phone: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                     placeholder="08..."
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="candidate-email" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Addr.</label>
+                  <label htmlFor="candidate-email" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Email Addr.</label>
                   <input
                     id="candidate-email"
                     value={candidateForm.email}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, email: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                     placeholder="@"
                   />
                 </div>
@@ -2715,25 +2715,25 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="candidate-role" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Role</label>
+                  <label htmlFor="candidate-role" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Target Role</label>
                   <input
                     id="candidate-role"
                     value={candidateForm.position}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, position: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                     placeholder="..."
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="candidate-expected-salary" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Exp. Salary</label>
+                  <label htmlFor="candidate-expected-salary" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Exp. Salary</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-black">Rp</span>
                     <input
                       id="candidate-expected-salary"
                       type="number"
                       value={candidateForm.expectedSalary}
                       onChange={(e) => setCandidateForm((p) => ({ ...p, expectedSalary: Number(e.target.value || 0) }))}
-                      className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                      className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                     />
                   </div>
                 </div>
@@ -2741,12 +2741,12 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="candidate-stage" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stage</label>
+                  <label htmlFor="candidate-stage" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stage</label>
                   <select
                     id="candidate-stage"
                     value={candidateForm.stage}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, stage: e.target.value as CandidateStage }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="APPLIED">APPLIED</option>
                     <option value="INTERVIEW">INTERVIEW</option>
@@ -2756,18 +2756,18 @@ export default function EmployeesPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="candidate-source" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Discovery Source</label>
+                  <label htmlFor="candidate-source" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Discovery Source</label>
                   <input
                     id="candidate-source"
                     value={candidateForm.source}
                     onChange={(e) => setCandidateForm((p) => ({ ...p, source: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                     placeholder="IG/REFERRAL/..."
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
                 <Save size={14} /> REGISTER CANDIDATE
               </button>
             </form>
@@ -2781,7 +2781,7 @@ export default function EmployeesPage() {
             <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
               <div>
                 <h2 className="text-base font-black text-gray-800 tracking-tight uppercase">Ledger Entry</h2>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Petty Cash Transaction</p>
+                <p className="text-xs text-gray-400 font-black uppercase tracking-widest mt-0.5">Petty Cash Transaction</p>
               </div>
               <button onClick={() => setPettyModalOpen(false)} className="p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
@@ -2790,12 +2790,12 @@ export default function EmployeesPage() {
 
             <form onSubmit={savePettyCashTx} className="space-y-4">
               <div className="space-y-1">
-                <label htmlFor="petty-staff" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
+                <label htmlFor="petty-staff" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Staff Member</label>
                 <select
                   id="petty-staff"
                   value={pettyForm.employeeId}
                   onChange={(e) => setPettyForm((p) => ({ ...p, employeeId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                 >
                   <option value="">SELECT...</option>
                   {employees
@@ -2808,22 +2808,22 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="petty-date" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Effective Date</label>
+                  <label htmlFor="petty-date" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Effective Date</label>
                   <input
                     id="petty-date"
                     type="date"
                     value={pettyForm.date}
                     onChange={(e) => setPettyForm((p) => ({ ...p, date: e.target.value }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="petty-type" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Tx Type</label>
+                  <label htmlFor="petty-type" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Tx Type</label>
                   <select
                     id="petty-type"
                     value={pettyForm.type}
                     onChange={(e) => setPettyForm((p) => ({ ...p, type: e.target.value as PettyCashTxType }))}
-                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
+                    className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none appearance-none uppercase"
                   >
                     <option value="TOPUP">TOPUP</option>
                     <option value="SPEND">SPEND</option>
@@ -2833,32 +2833,32 @@ export default function EmployeesPage() {
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="petty-amount" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Nominal (Amount)</label>
+                <label htmlFor="petty-amount" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nominal (Amount)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[9px] font-black">Rp</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-black">Rp</span>
                   <input
                     id="petty-amount"
                     type="number"
                     min={0}
                     value={pettyForm.amount}
                     onChange={(e) => setPettyForm((p) => ({ ...p, amount: Number(e.target.value || 0) }))}
-                    className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
+                    className="w-full pl-8 pr-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="petty-desc" className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                <label htmlFor="petty-desc" className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
                 <input
                   id="petty-desc"
                   value={pettyForm.description}
                   onChange={(e) => setPettyForm((p) => ({ ...p, description: e.target.value }))}
-                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-[11px] font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
+                  className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-gray-700 focus:ring-1 focus:ring-black outline-none uppercase"
                   placeholder="..."
                 />
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
                 <Save size={14} /> EXECUTE TRANSACTION
               </button>
             </form>
