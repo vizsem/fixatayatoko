@@ -22,7 +22,7 @@ export async function getCapitalData() {
       supabaseAdmin.from('loans').select('*').order('created_at', { ascending: false }),
       supabaseAdmin.from('marketplace_accounts').select('*').order('created_at', { ascending: true }),
       supabaseAdmin.from('marketplace_transactions').select('*').order('created_at', { ascending: false }).limit(50),
-      supabaseAdmin.from('products').select('stock, cost_price, raw_data'),
+      supabaseAdmin.from('products').select('stock, cost_price, is_active, raw_data'),
     ]);
 
     const transactions = (txRes.data || []).map((t: any) => {
@@ -80,18 +80,33 @@ export async function getCapitalData() {
       };
     });
 
-    // Calculate Stock Value directly from products
+    // Calculate Stock Value directly from ACTIVE products only
     let stockValue = 0;
+    let activeProductCount = 0;
+    let totalStockUnits = 0;
+
     for (const p of (prodRes.data || [])) {
       const raw = p.raw_data || {};
+      
+      // Filter produk aktif: abaikan yang is_active = false atau raw_data.isActive = false
+      const isInactive = p.is_active === false || raw.isActive === false || raw.is_active === false || raw.status === 'inactive';
+      if (isInactive) {
+        continue;
+      }
+
       const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
-      const cost = Number(p.cost_price ?? raw.purchasePrice ?? raw.Modal ?? 0);
-      if (stock > 0 && cost > 0) {
-        stockValue += stock * cost;
+      const cost = Number(p.cost_price ?? raw.purchasePrice ?? raw.Modal ?? raw.costPrice ?? 0);
+      
+      if (stock > 0) {
+        activeProductCount++;
+        totalStockUnits += stock;
+        if (cost > 0) {
+          stockValue += stock * cost;
+        }
       }
     }
 
-    // Calculate Liabilities
+    // Calculate Liabilities from active loans
     const totalLiabilities = loans
       .filter((l: any) => l.status === 'ACTIVE')
       .reduce((sum: number, l: any) => sum + (l.remainingAmount || 0), 0);
@@ -105,6 +120,8 @@ export async function getCapitalData() {
         marketplaceLogs,
         assetSummary: {
           stockValue,
+          activeProductCount,
+          totalStockUnits,
           receivables: 0,
           totalLiabilities,
         },

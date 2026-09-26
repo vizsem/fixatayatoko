@@ -391,13 +391,13 @@ export default function AdminInventory() {
                             </td>
                             <td className="p-3 text-gray-600 text-xs">{m.warehouse.name}</td>
                             <td className="p-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
-                                m.type === 'IN' ? 'bg-emerald-100 text-emerald-700' :
-                                m.type === 'OUT' ? 'bg-red-100 text-red-600' :
+                              <span className={`px-2 py-0.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 ${
+                                (m.type === 'IN' || m.type === 'MASUK') ? 'bg-emerald-100 text-emerald-700' :
+                                (m.type === 'OUT' || m.type === 'KELUAR') ? 'bg-red-100 text-red-600' :
                                 'bg-blue-100 text-blue-700'
                               }`}>
-                                {m.type === 'IN' ? <ArrowDown size={10} className="inline mr-1" /> : m.type === 'OUT' ? <ArrowUp size={10} className="inline mr-1" /> : null}
-                                {m.type}
+                                {(m.type === 'IN' || m.type === 'MASUK') ? <ArrowDown size={10} /> : (m.type === 'OUT' || m.type === 'KELUAR') ? <ArrowUp size={10} /> : null}
+                                {(m.type === 'IN' || m.type === 'MASUK') ? 'MASUK' : (m.type === 'OUT' || m.type === 'KELUAR') ? 'KELUAR' : m.type}
                               </span>
                             </td>
                             <td className="p-3 text-center font-bold text-gray-800">{Math.abs(m.quantity)}</td>

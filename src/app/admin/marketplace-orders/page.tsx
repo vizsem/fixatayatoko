@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import notify from '@/lib/notify';
-import { deductStockBatch } from '@/lib/inventory';
+import { deductStockFEFO } from '@/lib/inventory';
 import { Toaster } from 'react-hot-toast';
 import {
   ChevronLeft,
@@ -14,16 +14,17 @@ import {
   Truck,
   Hash,
   User,
-  Activity
+  Activity,
+  Warehouse
 } from 'lucide-react';
 
 import { ProductSearchList } from '@/components/admin/marketplace/ProductSearchList';
 import { CartTable } from '@/components/admin/marketplace/CartTable';
 import { Product } from '@/lib/types';
 import * as Sentry from '@sentry/nextjs';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, ref, where, writeBatch } from '@/lib/firebase';
+import { auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
@@ -88,6 +89,8 @@ function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCo
   return basePrice * contains;
 }
 
+type WarehouseOption = { id: string; name: string };
+
 export default function MarketplaceOrdersPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -99,6 +102,8 @@ export default function MarketplaceOrdersPage() {
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER');
   const [shippingCost, setShippingCost] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [warehouseId, setWarehouseId] = useState('gudang-utama');
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
@@ -106,18 +111,44 @@ export default function MarketplaceOrdersPage() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!isAuthorizedAdmin(user, userDoc.data())) { router.push('/'); return; }
       fetchProducts();
+      fetchWarehouses();
     });
     return () => unsubAuth();
   }, [router]);
 
   const fetchProducts = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)));
-      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, stock, unit, raw_data, image_url, is_active')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setProducts((data || []).map((d: any) => {
+        const raw = d.raw_data || {};
+        return {
+          id: d.id,
+          name: d.name || raw.name || raw.Nama || '',
+          price: Number(d.price ?? raw.price ?? raw.Ecer ?? 0),
+          stock: Number(d.stock ?? raw.stock ?? raw.Stok ?? 0),
+          unit: d.unit || raw.unit || raw.Satuan || 'PCS',
+          image: d.image_url || raw.image || raw.Link_Foto || '',
+          units: raw.units || [],
+          channelPricing: raw.channelPricing || {},
+          priceShopee: raw.priceShopee || 0,
+          priceTiktok: raw.priceTiktok || 0,
+          priceEcer: raw.priceEcer || raw.Ecer || d.price || 0,
+        } as unknown as Product;
+      }));
     } catch (err) {
       Sentry.captureException(err);
-      notify.error("Gagal memuat produk");
+      notify.error('Gagal memuat produk');
     }
+  };
+
+  const fetchWarehouses = async () => {
+    const { data } = await supabase.from('warehouses').select('id, name').order('name');
+    if (data) setWarehouses(data as WarehouseOption[]);
   };
 
   // Auto-sync cart prices when channel changes
@@ -211,78 +242,110 @@ export default function MarketplaceOrdersPage() {
   const total = subtotal + shippingCost;
 
   const handleSaveOrder = async () => {
-    if (cart.length === 0) return notify.error("Keranjang kosong");
-    if (!externalOrderId) return notify.error("Order ID Marketplace wajib diisi");
-    
+    if (cart.length === 0) return notify.error('Keranjang kosong');
+    if (!externalOrderId) return notify.error('Order ID Marketplace wajib diisi');
+    if (!warehouseId) return notify.error('Pilih gudang pengambilan stok');
+
     setLoading(true);
     try {
-      const batch = writeBatch(db);
-      const orderRef = doc(collection(db, 'orders'));
-      const orderData = {
-        orderId: `MKT-${Date.now()}`,
-        externalOrderId,
-        customerName: customerName || `Customer ${channel}`,
-        items: cart,
-        subtotal,
-        shippingCost,
-        total,
-        channel,
-        paymentMethod,
-        status: 'SELESAI',
-        createdAt: new Date().toISOString(),
-        adminId: (await supabase.auth.getUser()).data.user?.uid
-      };
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminId = user?.id || 'system';
+      const now = new Date().toISOString();
+      const orderId = `MKT-${Date.now()}`;
+      const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-      // FIX: Pre-fetch ALL product snapshots BEFORE batch writes
-      const productRefs = cart.map(item => doc(db, 'products', item.id));
-      const pSnaps = await Promise.all(productRefs.map(ref => getDoc(ref)));
+      const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
 
-      const adminId = (await supabase.auth.getUser()).data.user?.uid || 'system';
-
-      for (let i = 0; i < cart.length; i++) {
-        const item = cart[i];
-        const pSnap = pSnaps[i];
-
-        // FIX: Convert unit to base quantity before deducting stock
-        // e.g. if unit is CTN/DUS and contains=48, then 1 CTN = 48 pcs deducted
-        const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
+      // ── 1. Deduct stok via Supabase (satu per satu, validasi dulu semua) ──
+      const deductPlan: { item: CartItem; baseAmount: number }[] = [];
+      for (const item of cart) {
         const isCtnUnit = CTN_ALIASES.includes(item.unit?.toUpperCase());
-        const ctnUnit = item.units?.find((u: any) =>
-          CTN_ALIASES.includes(u.code?.toUpperCase())
-        );
-        const contains = ctnUnit?.contains || 1;
-        const baseAmount = isCtnUnit && contains > 1 
-          ? item.quantity * contains  // convert to base unit (pcs)
-          : item.quantity;
+        const ctnUnit = item.units?.find((u: any) => CTN_ALIASES.includes(u.code?.toUpperCase()));
+        const contains = Number(ctnUnit?.contains || 1);
+        const baseAmount = isCtnUnit && contains > 1 ? item.quantity * contains : item.quantity;
+        deductPlan.push({ item, baseAmount });
+      }
 
-        const result = await deductStockBatch(batch, {
-          productId: item.id,
-          amount: baseAmount,
-          adminId,
-          source: 'MARKETPLACE',
-          note: `Marketplace Order: ${channel} - ${externalOrderId}`,
-          prefetchedSnap: pSnap
-        });
-
-        if (!result?.success) {
-          notify.error(`Stok tidak cukup untuk produk: ${item.name}`);
+      // Validasi stok semua produk sebelum eksekusi
+      for (const { item, baseAmount } of deductPlan) {
+        const { data: prod } = await supabaseAdmin.from('products').select('stock, name').eq('id', item.id).single();
+        const available = Number(prod?.stock ?? 0);
+        if (available < baseAmount) {
+          notify.error(`Stok ${item.name} tidak cukup! Tersedia: ${available}, Butuh: ${baseAmount} pcs`);
           setLoading(false);
           return;
         }
       }
 
-      batch.set(orderRef, orderData);
-      
-      await batch.commit();
+      // Eksekusi deduct satu per satu
+      for (const { item, baseAmount } of deductPlan) {
+        const result = await deductStockFEFO({
+          productId: item.id,
+          amount: baseAmount,
+          warehouseId,
+          source: 'MARKETPLACE',
+          adminId,
+          reference: orderId,
+          notes: `${channel} Order #${externalOrderId} | Gudang: ${warehouses.find(w => w.id === warehouseId)?.name || warehouseId}`,
+        });
+        if (!result.success) {
+          notify.error(`Gagal deduct stok ${item.name}: ${result.error}`);
+          setLoading(false);
+          return;
+        }
+      }
 
-      notify.success("Pesanan marketplace berhasil disimpan");
+      // ── 2. Simpan order ke Supabase orders table ──
+      const orderItems = deductPlan.map(({ item, baseAmount }) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        baseQuantity: baseAmount,
+        price: item.price,
+        total: item.price * item.quantity,
+      }));
+
+      const orderData = {
+        orderId,
+        externalOrderId,
+        customerName: customerName || `Customer ${channel}`,
+        items: orderItems,
+        subtotal,
+        shippingCost,
+        total,
+        channel,
+        paymentMethod,
+        warehouseId,
+        warehouseName: warehouses.find(w => w.id === warehouseId)?.name || warehouseId,
+        status: 'SELESAI',
+        adminId,
+        createdAt: now,
+      };
+
+      const { error: orderError } = await supabase.from('orders').insert({
+        id: dbOrderId,
+        order_id: orderId,
+        user_id: null,
+        customer_name: customerName || `Customer ${channel}`,
+        status: 'SELESAI',
+        total,
+        items: orderItems,
+        raw_data: orderData,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (orderError) throw orderError;
+
+      notify.success(`✅ Order ${channel} berhasil disimpan ke Supabase! Stok dikurangi dari: ${warehouses.find(w => w.id === warehouseId)?.name || warehouseId}`);
       setCart([]);
       setExternalOrderId('');
       setCustomerName('');
       setShippingCost(0);
     } catch (err) {
       Sentry.captureException(err);
-      notify.error("Gagal menyimpan pesanan");
+      notify.error('Gagal menyimpan pesanan');
     } finally {
       setLoading(false);
     }
@@ -393,9 +456,28 @@ export default function MarketplaceOrdersPage() {
                 </div>
 
                 <div className="pt-6 space-y-3">
+                  {/* Pilih Gudang Pengambilan Stok */}
+                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+                    <Warehouse className="text-blue-500 shrink-0" size={18} />
+                    <div className="flex-1">
+                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Gudang Stok *</p>
+                      <select
+                        value={warehouseId}
+                        onChange={e => setWarehouseId(e.target.value)}
+                        className="bg-transparent text-xs font-black text-blue-800 outline-none w-full"
+                      >
+                        {warehouses.length === 0 && <option value="gudang-utama">Gudang Utama</option>}
+                        {warehouses.map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Metode Pembayaran */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                    <CreditCard className="text-gray-400" size={18} />
-                    <select 
+                    <CreditCard className="text-gray-400 shrink-0" size={18} />
+                    <select
                       value={paymentMethod}
                       onChange={e => setPaymentMethod(e.target.value)}
                       className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none w-full"
@@ -406,9 +488,9 @@ export default function MarketplaceOrdersPage() {
                     </select>
                   </div>
 
-                  <button 
+                  <button
                     onClick={handleSaveOrder}
-                    disabled={loading || cart.length === 0}
+                    disabled={loading || cart.length === 0 || !warehouseId}
                     className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:pointer-events-none"
                   >
                     {loading ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}

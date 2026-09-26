@@ -85,10 +85,20 @@ export const addInventoryLog = async (logData: InventoryLogData, _batch?: any) =
 };
 
 /**
- * Deduct stock from product in Supabase and record inventory log
+ * Deduct stock from product in Supabase (warehouse-aware, with waterfall fallback).
+ * warehouseId: explicit warehouse ID, or 'auto' to pick from available stock (gudang-utama first).
+ * Returns { success, deducted, warehousesUsed, error }.
  */
 export async function deductStockFEFO(
-  arg1: string | { productId: string; amount: number; warehouseId?: string; reference?: string; notes?: string },
+  arg1: string | {
+    productId: string;
+    amount: number;
+    warehouseId?: string;
+    reference?: string;
+    notes?: string;
+    source?: InventorySource;
+    adminId?: string;
+  },
   warehouseIdArg?: string,
   amountArg?: number,
   referenceArg?: string,
@@ -99,6 +109,8 @@ export async function deductStockFEFO(
   let warehouseId: string;
   let reference: string | undefined;
   let notes: string | undefined;
+  let source: InventorySource = 'ORDER';
+  let adminId: string | undefined;
 
   if (typeof arg1 === 'object') {
     productId = arg1.productId;
@@ -106,6 +118,8 @@ export async function deductStockFEFO(
     warehouseId = arg1.warehouseId || 'gudang-utama';
     reference = arg1.reference;
     notes = arg1.notes;
+    if (arg1.source) source = arg1.source;
+    adminId = arg1.adminId;
   } else {
     productId = arg1;
     warehouseId = warehouseIdArg || 'gudang-utama';
@@ -129,52 +143,79 @@ export async function deductStockFEFO(
     const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
 
     if (currentStock < amount) {
-      return { success: false, error: `Stok tidak cukup. Tersedia: ${currentStock}, Dibutuhkan: ${amount}` };
+      return {
+        success: false,
+        error: `Stok tidak cukup: ${product.name || productId}. Tersedia: ${currentStock}, Dibutuhkan: ${amount}`,
+      };
+    }
+
+    // ── Warehouse waterfall: deduct dari gudang dipilih, sisa dari gudang lain ──
+    const MAIN_WH = 'gudang-utama';
+    const stockByWarehouse: Record<string, number> = {
+      ...(raw.stockByWarehouse || { [MAIN_WH]: currentStock }),
+    };
+    let remainingToDeduct = amount;
+    const warehousesUsed: string[] = [];
+
+    // Urutan: warehouseId yang diminta (kecuali 'auto') → gudang-utama → sisanya
+    const prioritized =
+      warehouseId === 'auto'
+        ? Object.entries(stockByWarehouse).sort(([a]) => (a === MAIN_WH ? -1 : 1))
+        : [
+            [warehouseId, stockByWarehouse[warehouseId] ?? 0] as [string, number],
+            ...Object.entries(stockByWarehouse)
+              .filter(([id]) => id !== warehouseId)
+              .sort(([a]) => (a === MAIN_WH ? -1 : 1)),
+          ];
+
+    const deductionsPerWh: Array<{ whId: string; amount: number; prevWhStock: number; nextWhStock: number }> = [];
+
+    for (const [whId, qty] of prioritized) {
+      if (remainingToDeduct <= 0) break;
+      const available = Number(qty);
+      if (available <= 0) continue;
+      const deduct = Math.min(available, remainingToDeduct);
+      const nextWhStock = Math.max(0, available - deduct);
+      stockByWarehouse[whId] = nextWhStock;
+      remainingToDeduct -= deduct;
+      warehousesUsed.push(whId);
+      deductionsPerWh.push({ whId, amount: deduct, prevWhStock: available, nextWhStock });
     }
 
     const newStock = Math.max(0, currentStock - amount);
-    const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
-    const curWhStock = Number(stockByWarehouse[warehouseId] ?? currentStock);
-    stockByWarehouse[warehouseId] = Math.max(0, curWhStock - amount);
-
     const now = new Date().toISOString();
-    const updatedRaw = {
-      ...raw,
-      stock: newStock,
-      stockByWarehouse,
-      updatedAt: now,
-    };
+    const updatedRaw = { ...raw, stock: newStock, stockByWarehouse, updatedAt: now };
 
     const { error: updateErr } = await supabaseAdmin
       .from('products')
-      .update({
-        stock: newStock,
-        raw_data: updatedRaw,
-        updated_at: now,
-      })
+      .update({ stock: newStock, raw_data: updatedRaw, updated_at: now })
       .eq('id', productId);
 
     if (updateErr) {
       return { success: false, error: updateErr.message };
     }
 
-    await addInventoryLog({
-      productId,
-      productName: product.name || raw.name || raw.Nama || 'Produk',
-      type: 'KELUAR',
-      amount,
-      quantity: -amount,
-      prevStock: currentStock,
-      nextStock: newStock,
-      referenceId: reference,
-      orderId: reference,
-      note: notes || 'Pengurangan stok penjualan',
-      fromWarehouseId: warehouseId,
-      warehouseId,
-      source: 'ORDER',
-    });
+    // Catat log mutasi pengeluaran barang untuk setiap gudang yang terdampak
+    for (const item of deductionsPerWh) {
+      await addInventoryLog({
+        productId,
+        productName: product.name || raw.name || raw.Nama || 'Produk',
+        type: 'KELUAR',
+        amount: item.amount,
+        quantity: -item.amount,
+        prevStock: currentStock,
+        nextStock: newStock,
+        referenceId: reference,
+        orderId: reference,
+        note: notes ? `${notes} [Gudang: ${item.whId}]` : `Pengeluaran stok dari ${item.whId}`,
+        fromWarehouseId: item.whId,
+        warehouseId: item.whId,
+        adminId,
+        source,
+      });
+    }
 
-    return { success: true, deducted: amount };
+    return { success: true, deducted: amount, warehousesUsed };
   } catch (err: any) {
     console.error('deductStockFEFO error:', err);
     return { success: false, error: err.message || 'Gagal mengurangi stok' };

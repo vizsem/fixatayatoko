@@ -16,6 +16,69 @@ vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('@/lib/supabase', () => {
+  const productsData = [
+    {
+      id: 'p1',
+      name: 'Produk Marketplace',
+      price: 10000,
+      stock: 10,
+      unit: 'PCS',
+      image_url: '',
+      is_active: true,
+      raw_data: {
+        priceShopee: 12000,
+        channelPricing: {
+          shopee: { price: 12000 },
+        },
+      },
+    },
+  ];
+  const warehousesData = [{ id: 'gudang-utama', name: 'Gudang Utama' }];
+
+  const createQueryBuilder = (tableName: string) => {
+    const data = tableName === 'products' ? productsData : tableName === 'warehouses' ? warehousesData : [];
+    const builder: any = {};
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.order = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockReturnValue(builder);
+    builder.insert = vi.fn().mockReturnValue(builder);
+    builder.then = (onfulfilled: any, onrejected?: any) =>
+      Promise.resolve({ data, error: null }).then(onfulfilled, onrejected);
+    return builder;
+  };
+
+  return {
+    supabase: {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: 'admin-user' } }, error: null })),
+      },
+      from: vi.fn((table: string) => createQueryBuilder(table)),
+    },
+  };
+});
+
+vi.mock('@/lib/supabase-admin', () => ({
+  supabaseAdmin: {
+    from: vi.fn((_table: string) => ({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: { stock: 100, name: 'Produk Marketplace' },
+            error: null,
+          }),
+        }),
+      }),
+    })),
+  },
+}));
+
+vi.mock('@/lib/inventory', () => ({
+  deductStockFEFO: vi.fn(async () => ({ success: true })),
+  deductStockBatch: vi.fn(async () => ({ success: true })),
+}));
+
 vi.mock('@/lib/firebase', () => ({
   auth: {},
   db: {},

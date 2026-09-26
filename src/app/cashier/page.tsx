@@ -12,7 +12,7 @@ import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library K
 import toast from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
-import { addInventoryLog } from '@/lib/inventory';
+import { addInventoryLog, deductStockFEFO } from '@/lib/inventory';
 import { supabaseAdmin } from '@/lib/supabase';
 import { postJournal } from '@/lib/ledger';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
@@ -138,6 +138,10 @@ export default function CashierPOS() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [tempoDueDate, setTempoDueDate] = useState('');
   const [useBluetoothPrinter, setUseBluetoothPrinter] = useState(false);
+
+  // Warehouse Selector State (Supabase)
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('auto');
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
 
   // State untuk Wallet
   const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number} | null>(null);
@@ -679,6 +683,31 @@ export default function CashierPOS() {
     return () => unsubscribe();
   }, []);
 
+  // Load Warehouses from Supabase
+  useEffect(() => {
+    async function loadWarehouses() {
+      try {
+        const { data, error } = await supabase.from('warehouses').select('id, name').order('name');
+        if (!error && data && data.length > 0) {
+          setWarehouses(data);
+        } else {
+          setWarehouses([
+            { id: 'gudang-utama', name: 'Gudang Utama' },
+            { id: 'toko-depan', name: 'Toko Depan' },
+            { id: 'Rumah', name: 'Rumah' },
+            { id: 'ATAYATOKO', name: 'ATAYATOKO' },
+          ]);
+        }
+      } catch (err) {
+        setWarehouses([
+          { id: 'gudang-utama', name: 'Gudang Utama' },
+          { id: 'toko-depan', name: 'Toko Depan' },
+        ]);
+      }
+    }
+    loadWarehouses();
+  }, []);
+
   useEffect(() => {
     if (activeTab !== 'orders') return;
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(20));
@@ -943,85 +972,94 @@ export default function CashierPOS() {
       const newOrderRef = doc(collection(db, 'orders'));
       batch.set(newOrderRef, orderData);
 
-      // FIX: Fetch auth user once outside the loop (was called 2x per item)
+      // FIX: Fetch auth user once outside the loop
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const currentUserId = currentUser?.id || 'cashier';
+      const now = new Date().toISOString();
+      const selectedWhObj = warehouses.find(w => w.id === selectedWarehouse);
+      const warehouseName = selectedWhObj ? selectedWhObj.name : (selectedWarehouse === 'auto' ? 'Otomatis' : selectedWarehouse);
 
-      // Collect Supabase sync targets during loop
-      const supabaseStockUpdates: Array<{
+      // 1. Validasi kecukupan stok sebelum proses eksekusi
+      for (const item of cart) {
+        const contains = Number(item.contains || 1);
+        const pcsToDeduct = item.quantity * contains;
+        const localProduct = products.find(p => p.id === item.id);
+        if (localProduct && localProduct.stock < pcsToDeduct) {
+          setIsProcessing(false);
+          return toast.error(`Stok ${item.name} tidak cukup! Tersedia: ${localProduct.stock}, Dibutuhkan: ${pcsToDeduct}`);
+        }
+      }
+
+      // 2. Potong stok via Supabase deductStockFEFO (dengan fallback offline)
+      const deductionResults: Array<{
         productId: string;
         newStock: number;
         newStockByWarehouse: Record<string, number>;
-        prevStock: number;
-        pcsToDeduct: number;
       }> = [];
 
-      for (const item of cart) {
-        const pRef = doc(db, 'products', item.id);
-        
-        let productData: any = null;
-        if (isOffline) {
-          // OFFLINE MODE: Gunakan data stok dari state lokal agar tidak hang menunggu server
-          const localProduct = products.find(p => p.id === item.id);
-          if (localProduct) {
-            productData = { stock: localProduct.stock, stockByWarehouse: localProduct.stockByWarehouse || {} };
-          }
-        } else {
-          // ONLINE MODE: Fetch stok realtime dari server
-          const pSnap = await getDoc(pRef);
-          if (pSnap.exists()) productData = pSnap.data();
-        }
+      if (!isOffline) {
+        for (const item of cart) {
+          const contains = Number(item.contains || 1);
+          const pcsToDeduct = item.quantity * contains;
 
-        if (productData) {
-          const currentStock = productData.stock || 0;
+          const res = await deductStockFEFO({
+            productId: item.id,
+            amount: pcsToDeduct,
+            warehouseId: selectedWarehouse,
+            reference: newOrderRef.id,
+            notes: `Transaksi Kasir (${paymentMethod}) - ${item.quantity} ${item.unit} [Gudang: ${warehouseName}]`,
+            source: 'CASHIER',
+            adminId: currentUserId,
+          });
+
+          if (!res.success) {
+            throw new Error(`Gagal memotong stok ${item.name}: ${res.error}`);
+          }
+
+          // Fetch state terkini untuk sync ke batch Firestore & state lokal
+          const { data: updatedProd } = await supabaseAdmin
+            .from('products')
+            .select('stock, raw_data')
+            .eq('id', item.id)
+            .single();
+
+          const nStock = Number(updatedProd?.stock ?? Math.max(0, (products.find(p => p.id === item.id)?.stock || 0) - pcsToDeduct));
+          const nWh = (updatedProd?.raw_data?.stockByWarehouse || {}) as Record<string, number>;
+
+          deductionResults.push({
+            productId: item.id,
+            newStock: nStock,
+            newStockByWarehouse: nWh,
+          });
+
+          // Sync perubahan ke Firestore
+          batch.update(doc(db, 'products', item.id), {
+            stock: nStock,
+            stockByWarehouse: nWh,
+          });
+        }
+      } else {
+        // Mode OFFLINE
+        for (const item of cart) {
+          const localProduct = products.find(p => p.id === item.id);
+          const currentStock = localProduct?.stock || 0;
           const contains = Number(item.contains || 1);
           const pcsToDeduct = item.quantity * contains;
           const newStock = Math.max(0, currentStock - pcsToDeduct);
+          const stockByWarehouse = localProduct?.stockByWarehouse || {};
+          const newStockByWarehouse = { ...stockByWarehouse };
 
-          // Logika Pengurangan Stok Per Gudang (Prioritas Gudang Utama)
-          const MAIN_WAREHOUSE_ID = 'gudang-utama';
-          const stockByWarehouse = productData.stockByWarehouse || {};
-          const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
-          
-          let remainingToDeduct = pcsToDeduct;
-          
-          // 1. Prioritas Gudang Utama
-          if (newStockByWarehouse[MAIN_WAREHOUSE_ID] && newStockByWarehouse[MAIN_WAREHOUSE_ID] > 0) {
-            const deduct = Math.min(newStockByWarehouse[MAIN_WAREHOUSE_ID], remainingToDeduct);
-            newStockByWarehouse[MAIN_WAREHOUSE_ID] -= deduct;
-            remainingToDeduct -= deduct;
-            
-            // Sync warehouse capacity
-            const volChange = deduct * (productData.volumeInCtn || 0);
-            if (volChange > 0) {
-              batch.update(doc(db, 'warehouses', MAIN_WAREHOUSE_ID), { usedCapacity: increment(-volChange) });
-            }
-          }
-          
-          // 2. Gudang Lainnya (Jika masih ada sisa yang harus dikurangi)
-          if (remainingToDeduct > 0) {
-            for (const [whId, qty] of Object.entries(newStockByWarehouse)) {
-              if (whId === MAIN_WAREHOUSE_ID) continue;
-              if (remainingToDeduct <= 0) break;
-              
-              const deduct = Math.min(qty as number, remainingToDeduct);
-              newStockByWarehouse[whId] = (qty as number) - deduct;
-              remainingToDeduct -= deduct;
-
-              // Sync warehouse capacity
-              const volChange = deduct * (productData.volumeInCtn || 0);
-              if (volChange > 0) {
-                batch.update(doc(db, 'warehouses', whId), { usedCapacity: increment(-volChange) });
-              }
-            }
-          }
-
-          batch.update(pRef, { 
+          batch.update(doc(db, 'products', item.id), {
             stock: newStock,
-            stockByWarehouse: newStockByWarehouse
+            stockByWarehouse: newStockByWarehouse,
           });
 
-          // Log Inventory — uses currentUserId fetched once before loop
+          deductionResults.push({
+            productId: item.id,
+            newStock,
+            newStockByWarehouse,
+          });
+
           await addInventoryLog({
             productId: item.id,
             productName: item.name,
@@ -1031,39 +1069,27 @@ export default function CashierPOS() {
             source: 'CASHIER',
             referenceId: newOrderRef.id,
             orderId: newOrderRef.id,
-            note: `Transaksi Kasir via ${paymentMethod}`,
-            fromWarehouseId: 'gudang-utama',
+            note: `Transaksi Kasir Offline (${paymentMethod})`,
+            fromWarehouseId: selectedWarehouse === 'auto' ? 'gudang-utama' : selectedWarehouse,
             prevStock: currentStock,
-            nextStock: newStock
+            nextStock: newStock,
           }, batch);
-
-          // Collect for Supabase sync (done after batch.commit)
-          supabaseStockUpdates.push({
-            productId: item.id,
-            newStock,
-            newStockByWarehouse,
-            prevStock: currentStock,
-            pcsToDeduct
-          });
         }
       }
 
       // --- LOGIKA BARU UNTUK DOMPET ---
       if (paymentMethod === 'DOMPET' && selectedCustomer) {
         const newBalance = selectedCustomer.walletBalance - total;
-        // FIX: Update walletBalance ke kolom native Supabase + raw_data
-        // Menggunakan Supabase langsung agar kolom wallet_balance ikut terupdate
         await supabase
           .from('customers')
           .update({
             wallet_balance: newBalance,
           })
           .eq('id', selectedCustomer.id);
-        // Juga update via batch compat agar raw_data.walletBalance konsisten
+
         const custRef = doc(db, 'customers', selectedCustomer.id);
         batch.update(custRef, { walletBalance: newBalance });
 
-        // Log dompet langsung ke wallet_logs (punya kolom native)
         await supabase.from('wallet_logs').insert({
           id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           user_id: selectedCustomer.id,
@@ -1116,39 +1142,69 @@ export default function CashierPOS() {
   
       // EKSEKUSI BATCH BERDASARKAN STATUS JARINGAN
       if (isOffline) {
-        // Jangan await batch.commit() jika offline, agar UI tidak hang
-        // Firebase akan menyimpannya di antrean IndexedDB dan sinkron saat online
         batch.commit().catch(err => logger.warn('Offline commit queued:', err));
         toast.success('Disimpan Offline (Akan sinkron saat koneksi kembali)');
       } else {
         await batch.commit();
-        toast.success('Transaksi Berhasil!');
 
-        // SYNC SUPABASE: Update stok di Supabase setelah Firestore commit sukses
-        // Jalankan secara paralel dengan Promise.allSettled agar 1 gagal tidak memblokir yang lain
-        const now = new Date().toISOString();
-        await Promise.allSettled(
-          supabaseStockUpdates.map(async ({ productId, newStock, newStockByWarehouse }) => {
-            // Fetch raw_data dulu agar tidak overwrite field lain
-            const { data: existing } = await supabaseAdmin
-              .from('products')
-              .select('raw_data')
-              .eq('id', productId)
-              .single();
+        // 3. Simpan juga ke tabel orders Supabase secara native
+        try {
+          await supabaseAdmin.from('orders').insert({
+            id: newOrderRef.id,
+            order_id: newOrderRef.id,
+            user_id: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
+            customer_name: orderData.customerName,
+            status: orderData.status,
+            total,
+            items: cart.map(item => ({
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              unit: item.unit,
+              contains: item.contains || 1,
+              cost: item.cost,
+            })),
+            raw_data: {
+              ...orderData,
+              warehouseId: selectedWarehouse,
+              warehouseName,
+              source: 'CASHIER',
+            },
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (sbErr) {
+          console.warn('Gagal insert order ke Supabase:', sbErr);
+        }
 
-            const updatedRawData = {
-              ...(existing?.raw_data || {}),
-              stock: newStock,
-              stockByWarehouse: newStockByWarehouse,
-              updatedAt: now,
+        toast.success('Transaksi Berhasil! Stok diperbarui.');
+      }
+
+      // 4. Update stok di state produk kasir secara realtime
+      if (deductionResults.length > 0) {
+        setProducts(prev => prev.map(p => {
+          const res = deductionResults.find(d => d.productId === p.id);
+          if (res) {
+            return {
+              ...p,
+              stock: res.newStock,
+              stockByWarehouse: res.newStockByWarehouse || p.stockByWarehouse,
             };
-
-            return supabaseAdmin
-              .from('products')
-              .update({ stock: newStock, raw_data: updatedRawData, updated_at: now })
-              .eq('id', productId);
-          })
-        );
+          }
+          return p;
+        }));
+        setFilteredProducts(prev => prev.map(p => {
+          const res = deductionResults.find(d => d.productId === p.id);
+          if (res) {
+            return {
+              ...p,
+              stock: res.newStock,
+              stockByWarehouse: res.newStockByWarehouse || p.stockByWarehouse,
+            };
+          }
+          return p;
+        }));
       }
       
       printReceipt({ 
@@ -1774,6 +1830,31 @@ export default function CashierPOS() {
               </div>
 
               <div className="p-5 bg-white border-t space-y-4">
+                {/* Pilihan Gudang Pengambilan Barang */}
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-black text-slate-700 uppercase flex items-center gap-1.5">
+                      <Package size={13} className="text-emerald-600" />
+                      Gudang Pengambilan Stok
+                    </label>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      {selectedWarehouse === 'auto' ? 'Otomatis Waterfall' : 'Gudang Terpilih'}
+                    </span>
+                  </div>
+                  <select
+                    value={selectedWarehouse}
+                    onChange={(e) => setSelectedWarehouse(e.target.value)}
+                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                  >
+                    <option value="auto">⚡ Otomatis (Prioritas Toko / Gudang Utama)</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        🏢 {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                   {['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'].map(m => (
                     <button

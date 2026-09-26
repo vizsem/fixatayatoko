@@ -104,6 +104,7 @@ export type MarginRule = {
 
 export const MARGIN_RULES: MarginRule[] = [
   { key: 'AUTO', label: 'Auto (berdasarkan nama/kategori)', min: 10, max: 15 },
+  { key: 'CUSTOM', label: 'Custom / Bebas (Isi persentase manual %)', min: 0, max: 1000 },
   { key: 'BERAS_SPHP', label: 'Beras SPHP', min: 2, max: 4 },
   { key: 'BERAS_PREMIUM', label: 'Beras premium', min: 4, max: 7 },
   { key: 'BERAS_MEDIUM', label: 'Beras medium', min: 3, max: 6 },
@@ -266,12 +267,15 @@ export function recommendSellingPrice(opts: {
   if (!Number.isFinite(cost) || cost <= 0) return null;
 
   const ruleKey = String(opts.ruleKey || 'AUTO').trim();
+  const isCustom = ruleKey === 'CUSTOM';
   const resolvedKey = ruleKey === 'AUTO' ? resolveMarginRuleKey(opts.name, opts.category) : ruleKey;
   const rule = getMarginRuleByKey(resolvedKey);
 
   const midpoint = (rule.min + rule.max) / 2;
   const requested = Number(opts.marginPercent || 0);
-  const marginPercent = requested > 0 ? clamp(requested, rule.min, rule.max) : midpoint;
+  const marginPercent = isCustom
+    ? (requested > 0 ? requested : 10)
+    : (requested > 0 ? clamp(requested, rule.min, rule.max) : midpoint);
 
   const roundingStep = Number(opts.roundingStep || 100);
   const rawPrice = cost * (1 + marginPercent / 100);

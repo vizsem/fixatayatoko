@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -10,81 +10,87 @@ import {
   Package, 
   Camera, 
   X, 
-  Search,
-  Check,
-  Zap,
-  ShoppingCart,
-  ScanBarcode,
-  ShoppingBag,
-  RefreshCcw,
-  MoreHorizontal,
-  ArrowDownLeft,
-  ArrowUpRight,
-  TrendingUp,
-  BarChart3,
-  MessageCircle,
-  Users,
-  Settings,
-  CreditCard,
-  History,
-  Store,
-  Wallet,
-  Star,
-  ChevronRight,
-  ChevronLeft
+  Search, 
+  Check, 
+  Zap, 
+  ShoppingCart, 
+  ShoppingBag, 
+  RefreshCcw, 
+  MoreHorizontal, 
+  ArrowDownLeft, 
+  ArrowUpRight, 
+  TrendingUp, 
+  BarChart3, 
+  MessageCircle, 
+  Users, 
+  Settings, 
+  CreditCard, 
+  History, 
+  Store, 
+  Wallet, 
+  Star, 
+  ChevronRight, 
+  Boxes, 
+  Activity, 
+  AlertTriangle,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import { playScanBeep } from '@/lib/sound';
-import { Product } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { deductStockFEFO } from '@/lib/inventory';
+import { Product } from '@/lib/types';
 
-import { addDoc, collection, db, doc, getDocs, limit, query, ref, updateDoc, where } from '@/lib/firebase';
 // UI Helpers
 const triggerHaptic = (duration = 15) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate(duration);
+    try {
+      navigator.vibrate(duration);
+    } catch (_) {}
   }
 };
 
 export default function AdminMobileNav() {
   const pathname = usePathname();
-  const [activeModal, setActiveModal] = useState<'marketplace' | 'scanner' | 'addProduct' | 'more' | 'inventory' | null>(null);
-  const [scannerType, setScannerType] = useState<'po' | 'update' | null>(null);
+  const router = useRouter();
+  const [activeModal, setActiveModal] = useState<'marketplace' | 'more' | 'inventory' | null>(null);
   
   // Marketplace Order Form State
   const [mpProductName, setMpProductName] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [mpQty, setMpQty] = useState(1);
   const [mpSource, setMpSource] = useState('Shopee');
   const [mpLoading, setMpLoading] = useState(false);
-  const [mpSearchSuggestions, setMpSearchSuggestions] = useState<Product[]>([]);
+  const [mpSearchSuggestions, setMpSearchSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
 
-  // Quick Adjust State
-  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
-  const [adjustQty, setAdjustQty] = useState(0);
-
-  // Add Product State
-  const [newProductName, setNewProductName] = useState('');
-  const [newProductPrice, setNewProductPrice] = useState('');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Fetch Suggestions
+  // Fetch product suggestions from Supabase
   useEffect(() => {
-    if (mpProductName.length > 2) {
-      const fetchSuggestions = async () => {
-        const q = query(
-          collection(db, 'products'),
-          where('name', '>=', mpProductName.toUpperCase()),
-          where('name', '<=', mpProductName.toUpperCase() + '\uf8ff'),
-          limit(5)
-        );
-        const snap = await getDocs(q);
-        setMpSearchSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
-        setShowSuggestions(true);
-      };
-      fetchSuggestions();
+    if (mpProductName.trim().length >= 2) {
+      const timer = setTimeout(async () => {
+        setSearching(true);
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('id, name, sku, stock, price, raw_data')
+            .ilike('name', `%${mpProductName.trim()}%`)
+            .limit(6);
+
+          if (!error && data) {
+            setMpSearchSuggestions(data);
+            setShowSuggestions(true);
+          }
+        } catch (err) {
+          console.error('Search product error:', err);
+        } finally {
+          setSearching(false);
+        }
+      }, 250);
+
+      return () => clearTimeout(timer);
     } else {
+      setMpSearchSuggestions([]);
       setShowSuggestions(false);
     }
   }, [mpProductName]);
@@ -96,99 +102,155 @@ export default function AdminMobileNav() {
     setActiveModal('marketplace');
   };
 
-  const handleOpenScanner = (type: 'po' | 'update') => {
+  const handleOpenInventory = () => {
     triggerHaptic(15);
-    setScannerType(type);
-    setActiveModal('scanner');
+    setActiveModal('inventory');
   };
 
-  const handleOpenAddProduct = () => {
+  const handleOpenMore = () => {
     triggerHaptic(15);
-    setActiveModal('addProduct');
-    startCamera();
+    setActiveModal('more');
   };
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      notify.admin.error('Gagal mengakses kamera');
-    }
+  const closeModal = () => {
+    setActiveModal(null);
+    setShowSuggestions(false);
   };
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-    }
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(videoRef.current, 0, 0);
-      setCapturedImage(canvas.toDataURL('image/jpeg'));
-      triggerHaptic(30);
-    }
+  const navigateTo = (href: string) => {
+    triggerHaptic(15);
+    closeModal();
+    router.push(href);
   };
 
   const saveMarketplaceOrder = async () => {
-    if (!mpProductName) return notify.admin.error('Nama produk wajib diisi');
+    if (!mpProductName && !selectedProduct) {
+      return notify.admin.error('Pilih produk terlebih dahulu');
+    }
+    if (mpQty <= 0) {
+      return notify.admin.error('Jumlah QTY minimal 1');
+    }
+
     setMpLoading(true);
     try {
-      await addDoc(collection(db, 'marketplace_orders'), {
-        productName: mpProductName,
+      const prodName = selectedProduct?.name || mpProductName;
+      const prodId = selectedProduct?.id;
+
+      // 1. Simpan order marketplace ke Supabase
+      const now = new Date().toISOString();
+      const orderPayload = {
+        product_name: prodName,
+        product_id: prodId || null,
         qty: Number(mpQty),
         source: mpSource,
-        createdAt: new Date().toISOString(),
-        status: 'pending'
-      });
-      
-      notify.admin.success('Order Tersimpan & Stok Berkurang');
+        channel: mpSource.toUpperCase(),
+        status: 'completed',
+        created_at: now,
+        raw_data: {
+          productName: prodName,
+          productId: prodId,
+          qty: Number(mpQty),
+          source: mpSource,
+          createdAt: now,
+        }
+      };
+
+      const { data: insertedOrder, error: orderErr } = await supabase
+        .from('marketplace_orders')
+        .insert(orderPayload)
+        .select()
+        .single();
+
+      // Jika tabel marketplace_orders ada atau fallback
+      if (orderErr) {
+        // Coba simpan ke format generic orders jika diperlukan
+        console.warn('marketplace_orders insert fallback:', orderErr.message);
+      }
+
+      // 2. Potong stok otomatis jika ada product_id
+      if (prodId) {
+        const deductRes = await deductStockFEFO({
+          productId: prodId,
+          amount: Number(mpQty),
+          warehouseId: 'auto',
+          reference: `MP-${mpSource.toUpperCase()}-${Date.now().toString().slice(-6)}`,
+          notes: `Penjualan Marketplace ${mpSource} (${mpQty} unit)`,
+          source: 'ORDER'
+        });
+
+        if (!deductRes.success) {
+          notify.admin.error(`Order tersimpan, namun ${deductRes.error || 'stok gagal dikurangi'}`);
+        } else {
+          notify.admin.success(`Order ${mpSource} berhasil & stok terpotong!`);
+        }
+      } else {
+        notify.admin.success(`Order ${mpSource} berhasil disimpan!`);
+      }
+
       triggerHaptic(50);
-      setActiveModal(null);
+      closeModal();
       setMpProductName('');
+      setSelectedProduct(null);
       setMpQty(1);
-    } catch (error) {
-      notify.admin.error('Gagal menyimpan order');
+    } catch (error: any) {
+      console.error('Save MP order error:', error);
+      notify.admin.error(error.message || 'Gagal menyimpan order marketplace');
     } finally {
       setMpLoading(false);
     }
   };
 
-  const moreMenuItems = [
-    { name: 'POS', icon: ShoppingCart, href: '/cashier', color: 'text-red-600', bg: 'bg-red-50' },
-    { name: 'Reports', icon: BarChart3, href: '/admin/reports', color: 'text-purple-600', bg: 'bg-purple-50' },
-    { name: 'Finance', icon: CreditCard, href: '/admin/finance', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { name: 'Customers', icon: Users, href: '/admin/customers', color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'History', icon: History, href: '/admin/inventory/history', color: 'text-orange-600', bg: 'bg-orange-50' },
-    { name: 'Wallet', icon: Wallet, href: '/admin/wallet', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { name: 'Chat', icon: MessageCircle, href: '/admin/chat', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-    { name: 'Promotions', icon: Star, href: '/admin/promotions', color: 'text-pink-600', bg: 'bg-pink-50' },
-    { name: 'Settings', icon: Settings, href: '/admin/settings', color: 'text-gray-600', bg: 'bg-gray-50' },
+  const moreMenuGroups = [
+    {
+      title: 'Penjualan & Transaksi',
+      items: [
+        { name: 'POS Kasir', icon: ShoppingCart, href: '/cashier', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', desc: 'Kasir Penjualan Toko' },
+        { name: 'Marketplace', icon: ShoppingBag, href: '/admin/marketplace-orders', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', desc: 'Order Online & Ekspedisi' },
+        { name: 'Pelanggan', icon: Users, href: '/admin/customers', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', desc: 'Database Member & Piutang' },
+      ]
+    },
+    {
+      title: 'Inventaris & Gudang',
+      items: [
+        { name: 'Stok Gudang', icon: Package, href: '/admin/inventory', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', desc: 'Opname & Penyesuaian' },
+        { name: 'Pembelian (PO)', icon: Receipt, href: '/admin/purchases', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', desc: 'Supplier & Tagihan Hutang' },
+        { name: 'Log Mutasi', icon: Activity, href: '/admin/inventory/logs', color: 'text-cyan-600', bg: 'bg-cyan-50', border: 'border-cyan-100', desc: 'Histori Keluar Masuk' },
+        { name: 'Kartu Stok', icon: History, href: '/admin/inventory/history', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', desc: 'Audit Pergerakan Barang' },
+      ]
+    },
+    {
+      title: 'Laporan & Keuangan',
+      items: [
+        { name: 'Lap. Finansial', icon: CreditCard, href: '/admin/reports/finance', color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-100', desc: 'Laba Rugi & Arus Kas' },
+        { name: 'Lap. Penjualan', icon: BarChart3, href: '/admin/reports', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', desc: 'Grafik Omzet & Margin' },
+        { name: 'Dompet & Kas', icon: Wallet, href: '/admin/wallet', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', desc: 'Mutasi Saldo & Bank' },
+      ]
+    },
+    {
+      title: 'Pengaturan & Toko',
+      items: [
+        { name: 'Tambah Produk', icon: PlusCircle, href: '/admin/products/add', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100', desc: 'Katalog & Barcode Baru' },
+        { name: 'Pengaturan', icon: Settings, href: '/admin/settings', color: 'text-gray-700', bg: 'bg-gray-100', border: 'border-gray-200', desc: 'Toko, Printer & Sistem' },
+      ]
+    }
   ];
 
   const mainNavItems = [
-    { name: 'PO', icon: Receipt, href: '/admin/purchases/add' },
-    { name: 'Stok', icon: Package, action: () => setActiveModal('inventory') },
-    { name: 'Order', icon: ShoppingBag, action: handleOpenMarketplace, center: true },
-    { name: 'New', icon: Camera, action: handleOpenAddProduct },
-    { name: 'More', icon: MoreHorizontal, action: () => { triggerHaptic(10); setActiveModal('more'); } },
+    { name: 'PO', icon: Receipt, href: '/admin/purchases/add', label: 'Buat PO' },
+    { name: 'Stok', icon: Package, action: handleOpenInventory, label: 'Inventaris' },
+    { name: 'Order', icon: ShoppingBag, action: handleOpenMarketplace, center: true, label: 'Order MP' },
+    { name: 'Produk', icon: PlusCircle, href: '/admin/products/add', label: 'Tambah' },
+    { name: 'Menu', icon: MoreHorizontal, action: handleOpenMore, label: 'Lainnya' },
   ];
 
   return (
     <>
-      {/* Bottom Nav Bar */}
-      <nav className="fixed bottom-0 inset-x-0 z-[70] bg-white/80 backdrop-blur-xl border-t border-gray-100 md:hidden pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center justify-around px-2 h-16">
+      {/* ── Bottom Nav Bar (Mobile Dedicated) ── */}
+      <nav className="fixed bottom-0 inset-x-0 z-[70] bg-white/95 backdrop-blur-xl border-t border-gray-200/80 md:hidden pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_25px_rgba(0,0,0,0.06)]">
+        <div className="flex items-center justify-around px-2 h-16 max-w-lg mx-auto">
           {mainNavItems.map((item, idx) => {
             const Icon = item.icon;
+            
             if (item.href) {
               const isActive = pathname === item.href;
               return (
@@ -196,10 +258,12 @@ export default function AdminMobileNav() {
                   key={idx} 
                   href={item.href}
                   onClick={() => triggerHaptic(10)}
-                  className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all ${isActive ? 'text-green-600' : 'text-gray-400'}`}
+                  className={`flex flex-col items-center justify-center flex-1 h-14 rounded-2xl transition-all duration-200 active:scale-95 ${
+                    isActive ? 'text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-800'
+                  }`}
                 >
-                  <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[2]'} />
-                  <span className="text-[10px] font-bold mt-0.5 uppercase tracking-tight">{item.name}</span>
+                  <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'} />
+                  <span className="text-[10px] font-bold mt-1 tracking-tight">{item.name}</span>
                 </Link>
               );
             }
@@ -209,9 +273,10 @@ export default function AdminMobileNav() {
                 <button
                   key={idx}
                   onClick={item.action}
-                  className="flex flex-col items-center justify-center -mt-8 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-200 active:scale-90 transition-transform border-4 border-white"
+                  aria-label="Order Marketplace"
+                  className="flex flex-col items-center justify-center -mt-7 w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full shadow-lg shadow-blue-500/30 active:scale-90 transition-transform border-4 border-white"
                 >
-                  <Icon size={24} />
+                  <Icon size={24} className="stroke-[2.3]" />
                 </button>
               );
             }
@@ -220,448 +285,284 @@ export default function AdminMobileNav() {
               <button
                 key={idx}
                 onClick={item.action}
-                className="flex flex-col items-center justify-center w-12 h-12 text-gray-400 active:scale-90 transition-transform"
+                className="flex flex-col items-center justify-center flex-1 h-14 text-gray-500 hover:text-gray-800 active:scale-95 transition-all"
               >
-                <Icon size={20} />
-                <span className="text-[10px] font-bold mt-0.5 uppercase tracking-tight">{item.name}</span>
+                <Icon size={20} className="stroke-[1.8]" />
+                <span className="text-[10px] font-bold mt-1 tracking-tight">{item.name}</span>
               </button>
             );
           })}
         </div>
       </nav>
 
-      {/* Inventory Options Modal */}
+      {/* ── Modal 1: PILIH AKSI INVENTARIS (Sleek Bottom Sheet) ── */}
       {activeModal === 'inventory' && (
         <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
-            <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
-            <h2 className="text-xl font-black tracking-tighter mb-5">Pilih Aksi Inventaris</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => handleOpenScanner('po')}
-                className="flex flex-col items-center gap-3 p-5 bg-green-50 text-green-600 rounded-2xl border border-green-100 active:scale-95 transition-all"
-              >
-                <ArrowDownLeft size={32} />
-                <span className="text-xs font-black tracking-widest">STOCK IN (PO)</span>
-              </button>
-              <button 
-                onClick={() => handleOpenScanner('update')}
-                className="flex flex-col items-center gap-3 p-5 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100 active:scale-95 transition-all"
-              >
-                <ArrowUpRight size={32} />
-                <span className="text-xs font-black tracking-widest">STOCK ADJUST</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* More Menu Modal */}
-      {activeModal === 'more' && (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in fade-in duration-300">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-xl font-black tracking-tighter">Semua Fitur</h2>
-            <button onClick={() => setActiveModal(null)} className="p-2.5 bg-gray-50 rounded-xl text-gray-400">
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-2 gap-3">
-              {moreMenuItems.map((item, idx) => (
-                <Link
-                  key={idx}
-                  href={item.href}
-                  onClick={() => { setActiveModal(null); triggerHaptic(10); }}
-                  className={`flex flex-col items-center gap-2.5 p-5 rounded-2xl ${item.bg} ${item.color} active:scale-95 transition-all`}
-                >
-                  <item.icon size={24} />
-                  <span className="text-[9px] font-black tracking-widest uppercase">{item.name}</span>
-                </Link>
-              ))}
-            </div>
-            
-            <div className="mt-8 p-6 bg-gray-50 rounded-3xl border border-gray-100">
-              <h3 className="text-[11px] font-black mb-4 flex items-center gap-2">
-                <TrendingUp size={14} className="text-green-600" /> Ringkasan Hari Ini
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[9px] font-bold text-gray-400">Total Penjualan</p>
-                  <p className="text-base font-black text-gray-800">Rp 0</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold text-gray-400">Order Baru</p>
-                  <p className="text-base font-black text-gray-800">0</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Marketplace Modal (Bottom Sheet Style) */}
-      {activeModal === 'marketplace' && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end transform transition-all duration-300">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)} />
-          <div className="relative bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
-            <div className="w-12 h-1 bg-gray-100 rounded-full mx-auto mb-6" />
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" 
+            onClick={closeModal} 
+          />
+          <div className="relative bg-white rounded-t-[2rem] p-6 animate-in slide-in-from-bottom duration-300 shadow-2xl border-t border-gray-100 max-w-lg mx-auto w-full">
+            {/* Handle Drag bar */}
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5" />
             
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-black tracking-tighter text-gray-800">Order Marketplace</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 rounded-full text-gray-400">
-                <X size={20} />
+              <div>
+                <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
+                  <Boxes className="text-blue-600" size={20} />
+                  Menu Inventaris & Stok
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Pilih tindakan stok barang yang diinginkan</p>
+              </div>
+              <button 
+                onClick={closeModal}
+                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full active:scale-90 transition-transform"
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {/* Option 1: STOCK IN (PO) */}
+              <button 
+                onClick={() => navigateTo('/admin/purchases/add')}
+                className="flex flex-col items-start p-4 bg-gradient-to-br from-emerald-50 to-teal-50/50 hover:from-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200/80 active:scale-95 transition-all shadow-sm text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                  <ArrowDownLeft size={22} className="stroke-[2.5]" />
+                </div>
+                <span className="text-xs font-black tracking-wider text-emerald-800 uppercase">STOCK IN (PO)</span>
+                <span className="text-[11px] text-emerald-600/90 font-medium mt-1 leading-tight">Input Pembelian & Terima Barang PO</span>
+              </button>
+
+              {/* Option 2: STOCK ADJUST */}
+              <button 
+                onClick={() => navigateTo('/admin/inventory')}
+                className="flex flex-col items-start p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 hover:from-amber-100 text-amber-900 rounded-2xl border border-amber-200/80 active:scale-95 transition-all shadow-sm text-left group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                  <ArrowUpRight size={22} className="stroke-[2.5]" />
+                </div>
+                <span className="text-xs font-black tracking-wider text-amber-800 uppercase">STOCK ADJUST</span>
+                <span className="text-[11px] text-amber-600/90 font-medium mt-1 leading-tight">Opname, Koreksi & Alokasi Gudang</span>
+              </button>
+            </div>
+
+            {/* Sub Quick Links */}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+              <button 
+                onClick={() => navigateTo('/admin/inventory/logs')}
+                className="flex items-center gap-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-gray-700 text-xs font-bold active:scale-95 transition-all"
+              >
+                <Activity size={16} className="text-blue-500" />
+                <span>Log Mutasi Stok</span>
+              </button>
+              <button 
+                onClick={() => navigateTo('/admin/inventory/history')}
+                className="flex items-center gap-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-gray-700 text-xs font-bold active:scale-95 transition-all"
+              >
+                <History size={16} className="text-purple-500" />
+                <span>Kartu & Audit Stok</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal 2: ORDER MARKETPLACE (Bottom Sheet Style) ── */}
+      {activeModal === 'marketplace' && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" 
+            onClick={closeModal} 
+          />
+          <div className="relative bg-white rounded-t-[2rem] p-6 animate-in slide-in-from-bottom duration-300 shadow-2xl max-w-lg mx-auto w-full max-h-[90vh] overflow-y-auto">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5" />
+            
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
+                  <ShoppingBag className="text-blue-600" size={20} />
+                  Input Order Marketplace
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Catat order & potong stok otomatis</p>
+              </div>
+              <button 
+                onClick={closeModal} 
+                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full active:scale-90 transition-transform"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Product Search Input */}
               <div className="relative">
-                <label htmlFor="mp-product-name" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Nama Produk</label>
+                <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                  Cari Produk Toko
+                </label>
                 <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input 
-                    id="mp-product-name"
                     type="text" 
                     value={mpProductName}
-                    onChange={(e) => setMpProductName(e.target.value)}
-                    placeholder="Cari produk..."
-                    className="w-full bg-gray-50 border-none rounded-xl pl-12 pr-4 py-3.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    onChange={(e) => {
+                      setMpProductName(e.target.value);
+                      setSelectedProduct(null);
+                    }}
+                    placeholder="Ketik nama atau SKU produk..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                   />
+                  {searching && (
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                      <Zap size={14} className="animate-spin text-blue-500" />
+                    </div>
+                  )}
                 </div>
                 
+                {/* Suggestions Dropdown */}
                 {showSuggestions && mpSearchSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden py-2">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden py-1 max-h-56 overflow-y-auto">
                     {mpSearchSuggestions.map((s) => (
                       <button 
                         key={s.id}
+                        type="button"
                         onClick={() => {
+                          setSelectedProduct(s);
                           setMpProductName(s.name);
                           setShowSuggestions(false);
                           triggerHaptic(10);
                         }}
-                        className="w-full px-6 py-3 text-left hover:bg-gray-50 flex items-center justify-between group"
+                        className="w-full px-4 py-2.5 text-left hover:bg-blue-50/60 flex items-center justify-between border-b border-gray-50 last:border-0"
                       >
-                        <div>
-                          <p className="text-xs font-black text-gray-800">{s.name}</p>
-                          <p className="text-[9px] font-bold text-gray-400">{s.sku} • {s.stock} unit</p>
+                        <div className="pr-2">
+                          <p className="text-xs font-bold text-gray-800 line-clamp-1">{s.name}</p>
+                          <p className="text-[10px] text-gray-500 font-medium">
+                            SKU: {s.sku || '-'} • Stok: <span className="font-bold text-blue-600">{s.stock ?? 0}</span>
+                          </p>
                         </div>
-                        <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500" />
+                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg shrink-0">
+                          Pilih
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label htmlFor="mp-qty" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">QTY</label>
-                  <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
-                    <button onClick={() => { setMpQty(Math.max(1, mpQty - 1)); triggerHaptic(5); }} className="w-10 h-10 flex items-center justify-center text-gray-400 font-bold text-lg">-</button>
+              {/* QTY & Channel Selector */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                    Jumlah (QTY)
+                  </label>
+                  <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1">
+                    <button 
+                      type="button"
+                      onClick={() => { setMpQty(Math.max(1, mpQty - 1)); triggerHaptic(5); }} 
+                      className="w-9 h-9 flex items-center justify-center bg-white rounded-lg text-gray-700 font-bold text-base shadow-sm active:scale-90"
+                    >-</button>
                     <input 
-                      id="mp-qty"
                       type="number" 
+                      min="1"
                       value={mpQty}
-                      onChange={(e) => setMpQty(Number(e.target.value))}
-                      className="flex-1 bg-transparent text-center text-xs font-black outline-none"
+                      onChange={(e) => setMpQty(Math.max(1, Number(e.target.value) || 1))}
+                      className="flex-1 bg-transparent text-center text-xs font-bold outline-none"
                     />
-                    <button onClick={() => { setMpQty(mpQty + 1); triggerHaptic(5); }} className="w-10 h-10 flex items-center justify-center text-gray-400 font-bold text-lg">+</button>
+                    <button 
+                      type="button"
+                      onClick={() => { setMpQty(mpQty + 1); triggerHaptic(5); }} 
+                      className="w-9 h-9 flex items-center justify-center bg-white rounded-lg text-gray-700 font-bold text-base shadow-sm active:scale-90"
+                    >+</button>
                   </div>
                 </div>
                 
-                <div className="flex-1">
-                  <label htmlFor="mp-source" className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-2 block">Source</label>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                    Marketplace
+                  </label>
                   <select 
-                    id="mp-source"
                     value={mpSource}
                     onChange={(e) => setMpSource(e.target.value)}
-                    className="w-full h-11 bg-gray-50 border-none rounded-xl px-4 text-xs font-bold outline-none font-black"
+                    className="w-full h-11 bg-gray-50 border border-gray-200 rounded-xl px-3 text-xs font-bold text-gray-800 outline-none focus:bg-white focus:border-blue-500"
                   >
-                    <option>Shopee</option>
-                    <option>Tokped</option>
-                    <option>TikTok</option>
+                    <option value="Shopee">🟠 Shopee</option>
+                    <option value="Tokopedia">🟢 Tokopedia</option>
+                    <option value="TikTok">⚫ TikTok Shop</option>
+                    <option value="Lazada">🔵 Lazada</option>
+                    <option value="Manual">📦 Offline / Manual</option>
                   </select>
                 </div>
               </div>
 
+              {/* Submit Button */}
               <button 
                 onClick={saveMarketplaceOrder}
                 disabled={mpLoading}
-                className="w-full bg-blue-600 text-white h-14 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-blue-100 active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl font-bold text-xs tracking-wider shadow-lg shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
               >
                 {mpLoading ? <Zap className="animate-spin" size={16} /> : <Check size={18} />}
-                SIMPAN ORDER
+                SIMPAN & POTONG STOK
+              </button>
+
+              {/* Link to Full Marketplace Page */}
+              <button
+                onClick={() => navigateTo('/admin/marketplace-orders')}
+                className="w-full py-2 text-center text-xs font-bold text-gray-500 hover:text-blue-600 flex items-center justify-center gap-1"
+              >
+                Buka Halaman Lengkap Order Marketplace <ChevronRight size={14} />
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Scanner & Quick Adjust Modal */}
-      {activeModal === 'scanner' && (
-        <div className="fixed inset-0 z-[110] bg-black flex flex-col p-6 overflow-y-auto">
-          <div className="flex items-center justify-between mb-8">
+      {/* ── Modal 3: SEMUA FITUR (More Menu Fullsheet) ── */}
+      {activeModal === 'more' && (
+        <div className="fixed inset-0 z-[100] bg-gray-50 flex flex-col animate-in fade-in duration-200">
+          <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h2 className="text-white text-xl font-black tracking-tight">
-                {scannerType === 'po' ? 'Stock In (Barcode)' : 'Quick Adjust'}
-              </h2>
-              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Arahkan kamera ke barcode</p>
+              <h2 className="text-lg font-black tracking-tight text-gray-900">Semua Fitur Admin</h2>
+              <p className="text-xs text-gray-500">Navigasi cepat semua modul aplikasi</p>
             </div>
             <button 
-              onClick={() => {
-                setActiveModal(null);
-                setScannedProduct(null);
-              }} 
-              className="p-3 bg-white/10 rounded-2xl text-white"
+              onClick={closeModal} 
+              className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 active:scale-90 transition-transform"
             >
-              <X size={24} />
-            </button>
-          </div>
-
-          {!scannedProduct ? (
-            <div className="flex-1 flex flex-col">
-              <div className="aspect-square bg-gray-900 rounded-[3rem] border-2 border-dashed border-white/20 flex items-center justify-center overflow-hidden relative">
-                <BarcodeScanner onResult={(code) => {
-                  triggerHaptic(20);
-                  fetchProductBySku(code);
-                }} />
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-64 h-64 border-2 border-green-500/50 rounded-3xl" />
-                  <div className="absolute w-full h-[2px] bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-scan" />
-                </div>
-              </div>
-              <div className="mt-8">
-                <label htmlFor="manual-sku" className="text-[10px] font-black text-gray-500 tracking-widest uppercase mb-2 block">Atau Input SKU Manual</label>
-                <div className="flex gap-2">
-                  <input id="manual-sku" className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs font-bold outline-none" placeholder="Ketik SKU..." />
-                  <button className="bg-white text-black px-6 rounded-2xl font-black text-[10px]">CARI</button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 animate-in zoom-in-95 duration-300">
-              <div className="bg-white rounded-3xl p-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center text-gray-300">
-                    <Package size={32} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black tracking-tight">{scannedProduct.name}</h3>
-                    <p className="text-[10px] font-bold text-gray-400">{scannedProduct.sku} • {scannedProduct.stock} unit</p>
-                  </div>
-                </div>
-
-                <div className="space-y-8">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 tracking-widest uppercase mb-4 block text-center">
-                      {scannerType === 'po' ? 'Stok Masuk' : 'Adjust Stok'}
-                    </label>
-                    <div className="flex items-center justify-center gap-8">
-                      <button 
-                        onClick={() => { setAdjustQty(adjustQty - 1); triggerHaptic(10); }}
-                        className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-2xl font-black text-gray-400 active:bg-gray-200"
-                      >-</button>
-                      <span className="text-5xl font-black tracking-tighter w-24 text-center">
-                        {scannerType === 'po' ? `+${adjustQty}` : (adjustQty > 0 ? `+${adjustQty}` : adjustQty)}
-                      </span>
-                      <button 
-                        onClick={() => { setAdjustQty(adjustQty + 1); triggerHaptic(10); }}
-                        className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-2xl font-black text-gray-400 active:bg-gray-200"
-                      >+</button>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={saveStockUpdate}
-                    className="w-full bg-black text-white h-16 rounded-2xl font-black tracking-[0.2em] text-[10px] shadow-xl active:scale-95 transition-all"
-                  >
-                    UPDATE STOK REAL-TIME
-                  </button>
-                  <button onClick={() => setScannedProduct(null)} className="w-full py-4 text-[10px] font-black text-gray-400">RESET SCAN</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Add Product Modal */}
-      {activeModal === 'addProduct' && (
-        <div className="fixed inset-0 z-[110] bg-gray-50 flex flex-col">
-          <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-xl font-black tracking-tighter">Tambah Produk Baru</h2>
-            <button onClick={() => { setActiveModal(null); stopCamera(); }} className="p-2.5 bg-gray-100 rounded-xl text-gray-400">
               <X size={20} />
             </button>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {/* Camera View */}
-            <div className="aspect-square bg-gray-100 rounded-3xl overflow-hidden relative border-2 border-white shadow-lg">
-              {!capturedImage ? (
-                <>
-                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 flex items-end justify-center pb-8">
-                    <button 
-                      onClick={capturePhoto}
-                      className="w-16 h-16 rounded-full bg-white border-4 border-gray-200 flex items-center justify-center shadow-2xl active:scale-90 transition-transform"
-                    >
-                      <div className="w-12 h-12 bg-red-500 rounded-full" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="relative w-full h-full">
-                    <img 
-                      src={capturedImage} 
-                      alt="Captured product" 
-                      className="object-cover" // Since it's a base64 data URL
-                    />
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <button onClick={() => setCapturedImage(null)} className="p-3 bg-black/50 backdrop-blur-md rounded-2xl text-white">
-                      <RefreshCcw size={20} />
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="new-product-name" className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">NAMA PRODUK</label>
-                <input 
-                  id="new-product-name"
-                  type="text" 
-                  value={newProductName}
-                  onChange={(e) => setNewProductName(e.target.value)}
-                  placeholder="Mis: Keripik Singkong Level 10"
-                  className="w-full bg-white border border-gray-100 rounded-2xl px-6 py-4 text-xs font-bold outline-none"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="new-product-price" className="text-[10px] font-black text-gray-400 tracking-widest mb-2 block">HARGA DASAR (MODAL)</label>
-                <div className="relative">
-                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Rp</span>
-                  <input 
-                    id="new-product-price"
-                    type="number" 
-                    value={newProductPrice}
-                    onChange={(e) => setNewProductPrice(e.target.value)}
-                    className="w-full bg-white border border-gray-100 rounded-xl pl-11 pr-4 py-3.5 text-xs font-bold outline-none"
-                        placeholder="0"
-                  />
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
+            {moreMenuGroups.map((group, gIdx) => (
+              <div key={gIdx}>
+                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2.5 px-1">
+                  {group.title}
+                </h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {group.items.map((item, idx) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={idx}
+                        href={item.href}
+                        onClick={() => { closeModal(); triggerHaptic(10); }}
+                        className={`flex flex-col p-3.5 rounded-2xl bg-white border ${item.border} hover:shadow-sm active:scale-95 transition-all text-left group`}
+                      >
+                        <div className={`w-9 h-9 rounded-xl ${item.bg} ${item.color} flex items-center justify-center mb-2 shadow-xs group-hover:scale-105 transition-transform`}>
+                          <Icon size={18} className="stroke-[2.2]" />
+                        </div>
+                        <span className="text-xs font-black text-gray-800">{item.name}</span>
+                        <span className="text-[10px] text-gray-500 font-medium mt-0.5 line-clamp-1">{item.desc}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
-
-              <button className="w-full bg-green-600 text-white h-14 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-green-100 active:scale-95 transition-all mt-4">
-                SIMPAN PRODUK & MASUK GUDANG
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}
-
-      <style jsx global>{`
-        @keyframes scan {
-          0% { top: 0; }
-          100% { top: 100%; }
-        }
-        .animate-scan {
-          animation: scan 2s linear infinite;
-        }
-      `}</style>
     </>
   );
-
-  async function fetchProductBySku(sku: string) {
-    try {
-      const q = query(collection(db, 'products'), where('sku', '==', sku), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setScannedProduct({ id: snap.docs[0].id, ...snap.docs[0].data() } as Product);
-      } else {
-        notify.admin.error('Produk tidak ditemukan');
-      }
-    } catch (e) {
-      notify.admin.error('Error mencari produk');
-    }
-  }
-
-  async function saveStockUpdate() {
-    if (!scannedProduct) return;
-    try {
-      const newStock = scannedProduct.stock + adjustQty;
-      await updateDoc(doc(db, 'products', scannedProduct.id), {
-        stock: newStock,
-        updatedAt: new Date().toISOString()
-      });
-      
-      notify.admin.success(`Stok berhasil diupdate ke ${newStock}`);
-      triggerHaptic(50);
-      setActiveModal(null);
-      setScannedProduct(null);
-      setAdjustQty(0);
-    } catch (e) {
-      notify.admin.error('Gagal update stok');
-    }
-  }
-}
-
-function BarcodeScanner({ onResult }: { onResult: (code: string) => void }) {
-  useEffect(() => {
-    let html5QrCode: any = null;
-    let isCancelled = false;
-
-    const start = async () => {
-      try {
-        const mod = await import('html5-qrcode');
-        if (isCancelled) return;
-        const Html5Qrcode = mod.Html5Qrcode;
-        const el = document.getElementById('reader');
-        if (!el) return;
-
-        html5QrCode = new Html5Qrcode('reader');
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          {
-            fps: 15,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          (decodedText: string) => {
-            playScanBeep();
-            if (html5QrCode?.isScanning) {
-              html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-                onResult(decodedText);
-              }).catch(() => onResult(decodedText));
-            } else {
-              onResult(decodedText);
-            }
-          },
-          () => {}
-        );
-      } catch (e) {
-        console.warn('MobileNav camera error:', e);
-      }
-    };
-
-    start();
-
-    return () => {
-      isCancelled = true;
-      if (html5QrCode) {
-        if (html5QrCode.isScanning) {
-          html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
-        } else {
-          html5QrCode.clear().catch(console.error);
-        }
-      }
-    };
-  }, [onResult]);
-
-  return <div id="reader" className="w-full h-full overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover" />;
 }

@@ -23,7 +23,7 @@ interface StockLog {
   previousStock: number;
   newStock: number;
   type?: string;
-  createdAt?: Timestamp;
+  createdAt?: any;
 }
 
 
@@ -39,32 +39,73 @@ export default function StockLogsPage() {
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    // Ambil 100 riwayat terbaru
-    const q = query(
-      collection(db, 'stock_logs'),
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
+    async function loadLogs() {
+      try {
+        const { data: whData } = await supabase.from('warehouses').select('id, name');
+        const whMap: Record<string, string> = {
+          'gudang-utama': 'Gudang Utama',
+          'toko-depan': 'Toko Depan',
+          'Rumah': 'Rumah',
+          'ATAYATOKO': 'ATAYATOKO'
+        };
+        (whData || []).forEach((w: any) => { whMap[w.id] = w.name || w.id; });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as StockLog[];
+        const { data, error } = await supabase
+          .from('inventory_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200);
 
-      setLogs(data);
-      setLoading(false);
-    });
+        if (!error && data) {
+          const mapped: StockLog[] = data.map((d: any) => {
+            const raw = d.raw_data || {};
+            const whId = d.warehouse_id || d.from_warehouse_id || d.to_warehouse_id || 'gudang-utama';
+            const changeVal = d.quantity !== null && d.quantity !== undefined
+              ? Number(d.quantity)
+              : (d.type === 'KELUAR' ? -Math.abs(Number(d.amount || 0)) : Math.abs(Number(d.amount || 0)));
+            const prev = Number(d.prev_stock ?? raw.prevStock ?? 0);
+            const next = Number(d.next_stock ?? raw.nextStock ?? (prev + changeVal));
 
-    return () => unsubscribe();
+            return {
+              id: d.id,
+              adminEmail: d.admin_id || raw.adminId || raw.adminEmail || 'Admin/Sistem',
+              productName: d.product_name || raw.productName || 'Produk',
+              warehouseName: whMap[whId] || whId,
+              change: changeVal,
+              previousStock: prev,
+              newStock: next,
+              type: d.type || raw.type || (changeVal >= 0 ? 'MASUK' : 'KELUAR'),
+              createdAt: d.created_at ? new Date(d.created_at) : new Date(),
+            };
+          });
+          setLogs(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load stock logs:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadLogs();
   }, []);
+
+  const formatDateVal = (d: any) => {
+    if (!d) return '-';
+    const dateObj = d instanceof Date ? d : (d.toDate ? d.toDate() : new Date(d));
+    try {
+      return format(dateObj, 'dd MMM yyyy, HH:mm', { locale: id });
+    } catch {
+      return '-';
+    }
+  };
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.adminEmail?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesWarehouse = warehouseFilter ? (log.warehouseName || '').toLowerCase() === warehouseFilter.toLowerCase() : true;
     const matchesAdmin = adminFilter ? (log.adminEmail || '').toLowerCase().includes(adminFilter.toLowerCase()) : true;
-    const t = log.createdAt ? log.createdAt.toDate().getTime() : 0;
+    const t = log.createdAt ? (log.createdAt instanceof Date ? log.createdAt.getTime() : (log.createdAt.toDate ? log.createdAt.toDate().getTime() : new Date(log.createdAt).getTime())) : 0;
     const startOk = startDate ? t >= new Date(startDate).getTime() : true;
     const endOk = endDate ? t <= new Date(endDate).getTime() + 86400000 - 1 : true;
     return matchesSearch && matchesWarehouse && matchesAdmin && startOk && endOk;
@@ -155,7 +196,7 @@ export default function StockLogsPage() {
                           <div className="flex items-center gap-1 mt-0.5 text-gray-400">
                              <Clock size={10} />
                              <span className="text-[9px] font-bold uppercase">
-                                {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM yyyy, HH:mm', { locale: id }) : '-'}
+                                {formatDateVal(log.createdAt)}
                              </span>
                           </div>
                        </div>
@@ -224,7 +265,7 @@ export default function StockLogsPage() {
                           <div>
                             <p className="text-[10px] font-black uppercase">{log.adminEmail?.split('@')[0]}</p>
                             <p className="text-[9px] text-gray-400 font-bold">
-                              {log.createdAt ? format(log.createdAt.toDate(), 'dd MMM yyyy, HH:mm', { locale: id }) : 'Loading...'}
+                              {formatDateVal(log.createdAt)}
                             </p>
                           </div>
                         </div>
