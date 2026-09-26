@@ -33,8 +33,8 @@ import {
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import notify from '@/lib/notify';
+import { playScanBeep } from '@/lib/sound';
 import { Product } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
@@ -612,22 +612,56 @@ export default function AdminMobileNav() {
 
 function BarcodeScanner({ onResult }: { onResult: (code: string) => void }) {
   useEffect(() => {
-    const scanner = new Html5QrcodeScanner("reader", { 
-      fps: 10, 
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0
-    }, false);
-    
-    scanner.render((result) => {
-      scanner.clear().then(() => onResult(result));
-    }, (err) => {
-      // Ignore errors for continuous scanning
-    });
+    let html5QrCode: any = null;
+    let isCancelled = false;
+
+    const start = async () => {
+      try {
+        const mod = await import('html5-qrcode');
+        if (isCancelled) return;
+        const Html5Qrcode = mod.Html5Qrcode;
+        const el = document.getElementById('reader');
+        if (!el) return;
+
+        html5QrCode = new Html5Qrcode('reader');
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+          },
+          (decodedText: string) => {
+            playScanBeep();
+            if (html5QrCode?.isScanning) {
+              html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                onResult(decodedText);
+              }).catch(() => onResult(decodedText));
+            } else {
+              onResult(decodedText);
+            }
+          },
+          () => {}
+        );
+      } catch (e) {
+        console.warn('MobileNav camera error:', e);
+      }
+    };
+
+    start();
 
     return () => {
-      scanner.clear().catch(console.error);
+      isCancelled = true;
+      if (html5QrCode) {
+        if (html5QrCode.isScanning) {
+          html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
+        } else {
+          html5QrCode.clear().catch(console.error);
+        }
+      }
     };
   }, [onResult]);
 
-  return <div id="reader" className="w-full" />;
+  return <div id="reader" className="w-full h-full overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover" />;
 }

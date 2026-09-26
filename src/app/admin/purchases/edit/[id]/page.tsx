@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
   Package, Store, Truck, Calculator,
-  Info
+  Info, Camera
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import { playScanBeep } from '@/lib/sound';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
 import { updatePurchaseOrder } from '@/lib/actions/purchase.actions';
@@ -53,7 +55,6 @@ function EditPurchaseFormContent() {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showScanner, setShowScanner] = useState(false);
-  const [scannerReady, setScannerReady] = useState(false);
 
 
   useEffect(() => {
@@ -180,30 +181,15 @@ function EditPurchaseFormContent() {
         return;
       }
       const normalized: NormalizedProduct = normalizeProduct(p.id, p);
+      playScanBeep();
       addToCart(normalized);
+      notify.admin.success(`Produk ditambahkan: ${normalized.name}`);
       setShowScanner(false);
     } catch {
       notify.admin.error('Gagal membaca barcode');
     }
   };
 
-  useEffect(() => {
-    let scanner: any = null;
-    const init = async () => {
-      if (!showScanner || scannerReady) return;
-      const mod: any = await import('html5-qrcode');
-      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
-      scanner = new Html5QrcodeScanner('po-scanner', { fps: 10, qrbox: 200 }, false);
-      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
-      setScannerReady(true);
-    };
-    init();
-    return () => {
-      const el = document.getElementById('po-scanner');
-      if (el) el.innerHTML = '';
-      setScannerReady(false);
-    };
-  }, [showScanner, scannerReady]);
 
   const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));
 
@@ -353,13 +339,15 @@ function EditPurchaseFormContent() {
     <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-10">
-        <Link href="/admin/purchases" className="p-4 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-          <ChevronLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Edit PO</h1>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">{id}</p>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <Link href="/admin/purchases" className="p-2.5 bg-white rounded-xl shadow-sm hover:bg-black hover:text-white transition-all">
+            <ChevronLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-base sm:text-2xl font-black text-gray-800 uppercase tracking-tighter">Edit PO</h1>
+            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mt-0.5">{id}</p>
+          </div>
         </div>
       </div>
 
@@ -369,7 +357,7 @@ function EditPurchaseFormContent() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* 1. Supplier & Warehouse */}
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <select
                 id="supplier-select"
@@ -399,8 +387,8 @@ function EditPurchaseFormContent() {
           </div>
 
           {/* 2. Product Search & Table */}
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-gray-50">
+          <div className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-8 border-b border-gray-50">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -414,14 +402,19 @@ function EditPurchaseFormContent() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowScanner(!showScanner)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black text-white rounded-xl text-[10px] font-black uppercase"
+                  onClick={() => setShowScanner(true)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  Scan
+                  <Camera size={13} />
+                  <span>Scan</span>
                 </button>
-                {showScanner && (
-                  <div id="po-scanner" className="mt-3 rounded-2xl overflow-hidden border border-gray-100" />
-                )}
+                <CameraBarcodeScannerModal
+                  isOpen={showScanner}
+                  onClose={() => setShowScanner(false)}
+                  title="Scan Barcode Pembelian (PO)"
+                  description="Arahkan kamera ke barcode produk untuk masuk keranjang PO"
+                  onScan={handleScan}
+                />
                 {/* Search Results Dropdown */}
                 {searchProduct && (
                   <div className="absolute top-full left-0 w-full bg-white mt-2 rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">

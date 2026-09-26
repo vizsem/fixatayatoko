@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import { playScanBeep } from '@/lib/sound';
 import { addInventoryLog } from '@/lib/inventory';
 import { supabaseAdmin } from '@/lib/supabase';
 import { postJournal } from '@/lib/ledger';
@@ -161,7 +163,6 @@ export default function CashierPOS() {
 
   // Scanner state
   const [showScanner, setShowScanner] = useState(false);
-  const [scannerReady, setScannerReady] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
 
   const handleScan = useCallback(async (code: string) => {
@@ -214,7 +215,9 @@ export default function CashierPOS() {
         units: prod.units || [],
         channelPricing: prod.channelPricing || {}
       };
+      playScanBeep();
       setScannedProduct(mapped);
+      toast.success(`Produk ditemukan: ${mapped.name}`);
       setShowScanner(false);
     } catch {
       toast.error('Gagal membaca barcode');
@@ -224,23 +227,6 @@ export default function CashierPOS() {
   // NOTE: Auth & shift loading is handled by the main useEffect below.
   // Removed duplicate auth listener that caused race conditions.
 
-  useEffect(() => {
-    let scanner: any = null;
-    const init = async () => {
-      if (!showScanner || scannerReady) return;
-      const mod: any = await import('html5-qrcode');
-      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
-      scanner = new Html5QrcodeScanner('pos-scanner', { fps: 10, qrbox: 200 }, false);
-      scanner.render((decodedText: string) => handleScan(decodedText), () => {});
-      setScannerReady(true);
-    };
-    init();
-    return () => {
-      const el = document.getElementById('pos-scanner');
-      if (el) el.innerHTML = '';
-      setScannerReady(false);
-    };
-  }, [showScanner, scannerReady, handleScan]);
 
   // --- TAMBAHAN: LOGIKA KOMPRESI PHOTO ---
   const compressImage = useCallback(async (file: File) => {
@@ -555,6 +541,7 @@ export default function CashierPOS() {
           );
 
           if (scannedProduct) {
+            playScanBeep();
             const unitMatch = scannedProduct.units?.find((u: any) => u.barcode === barcodeBuffer);
             if (unitMatch) {
               addToCartWithUnit(scannedProduct, unitMatch);
@@ -1527,7 +1514,13 @@ export default function CashierPOS() {
                 </span>
               </div>
             </div>
-            {showScanner && <div id="pos-scanner" className="p-2 bg-white rounded-2xl border border-gray-100" />}
+            <CameraBarcodeScannerModal
+              isOpen={showScanner}
+              onClose={() => setShowScanner(false)}
+              title="Scan Barcode Kasir"
+              description="Arahkan kamera ke barcode produk untuk masuk transaksi kasir"
+              onScan={handleScan}
+            />
 
             <div 
               className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} 

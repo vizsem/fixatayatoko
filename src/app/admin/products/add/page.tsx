@@ -8,11 +8,14 @@ import {
   Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
 import imageCompression from 'browser-image-compression';
 import { addProductFull, getCategories } from '@/lib/actions/product.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
-import { onSnapshot, collection, db } from '@/lib/firebase';
+import { onSnapshot, collection, db, doc, getDoc } from '@/lib/firebase';
+import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 export default function AddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -20,6 +23,7 @@ export default function AddProductPage() {
   const [collapsedDim, setCollapsedDim] = useState(true);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [units, setUnits] = useState<UnitOption[]>([
     { code: 'PCS', contains: 1, price: 0, label: '' },
     { code: 'BOX', contains: 0, price: 0, label: '' },
@@ -70,6 +74,18 @@ export default function AddProductPage() {
 
   const [scannerReady, setScannerReady] = useState(false);
 
+  // Auto-fill barcode dari query param (misal dari scanner "Buat Produk Baru")
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const initialBarcode = params.get('barcode');
+      if (initialBarcode) {
+        setFormData(prev => ({ ...prev, Barcode: initialBarcode, ID: prev.ID || initialBarcode }));
+        notify.admin.info(`Barcode terisi: ${initialBarcode}`);
+      }
+    }
+  }, []);
+
   // === GLOBAL BARCODE SCANNER LISTENER ===
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
 
@@ -92,7 +108,9 @@ export default function AddProductPage() {
       } else {
         if (barcodeBuffer) {
           e.preventDefault();
+          playScanBeep();
           setFormData(prev => ({ ...prev, Barcode: barcodeBuffer }));
+          notify.admin.success(`Barcode dipindai: ${barcodeBuffer}`);
           setBarcodeBuffer('');
         }
       }
@@ -105,6 +123,15 @@ export default function AddProductPage() {
     };
   }, [barcodeBuffer]);
   // ========================================
+
+  // Fetch Tax Settings from Firebase
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'system')).then(snap => {
+      if (snap.exists() && snap.data()?.tax) {
+        setTaxSettings({ ...DEFAULT_TAX_SETTINGS, ...snap.data().tax });
+      }
+    }).catch(() => {});
+  }, []);
 
   const pricingRec = useMemo(() => {
     if (pricingMode !== 'RECOMMENDED') return null;
@@ -241,29 +268,6 @@ export default function AddProductPage() {
     }
   };
 
-  useEffect(() => {
-    let scanner: any = null;
-    const init = async () => {
-      if (!scannerReady) return;
-      const mod: any = await import('html5-qrcode');
-      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
-      scanner = new Html5QrcodeScanner('barcode-scanner-camera', { fps: 10, qrbox: 250 }, false);
-      scanner.render(
-        (decodedText: string) => {
-          setFormData(prev => ({ ...prev, Barcode: decodedText }));
-          setScannerReady(false);
-          notify.admin.success(`Barcode berhasil dipindai: ${decodedText}`);
-        },
-        (err: any) => { /* ignore errors */ }
-      );
-    };
-    init();
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
-    };
-  }, [scannerReady]);
 
   // Load warehouses (masih dari Firestore) + categories (dari Supabase)
   useEffect(() => {
@@ -285,16 +289,25 @@ export default function AddProductPage() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header Navigation */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link href="/admin/products" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-              <ChevronLeft size={20} />
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <Link href="/admin/products" className="p-2.5 bg-white rounded-xl shadow-sm hover:bg-black hover:text-white transition-all">
+              <ChevronLeft size={18} />
             </Link>
             <div>
-              <h1 className="text-xl font-black uppercase tracking-tighter">Tambah Produk</h1>
-              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Database Inventaris Ataya</p>
+              <h1 className="text-base sm:text-xl font-black uppercase tracking-tighter">Tambah Produk</h1>
+              <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest hidden sm:block">Database Inventaris Ataya</p>
             </div>
           </div>
+          {/* Quick save for mobile */}
+          <button
+            type="submit"
+            form="add-product-form"
+            disabled={loading}
+            className="sm:hidden px-3 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+          >
+            {loading ? '...' : 'Simpan'}
+          </button>
         </div>
 
         {errorMsg && (
@@ -305,7 +318,7 @@ export default function AddProductPage() {
 
         <form id="add-product-form" onSubmit={handleSubmit} className="space-y-6">
 
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] shadow-sm border border-gray-100">
             <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag" aria-hidden="true">
                 <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path>
@@ -385,14 +398,16 @@ export default function AddProductPage() {
                   <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
                 </div>
-                {scannerReady && (
-                  <div className="mt-2 p-2 bg-black rounded-2xl relative">
-                    <button type="button" onClick={() => setScannerReady(false)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 z-10">
-                      <X size={14} />
-                    </button>
-                    <div id="barcode-scanner-camera" className="rounded-xl overflow-hidden"></div>
-                  </div>
-                )}
+                <CameraBarcodeScannerModal
+                  isOpen={scannerReady}
+                  onClose={() => setScannerReady(false)}
+                  title="Scan Barcode Produk"
+                  description="Arahkan kamera ke barcode / QR code produk"
+                  onScan={(code) => {
+                    setFormData(prev => ({ ...prev, Barcode: code }));
+                    notify.admin.success(`Barcode berhasil dipindai: ${code}`);
+                  }}
+                />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
@@ -534,6 +549,70 @@ export default function AddProductPage() {
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
             </div>
+
+            {/* TAX BREAKDOWN PANEL */}
+            {(() => {
+              const ecer = Number(formData.Ecer || 0);
+              if (ecer <= 0) return null;
+              const category = formData.Kategori || '';
+              const breakdown = calculateTaxBreakdown({ amount: ecer, category, taxSettings });
+              const modal = Number(formData.Modal || 0);
+              const marginAfterTax = modal > 0 && !breakdown.isExempt
+                ? (((breakdown.dpp - modal) / modal) * 100).toFixed(1)
+                : null;
+              return (
+                <div className={`mt-0 mb-5 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center gap-4 ${
+                  !taxSettings.enabled
+                    ? 'bg-gray-50 border-gray-100'
+                    : breakdown.isExempt
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-indigo-50 border-indigo-100'
+                }`}>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
+                    <div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${
+                        !taxSettings.enabled ? 'text-gray-400' : breakdown.isExempt ? 'text-amber-700' : 'text-indigo-700'
+                      }`}>Status Pajak</p>
+                      <p className={`text-xs font-black ${
+                        !taxSettings.enabled ? 'text-gray-500' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
+                      }`}>{breakdown.taxLabel}</p>
+                    </div>
+                  </div>
+                  {taxSettings.enabled && !breakdown.isExempt && (
+                    <>
+                      <div className="w-px h-8 bg-indigo-200 hidden md:block" />
+                      <div className="grid grid-cols-3 gap-4 flex-1">
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                          <p className="text-sm font-black text-indigo-900">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                          <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                          <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {taxSettings.enabled && breakdown.isExempt && (
+                    <p className="text-[11px] font-bold text-amber-700">
+                      Kategori ini bebas PPN (0%) sesuai PP 49/2022 / UU HPP — tidak ada pajak yang dikenakan.
+                    </p>
+                  )}
+                  {!taxSettings.enabled && (
+                    <p className="text-[11px] font-bold text-gray-400">
+                      Pajak belum diaktifkan. Aktifkan di <span className="underline">Pengaturan → Pajak</span> untuk melihat DPP & kewajiban pajak.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1">

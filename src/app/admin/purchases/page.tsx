@@ -275,7 +275,43 @@ export default function AdminPurchases() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Mobile Card List (< md) */}
+            <div className="divide-y divide-gray-100 md:hidden">
+              {filtered.map(po => (
+                <div key={po.id} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${STATUS_COLOR[po.status]}`}>
+                      {STATUS_LABEL[po.status] || po.status}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{po.supplier.name}</p>
+                    <p className="text-[11px] text-gray-400">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-50">
+                    <div>
+                      <p className="text-[9px] uppercase font-bold text-gray-400">Total Nilai</p>
+                      <p className="font-black text-sm text-gray-900">Rp{po.totalAmount.toLocaleString('id-ID')}</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setDetailModal(po)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors">
+                        Detail
+                      </button>
+                      {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
+                        <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
+                          className="px-3 py-1.5 bg-green-100 text-green-700 rounded-xl text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
+                          <Truck size={12} /> Terima
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="overflow-x-auto hidden md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">

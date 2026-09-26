@@ -181,7 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Notifikasi', href: '/admin/notifications', icon: Bell },
       ]
     },
-    {
+      {
       group: "Laporan", items: [
         { name: 'Laporan', href: '/admin/reports', icon: BarChart3 },
         { name: 'Penjualan', href: '/admin/reports/sales', icon: TrendingUp },
@@ -190,11 +190,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Operasional', href: '/admin/reports/operations', icon: Settings },
         { name: 'Promosi', href: '/admin/reports/promotions', icon: Star },
         { name: 'Pelanggan', href: '/admin/reports/customers', icon: Users },
+        { name: 'Laporan Pajak', href: '/admin/reports/tax', icon: Receipt },
       ]
     },
     {
       group: "Audit & Keamanan", items: [
-        { name: 'Audit Log', href: '/admin/audit', icon: History },
+        { name: 'Audit Terpusat', href: '/admin/audit', icon: History },
+        { name: 'Audit Pajak', href: '/admin/audit?tab=tax', icon: Receipt },
       ]
     },
     {
@@ -258,7 +260,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </aside>
-      <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-6 pb-32 md:pb-6">
+      <main className="flex-1 min-w-0 overflow-x-hidden px-3 sm:px-4 md:px-6 pt-20 md:pt-6 pb-32 md:pb-6">
         {children}
         {!!toasts.length && (
           <div className="fixed bottom-4 right-4 z-[60] space-y-2">

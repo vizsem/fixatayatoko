@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
+import { playScanBeep } from '@/lib/sound';
 
 
 // ✅ SheetJS untuk Export/Import Excel
@@ -334,6 +337,9 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [unfoundBarcode, setUnfoundBarcode] = useState('');
+  const [showUnfoundModal, setShowUnfoundModal] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
@@ -408,6 +414,29 @@ export default function AdminProducts() {
   // === GLOBAL BARCODE SCANNER LISTENER ===
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
 
+  // Handle barcode scanned from camera or hardware USB scanner
+  const handleBarcodeScanned = (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+
+    // Cek apakah barcode cocok dengan produk yang ada (Barcode utama, SKU, atau Barcode multi-unit)
+    const found = rows.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === trimmed.toLowerCase()) ||
+      (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()) ||
+      (p.units && p.units.some(u => (u as any).barcode && (u as any).barcode.toLowerCase() === trimmed.toLowerCase()))
+    );
+
+    if (found) {
+      setSearchTerm(trimmed);
+      setCurrentPage(1);
+      notify.admin.success(`Produk ditemukan: ${found.name}`);
+    } else {
+      // Tidak ditemukan -> Munculkan modal pilihan cerdas
+      setUnfoundBarcode(trimmed);
+      setShowUnfoundModal(true);
+    }
+  };
+
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     
@@ -427,10 +456,9 @@ export default function AdminProducts() {
       } else {
         if (barcodeBuffer) {
           e.preventDefault();
-          // Set searchQuery ke barcodeBuffer agar langsung memfilter list
-          setSearchTerm(barcodeBuffer);
+          playScanBeep();
+          handleBarcodeScanned(barcodeBuffer);
           setBarcodeBuffer('');
-          notify.admin.success(`Mencari barcode: ${barcodeBuffer}`);
         }
       }
     };
@@ -656,30 +684,49 @@ export default function AdminProducts() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+      <div className="flex justify-between items-center mb-3 gap-2">
         <div className="flex items-center gap-2">
-          <div className="p-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-sm">
-            <Package size={18} />
+          <div className="p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-sm">
+            <Package size={16} />
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">Atayamarket</h1>
-            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Inventory Management</p>
+            <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight leading-none">Produk</h1>
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Inventory Management</p>
           </div>
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          {/* Tombol sekunder: hanya tampil di sm ke atas */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            <button
+              onClick={handleSync}
+              className="bg-white border border-gray-100 text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-all shadow-sm"
+              title="Sinkron & Reset Filter"
+            >
+              <RefreshCw size={13} />
+            </button>
+            <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
+            <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
+            <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
+          </div>
+          {/* Sync icon always visible on mobile */}
           <button
             onClick={handleSync}
-            className="bg-white border border-gray-100 text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-all shadow-sm flex items-center justify-center"
-            title="Sinkron & Reset Filter"
+            className="sm:hidden bg-white border border-gray-100 text-blue-600 p-2 rounded-lg transition-all shadow-sm"
+            title="Sinkron"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={13} />
           </button>
-          <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
-          <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
-          <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
-          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> NEW SKU</button>
+          {/* NEW SKU selalu tampil */}
+          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> <span className="hidden xs:inline">NEW</span> SKU</button>
         </div>
+      </div>
+
+      {/* Mobile extra actions row */}
+      <div className="sm:hidden flex gap-1.5 mb-3">
+        <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
+        <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
+        <button onClick={downloadTemplate} className="flex-1 bg-white border border-gray-200 px-2.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-tight flex items-center justify-center gap-1"><FileSpreadsheet size={11} /> Template</button>
       </div>
 
       {/* STATS */}
@@ -769,6 +816,16 @@ export default function AdminProducts() {
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowScannerModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-black transition-all border border-blue-200/60 shadow-sm"
+            title="Scan Barcode Kamera"
+          >
+            <Camera size={14} />
+            <span className="hidden sm:inline">Scan Kamera</span>
+          </button>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <select
@@ -1197,6 +1254,27 @@ export default function AdminProducts() {
           </div>
         </div>
       )}
+
+      {/* Modal Scanner Barcode Kamera */}
+      <CameraBarcodeScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        title="Scan Barcode Produk"
+        description="Arahkan kamera ke barcode produk untuk mencari di katalog"
+        onScan={(code) => handleBarcodeScanned(code)}
+      />
+
+      {/* Modal Barcode Tidak Ditemukan (Buat Produk Baru vs Tautkan ke Produk Ada) */}
+      <UnfoundBarcodeModal
+        isOpen={showUnfoundModal}
+        barcode={unfoundBarcode}
+        products={rows}
+        onClose={() => setShowUnfoundModal(false)}
+        onBarcodeAttached={(prodName, newBarcode) => {
+          setSearchTerm(newBarcode);
+          setCurrentPage(1);
+        }}
+      />
 
     </div>
   </ErrorBoundary>

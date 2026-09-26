@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
-  History, ArrowLeftRight, Wallet, Search, Download, AlertCircle, CheckCircle, Clock, User, Package, ArrowUpCircle, ArrowDownCircle, Landmark, ChevronRight, BarChart3, TrendingUp, Info
+  History, ArrowLeftRight, Wallet, Search, Download, AlertCircle, CheckCircle, Clock, User, Package, ArrowUpCircle, ArrowDownCircle, Landmark, ChevronRight, BarChart3, TrendingUp, Info, Receipt
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -16,11 +16,18 @@ import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, ref, where } from '@/lib/firebase';
-type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital';
+import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
+
+type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital' | 'tax';
 
 export default function AuditPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AuditTab>('stock');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AuditTab>(() => {
+    const tab = searchParams?.get('tab') as AuditTab | null;
+    const validTabs: AuditTab[] = ['stock', 'transaction', 'finance', 'profit', 'cost', 'capital', 'tax'];
+    return tab && validTabs.includes(tab) ? tab : 'stock';
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [limitCount, setLimitCount] = useState(50);
@@ -34,7 +41,9 @@ export default function AuditPage() {
   const [profitLogs, setProfitLogs] = useState<any[]>([]);
   const [costLogs, setCostLogs] = useState<any[]>([]);
   const [capitalLogs, setCapitalLogs] = useState<any[]>([]);
+  const [taxLogs, setTaxLogs] = useState<any[]>([]);
   const [profitSummary, setProfitSummary] = useState({ sales: 0, cost: 0, profit: 0, discount: 0, expenses: 0, netProfit: 0 });
+  const [taxSummary, setTaxSummary] = useState({ totalSales: 0, dpp: 0, taxAmount: 0 });
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
@@ -99,9 +108,68 @@ export default function AuditPage() {
         setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         setLoading(false);
       } else if (activeTab === 'capital') {
-        const q = query(collection(db, 'capital_transactions'), where('date', '>=', startT), where('date', '<=', endT), orderBy('date', 'desc'), limit(limitCount));
-        const snap = await getDocs(q);
-        setCapitalLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const { data: capData } = await supabase.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(limitCount);
+        if (capData) {
+          setCapitalLogs(capData.map(c => {
+            const raw = c.raw_data || {};
+            return {
+              id: c.id,
+              date: raw.date ? new Date(raw.date) : new Date(c.created_at),
+              type: raw.type === 'INJECTION' ? 'INJEKSI MODAL' : 'PENARIKAN / PRIVE',
+              transactionType: raw.type === 'INJECTION' ? 'IN' : 'OUT',
+              amount: raw.amount || 0,
+              referenceId: raw.description || '-',
+              executorName: raw.recordedBy || 'Admin'
+            };
+          }));
+        } else {
+          setCapitalLogs([]);
+        }
+        setLoading(false);
+      } else if (activeTab === 'tax') {
+        // Audit Audit Pajak (PPN & PPh)
+        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']));
+        const sSnap = await getDocs(collection(db, 'settings'));
+        let taxSettings = DEFAULT_TAX_SETTINGS;
+        sSnap.docs.forEach(d => { if (d.id === 'system' && d.data()?.tax) taxSettings = { ...DEFAULT_TAX_SETTINGS, ...d.data().tax }; });
+        
+        const oSnap = await getDocs(qOrders);
+        const tLogs: any[] = [];
+        let sumSales = 0, sumDPP = 0, sumTax = 0;
+
+        oSnap.docs.forEach(d => {
+          const data = d.data();
+          const created = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || new Date());
+          if (created >= start && created <= end) {
+            (data.items || []).forEach((item: any) => {
+              const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
+              const breakdown = calculateTaxBreakdown({
+                amount: itemTotal,
+                category: item.category || item.Kategori || 'UMUM',
+                taxSettings
+              });
+              sumSales += itemTotal;
+              sumDPP += breakdown.dpp;
+              sumTax += breakdown.taxAmount;
+              tLogs.push({
+                id: `${d.id}_${item.id || item.productId}`,
+                orderId: data.orderId || d.id,
+                date: created,
+                customer: data.customerName || 'Pelanggan',
+                product: item.name || 'Produk',
+                category: item.category || item.Kategori || 'UMUM',
+                sales: itemTotal,
+                dpp: breakdown.dpp,
+                taxAmount: breakdown.taxAmount,
+                taxLabel: breakdown.taxLabel,
+                isExempt: breakdown.isExempt
+              });
+            });
+          }
+        });
+
+        setTaxLogs(tLogs);
+        setTaxSummary({ totalSales: sumSales, dpp: sumDPP, taxAmount: sumTax });
         setLoading(false);
       }
     } catch (err) {
@@ -119,7 +187,8 @@ export default function AuditPage() {
     let data: any[] = [];
     if (activeTab === 'stock') data = stockLogs.map(l => ({ Tanggal: format(l.date.toDate(), 'Pp'), Produk: l.productName, Tipe: l.type, Qty: l.amount, Sisa: l.nextStock, Admin: l.adminId }));
     else if (activeTab === 'transaction') data = transactions.map(t => ({ Tanggal: format(t.createdAt.toDate(), 'Pp'), ID: t.id, Customer: t.customerName, Total: t.total, Status: t.status }));
-    
+    else if (activeTab === 'tax') data = taxLogs.map(t => ({ Tanggal: format(t.date, 'Pp'), Nota: t.orderId, Customer: t.customer, Produk: t.product, Kategori: t.category, Omzet: t.sales, DPP: t.dpp, Pajak: t.taxAmount, Status: t.taxLabel }));
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, activeTab);
@@ -131,6 +200,7 @@ export default function AuditPage() {
     { id: 'transaction', label: 'Transaksi Pesanan', icon: ArrowLeftRight },
     { id: 'finance', label: 'Sesi Kasir', icon: Wallet },
     { id: 'capital', label: 'Arus Modal', icon: Landmark },
+    { id: 'tax', label: 'Audit Pajak', icon: Receipt },
     { id: 'profit', label: 'Laba Rugi', icon: TrendingUp },
     { id: 'cost', label: 'Perubahan HPP', icon: BarChart3 },
   ];
@@ -188,6 +258,26 @@ export default function AuditPage() {
         </div>
       )}
 
+      {activeTab === 'tax' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-in fade-in slide-in-from-top-4">
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Total Omzet (Termasuk Pajak)</p>
+            <p className="text-2xl font-black text-slate-900">Rp {taxSummary.totalSales.toLocaleString('id-ID')}</p>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{taxLogs.length} item terjual</p>
+          </div>
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">DPP (Dasar Pengenaan Pajak)</p>
+            <p className="text-2xl font-black text-blue-700">Rp {taxSummary.dpp.toLocaleString('id-ID')}</p>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">Harga sebelum pajak</p>
+          </div>
+          <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-xl text-white">
+            <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Total Pajak Terutang</p>
+            <p className="text-2xl font-black">Rp {taxSummary.taxAmount.toLocaleString('id-ID')}</p>
+            <p className="text-[9px] opacity-60 font-bold mt-1 uppercase tracking-widest">PPN / PPh yang harus disetorkan</p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         {loading ? <div className="p-8"><TableSkeleton rows={10} /></div> : (
           <div className="overflow-x-auto">
@@ -236,6 +326,16 @@ export default function AuditPage() {
                       <th className="px-8 py-5">HPP Lama</th>
                       <th className="px-8 py-5">HPP Baru</th>
                       <th className="px-8 py-5 text-right">Perubahan</th>
+                    </tr>
+                  )}
+                  {activeTab === 'tax' && (
+                    <tr>
+                      <th className="px-8 py-5">Tanggal</th>
+                      <th className="px-8 py-5">No. Nota</th>
+                      <th className="px-8 py-5">Produk / Kategori</th>
+                      <th className="px-8 py-5">Omzet (Inkl. Pajak)</th>
+                      <th className="px-8 py-5">DPP</th>
+                      <th className="px-8 py-5 text-right">Pajak Terutang</th>
                     </tr>
                   )}
                   {activeTab === 'profit' && (
@@ -343,20 +443,44 @@ export default function AuditPage() {
                        </td>
                     </tr>
                   ))}
-                  {activeTab === 'capital' && capitalLogs.map(c => (
-                    <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
+                  {activeTab === 'capital' && capitalLogs.map(c => {
+                    const dateObj = c.date ? (c.date.toDate ? c.date.toDate() : new Date(c.date)) : new Date();
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
+                         <td className="px-8 py-5">
+                            <p className="text-[11px] font-black text-slate-800">{format(dateObj, 'HH:mm')}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(dateObj, 'd MMM yyyy')}</p>
+                         </td>
+                         <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.referenceId || '-'}</td>
+                         <td className="px-8 py-5">
+                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{c.type}</span>
+                         </td>
+                         <td className={`px-8 py-5 font-black text-xs ${c.transactionType === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {c.transactionType === 'IN' ? '+' : '-'}Rp {c.amount?.toLocaleString()}
+                         </td>
+                         <td className="px-8 py-5 text-right font-bold text-[10px] text-slate-400 uppercase">{c.executorName || 'Admin'}</td>
+                      </tr>
+                    );
+                  })}
+                  {activeTab === 'tax' && taxLogs.filter(t => t.product?.toLowerCase().includes(searchTerm.toLowerCase()) || t.orderId?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+                    <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-[11px] font-black text-slate-800">{c.date && format(c.date.toDate(), 'HH:mm')}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.date && format(c.date.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-[11px] font-black text-slate-800">{format(t.date, 'HH:mm')}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{format(t.date, 'd MMM yyyy')}</p>
                        </td>
-                       <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.referenceId || '-'}</td>
-                       <td className="px-8 py-5">
-                          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">{c.type}</span>
+                       <td className="px-8 py-5 font-mono text-[10px] font-black text-slate-600 uppercase">{t.orderId?.substring(0,12)}</td>
+                       <td className="px-8 py-5 text-xs font-bold text-slate-700">
+                          <p className="font-black text-slate-900 line-clamp-1">{t.product}</p>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{t.category}</span>
                        </td>
-                       <td className={`px-8 py-5 font-black text-xs ${c.transactionType === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {c.transactionType === 'IN' ? '+' : '-'}Rp {c.amount?.toLocaleString()}
+                       <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {t.sales?.toLocaleString('id-ID')}</td>
+                       <td className="px-8 py-5 text-xs font-bold text-blue-700">Rp {t.dpp?.toLocaleString('id-ID')}</td>
+                       <td className="px-8 py-5 text-right">
+                          <p className={`font-black text-sm ${t.isExempt ? 'text-amber-500' : 'text-indigo-600'}`}>
+                            {t.isExempt ? 'Rp 0' : `Rp ${t.taxAmount?.toLocaleString('id-ID')}`}
+                          </p>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.isExempt ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-500'}`}>{t.taxLabel}</span>
                        </td>
-                       <td className="px-8 py-5 text-right font-bold text-[10px] text-slate-400 uppercase">{c.executorName || 'Admin'}</td>
                     </tr>
                   ))}
                   {activeTab === 'cost' && costLogs.filter(c => c.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(c => (

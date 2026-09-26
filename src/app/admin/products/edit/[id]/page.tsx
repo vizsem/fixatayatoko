@@ -11,6 +11,8 @@ import {
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { supabase } from '@/lib/supabase';
 import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
@@ -18,6 +20,7 @@ import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 
 import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, setDoc, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
+import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 type ChannelPrices = {
   offline?: number;
   website?: number;
@@ -94,6 +97,7 @@ export default function EditProductPage() {
   const [pricingRuleKey, setPricingRuleKey] = useState<string>('AUTO');
   const [pricingMarginPercent, setPricingMarginPercent] = useState<number>(0);
   const [pricingRoundingStep, setPricingRoundingStep] = useState<number>(100);
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
 
   // Cost History State
   const [costHistory, setCostHistory] = useState<any[]>([]);
@@ -122,6 +126,7 @@ export default function EditProductPage() {
       } else {
         if (barcodeBuffer) {
           e.preventDefault();
+          playScanBeep();
           setFormData(prev => ({ ...prev, Barcode: barcodeBuffer }));
           setBarcodeBuffer('');
           toast.success(`Barcode dipindai: ${barcodeBuffer}`);
@@ -137,29 +142,6 @@ export default function EditProductPage() {
   }, [barcodeBuffer]);
   // ========================================
 
-  useEffect(() => {
-    let scanner: any = null;
-    const init = async () => {
-      if (!scannerReady) return;
-      const mod: any = await import('html5-qrcode');
-      const Html5QrcodeScanner = mod.Html5QrcodeScanner;
-      scanner = new Html5QrcodeScanner('barcode-scanner-camera-edit', { fps: 10, qrbox: 250 }, false);
-      scanner.render(
-        (decodedText: string) => {
-          setFormData(prev => ({ ...prev, Barcode: decodedText }));
-          setScannerReady(false);
-          toast.success(`Barcode berhasil dipindai: ${decodedText}`);
-        },
-        (err: any) => { /* ignore errors */ }
-      );
-    };
-    init();
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
-    };
-  }, [scannerReady]);
 
   const formDataRef = useRef(formData); // Ref to keep track of latest formData for logs if needed
   
@@ -196,6 +178,15 @@ export default function EditProductPage() {
     if (Number(formData.Ecer || 0) === pricingRec.recommendedPrice) return;
     applyRecommendedEcer(pricingRec.recommendedPrice);
   }, [pricingMode, pricingRec, formData.Ecer, formData.Satuan]);
+
+  // Fetch Tax Settings from Firebase
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'system')).then(snap => {
+      if (snap.exists() && snap.data()?.tax) {
+        setTaxSettings({ ...DEFAULT_TAX_SETTINGS, ...snap.data().tax });
+      }
+    }).catch(() => {});
+  }, []);
   
   const fetchCostHistory = useCallback(async () => {
     try {
@@ -789,14 +780,16 @@ export default function EditProductPage() {
                   <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                   <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
                 </div>
-                {scannerReady && (
-                  <div className="mt-2 p-2 bg-black rounded-2xl relative">
-                    <button type="button" onClick={() => setScannerReady(false)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 z-10">
-                      <X size={14} />
-                    </button>
-                    <div id="barcode-scanner-camera-edit" className="rounded-xl overflow-hidden"></div>
-                  </div>
-                )}
+                <CameraBarcodeScannerModal
+                  isOpen={scannerReady}
+                  onClose={() => setScannerReady(false)}
+                  title="Scan Barcode Produk"
+                  description="Arahkan kamera ke barcode / QR code produk"
+                  onScan={(code) => {
+                    setFormData(prev => ({ ...prev, Barcode: code }));
+                    toast.success(`Barcode berhasil dipindai: ${code}`);
+                  }}
+                />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
@@ -964,6 +957,70 @@ export default function EditProductPage() {
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
               </div>
             </div>
+
+            {/* TAX BREAKDOWN PANEL */}
+            {(() => {
+              const ecer = Number(formData.Ecer || 0);
+              if (ecer <= 0) return null;
+              const category = formData.Kategori || '';
+              const breakdown = calculateTaxBreakdown({ amount: ecer, category, taxSettings });
+              const modal = Number(formData.Modal || 0);
+              const marginAfterTax = modal > 0 && !breakdown.isExempt
+                ? (((breakdown.dpp - modal) / modal) * 100).toFixed(1)
+                : null;
+              return (
+                <div className={`mb-5 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center gap-4 ${
+                  !taxSettings.enabled
+                    ? 'bg-gray-50 border-gray-100'
+                    : breakdown.isExempt
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-indigo-50 border-indigo-100'
+                }`}>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
+                    <div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${
+                        !taxSettings.enabled ? 'text-gray-400' : breakdown.isExempt ? 'text-amber-700' : 'text-indigo-700'
+                      }`}>Status Pajak</p>
+                      <p className={`text-xs font-black ${
+                        !taxSettings.enabled ? 'text-gray-500' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
+                      }`}>{breakdown.taxLabel}</p>
+                    </div>
+                  </div>
+                  {taxSettings.enabled && !breakdown.isExempt && (
+                    <>
+                      <div className="w-px h-8 bg-indigo-200 hidden md:block" />
+                      <div className="grid grid-cols-3 gap-4 flex-1">
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                          <p className="text-sm font-black text-indigo-900">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                          <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                          <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {taxSettings.enabled && breakdown.isExempt && (
+                    <p className="text-[11px] font-bold text-amber-700">
+                      Kategori ini bebas PPN (0%) sesuai PP 49/2022 / UU HPP — tidak ada pajak yang dikenakan.
+                    </p>
+                  )}
+                  {!taxSettings.enabled && (
+                    <p className="text-[11px] font-bold text-gray-400">
+                      Pajak belum diaktifkan. Aktifkan di <span className="underline">Pengaturan → Pajak</span> untuk melihat DPP & kewajiban pajak.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1">

@@ -566,3 +566,57 @@ export async function createCategory(data: { name: string; description?: string 
     return { success: false, error: error?.message || 'Gagal membuat kategori' };
   }
 }
+
+export async function attachBarcodeToProduct(productId: string, barcode: string, unitCode?: string) {
+  try {
+    const { data: prod, error } = await supabaseAdmin
+      .from('products')
+      .select('id, name, barcode, raw_data, unit')
+      .eq('id', productId)
+      .single();
+
+    if (error || !prod) throw new Error('Produk tidak ditemukan');
+
+    const cleanBarcode = barcode.trim();
+    const raw = (prod.raw_data || {}) as Record<string, any>;
+    const now = new Date().toISOString();
+
+    let updatedBarcode = prod.barcode;
+    let updatedRawData: Record<string, any> = { ...raw, updatedAt: now };
+
+    if (!unitCode || unitCode === prod.unit || unitCode === raw.Satuan) {
+      // Barcode utama produk
+      updatedBarcode = cleanBarcode;
+      updatedRawData.Barcode = cleanBarcode;
+      updatedRawData.barcode = cleanBarcode;
+    } else {
+      // Barcode untuk satuan spesifik (multi-unit: BOX, RENCENG, dll)
+      const units = Array.isArray(raw.units) ? [...raw.units] : [];
+      const unitIndex = units.findIndex((u: any) => (u.code || u.unit) === unitCode);
+      if (unitIndex >= 0) {
+        units[unitIndex] = { ...units[unitIndex], barcode: cleanBarcode };
+      } else {
+        units.push({ code: unitCode, barcode: cleanBarcode, contains: 1 });
+      }
+      updatedRawData.units = units;
+    }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('products')
+      .update({
+        barcode: updatedBarcode,
+        raw_data: updatedRawData,
+        updated_at: now,
+      })
+      .eq('id', productId);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${productId}`);
+    return { success: true, productName: prod.name };
+  } catch (err: any) {
+    console.error('attachBarcodeToProduct error:', err);
+    return { success: false, error: err?.message || 'Gagal menautkan barcode' };
+  }
+}
