@@ -77,6 +77,9 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         totalAmount,
         notes: raw.notes || null,
         createdAt: parseDate(raw.createdAt || p.created_at),
+        paymentStatus: raw.paymentStatus || p.payment_status || 'LUNAS',
+        paymentMethod: raw.paymentMethod || p.payment_method || 'CASH',
+        dueDate: raw.dueDate || null,
         supplier: {
           name: raw.supplierName || 'Supplier Umum'
         },
@@ -151,12 +154,17 @@ export async function createPurchaseOrder(data: {
   warehouseId?: string
   batchNumber?: string
   expiryDate?: string
+  paymentStatus?: 'LUNAS' | 'HUTANG' | string
+  paymentMethod?: string
+  dueDate?: string
 }) {
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const poNumber = `PO-${Date.now()}`;
     const id = `po_${Date.now()}`;
     const targetWarehouse = data.warehouseId || 'gudang-utama';
+    const paymentStatus = data.paymentStatus || 'LUNAS';
+    const paymentMethod = data.paymentMethod || 'CASH';
 
     // Cari supplier name
     let supplierName = 'Supplier';
@@ -212,6 +220,9 @@ export async function createPurchaseOrder(data: {
       warehouseId: targetWarehouse,
       notes: data.notes || '',
       status,
+      paymentStatus,
+      paymentMethod,
+      dueDate: data.dueDate || undefined,
       total: totalAmount,
       subtotal: totalAmount,
       items: enrichedItems,

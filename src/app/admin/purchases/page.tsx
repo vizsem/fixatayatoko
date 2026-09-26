@@ -23,6 +23,9 @@ type PO = {
   poNumber: string;
   status: string;
   totalAmount: number;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  dueDate?: string | null;
   notes?: string | null;
   createdAt: Date;
   supplier: { name: string };
@@ -64,7 +67,17 @@ export default function AdminPurchases() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [form, setForm] = useState({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
+  const [form, setForm] = useState({
+    supplierId: '',
+    notes: '',
+    autoReceive: false,
+    warehouseId: '',
+    batchNumber: '',
+    expiryDate: '',
+    paymentStatus: 'LUNAS',
+    paymentMethod: 'CASH',
+    dueDate: '',
+  });
   const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
   const [receiveForm, setReceiveForm] = useState({ warehouseId: '', batchNumber: '', expiryDate: '' });
   const [saving, setSaving] = useState(false);
@@ -153,11 +166,24 @@ export default function AdminPurchases() {
       warehouseId: form.autoReceive ? form.warehouseId : undefined,
       batchNumber: form.autoReceive && form.batchNumber ? form.batchNumber : undefined,
       expiryDate: form.autoReceive && form.expiryDate ? form.expiryDate : undefined,
+      paymentStatus: form.paymentStatus,
+      paymentMethod: form.paymentMethod,
+      dueDate: form.dueDate || undefined,
     });
     if (result.success) {
       notify.success(form.autoReceive ? 'PO berhasil dibuat & stok telah ditambahkan!' : 'Purchase Order berhasil dibuat');
       setModalOpen(false);
-      setForm({ supplierId: '', notes: '', autoReceive: false, warehouseId: '', batchNumber: '', expiryDate: '' });
+      setForm({
+        supplierId: '',
+        notes: '',
+        autoReceive: false,
+        warehouseId: '',
+        batchNumber: '',
+        expiryDate: '',
+        paymentStatus: 'LUNAS',
+        paymentMethod: 'CASH',
+        dueDate: '',
+      });
       setItems([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
       await load();
     } else {
@@ -480,6 +506,76 @@ export default function AdminPurchases() {
                 />
               </div>
 
+              {/* Metode & Status Pembayaran Lengkap */}
+              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700">Status Pembayaran *</label>
+                  <div className="flex bg-white rounded-lg p-0.5 border border-gray-200 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, paymentStatus: 'LUNAS' }))}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        form.paymentStatus === 'LUNAS'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      Lunas (Paid)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, paymentStatus: 'HUTANG' }))}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        form.paymentStatus === 'HUTANG'
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      Hutang / Tempo
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran *</label>
+                    <select
+                      value={form.paymentMethod}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setForm(p => ({
+                          ...p,
+                          paymentMethod: val,
+                          paymentStatus: (val === 'TEMPO' || val === 'KREDIT') ? 'HUTANG' : p.paymentStatus
+                        }));
+                      }}
+                      className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase"
+                    >
+                      <option value="CASH">CASH / TUNAI</option>
+                      <option value="TRANSFER">TRANSFER BANK</option>
+                      <option value="TEMPO">TEMPO / NET TERMS</option>
+                      <option value="DP">DP + PELUNASAN</option>
+                      <option value="GIRO">GIRO / CEK</option>
+                      <option value="QRIS">QRIS / INSTAN</option>
+                      <option value="KREDIT">KREDIT SUPPLIER</option>
+                      <option value="KONSINYASI">KONSINYASI</option>
+                    </select>
+                  </div>
+
+                  {(form.paymentStatus === 'HUTANG' || form.paymentMethod === 'TEMPO' || form.paymentMethod === 'KREDIT') && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tgl Jatuh Tempo</label>
+                      <input
+                        type="date"
+                        value={form.dueDate}
+                        onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Opsi Langsung Terima Barang & Tambah Stok */}
               <div className="pt-2 border-t border-gray-100">
                 <label className="flex items-center gap-2.5 cursor-pointer font-bold text-xs text-emerald-800 bg-emerald-50 p-3 rounded-xl border border-emerald-200 hover:bg-emerald-100/60 transition-colors">
@@ -611,16 +707,28 @@ export default function AdminPurchases() {
               </div>
               <button onClick={() => setDetailModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
-            <div className="flex gap-3 mb-4">
-              <div className="flex-1 bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-medium">Supplier</p>
-                <p className="font-bold text-gray-800 text-sm">{detailModal.supplier.name}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">Supplier</p>
+                <p className="font-bold text-gray-800 text-xs truncate">{detailModal.supplier.name}</p>
               </div>
-              <div className="flex-1 bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-medium">Status</p>
-                <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLOR[detailModal.status]}`}>
-                  {STATUS_LABEL[detailModal.status]}
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">Status PO</p>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${STATUS_COLOR[detailModal.status]}`}>
+                  {STATUS_LABEL[detailModal.status] || detailModal.status}
                 </span>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">Pembayaran</p>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                  detailModal.paymentStatus === 'HUTANG' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                }`}>
+                  {detailModal.paymentStatus || 'LUNAS'}
+                </span>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">Metode</p>
+                <p className="font-bold text-gray-800 text-xs uppercase">{detailModal.paymentMethod || 'CASH'}</p>
               </div>
             </div>
             <table className="w-full text-sm mb-4">
