@@ -87,7 +87,7 @@ export default function AllCategoriesPage() {
             </Link>
             <div className="flex flex-col">
               <h1 className="text-sm font-black tracking-tight text-green-600 leading-none">Atayatoko</h1>
-              <span className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">Kategori otomatis</span>
+              <span className="text-xs text-slate-400 mt-0.5">Kategori otomatis</span>
             </div>
 
           </div>
@@ -108,7 +108,7 @@ export default function AllCategoriesPage() {
         {loading ? (
           <div className="flex flex-col items-center py-20 text-gray-400">
             <Loader2 className="animate-spin mb-4" size={40} />
-            <p className="font-bold text-[10px] tracking-widest">Sinkronisasi kategori...</p>
+            <p className="font-medium text-xs text-slate-400">Sinkronisasi kategori...</p>
 
           </div>
         ) : (
@@ -117,8 +117,8 @@ export default function AllCategoriesPage() {
             {(activeChip === 'SEMUA' || activeChip === 'PROMO') && (
               <Link href="/kategori/promo" className="bg-red-50 border border-red-100 rounded-[2rem] p-6 text-center shadow-sm active:scale-95 transition-all">
                 <div className="w-20 h-20 bg-red-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg">🔥</div>
-                <h2 className="font-black text-[11px] text-red-600">Promo produk</h2>
-                <div className="mt-2 text-[8px] font-black text-red-400 animate-pulse">Diskon spesial</div>
+                <h2 className="font-black text-sm font-bold text-red-600">Promo produk</h2>
+                <div className="mt-2 text-xs font-semibold text-red-500 animate-pulse">Diskon spesial</div>
               </Link>
             )}
 
@@ -142,7 +142,7 @@ export default function AllCategoriesPage() {
                     {getIcon(cat.slug)}
                   </span>
                 </div>
-                <h2 className="font-black text-[11px] tracking-tighter text-gray-800 group-hover:text-green-600 capitalize">
+                <h2 className="font-black text-sm font-semibold tracking-tight text-slate-800 group-hover:text-green-600 capitalize">
                   {cat.name}
                 </h2>
 
@@ -154,7 +154,7 @@ export default function AllCategoriesPage() {
         <div className="mt-12 bg-green-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-xl font-black mb-2">Update stok otomatis</h2>
-            <p className="text-green-100 text-[10px] mb-6 font-bold tracking-widest opacity-80">
+            <p className="text-green-100 text-xs mb-4 leading-relaxed opacity-90">
 
               Kategori ini sinkron langsung dengan data barang di gudang.
             </p>

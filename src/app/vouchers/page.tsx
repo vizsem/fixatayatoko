@@ -152,7 +152,7 @@ export default function VoucherExchangePage() {
               toast.dismiss(t.id);
               toast.success("Disalin ulang!");
             }}
-            className="mt-2 bg-black text-white text-[8px] font-black py-1 px-2 rounded-lg"
+            className="mt-2 bg-black text-white text-xs font-medium py-1 px-2.5 rounded-lg"
 
           >
             Salin Ulang
@@ -208,7 +208,7 @@ export default function VoucherExchangePage() {
           </button>
           <div className="text-center">
             <h1 className="font-black italic text-lg tracking-tighter">Voucher Center</h1>
-            <p className="text-[10px] font-bold text-gray-400 tracking-widest">Tukar poin jadi keuntungan</p>
+            <p className="text-xs text-slate-400">Tukar poin jadi keuntungan</p>
           </div>
 
           <div className="w-10"></div>
@@ -225,7 +225,7 @@ export default function VoucherExchangePage() {
           <>
             <div className="bg-black rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
               <Coins className="absolute right-[-20px] bottom-[-20px] text-white/10" size={150} />
-              <p className="text-[10px] font-black tracking-[0.2em] opacity-60 mb-2">Saldo poin Anda</p>
+              <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-2">Saldo poin Anda</p>
               <div className="flex items-center gap-3">
                 <h2 className="text-5xl font-black italic">{(userData?.points || 0).toLocaleString()}</h2>
                 <div className="bg-yellow-400 text-black p-1 rounded-full"><Zap size={14} fill="currentColor" /></div>
@@ -233,13 +233,13 @@ export default function VoucherExchangePage() {
               {userData?.isPointsFrozen && (
                 <div className="mt-4 flex items-center gap-2 bg-red-600/20 text-red-400 p-3 rounded-2xl border border-red-600/30">
                   <Snowflake size={16} />
-                  <span className="text-[10px] font-black">Akun dibekukan sementara</span>
+                  <span className="text-xs font-bold">Akun dibekukan sementara</span>
                 </div>
               )}
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-[10px] font-black tracking-widest text-gray-400 ml-2">Voucher tersedia</h3>
+              <h3 className="text-xs font-bold tracking-widest text-gray-400 ml-2">Voucher tersedia</h3>
               {filteredVouchers.length === 0 ? (
                 <EmptyState
                   icon={<Ticket className="mx-auto text-slate-200" size={48} />}
@@ -258,11 +258,11 @@ export default function VoucherExchangePage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-black italic leading-tight">{v.name}</h4>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${categoryBadgeCls(v.category)}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${categoryBadgeCls(v.category)}`}>
                               {categoryLabel(v.category)}
                             </span>
                           </div>
-                          <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 mt-1">
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                             <Coins size={10} className="text-yellow-500" /> {v.cost.toLocaleString()} Poin
                           </p>
                         </div>
@@ -270,7 +270,7 @@ export default function VoucherExchangePage() {
                       <button
                         disabled={!isAffordable || userData?.isPointsFrozen || isProcessing}
                         onClick={() => handleRedeem(v)}
-                        className={`px-6 py-3 rounded-2xl font-black text-[10px] tracking-widest transition-all ${isAffordable
+                        className={`px-6 py-3 rounded-2xl font-black text-xs font-bold tracking-wider transition-all ${isAffordable
                           ? 'bg-black text-white hover:bg-emerald-500'
                           : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           }`}
@@ -287,10 +287,10 @@ export default function VoucherExchangePage() {
 
         {/* INFO */}
         <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100">
-          <h5 className="text-[10px] font-black text-blue-600 mb-2 flex items-center gap-2">
+          <h5 className="text-xs font-bold text-blue-600 mb-2 flex items-center gap-2">
             <Gift size={14} /> Cara menggunakan voucher
           </h5>
-          <p className="text-[10px] text-blue-800/70 font-bold leading-relaxed">
+          <p className="text-xs text-blue-900/80 leading-relaxed">
             Voucher yang telah ditukar akan muncul di riwayat belanja. Masukkan kode voucher saat checkout untuk memotong harga belanja Anda.
           </p>
         </div>

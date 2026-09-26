@@ -182,7 +182,7 @@ export default function EditProfilePage() {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">
                 Nama Lengkap
               </label>
               <div className="relative">
@@ -193,14 +193,14 @@ export default function EditProfilePage() {
                   required
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-50 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-emerald-400"
+                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-emerald-400"
                   placeholder="Contoh: Agus Santoso"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">
                 Email
               </label>
               <div className="relative">
@@ -211,14 +211,14 @@ export default function EditProfilePage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-50 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-emerald-400"
+                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-emerald-400"
                   placeholder="contoh@email.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-2">
                 Nomor WhatsApp
               </label>
               <div className="relative">
@@ -229,7 +229,7 @@ export default function EditProfilePage() {
                   required
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-50 rounded-2xl text-xs font-black outline-none focus:bg-white focus:border-emerald-400"
+                  className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-emerald-400"
                   placeholder="081234567890"
                 />
               </div>
@@ -239,14 +239,14 @@ export default function EditProfilePage() {
               <button
                 type="button"
                 onClick={() => router.push('/profil')}
-                className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-2xl hover:bg-slate-200 text-[10px] font-black uppercase tracking-widest"
+                className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl hover:bg-slate-200 text-sm font-semibold"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl hover:bg-emerald-700 disabled:bg-gray-400 text-[10px] font-black uppercase tracking-widest"
+                className="flex-1 bg-emerald-600 text-white py-3 rounded-xl hover:bg-emerald-700 disabled:bg-gray-400 text-sm font-semibold shadow-sm"
               >
                 {submitting ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
@@ -255,23 +255,23 @@ export default function EditProfilePage() {
         </div>
 
         <div className="mt-6 bg-white rounded-3xl p-8 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-          <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-6 flex items-center gap-2">
+          <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-6 flex items-center gap-2">
             <MapPin size={14} className="text-emerald-500" /> Alamat Tersimpan
           </h3>
           <div className="space-y-4 mb-8">
             {addresses.length > 0 ? (
               addresses.map((addr) => (
                 <div key={addr.id} className="p-5 bg-slate-50 rounded-3xl relative border border-slate-50 group">
-                  <p className="text-[10px] font-bold text-green-600 uppercase mb-1">{addr.label}</p>
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">{addr.label}</p>
                   <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{addr.receiverName}</p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase leading-relaxed">{addr.address}</p>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{addr.address}</p>
                   <button onClick={() => deleteAddress(addr.id)} className="absolute top-5 right-5 text-slate-300 hover:text-rose-500 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-center text-slate-400 py-4 font-medium">Belum ada alamat.</p>
+              <p className="text-xs text-center text-slate-400 py-4 font-normal">Belum ada alamat.</p>
             )}
           </div>
 
@@ -279,32 +279,32 @@ export default function EditProfilePage() {
             <input
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="LABEL (MISAL: RUMAH)..."
-              className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Label (misal: Rumah)..."
+              className="w-full bg-white rounded-xl px-4 py-3 text-xs font-medium outline-none border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
             <input
               value={newReceiverName}
               onChange={(e) => setNewReceiverName(e.target.value)}
-              placeholder="NAMA PENERIMA..."
-              className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Nama Penerima..."
+              className="w-full bg-white rounded-xl px-4 py-3 text-xs font-medium outline-none border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
             <input
               value={newReceiverPhone}
               onChange={(e) => setNewReceiverPhone(e.target.value)}
-              placeholder="NO. WHATSAPP..."
-              className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Nomor WhatsApp..."
+              className="w-full bg-white rounded-xl px-4 py-3 text-xs font-medium outline-none border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
             <textarea
               value={newAddress}
               onChange={(e) => setNewAddress(e.target.value)}
-              placeholder="ALAMAT LENGKAP..."
-              className="w-full bg-white rounded-xl px-4 py-3 text-[10px] font-bold uppercase outline-none border border-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 h-20 resize-none"
+              placeholder="Alamat lengkap..."
+              className="w-full bg-white rounded-xl px-4 py-3 text-xs font-medium outline-none border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 h-20 resize-none"
             />
             <button
               type="button"
               onClick={addAddress}
               disabled={savingAddress}
-              className="w-full bg-emerald-500 text-white py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-emerald-600 disabled:opacity-60"
+              className="w-full bg-emerald-500 text-white py-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-emerald-600 disabled:opacity-60"
             >
               {savingAddress ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Simpan Alamat
             </button>
