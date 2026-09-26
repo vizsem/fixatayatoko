@@ -54,7 +54,7 @@ function SemuaProdukContent() {
   // Filter and Sort Products
   const processedProducts = useMemo(() => {
     let list = rawProducts.map((p) => {
-      const priceEcer = Number(p.priceEcer ?? (p as any).Ecer ?? p.price ?? 0);
+      const priceEcer = Number(p.priceEcer ?? (p as any).Ecer ?? (p as any).price ?? 0);
       const priceGrosir = Number(p.priceGrosir ?? (p as any).Grosir ?? priceEcer);
       const category = p.category || (p as any).Kategori || 'Umum';
 
@@ -256,9 +256,10 @@ function SemuaProdukContent() {
               <ProductCard
                 key={p.id}
                 product={p}
+                promoInfo={{ price: p.price, hasPromo: false, promoName: null }}
                 isWish={wishlist.includes(p.id)}
                 onWishlistToggle={handleWishlistToggle}
-                onAddToCart={addToCart}
+                onAddToCart={(prod) => addToCart(prod, 1, prod.unit)}
               />
             ))}
           </div>

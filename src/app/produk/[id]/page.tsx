@@ -226,16 +226,16 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <>
-      {productSchema && (
+      {product && productSchema && (
         <Script
           id={`product-jsonld-${product.id}`}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
         />
       )}
-      {breadcrumbSchema && (
+      {product && breadcrumbSchema && (
         <Script
-          id={`breadcrumb-jsonld-${product?.id}`}
+          id={`breadcrumb-jsonld-${product.id}`}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         />
