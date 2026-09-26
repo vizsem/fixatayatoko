@@ -1,12 +1,15 @@
 import ProductDetailClient, { Product, RelatedProduct, Review } from './ProductDetailClient';
 import { Metadata } from 'next';
+import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-// 1. Generate Metadata for SEO
+const BASE_URL = 'https://atayatoko.aty0.com';
+
+// 1. Generate Metadata for SEO & Social Media
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
 
@@ -18,33 +21,63 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       .maybeSingle();
 
     if (!prod) {
-      return { title: 'Produk Tidak Ditemukan - ATAYATOKO' };
+      return {
+        title: 'Produk Tidak Ditemukan | ATAYATOKO Kediri',
+        robots: { index: false, follow: false },
+      };
     }
 
     const raw = prod.raw_data || {};
-    const productName = prod.name || raw.name || raw.Nama || 'Produk';
-    const productDesc = prod.description || raw.description || raw.Deskripsi || 'Beli produk ini di ATAYATOKO dengan harga terbaik.';
+    const productName = prod.name || raw.name || raw.Nama || 'Produk Sembako';
+    const productPrice = Number(prod.price ?? raw.price ?? raw.Ecer ?? 0);
+    const productDesc =
+      prod.description ||
+      raw.description ||
+      raw.Deskripsi ||
+      `Beli ${productName} murah berkualitas di ATAYATOKO Kediri. Siap kirim partai besar & eceran gratis ongkir wilayah Kediri Kota.`;
     const productImage = prod.image_url || raw.imageUrl || raw.Link_Foto || raw.image || '/logo-atayatoko.png';
+    const fullImageUrl = productImage.startsWith('http') ? productImage : `${BASE_URL}${productImage}`;
+    const productUrl = `${BASE_URL}/produk/${id}`;
+    const categoryName = prod.category || raw.category || raw.Kategori || 'Sembako';
 
     return {
-      title: `${productName} - Jual Murah ATAYATOKO`,
+      title: `${productName} - Harga Grosir & Eceran | ATAYATOKO`,
       description: productDesc.substring(0, 160),
+      keywords: `${productName}, beli ${productName} kediri, harga ${productName}, grosir ${categoryName} kediri, ATAYATOKO`,
+      alternates: {
+        canonical: productUrl,
+      },
       openGraph: {
-        title: productName,
+        title: `${productName} - ATAYATOKO Kediri`,
         description: productDesc.substring(0, 160),
-        images: [productImage],
+        url: productUrl,
+        siteName: 'ATAYATOKO Sembako Kediri',
+        images: [
+          {
+            url: fullImageUrl,
+            width: 800,
+            height: 800,
+            alt: productName,
+          },
+        ],
         type: 'website',
+        locale: 'id_ID',
       },
       twitter: {
         card: 'summary_large_image',
-        title: productName,
+        title: `${productName} - ATAYATOKO Kediri`,
         description: productDesc.substring(0, 160),
-        images: [productImage],
+        images: [fullImageUrl],
+      },
+      other: {
+        'product:price:amount': String(productPrice),
+        'product:price:currency': 'IDR',
+        'product:availability': (Number(prod.stock ?? raw.stock ?? 0) > 0) ? 'in stock' : 'out of stock',
       },
     };
   } catch (error) {
     console.error('Error generating metadata:', error);
-    return { title: 'ATAYATOKO - Belanja Hemat' };
+    return { title: 'ATAYATOKO - Belanja Sembako Hemat Kediri' };
   }
 }
 
@@ -54,7 +87,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   let product: Product | null = null;
   let relatedProducts: RelatedProduct[] = [];
-  let reviews: Review[] = [];
+  const reviews: Review[] = [];
 
   try {
     const { data: prod } = await supabase
@@ -126,12 +159,92 @@ export default async function ProductDetailPage({ params }: PageProps) {
     console.error('Error fetching product data:', error);
   }
 
+  // Schema.org Structured Data (JSON-LD) for Google Rich Snippets
+  const fullImageUrl = product?.image?.startsWith('http')
+    ? product.image
+    : `${BASE_URL}${product?.image || '/logo-atayatoko.png'}`;
+
+  const productSchema = product
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        image: [fullImageUrl],
+        description:
+          product.description ||
+          `Beli ${product.name} murah berkualitas di ATAYATOKO Kediri. Grosir & Eceran.`,
+        sku: product.id,
+        brand: {
+          '@type': 'Brand',
+          name: 'ATAYATOKO',
+        },
+        offers: {
+          '@type': 'Offer',
+          url: `${BASE_URL}/produk/${product.id}`,
+          priceCurrency: 'IDR',
+          price: product.price,
+          priceValidUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          itemCondition: 'https://schema.org/NewCondition',
+          availability:
+            product.stock > 0
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/OutOfStock',
+          seller: {
+            '@type': 'Organization',
+            name: 'ATAYATOKO Sembako Kediri',
+          },
+        },
+      }
+    : null;
+
+  const breadcrumbSchema = product
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Beranda',
+            item: BASE_URL,
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Katalog',
+            item: `${BASE_URL}/semua-kategori`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: product.name,
+            item: `${BASE_URL}/produk/${product.id}`,
+          },
+        ],
+      }
+    : null;
+
   return (
-    <ProductDetailClient
-      initialProduct={product}
-      initialRelatedProducts={relatedProducts}
-      initialReviews={reviews}
-    />
+    <>
+      {productSchema && (
+        <Script
+          id={`product-jsonld-${product.id}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+        />
+      )}
+      {breadcrumbSchema && (
+        <Script
+          id={`breadcrumb-jsonld-${product?.id}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+      )}
+      <ProductDetailClient
+        initialProduct={product}
+        initialRelatedProducts={relatedProducts}
+        initialReviews={reviews}
+      />
+    </>
   );
 }
-

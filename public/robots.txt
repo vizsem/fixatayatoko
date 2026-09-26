@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://atayatoko.aty0.com/sitemap.xml
