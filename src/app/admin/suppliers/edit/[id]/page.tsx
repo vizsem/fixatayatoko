@@ -6,7 +6,8 @@
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
-import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
  import { ArrowLeft, Save, Users, Phone, Mail, MapPin } from 'lucide-react';
 
@@ -40,28 +41,37 @@ import { isAdminRole } from '@/lib/auth-helpers';
    });
  
    useEffect(() => {
-     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
-       if (!user) {
-         router.push('/profil/login');
-         return;
-       }
- 
-       const userDoc = await getDoc(doc(db, 'users', user.uid));
-       if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
+      if (!user) {
+        router.push('/profil/login');
+        return;
+      }
+
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
-         router.push('/profil');
-         return;
-       }
- 
-       setLoading(false);
-     });
- 
-     return () => unsubscribe();
-   }, [router]);
+        router.push('/profil');
+        return;
+      }
+
+      setLoading(false);
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
+  }, [router]);
  
    const fetchSupplier = useCallback(async () => {
      try {
-       const snap = await getDoc(doc(db, 'suppliers', id));
+       const snap = await sbGetDoc('suppliers', id);
        if (!snap.exists()) {
          notify.admin.error('Supplier tidak ditemukan');
          router.push('/admin/suppliers');
@@ -94,7 +104,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
      setIsSubmitting(true);
      setError(null);
      try {
-       await updateDoc(doc(db, 'suppliers', id), {
+       await sbUpdateDoc('suppliers', id, {
          name: supplier.name.trim(),
          contactPerson: supplier.contactPerson.trim(),
          phone: supplier.phone.trim(),

@@ -15,7 +15,8 @@ import { Toaster } from 'react-hot-toast';
 import { logActivity } from '@/lib/activity';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, onAuthStateChanged, ref, setDoc, updateDoc, writeBatch } from '@/lib/firebase';
+import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, getDocs, ref, writeBatch } from '@/lib/firebase';
 import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import {
   DEFAULT_DELIVERY_METHODS,
@@ -121,20 +122,29 @@ export default function AdminSettings() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) { router.push('/profil/login'); return; }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      if (!isAuthorizedAdmin(user, userDocData)) { router.push('/'); return; }
+      if (!isAdmin) { router.push('/'); return; }
 
       await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners(), loadWarehouses()]);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   const loadSettings = async () => {
-    const snap = await getDoc(doc(db, 'settings', 'system'));
+    const snap = await sbGetDoc('settings', 'system');
     if (snap.exists()) {
       const data = snap.data() as SystemSettings;
       setSettings({ ...defaultSettings, ...data, store: { ...defaultSettings.store, ...data.store }, deliveryMethods: data.deliveryMethods || defaultSettings.deliveryMethods });
@@ -142,34 +152,34 @@ export default function AdminSettings() {
   };
 
   const loadPointSettings = async () => {
-    const snap = await getDoc(doc(db, 'settings', 'points'));
+    const snap = await sbGetDoc('settings', 'points');
     if (snap.exists()) setPointConfig(snap.data() as PointSettings);
   };
 
   const loadCategories = async () => {
-    const snap = await getDocs(collection(db, 'categories'));
+    const snap = await sbGetDocs({ table: 'categories' });
     setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
   };
 
   const loadEmployees = async () => {
-    const snap = await getDocs(collection(db, 'employees'));
+    const snap = await sbGetDocs({ table: 'employees' });
     setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
   };
 
   const loadBanners = async () => {
-    const snap = await getDocs(collection(db, 'banners'));
+    const snap = await sbGetDocs({ table: 'banners' });
     setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)));
   };
 
   const loadWarehouses = async () => {
-    const snap = await getDocs(collection(db, 'warehouses'));
+    const snap = await sbGetDocs({ table: 'warehouses' });
     setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
   };
 
   const handleSaveSystem = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'system'), { ...settings, updatedAt: new Date().toISOString() });
+      await sbUpsertDoc('settings', 'system', { ...settings, updatedAt: new Date().toISOString() });
       await logActivity({ type: 'SETTING_UPDATE', description: 'Updated system settings (Store, Payment, Shipping)' });
       notify.admin.success('Sistem diperbarui!');
     } catch { notify.admin.error('Gagal menyimpan.'); }
@@ -179,7 +189,7 @@ export default function AdminSettings() {
   const handleSavePoints = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'points'), pointConfig);
+      await sbUpsertDoc('settings', 'points', pointConfig);
       await logActivity({ type: 'SETTING_UPDATE', description: 'Updated loyalty point configuration' });
       notify.admin.success('Konfigurasi Point disimpan!');
     } finally { setSaving(false); }
@@ -193,8 +203,8 @@ export default function AdminSettings() {
       for (const colName of colls) {
         let data: any[] = [];
         if (colName === 'settings') {
-           const sys = await getDoc(doc(db, 'settings', 'system'));
-           const pts = await getDoc(doc(db, 'settings', 'points'));
+           const sys = await sbGetDoc('settings', 'system');
+           const pts = await sbGetDoc('settings', 'points');
            if (sys.exists()) data.push({ id: 'system', ...sys.data() });
            if (pts.exists()) data.push({ id: 'points', ...pts.data() });
         } else {
@@ -275,7 +285,7 @@ export default function AdminSettings() {
   const handleAddCategory = async () => {
     if (!newCat) return;
     const slug = newCat.toLowerCase().replace(/\s+/g, '-');
-    const docRef = await addDoc(collection(db, 'categories'), { name: newCat, slug });
+    const docRef = await sbInsertDoc('categories', { name: newCat, slug });
     setCategories([...categories, { id: docRef.id, name: newCat, slug }]);
     setNewCat('');
     notify.success("Kategori ditambahkan");
@@ -283,14 +293,14 @@ export default function AdminSettings() {
 
   const handleDeleteCategory = async (id: string) => {
     if (!confirm("Hapus kategori ini?")) return;
-    await deleteDoc(doc(db, 'categories', id));
+    await sbDeleteDoc('categories', id);
     setCategories(categories.filter(c => c.id !== id));
     notify.success("Kategori dihapus");
   };
 
   const handleAddEmployee = async () => {
     if (!newEmp.name || !newEmp.email) return notify.error("Nama & Email wajib");
-    const docRef = await addDoc(collection(db, 'employees'), newEmp);
+    const docRef = await sbInsertDoc('employees', newEmp);
     setEmployees([...employees, { id: docRef.id, ...newEmp }]);
     setNewEmp({ name: '', role: 'kasir', phone: '', email: '', isActive: true });
     notify.success("Staff ditambahkan");
@@ -298,26 +308,26 @@ export default function AdminSettings() {
 
   const handleToggleEmployee = async (emp: Employee) => {
     const updated = { ...emp, isActive: !emp.isActive };
-    await updateDoc(doc(db, 'employees', emp.id!), { isActive: !emp.isActive });
+    await sbUpdateDoc('employees', emp.id!, { isActive: !emp.isActive });
     setEmployees(employees.map(e => e.id === emp.id ? updated : e));
   };
 
   const handleDeleteEmployee = async (id: string) => {
     if (!confirm("Hapus staff?")) return;
-    await deleteDoc(doc(db, 'employees', id));
+    await sbDeleteDoc('employees', id);
     setEmployees(employees.filter(e => e.id !== id));
   };
 
   const handleAddBanner = async () => {
     if (!newBanner.title || !newBanner.imageUrl) return notify.error("Title & Image URL wajib");
-    const docRef = await addDoc(collection(db, 'banners'), newBanner);
+    const docRef = await sbInsertDoc('banners', newBanner);
     setBanners([...banners, { id: docRef.id, ...newBanner }]);
     setNewBanner({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
     notify.success("Banner ditambahkan");
   };
 
   const handleDeleteBanner = async (id: string) => {
-    await deleteDoc(doc(db, 'banners', id));
+    await sbDeleteDoc('banners', id);
     setBanners(banners.filter(b => b.id !== id));
   };
 

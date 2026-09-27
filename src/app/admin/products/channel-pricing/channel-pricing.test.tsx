@@ -44,7 +44,9 @@ vi.mock('@/lib/hooks/useProducts', () => ({
   }),
 }));
 
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/firebase', () => {
+  const M = Symbol('supabase_increment');
+  return ({
   db: {},
   collection: vi.fn(),
   orderBy: vi.fn(),
@@ -59,11 +61,59 @@ vi.mock('@/lib/firebase', () => ({
   limit: vi.fn(),
   ref: vi.fn(),
   writeBatch: vi.fn(),
-}));
+  INCREMENT_MARKER: M,
+  increment: (n: any) => ({ [M]: true, delta: n }),
+  });
+});
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: { storage: {}, auth: {} },
-}));
+vi.mock('@/lib/supabase', () => {
+  const createQueryBuilder = () => {
+    const builder: any = {};
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.order = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue({ data: null, error: null });
+    builder.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    builder.neq = vi.fn().mockReturnValue(builder);
+    builder.gt = vi.fn().mockReturnValue(builder);
+    builder.lt = vi.fn().mockReturnValue(builder);
+    builder.gte = vi.fn().mockReturnValue(builder);
+    builder.lte = vi.fn().mockReturnValue(builder);
+    builder.limit = vi.fn().mockReturnValue(builder);
+    builder.insert = vi.fn().mockReturnValue(builder);
+    builder.delete = vi.fn().mockReturnValue(builder);
+    builder.upsert = vi.fn().mockReturnValue(builder);
+    builder.in = vi.fn().mockReturnValue(builder);
+    builder.contains = vi.fn().mockReturnValue(builder);
+    builder.update = vi.fn().mockReturnValue(builder);
+    builder.then = (onfulfilled: any, onrejected?: any) =>
+      Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+    return builder;
+  };
+  return {
+    supabase: {
+      storage: {},
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: 'admin-user', app_metadata: { role: 'admin' } } },
+          error: null,
+        })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+        signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
+        signOut: vi.fn(async () => ({ error: null })),
+      },
+      from: vi.fn(() => createQueryBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+    supabaseAdmin: {
+      from: vi.fn(() => createQueryBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+  };
+});
+
 
 vi.mock('react-hot-toast', () => ({
   Toaster: () => <div />,

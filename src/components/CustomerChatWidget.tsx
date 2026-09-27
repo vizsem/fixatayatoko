@@ -9,6 +9,7 @@ import type { ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
+import { sbGetDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
 import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, ref, setDoc, updateDoc, where } from '@/lib/firebase';
 export default function CustomerChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,7 +25,7 @@ export default function CustomerChatWidget() {
       if (currentUser) {
         // Check role to hide widget for admins/cashiers
         try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          const userDoc = await sbGetDoc('users', currentUser.uid);
           const role = userDoc.data()?.role;
           if (role === 'admin' || role === 'cashier') {
             setUser(null); // Hide widget
@@ -99,10 +100,10 @@ export default function CustomerChatWidget() {
 
       // 1. Ensure Chat Thread Exists
       const chatRef = doc(db, 'chats', user.uid);
-      const chatSnap = await getDoc(chatRef);
+      const chatSnap = await sbGetDoc('chats', user.uid);
 
       if (!chatSnap.exists()) {
-        await setDoc(chatRef, {
+        await sbUpsertDoc('chats', user.uid, {
           id: user.uid,
           userInfo: {
             uid: user.uid,
@@ -126,7 +127,7 @@ export default function CustomerChatWidget() {
       });
 
       // 3. Update Thread Metadata
-      await updateDoc(chatRef, {
+      await sbUpdateDoc('chats', user.uid, {
         lastMessage: text,
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,

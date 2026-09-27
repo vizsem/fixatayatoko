@@ -12,6 +12,7 @@ import Link from 'next/link';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
+import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { Timestamp, db, doc, getDoc, getDownloadURL, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
 export default function EditOperationalExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
     const fetchExpense = async () => {
       try {
         const docRef = doc(db, 'operational_expenses', id);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await sbGetDoc('operational_expenses', id);
         
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -83,7 +84,7 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
 
       // Update document
       const docRef = doc(db, 'operational_expenses', id);
-      await updateDoc(docRef, {
+      await sbUpdateDoc('operational_expenses', id, {
         category,
         amount: Number(amount),
         date: Timestamp.fromDate(new Date(date)),

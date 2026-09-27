@@ -8,7 +8,7 @@ import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, collection, db, doc, getDoc } from '@/lib/firebase';
+import { sbGetDoc, sbInsertDoc } from '@/lib/supabase-helpers';
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: '',
@@ -32,7 +32,7 @@ export default function ContactPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'settings', 'system'));
+        const docSnap = await sbGetDoc('settings', 'system');
         if (docSnap.exists()) {
           const data = docSnap.data();
           const store = data.store || {};
@@ -77,7 +77,7 @@ export default function ContactPage() {
     setIsSubmitting(true);
     
     try {
-      await addDoc(collection(db, 'messages'), {
+      await sbInsertDoc('messages', {
         ...formData,
         createdAt: new Date().toISOString(),
         status: 'unread',

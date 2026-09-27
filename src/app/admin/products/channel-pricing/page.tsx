@@ -10,7 +10,8 @@ import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
-import { db, doc, limit, ref, updateDoc, writeBatch } from '@/lib/firebase';
+import { sbUpdateDoc } from '@/lib/supabase-helpers';
+import { db, doc, limit, ref, writeBatch } from '@/lib/firebase';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
 type ChannelPricingState = {
@@ -162,7 +163,7 @@ export default function ChannelPricingPage() {
           }
         });
       });
-      await updateDoc(doc(db, 'products', product.id), {
+      await sbUpdateDoc('products', product.id, {
         channelPricing: Object.keys(payload).length ? payload : null,
       });
       notify.admin.success('Harga channel tersimpan.', { id: toastId });

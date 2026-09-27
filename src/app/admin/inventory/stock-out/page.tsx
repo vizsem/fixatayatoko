@@ -1,18 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { deductStockTx } from '@/lib/inventory';
+import { deductStockFEFO } from '@/lib/inventory';
 import { postJournal } from '@/lib/ledger';
-import { ArrowLeft, ArrowUpCircle, Search, AlertCircle, CheckCircle2, Package, X, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowUpCircle, Search, Package, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, runTransaction } from '@/lib/firebase';
 export default function StockOutPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,23 +21,38 @@ export default function StockOutPage() {
   const [qty, setQty] = useState<number>(0);
   const [reason, setReason] = useState('Barang Rusak');
 
+  const [adminId, setAdminId] = useState('system');
+
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      if (!isAuthorizedAdmin(user, userDocData)) {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/admin/login'); return; }
+      if (!isAuthorizedAdmin(user)) {
         notify.aksesDitolakAdmin();
-        return router.push('/profil');
+        router.push('/profil');
+        return;
       }
-    });
-    return () => unsubAuth();
+      setAdminId(user.id);
+    };
+    checkAuth();
   }, [router]);
 
   const fetchProducts = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(db, 'products'));
-      setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      const { data, error } = await supabaseAdmin
+        .from('products')
+        .select('id, name, stock, unit, raw_data')
+        .or('is_active.eq.true,is_active.is.null')
+        .order('name', { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      setProducts((data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        stock: Number(p.stock ?? p.raw_data?.stock ?? 0),
+        unit: p.unit || p.raw_data?.unit || 'pcs',
+        stockByWarehouse: p.raw_data?.stockByWarehouse || {},
+      } as Product)));
     } catch (err) {
       Sentry.captureException(err);
       notify.error("Gagal memuat produk");
@@ -55,32 +69,38 @@ export default function StockOutPage() {
     setLoading(true);
     const t = notify.admin.loading("Memproses pengeluaran stok...");
     try {
-      await runTransaction(db, async (tx) => {
-        const pRef = doc(db, 'products', selectedProduct.id);
-        const pSnap = await tx.get(pRef);
-        const costPrice = Number(pSnap.data()?.Modal || pSnap.data()?.purchasePrice || 0);
-        const lossValue = costPrice * qty;
+      const { data: prodData } = await supabaseAdmin
+        .from('products')
+        .select('cost_price, raw_data')
+        .eq('id', selectedProduct.id)
+        .single();
+      const costPrice = Number(prodData?.cost_price ?? prodData?.raw_data?.Modal ?? 0);
+      const lossValue = costPrice * qty;
 
-        await deductStockTx(tx, {
-          productId: selectedProduct.id,
-          amount: qty,
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-          source: 'MANUAL',
-          note: `Manual Out: ${reason}`,
-          mainWarehouseId: 'gudang-utama'
-        });
-
-        if (lossValue > 0) {
-          await postJournal({
-            debitAccount: 'LossOnInventory',
-            creditAccount: 'Inventory',
-            amount: lossValue,
-            memo: `Inventory Loss: ${reason} (${qty} units)`,
-            refType: 'STOCK_OUT',
-            refId: selectedProduct.id
-          }, tx);
-        }
+      const result = await deductStockFEFO({
+        productId: selectedProduct.id,
+        amount: qty,
+        warehouseId: 'auto',
+        adminId,
+        source: 'MANUAL',
+        notes: `Manual Out: ${reason}`,
       });
+
+      if (!result.success) {
+        notify.admin.error(`Gagal: ${result.error}`, { id: t });
+        return;
+      }
+
+      if (lossValue > 0) {
+        await postJournal({
+          debitAccount: 'LossOnInventory',
+          creditAccount: 'Inventory',
+          amount: lossValue,
+          memo: `Inventory Loss: ${reason} (${qty} units)`,
+          refType: 'STOCK_OUT',
+          refId: selectedProduct.id
+        });
+      }
 
       notify.admin.success('Stok berhasil dikurangi!', { id: t });
       setQty(0);

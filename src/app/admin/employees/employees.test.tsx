@@ -7,8 +7,9 @@ import EmployeesPage from './page';
 const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
 const mockRunTransaction = vi.fn();
-
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/firebase', () => {
+  const M = Symbol('supabase_increment');
+  return ({
   auth: {},
   db: {},
   collection: vi.fn(),
@@ -20,7 +21,8 @@ vi.mock('@/lib/firebase', () => ({
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   runTransaction: (...args: unknown[]) => mockRunTransaction(...args),
-  increment: vi.fn(),
+  increment: (n: any) => ({ [M]: true, delta: n }),
+  INCREMENT_MARKER: M,
   addDoc: vi.fn(),
   deleteDoc: vi.fn(),
   serverTimestamp: vi.fn(),
@@ -30,7 +32,8 @@ vi.mock('@/lib/firebase', () => ({
     cb({ uid: 'admin-user' });
     return () => {};
   },
-}));
+  });
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -41,19 +44,44 @@ vi.mock('@/lib/hooks/useAdminAuth', () => ({
   default: () => ({ adminId: 'admin-user', role: 'admin', authLoading: false }),
 }));
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(async () => ({
-        data: { user: { id: 'admin-user', app_metadata: { role: 'admin' } } },
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
+vi.mock('@/lib/supabase', () => {
+  const createQueryBuilder = () => {
+    const builder: any = {};
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.order = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue({ data: null, error: null });
+    builder.then = (onfulfilled: any, onrejected?: any) =>
+      Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+    return builder;
+  };
+  return {
+    supabase: {
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: 'admin-user', app_metadata: { role: 'admin' } } },
+        })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+        signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
+        signOut: vi.fn(async () => ({ error: null })),
+      },
+      storage: {},
+      from: vi.fn(() => createQueryBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     },
-    storage: {},
-  },
-}));
+    supabaseAdmin: {
+      from: vi.fn(() => {
+        const builder: any = createQueryBuilder();
+        builder.update = vi.fn().mockReturnValue(builder);
+        builder.set = vi.fn().mockResolvedValue({ data: null, error: null });
+        return builder;
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+  };
+});
 
 vi.mock('jspdf', () => ({
   default: function () {

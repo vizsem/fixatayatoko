@@ -7,7 +7,8 @@ import { Loader2, Mail, MapPin, Phone, Save, Trash2, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { arrayRemove, arrayUnion, auth, db, doc, onAuthStateChanged, onSnapshot, updateDoc } from '@/lib/firebase';
+import { sbUpdateDoc } from '@/lib/supabase-helpers';
+import { arrayRemove, arrayUnion, auth, db, doc, onAuthStateChanged, onSnapshot } from '@/lib/firebase';
 type Address = {
   id: string;
   label: string;
@@ -93,7 +94,7 @@ export default function EditProfilePage() {
     };
 
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      await sbUpdateDoc('users', user.id, {
         addresses: arrayUnion(addressObj),
         address: addressObj.address,
         updatedAt: new Date().toISOString(),
@@ -119,7 +120,7 @@ export default function EditProfilePage() {
     try {
       const patch: Record<string, unknown> = { addresses: arrayRemove(addrToDelete), updatedAt: new Date().toISOString() };
       if (addresses.length === 1) patch.address = '';
-      await updateDoc(doc(db, 'users', user.id), patch);
+      await sbUpdateDoc('users', user.id, patch);
     } catch {
       toast.error('Gagal menghapus alamat');
     }
@@ -136,7 +137,7 @@ export default function EditProfilePage() {
         return;
       }
       
-      await updateDoc(doc(db, 'users', user.id), {
+      await sbUpdateDoc('users', user.id, {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),

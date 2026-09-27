@@ -8,7 +8,7 @@ import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
 
 
-import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus } from '@/lib/actions/product.actions';
+import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus, restockProductViaSupabase } from '@/lib/actions/product.actions';
 
 
 import Link from 'next/link';
@@ -117,35 +117,23 @@ function RestockModal({ product, isOpen, onClose }: RestockModalProps) {
     
     setLoading(true);
     try {
-      const batch = writeBatch(db);
-      const productRef = doc(db, 'products', product.id);
+      const res = await restockProductViaSupabase(
+        product.id,
+        stokMasuk,
+        hargaBaru,
+        'system',
+        product.warehouseId || 'gudang-utama'
+      );
+
+      if (!res.success) {
+        throw new Error(res.error || "Gagal update data restock");
+      }
+
+      notify.admin.success("Restock & Log Berhasil tersimpan ke database!");
       
-      batch.update(productRef, {
-        stock: totalStokBaru,
-        Stok: totalStokBaru,
-        purchasePrice: simulasiHargaAvg,
-        hargaBeli: simulasiHargaAvg,
-        Modal: simulasiHargaAvg,
-        updatedAt: new Date().toISOString(),
-        tgl_masuk: new Date().toISOString().split('T')[0]
-      });
-
-      const logRef = doc(collection(db, 'inventory_logs'));
-      batch.set(logRef, {
-        productId: product.id,
-        productName: product.name || product.Nama || '',
-        type: 'MASUK',
-        amount: stokMasuk,
-        adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-        source: 'MANUAL',
-        toWarehouseId: product.warehouseId || '',
-        note: `Restock (Avg Price). Old: ${stokLama}@${hargaLama}, New: ${stokMasuk}@${hargaBaru}, Final Avg: ${simulasiHargaAvg}`,
-        date: new Date().toISOString()
-      });
-
-      await batch.commit();
-
-      notify.admin.success("Restock & Log Berhasil!");
+      // Force reload to reflect latest changes from Supabase
+      window.location.reload();
+      
       onClose();
     } catch (err) {
       console.error(err);

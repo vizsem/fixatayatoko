@@ -3,8 +3,8 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
-import { Timestamp, auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
-import { isAdminRole } from '@/lib/auth-helpers';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { isAdminRole, isStaffOrAdmin } from '@/lib/auth-helpers';
 
 type OrderItem = {
   productId?: string;
@@ -30,7 +30,7 @@ type Order = {
   paymentMethod: string;
   deliveryMethod?: string;
   deliveryAddress?: string;
-  createdAt: Timestamp | null;
+  createdAt: string | null;
   dueDate?: string;
 };
 
@@ -58,41 +58,73 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) { router.push('/profil/login'); return; }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAdminRole(userDoc.data()?.role) && userDoc.data()?.role !== 'cashier') {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/admin/login'); return; }
+      
+      const userRole = user.app_metadata?.role
+        || user.user_metadata?.role
+        || (user.email?.startsWith('admin') ? 'admin' : undefined)
+        || (user.email?.includes('hadzikoh') ? 'superadmin' : undefined)
+        || (user.email?.startsWith('kasir') ? 'cashier' : undefined);
+
+      if (!isAdminRole(userRole) && !isStaffOrAdmin(userRole)) {
         router.push('/profil'); return;
       }
       setAuthChecked(true);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
   }, [router]);
 
   useEffect(() => {
     if (!authChecked || !id) return;
     const fetchData = async () => {
       try {
-        const [docSnap, settingsSnap] = await Promise.all([
-          getDoc(doc(db, 'orders', id)),
-          getDoc(doc(db, 'settings', 'system'))
-        ]);
+        // Ambil order dari Supabase
+        const { data: orderRow } = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .or(`id.eq.${id},order_id.eq.${id}`)
+          .maybeSingle();
 
-        if (settingsSnap.exists()) {
-          const s = settingsSnap.data();
-          setStoreSettings((prev) => ({
+        if (orderRow) {
+          const raw = orderRow.raw_data || {};
+          setOrder({
+            id: orderRow.id,
+            customerName: orderRow.customer_name || raw.customerName || 'Pelanggan',
+            customerPhone: raw.customerPhone || raw.phone,
+            items: orderRow.items || raw.items || [],
+            total: orderRow.total || raw.total || 0,
+            subtotal: raw.subtotal,
+            shippingCost: raw.shippingCost,
+            discount: raw.discount,
+            voucher: raw.voucher,
+            pointsUsed: raw.pointsUsed,
+            walletUsed: raw.walletUsed,
+            status: orderRow.status || raw.status,
+            paymentMethod: raw.paymentMethod || 'TUNAI',
+            deliveryMethod: raw.deliveryMethod,
+            deliveryAddress: raw.deliveryAddress,
+            createdAt: orderRow.created_at || null,
+            dueDate: raw.dueDate,
+          });
+          setTimeout(() => { window.print(); }, 600);
+        }
+
+        // Ambil settings dari Supabase
+        const { data: settingsRow } = await supabaseAdmin
+          .from('settings')
+          .select('*')
+          .eq('key', 'system')
+          .maybeSingle();
+        if (settingsRow?.value) {
+          const s = settingsRow.value;
+          setStoreSettings(prev => ({
             name: (s.name || prev.name).toUpperCase(),
             address: s.address || prev.address,
             phone: s.phone || prev.phone,
-            footerMsg: s.footerMsg || prev.footerMsg
+            footerMsg: s.footerMsg || prev.footerMsg,
           }));
-        }
-
-        if (docSnap.exists()) {
-          setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
-          setTimeout(() => {
-            window.print();
-          }, 600);
         }
       } catch (err) {
         console.error(err);
@@ -123,8 +155,8 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
   const shippingCost = order.shippingCost ?? 0;
   const discountTotal = (order.discount || 0) + (order.voucher || 0) + (order.pointsUsed || 0) + (order.walletUsed || 0);
 
-  const dateStr = order.createdAt?.toDate
-    ? new Date(order.createdAt.toDate()).toLocaleString('id-ID', {
+  const dateStr = order.createdAt
+    ? new Date(order.createdAt).toLocaleString('id-ID', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',

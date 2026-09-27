@@ -10,7 +10,8 @@ import {
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Order = {
   id: string;
@@ -40,14 +41,14 @@ export default function PromotionsReport() {
 
   // Cek autentikasi dan role
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -55,8 +56,18 @@ export default function PromotionsReport() {
 
       setIsAdmin(true);
       setAuthChecked(true);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   // Fetch data hanya jika user sudah diverifikasi sebagai admin
@@ -65,10 +76,11 @@ export default function PromotionsReport() {
 
     const fetchPromotionsData = async () => {
       try {
-        const promotionsSnapshot = await getDocs(collection(db, 'promotions'));
-        const ordersSnapshot = await getDocs(
-          query(collection(db, 'orders'), where('status', '==', 'SELESAI'))
-        );
+        const promotionsSnapshot = await sbGetDocs({ table: 'promotions' });
+        const ordersSnapshot = await sbGetDocs({
+          table: 'orders',
+          where: [{ field: 'status', op: '==', val: 'SELESAI' }],
+        });
         const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
         const promoList: PromotionRecord[] = promotionsSnapshot.docs.map(doc => {

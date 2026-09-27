@@ -11,10 +11,9 @@ import {
   HelpCircle, AlertCircle, TrendingDown, DollarSign
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import {
-  addDoc, auth, collection, db, doc, getDoc,
-  getDocs, onAuthStateChanged, updateDoc
-} from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 /* ================= TYPES ================= */
@@ -108,7 +107,7 @@ function AddPromotionContent() {
 
   const loadSupportingData = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(db, 'products'));
+      const snap = await sbGetDocs({ table: 'products' });
       const list: Product[] = snap.docs.map((d) => {
         const data = d.data() as any;
         return {
@@ -133,14 +132,14 @@ function AddPromotionContent() {
   /* ================= AUTH & INIT ================= */
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -148,9 +147,18 @@ function AddPromotionContent() {
 
       await loadSupportingData();
       setLoading(false);
-    });
+    };
+    checkAuth();
 
-    return () => unsubscribe();
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, loadSupportingData]);
 
   /* ================= LOAD EDIT DATA ================= */
@@ -160,7 +168,7 @@ function AddPromotionContent() {
 
     const loadPromotion = async () => {
       try {
-        const snap = await getDoc(doc(db, 'promotions', editId));
+        const snap = await sbGetDoc('promotions', editId);
         if (snap.exists()) {
           const d = snap.data() as any;
           setFormData({
@@ -333,10 +341,10 @@ function AddPromotionContent() {
       };
 
       if (editId) {
-        await updateDoc(doc(db, 'promotions', editId), payload);
+        await sbUpdateDoc('promotions', editId, payload);
         notify.admin.success('Program promosi berhasil diperbarui!');
       } else {
-        await addDoc(collection(db, 'promotions'), {
+        await sbInsertDoc('promotions', {
           ...payload,
           createdAt: new Date().toISOString(),
         });

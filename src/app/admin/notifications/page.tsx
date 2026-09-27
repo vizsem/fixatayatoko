@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Send, Info, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, collection, db, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
+import { sbInsertDoc } from '@/lib/supabase-helpers';
+import { collection, db, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
@@ -47,7 +48,7 @@ export default function NotificationsPage() {
 
     setLoading(true);
     try {
-        await addDoc(collection(db, 'notifications'), {
+        await sbInsertDoc('notifications', {
             title,
             body,
             type,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { addInventoryLog } from '@/lib/inventory';
 
 type IncomingItem = {
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     const MAIN_WAREHOUSE_ID = 'gudang-utama';
 
     for (const item of items) {
-      const { data: pRecord, error: pError } = await supabase
+      const { data: pRecord, error: pError } = await supabaseAdmin
         .from('products')
         .select('*')
         .eq('id', item.id)
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
     let voucherDiscount = 0;
     let appliedVoucherId = null;
     if (voucherCode && userId) {
-      const { data: vList } = await supabase
+      const { data: vList } = await supabaseAdmin
         .from('user_vouchers')
         .select('*')
         .eq('raw_data->>userId', userId)
@@ -203,7 +203,7 @@ export async function POST(req: Request) {
     let walletUsed = 0;
     let userData: any = null;
     if (userId && (usePoints || useWallet)) {
-      const { data: userRec } = await supabase.from('users').select('*').eq('id', userId).single();
+      const { data: userRec } = await supabaseAdmin.from('users').select('*').eq('id', userId).single();
       if (userRec) {
         userData = userRec.raw_data || {};
         const curPoints = Number(userRec.points ?? userData.points ?? 0);
@@ -244,7 +244,7 @@ export async function POST(req: Request) {
     };
 
     // 1. Insert order
-    const { error: orderError } = await supabase.from('orders').insert({
+    const { error: orderError } = await supabaseAdmin.from('orders').insert({
       id: dbOrderId,
       order_id: orderId,
       user_id: userId || null,
@@ -267,10 +267,10 @@ export async function POST(req: Request) {
 
     // 2. Update products stock & write inventory logs
     for (const p of productUpdates) {
-      const { data: existingP } = await supabase.from('products').select('raw_data').eq('id', p.id).single();
+      const { data: existingP } = await supabaseAdmin.from('products').select('raw_data').eq('id', p.id).single();
       const pRaw = existingP?.raw_data || {};
 
-      await supabase.from('products').update({
+      await supabaseAdmin.from('products').update({
         stock: p.newStock,
         raw_data: {
           ...pRaw,
@@ -306,7 +306,7 @@ export async function POST(req: Request) {
       const newPoints = Math.max(0, curPoints - pointsUsed);
       const newWallet = Math.max(0, curWallet - walletUsed);
 
-      await supabase.from('users').update({
+      await supabaseAdmin.from('users').update({
         wallet_balance: newWallet,
         raw_data: {
           ...userData,
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
       }).eq('id', userId);
 
       if (pointsUsed > 0) {
-        await supabase.from('point_logs').insert({
+        await supabaseAdmin.from('point_logs').insert({
           id: `pt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           user_id: userId,
           points: -pointsUsed,
@@ -328,7 +328,7 @@ export async function POST(req: Request) {
       }
 
       if (walletUsed > 0) {
-        await supabase.from('wallet_logs').insert({
+        await supabaseAdmin.from('wallet_logs').insert({
           id: `wl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           user_id: userId,
           amount: -walletUsed,

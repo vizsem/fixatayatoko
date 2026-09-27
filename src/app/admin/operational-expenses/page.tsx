@@ -15,7 +15,8 @@ import { ExpensesSummary } from '@/components/admin/expenses/ExpensesSummary';
 import { ExpensesTable } from '@/components/admin/expenses/ExpensesTable';
 import { supabase } from '@/lib/supabase';
 
-import { Timestamp, collection, db, deleteDoc, doc, getDocs, orderBy, query } from '@/lib/firebase';
+import { sbDeleteDoc } from '@/lib/supabase-helpers';
+import { Timestamp, collection, db, doc, getDocs, orderBy, query } from '@/lib/firebase';
 export default function OperationalExpensesPage() {
   const [expenses, setExpenses] = useState<OperationalExpense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function OperationalExpensesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this record?')) return;
     try {
-      await deleteDoc(doc(db, 'operational_expenses', id));
+      await sbDeleteDoc('operational_expenses', id);
       setExpenses(prev => prev.filter(item => item.id !== id));
       notify.success('Expense deleted');
     } catch (error) {

@@ -15,7 +15,8 @@ import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 
-import { arrayRemove, arrayUnion, auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, updateDoc, where, FirebaseUser } from '@/lib/firebase';
+import { sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, where, FirebaseUser } from '@/lib/firebase';
 import { isOperationalUser } from '@/lib/auth-helpers';
 
 const MAX_ADDRESSES = 5;
@@ -177,7 +178,7 @@ export default function ProfilePage() {
     if (!newName.trim() || isSaving || !user) return;
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), { name: newName.trim() });
+      await sbUpdateDoc('users', user.uid, { name: newName.trim() });
       setIsEditingName(false);
     } catch {
       toast.error("Gagal memperbarui nama");
@@ -239,7 +240,7 @@ export default function ProfilePage() {
         newAddresses = [...addresses, newAddr];
       }
 
-      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
       setShowForm(false);
       setForm(EMPTY_FORM);
       setEditingId(null);
@@ -259,7 +260,7 @@ export default function ProfilePage() {
       if (wasDefault && newAddresses.length > 0) {
         newAddresses[0] = { ...newAddresses[0], isDefault: true };
       }
-      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
       toast.success("Alamat dihapus");
     } catch {
       toast.error("Gagal menghapus alamat");
@@ -272,7 +273,7 @@ export default function ProfilePage() {
     if (!user) return;
     const newAddresses = addresses.map(a => ({ ...a, isDefault: a.id === addrId }));
     try {
-      await updateDoc(doc(db, 'users', user.uid), { addresses: newAddresses });
+      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
       toast.success("Alamat utama diperbarui");
     } catch {
       toast.error("Gagal mengubah alamat utama");

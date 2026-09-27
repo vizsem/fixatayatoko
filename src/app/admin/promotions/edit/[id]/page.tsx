@@ -11,10 +11,9 @@ import {
   AlertCircle, DollarSign, Trash2
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import {
-  auth, collection, db, doc, getDoc,
-  getDocs, onAuthStateChanged, updateDoc, deleteDoc
-} from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 export type PromoType =
@@ -97,7 +96,7 @@ export default function EditPromotionPage() {
 
   const loadSupportingData = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(db, 'products'));
+      const snap = await sbGetDocs({ table: 'products' });
       const list: Product[] = snap.docs.map((d) => {
         const data = d.data() as any;
         return {
@@ -120,14 +119,14 @@ export default function EditPromotionPage() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -138,7 +137,7 @@ export default function EditPromotionPage() {
       // Load specific promo
       if (id) {
         try {
-          const promoDoc = await getDoc(doc(db, 'promotions', id));
+          const promoDoc = await sbGetDoc('promotions', id);
           if (promoDoc.exists()) {
             const d = promoDoc.data() as any;
             setFormData({
@@ -176,9 +175,18 @@ export default function EditPromotionPage() {
         }
       }
       setLoading(false);
-    });
+    };
+    checkAuth();
 
-    return () => unsubscribe();
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, id, loadSupportingData]);
 
   const handleTypeChange = (type: PromoType) => {
@@ -238,7 +246,7 @@ export default function EditPromotionPage() {
   const handleDelete = async () => {
     if (!confirm(`Hapus promosi "${formData.name}" secara permanen?`)) return;
     try {
-      await deleteDoc(doc(db, 'promotions', id));
+      await sbDeleteDoc('promotions', id);
       notify.admin.success('Promosi berhasil dihapus');
       router.push('/admin/promotions');
     } catch {
@@ -316,7 +324,7 @@ export default function EditPromotionPage() {
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, 'promotions', id), payload);
+      await sbUpdateDoc('promotions', id, payload);
       notify.admin.success('Perubahan promosi berhasil disimpan!');
       router.push('/admin/promotions');
     } catch (err) {

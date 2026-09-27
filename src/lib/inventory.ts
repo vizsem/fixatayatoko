@@ -1,5 +1,4 @@
 import { supabaseAdmin } from '@/lib/supabase';
-import { collection, db, doc, increment, serverTimestamp } from '@/lib/firebase';
 
 export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION';
 
@@ -375,28 +374,8 @@ export const deductStockTx = async (txOrParams: any, maybeParams?: any) => {
 
 export const addStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
-  const tx = isTx ? txOrParams : null;
   const params = isTx ? maybeParams : txOrParams;
   if (!params) return { success: true };
-
-  if (tx) {
-    const productRef = doc(db, 'products', params.productId);
-    const snap = await tx.get(productRef);
-    if (!snap.exists()) throw new Error('Product not found');
-    const pData = snap.data();
-    const stockMap = pData.stockByWarehouse || {};
-    const currentWhStock = Number(stockMap[params.warehouseId] || 0);
-    const nextMap = {
-      ...stockMap,
-      [params.warehouseId]: currentWhStock + params.amount,
-    };
-    tx.update(productRef, {
-      stock: Number(pData.stock || 0) + params.amount,
-      stockByWarehouse: nextMap,
-      updatedAt: new Date().toISOString(),
-    });
-    return { success: true };
-  }
 
   return await addStock({
     productId: params.productId,
@@ -411,52 +390,8 @@ export const addStockTx = async (txOrParams: any, maybeParams?: any) => {
 
 export const transferStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
-  const tx = isTx ? txOrParams : null;
   const params = isTx ? maybeParams : txOrParams;
   if (!params) return { success: true };
-
-  if (tx) {
-    const productRef = doc(db, 'products', params.productId);
-    const snap = await tx.get(productRef);
-    if (!snap.exists()) throw new Error('Product not found');
-    const pData = snap.data();
-    const stockMap = pData.stockByWarehouse || {};
-    const fromStock = Number(stockMap[params.fromWarehouseId] || 0);
-    if (fromStock < params.amount) {
-      throw new Error('Stok di gudang asal tidak cukup');
-    }
-    const nextMap = {
-      ...stockMap,
-      [params.fromWarehouseId]: fromStock - params.amount,
-      [params.toWarehouseId]: Number(stockMap[params.toWarehouseId] || 0) + params.amount,
-    };
-    tx.update(productRef, {
-      stockByWarehouse: nextMap,
-      updatedAt: new Date().toISOString(),
-    });
-
-    const fromWhRef = doc(db, 'warehouses', params.fromWarehouseId);
-    const toWhRef = doc(db, 'warehouses', params.toWarehouseId);
-    tx.update(fromWhRef, { usedCapacity: increment(-params.amount) });
-    tx.update(toWhRef, { usedCapacity: increment(params.amount) });
-
-    const currentTotalStock = Number(pData.stock || 0);
-    const logRef = doc(collection(db, 'inventory_logs'));
-    tx.set(logRef, {
-      productId: params.productId,
-      type: 'MUTASI',
-      amount: params.amount,
-      prevStock: currentTotalStock,
-      nextStock: currentTotalStock,
-      fromWarehouseId: params.fromWarehouseId,
-      toWarehouseId: params.toWarehouseId,
-      adminId: params.adminId,
-      source: params.source || 'TRANSFER',
-      createdAt: serverTimestamp(),
-    });
-
-    return { success: true };
-  }
 
   return await transferStock({
     productId: params.productId,
@@ -470,50 +405,8 @@ export const transferStockTx = async (txOrParams: any, maybeParams?: any) => {
 
 export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
   const isTx = txOrParams && typeof txOrParams.get === 'function';
-  const tx = isTx ? txOrParams : null;
   const params = isTx ? maybeParams : txOrParams;
   if (!params || !params.productId) return { success: true };
-
-  if (tx) {
-    const productRef = doc(db, 'products', params.productId);
-    const snap = await tx.get(productRef);
-    if (!snap.exists()) throw new Error('Product not found');
-    const pData = snap.data();
-    const stockMap = pData.stockByWarehouse || {};
-    const targetStock = params.newStock !== undefined ? params.newStock : (params.actualStock !== undefined ? params.actualStock : 0);
-    const prevWhStock = Number(stockMap[params.warehouseId] || 0);
-    const diff = targetStock - prevWhStock;
-    const nextMap = {
-      ...stockMap,
-      [params.warehouseId]: targetStock,
-    };
-    const prevTotal = Number(pData.stock || 0);
-    const nextTotal = Math.max(0, prevTotal + diff);
-    tx.update(productRef, {
-      stock: nextTotal,
-      stockByWarehouse: nextMap,
-      updatedAt: new Date().toISOString(),
-    });
-
-    const whRef = doc(db, 'warehouses', params.warehouseId);
-    tx.update(whRef, { usedCapacity: increment(diff) });
-
-    const logRef = doc(collection(db, 'inventory_logs'));
-    tx.set(logRef, {
-      productId: params.productId,
-      type: diff < 0 ? 'KELUAR' : 'MASUK',
-      amount: Math.abs(diff),
-      prevStock: prevTotal,
-      nextStock: nextTotal,
-      diff,
-      warehouseId: params.warehouseId,
-      adminId: params.adminId,
-      source: params.source || 'OPNAME',
-      createdAt: serverTimestamp(),
-    });
-
-    return { success: true, diff };
-  }
 
   const { data: product } = await supabaseAdmin.from('products').select('*').eq('id', params.productId).single();
   if (!product) throw new Error('Product not found');

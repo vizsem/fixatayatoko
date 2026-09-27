@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db, doc, getDoc } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
 import { supabase } from '@/lib/supabase';
 
 // ── KATEGORI & KOMISI (Feb 2026) ─────────────────────────────
@@ -295,7 +295,7 @@ export default function App() {
   useEffect(() => {
     const fetchAiPrompt = async () => {
       try {
-        const snap = await getDoc(doc(db, "settings", "system"));
+        const snap = await sbGetDoc('settings', "system");
         if (snap.exists()) {
           const data = snap.data();
           if (data.store?.aiPromptTiktok) {

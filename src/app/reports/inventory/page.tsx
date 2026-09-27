@@ -14,7 +14,8 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 
 type InventoryItem = {
   id: string;
@@ -33,33 +34,41 @@ export default function InventoryReport() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
     const fetchInventoryData = async () => {
       try {
-        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsSnapshot = await sbGetDocs({ table: 'products' });
         const inventoryList: InventoryItem[] = [];
         
         // Ambil data transaksi untuk perhitungan mutasi
-        const transactionsSnapshot = await getDocs(collection(db, 'inventory_transactions'));
+        const transactionsSnapshot = await sbGetDocs({ table: 'inventory_transactions' });
         const transactions = transactionsSnapshot.docs.map(doc => doc.data());
         
         productsSnapshot.docs.forEach((doc) => {

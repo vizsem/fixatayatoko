@@ -16,6 +16,7 @@ import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib
 import { updatePurchaseOrder } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
+import { sbGetDoc } from '@/lib/supabase-helpers';
 import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 import { useParams } from 'next/navigation';
 interface Supplier { id: string; name: string; }
@@ -68,7 +69,7 @@ function EditPurchaseFormContent() {
       setIsDuplicating(true);
       try {
         const docRef = doc(db, 'purchases', id);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await sbGetDoc('purchases', id);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOldPurchaseData(data);

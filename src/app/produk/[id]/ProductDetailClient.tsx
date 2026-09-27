@@ -13,7 +13,8 @@ import { ProductSkeleton } from '@/components/home/ProductSkeleton';
 import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, setDoc } from '@/lib/firebase';
+import { sbGetDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
+import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query } from '@/lib/firebase';
 export type Review = {
   id: string;
   userId: string;
@@ -161,12 +162,12 @@ export default function ProductDetailClient({
     if (userId) {
       try {
         const cartRef = doc(db, 'carts', userId);
-        const cartSnap = await getDoc(cartRef);
+        const cartSnap = await sbGetDoc('carts', userId);
         const cloudItems = (cartSnap.exists() ? (cartSnap.data().items as CartItem[]) : []) ?? [];
         const existingIndex = cloudItems.findIndex(item => item.productId === idToMatch && item.unit === unitCode);
         if (existingIndex > -1) { cloudItems[existingIndex].quantity += q; cloudItems[existingIndex].price = finalPrice; }
         else { cloudItems.push({ productId: idToMatch, id: idToMatch, name: p.name, price: finalPrice, image: p.image, unit: unitCode, quantity: q, addedAt: new Date().toISOString() }); }
-        await setDoc(doc(db, 'carts', userId), { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
+        await sbUpsertDoc('carts', userId, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
       } catch (err) { console.error(err); }
     }
     setIsAdding(false);

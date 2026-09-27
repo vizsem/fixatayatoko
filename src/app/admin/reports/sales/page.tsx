@@ -16,7 +16,8 @@ import {
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { Timestamp, collection, db, getDocs, query, where } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
+import { Timestamp } from '@/lib/firebase';
 type SaleItem = {
   id: string;
   date: string;
@@ -73,12 +74,7 @@ export default function SalesReport() {
         endDate.setHours(23, 59, 59, 999);
 
         // Ambil order selesai, filter tanggal di sisi klien (menghindari mismatch tipe Timestamp/string)
-        const ordersSnapshot = await getDocs(
-          query(
-            collection(db, 'orders'),
-            where('status', 'in', ['SELESAI', 'SUCCESS'])
-          )
-        );
+        const ordersSnapshot = await sbGetDocs({ table: 'orders' });
 
         const salesList: SaleItem[] = [];
         for (const orderDoc of ordersSnapshot.docs) {

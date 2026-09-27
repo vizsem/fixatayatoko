@@ -7,7 +7,7 @@ import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, doc, documentId, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
+import { collection, db, documentId, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);

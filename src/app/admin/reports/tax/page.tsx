@@ -19,7 +19,7 @@ import {
   FileText
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import { collection, db, getDocs, query, where } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
 
 type TaxRecord = {
@@ -65,7 +65,7 @@ export default function TaxReportPage() {
       setLoading(true);
       try {
         // Fetch System Settings for Tax
-        const settingsSnap = await getDocs(collection(db, 'settings'));
+        const settingsSnap = await sbGetDocs({ table: 'settings' });
         let currentTaxSettings = DEFAULT_TAX_SETTINGS;
         settingsSnap.docs.forEach(d => {
           if (d.id === 'system' && d.data()?.tax) {
@@ -79,9 +79,7 @@ export default function TaxReportPage() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
 
-        const ordersSnapshot = await getDocs(
-          query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']))
-        );
+        const ordersSnapshot = await sbGetDocs({ table: 'orders' });
 
         const records: TaxRecord[] = [];
         for (const docSnap of ordersSnapshot.docs) {

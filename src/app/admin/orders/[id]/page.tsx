@@ -19,9 +19,16 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
-import { supabase } from '@/lib/supabase';
 
-import { Timestamp, addDoc, auth, collection, db, doc, getDoc, increment, onAuthStateChanged, runTransaction, updateDoc } from '@/lib/firebase';
+import { Timestamp } from '@/lib/firebase';
+import {
+  sbGetDoc,
+  sbUpdateDoc,
+  sbInsertDoc,
+  getUserAndRole,
+  getRoleFromUser,
+} from '@/lib/supabase-helpers';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
@@ -111,21 +118,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin, isStaff } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      const role = userDocData?.role || user.app_metadata?.role || user.user_metadata?.role;
-      if (!isAuthorizedAdmin(user, userDocData) && role !== 'cashier' && role !== 'kasir') {
+      const role = getRoleFromUser(user, userDocData);
+      if (!isAdmin && !isStaff && role !== 'cashier' && role !== 'kasir') {
         router.push('/profil');
         return;
       }
       setAuthChecked(true);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
@@ -133,14 +149,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const fetchAll = async () => {
       try {
         const [docSnap, settingsSnap] = await Promise.all([
-          getDoc(doc(db, 'orders', id)),
-          getDoc(doc(db, 'settings', 'system'))
+          sbGetDoc('orders', id),
+          sbGetDoc('settings', 'system'),
         ]);
-        if (!docSnap.exists()) {
+        if (!docSnap.exists) {
           setError('Pesanan tidak ditemukan.');
           return;
         }
-        const data = { id: docSnap.id, ...docSnap.data() } as Order;
+        const data = { id: docSnap.id, ...docSnap.data } as Order;
         setOrder(data);
         if (data.items && Array.isArray(data.items)) {
           setEditableItems(
@@ -188,10 +204,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order || isUpdating) return;
     setIsUpdating(true);
     try {
-      const orderRef = doc(db, 'orders', order.id);
-      await updateDoc(orderRef, {
+      await sbUpdateDoc('orders', order.id, {
         status: newStatus,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       notify.admin.success(`Status: ${newStatus}`, { icon: '🚀' });
@@ -255,31 +270,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order || confirmedItems.length === 0 || isConfirmingItems) return;
     setIsConfirmingItems(true);
     try {
-      const orderRef = doc(db, 'orders', order.id);
+      const orderSnap = await sbGetDoc('orders', order.id);
+      if (!orderSnap.exists()) {
+        throw new Error('Pesanan tidak ditemukan saat konfirmasi');
+      }
+      const current = orderSnap.data() as Order;
+      const logsToAdd: InventoryLogData[] = [];
 
-      const logsToAdd = await runTransaction(db, async (tx) => {
-        const snap = await tx.get(orderRef);
-        if (!snap.exists()) {
-          throw new Error('Pesanan tidak ditemukan saat konfirmasi');
-        }
-        const current = snap.data() as Order;
-        const logs: InventoryLogData[] = [];
+      // --- SYNC STOCK LOGIC ---
+      for (const newItem of editableItems) {
+        if (!newItem.productId) continue;
 
-        // --- SYNC STOCK LOGIC ---
-        for (const newItem of editableItems) {
-          if (!newItem.productId) continue;
-          
-          const oldItem = current.items.find(i => i.productId === newItem.productId);
-          const oldQty = oldItem ? (Number(oldItem.quantity) || 0) : 0;
-          const newQty = newItem.selected && newItem.quantity > 0 ? Number(newItem.quantity) : 0;
-          const diff = newQty - oldQty;
-          
-          if (diff !== 0) {
-            const productRef = doc(db, 'products', newItem.productId);
-            const pSnap = await tx.get(productRef);
-            
-            if (pSnap.exists()) {
-              const pData = pSnap.data();
+        const oldItem = current.items.find(i => i.productId === newItem.productId);
+        const oldQty = oldItem ? (Number(oldItem.quantity) || 0) : 0;
+        const newQty = newItem.selected && newItem.quantity > 0 ? Number(newItem.quantity) : 0;
+        const diff = newQty - oldQty;
+
+        if (diff !== 0) {
+          const pSnap = await sbGetDoc('products', newItem.productId);
+
+          if (pSnap.exists()) {
+            const pData = pSnap.data();
               const currentStock = Number(pData.stock || pData.Stok || 0);
               const stockByWarehouse = pData.stockByWarehouse || {};
               const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
@@ -296,116 +307,120 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               
               newStockByWarehouse[targetWarehouseId] = currentWarehouseStock + stockChange;
               
-              let cogsDelta = 0;
-              if (stockChange < 0) {
-                const consumeQty = Math.abs(stockChange);
-                const layers: Array<{ qty: number; costPerPcs: number; ts?: any }> = Array.isArray(pData.inventoryLayers) ? pData.inventoryLayers : [];
-                const nextLayers: Array<{ qty: number; costPerPcs: number; ts?: any }> = [];
-                let remaining = consumeQty;
-                for (const layer of layers) {
-                  if (remaining <= 0) {
-                    nextLayers.push(layer);
-                    continue;
-                  }
-                  const take = Math.min(Number(layer.qty || 0), remaining);
-                  if (take > 0) {
-                    cogsDelta += take * Number(layer.costPerPcs || 0);
-                    const left = Number(layer.qty || 0) - take;
-                    if (left > 0) nextLayers.push({ ...layer, qty: left });
-                    remaining -= take;
-                  } else {
-                    nextLayers.push(layer);
-                  }
+            let cogsDelta = 0;
+            if (stockChange < 0) {
+              const consumeQty = Math.abs(stockChange);
+              const layers: Array<{ qty: number; costPerPcs: number; ts?: any }> = Array.isArray(pData.inventoryLayers) ? pData.inventoryLayers : [];
+              const nextLayers: Array<{ qty: number; costPerPcs: number; ts?: any }> = [];
+              let remaining = consumeQty;
+              for (const layer of layers) {
+                if (remaining <= 0) {
+                  nextLayers.push(layer);
+                  continue;
                 }
-                if (remaining > 0) {
-                  const fallbackCost = Number(pData.Modal || pData.purchasePrice || 0);
-                  cogsDelta += remaining * fallbackCost;
+                const take = Math.min(Number(layer.qty || 0), remaining);
+                if (take > 0) {
+                  cogsDelta += take * Number(layer.costPerPcs || 0);
+                  const left = Number(layer.qty || 0) - take;
+                  if (left > 0) nextLayers.push({ ...layer, qty: left });
+                  remaining -= take;
+                } else {
+                  nextLayers.push(layer);
                 }
-                tx.update(orderRef, {
-                  cogsTotal: ((current as any).cogsTotal || 0) + Math.round(cogsDelta)
-                });
-                tx.update(productRef, {
-                  inventoryLayers: nextLayers
+              }
+              if (remaining > 0) {
+                const fallbackCost = Number(pData.Modal || pData.purchasePrice || 0);
+                cogsDelta += remaining * fallbackCost;
+              }
+              if (cogsDelta !== 0) {
+                await sbUpdateDoc('orders', order.id, {
+                  cogsTotal: ((current as any).cogsTotal || 0) + Math.round(cogsDelta),
                 });
               }
-
-              tx.update(productRef, {
-                stock: currentStock + stockChange,
-                stockByWarehouse: newStockByWarehouse
-              });
-
-              logs.push({
-                productId: newItem.productId!,
-                productName: newItem.name,
-                type: stockChange > 0 ? 'MASUK' : 'KELUAR',
-                amount: Math.abs(stockChange),
-                adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-                source: 'ORDER',
-                orderId: order.id,
-                referenceId: order.id,
-                note: `Update pesanan #${order.id}`,
-                fromWarehouseId: stockChange < 0 ? targetWarehouseId : undefined,
-                toWarehouseId: stockChange > 0 ? targetWarehouseId : undefined,
-                prevStock: currentStock,
-                nextStock: currentStock + stockChange
-              });
+              if (nextLayers.length !== layers.length || cogsDelta !== 0) {
+                await sbUpdateDoc('products', newItem.productId, {
+                  inventoryLayers: nextLayers,
+                });
+              }
             }
+
+            await sbUpdateDoc('products', newItem.productId, {
+              stock: currentStock + stockChange,
+              stockByWarehouse: newStockByWarehouse,
+            });
+
+            logsToAdd.push({
+              productId: newItem.productId!,
+              productName: newItem.name,
+              type: stockChange > 0 ? 'MASUK' : 'KELUAR',
+              amount: Math.abs(stockChange),
+              adminId: (await supabase.auth.getUser()).data.user?.id || 'system',
+              source: 'ORDER',
+              orderId: order.id,
+              referenceId: order.id,
+              note: `Update pesanan #${order.id}`,
+              fromWarehouseId: stockChange < 0 ? targetWarehouseId : undefined,
+              toWarehouseId: stockChange > 0 ? targetWarehouseId : undefined,
+              prevStock: currentStock,
+              nextStock: currentStock + stockChange,
+            });
           }
         }
-        // -------------------------
+      }
+      // -------------------------
 
-        const currentSubtotal =
-          typeof current.subtotal === 'number'
-            ? current.subtotal
-            : Array.isArray(current.items)
-            ? current.items.reduce(
-                (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-                0
-              )
-            : 0;
+      const currentSubtotal =
+        typeof current.subtotal === 'number'
+          ? current.subtotal
+          : Array.isArray(current.items)
+          ? current.items.reduce(
+              (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+              0
+            )
+          : 0;
 
-        const calculatedNewSubtotal = confirmedItems.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        );
-        const calculatedRefund =
-          currentSubtotal > calculatedNewSubtotal ? currentSubtotal - calculatedNewSubtotal : 0;
-        const currentTotal = Number(current.total || 0);
-        const calculatedNewTotal =
-          calculatedRefund > 0 ? Math.max(0, currentTotal - calculatedRefund) : currentTotal;
+      const calculatedNewSubtotal = confirmedItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      const calculatedRefund =
+        currentSubtotal > calculatedNewSubtotal ? currentSubtotal - calculatedNewSubtotal : 0;
+      const currentTotal = Number(current.total || 0);
+      const calculatedNewTotal =
+        calculatedRefund > 0 ? Math.max(0, currentTotal - calculatedRefund) : currentTotal;
 
-        tx.update(orderRef, {
-          items: editableItems.map((item) => ({
-            name: item.name || 'Produk Tanpa Nama',
-            price: Number(item.price) || 0,
-            quantity: item.selected && item.quantity > 0 ? Number(item.quantity) : 0,
-            productId: item.productId || '',
-            originalQuantity: Number(item.originalQuantity) || 0,
-            status: item.selected && item.quantity > 0
-              ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
-              : 'unfulfilled',
-          })),
-          subtotal: calculatedNewSubtotal,
-          total: calculatedNewTotal,
-          status: 'DIPROSES',
-          updatedAt: new Date().toISOString()
-        });
-
-        const isRefundablePayment = !['CASH', 'TEMPO', 'COD'].includes((current.paymentMethod || '').toUpperCase());
-
-        if (
-          calculatedRefund > 0 &&
-          typeof current.userId === 'string' &&
-          current.userId &&
-          current.userId !== 'guest' &&
-          isRefundablePayment
-        ) {
-          const userRef = doc(db, 'users', current.userId);
-          tx.update(userRef, { walletBalance: increment(calculatedRefund) });
-        }
-
-        return logs;
+      await sbUpdateDoc('orders', order.id, {
+        items: editableItems.map((item) => ({
+          name: item.name || 'Produk Tanpa Nama',
+          price: Number(item.price) || 0,
+          quantity: item.selected && item.quantity > 0 ? Number(item.quantity) : 0,
+          productId: item.productId || '',
+          originalQuantity: Number(item.originalQuantity) || 0,
+          status: item.selected && item.quantity > 0
+            ? (item.quantity < item.originalQuantity ? 'partial' : 'fulfilled')
+            : 'unfulfilled',
+        })),
+        subtotal: calculatedNewSubtotal,
+        total: calculatedNewTotal,
+        status: 'DIPROSES',
+        updatedAt: new Date().toISOString(),
       });
+
+      const isRefundablePayment = !['CASH', 'TEMPO', 'COD'].includes((current.paymentMethod || '').toUpperCase());
+
+      if (
+        calculatedRefund > 0 &&
+        typeof current.userId === 'string' &&
+        current.userId &&
+        current.userId !== 'guest' &&
+        isRefundablePayment
+      ) {
+        const userSnap = await sbGetDoc('users', current.userId);
+        const currentWallet = Number(userSnap.data()?.walletBalance || userSnap.data()?.wallet_balance || 0);
+        await sbUpdateDoc('users', current.userId, {
+          walletBalance: currentWallet + calculatedRefund,
+        });
+      }
 
       // Execute logs
       if (logsToAdd && logsToAdd.length > 0) {
@@ -418,13 +433,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         order.userId !== 'guest' &&
         !['CASH', 'TEMPO', 'COD'].includes((order.paymentMethod || '').toUpperCase())
       ) {
-        await addDoc(collection(db, 'wallet_logs'), {
+        await sbInsertDoc('wallet_logs', {
           userId: order.userId,
           orderId: order.id,
           amountChanged: refundAmount,
           type: 'REFUND_STOCK',
           description: 'Pengembalian dana karena stok tidak sesuai',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         });
       }
 
@@ -466,7 +481,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmittingReturn(true);
     try {
       const totalValue = itemsToReturn.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      await addDoc(collection(db, 'returns'), {
+      await sbInsertDoc('returns', {
         type: 'SALES_RETURN',
         refId: order?.id,
         customerOrSupplierName: order?.customerName,
@@ -475,7 +490,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         status: 'PENDING',
         totalValue,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
 
       notify.admin.success("Request retur berhasil dibuat");

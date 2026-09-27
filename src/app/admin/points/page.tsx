@@ -21,7 +21,8 @@ import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { Timestamp, addDoc, collection, db, doc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc } from '@/lib/firebase';
+import { sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { Timestamp, collection, db, doc, increment, limit, onSnapshot, orderBy, query, updateDoc } from '@/lib/firebase';
 interface PointLog { id: string; userId: string; pointsChanged: number; type: string; description: string; createdAt: Timestamp | { toDate: () => Date } | null; }
 
 
@@ -52,7 +53,7 @@ export default function AdminPointsDashboard() {
 
 
     const fetchStats = async () => {
-      const logsSnap = await getDocs(collection(db, 'point_logs'));
+      const logsSnap = await sbGetDocs({ table: 'point_logs' });
       let earned = 0;
       let redeemed = 0;
       logsSnap.forEach(doc => {
@@ -75,8 +76,8 @@ export default function AdminPointsDashboard() {
       const pointsToChange = adjustData.type === 'BONUS' ? adjustData.amount : -adjustData.amount;
       const userRef = doc(db, 'users', adjustData.userId);
 
-      await updateDoc(userRef, { points: increment(pointsToChange) });
-      await addDoc(collection(db, 'point_logs'), {
+      await sbUpdateDoc('users', adjustData.userId, { points: increment(pointsToChange) });
+      await sbInsertDoc('point_logs', {
         userId: adjustData.userId,
         pointsChanged: pointsToChange,
         type: adjustData.type === 'BONUS' ? 'BONUS' : 'PENALTY',
@@ -96,7 +97,7 @@ export default function AdminPointsDashboard() {
   // FUNGSI BEKUKAN/AKTIFKAN POIN
   const toggleFreeze = async (userId: string, currentStatus: boolean) => {
     try {
-      await updateDoc(doc(db, 'users', userId), {
+      await sbUpdateDoc('users', userId, {
         isPointsFrozen: !currentStatus
       });
       toast.success(!currentStatus ? "Poin user dibekukan!" : "Poin user diaktifkan!");

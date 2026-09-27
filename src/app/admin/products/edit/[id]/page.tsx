@@ -19,7 +19,8 @@ import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/a
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 
-import { addDoc, auth, collection, db, deleteDoc, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, orderBy, query, ref, setDoc, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
+import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 type ChannelPrices = {
   offline?: number;
@@ -181,7 +182,7 @@ export default function EditProductPage() {
 
   // Fetch Tax Settings from Firebase
   useEffect(() => {
-    getDoc(doc(db, 'settings', 'system')).then(snap => {
+    sbGetDoc('settings', 'system').then(snap => {
       if (snap.exists() && snap.data()?.tax) {
         setTaxSettings({ ...DEFAULT_TAX_SETTINGS, ...snap.data().tax });
       }
@@ -231,7 +232,7 @@ export default function EditProductPage() {
         };
       } else {
         // Fallback to Firestore
-        const docSnap = await getDoc(doc(db, 'products', id));
+        const docSnap = await sbGetDoc('products', id);
         if (!docSnap.exists()) {
           toast.error('Produk tidak ditemukan');
           return router.push('/admin/products');
@@ -344,23 +345,38 @@ export default function EditProductPage() {
   }, [id, router]);
 
   const fetchWarehouses = useCallback(async () => {
-    const snapshot = await getDocs(collection(db, 'warehouses'));
+    const snapshot = await sbGetDocs({ table: 'warehouses' });
     setWarehouses(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
   }, []);
 
   const fetchCategories = useCallback(async () => {
-    const snapshot = await getDocs(collection(db, 'categories'));
+    const snapshot = await sbGetDocs({ table: 'categories' });
     setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin, isStaff, role } = await getUserAndRole();
+      if (!user) return;
+      // For backwards compat, expose userDoc variable matching old pattern
+      const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
+      
       if (!user) return router.push('/profil/login');
       if (!isOperationalUser(user)) return router.push('/profil');
       await Promise.all([fetchProductData(), fetchWarehouses(), fetchCategories(), fetchCostHistory()]);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [id, router, fetchProductData, fetchWarehouses]);
 
   const handleAddUnit = () => {
@@ -413,7 +429,7 @@ export default function EditProductPage() {
       const existingCat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
       if (!existingCat && categoryName) {
         try {
-          await addDoc(collection(db, 'categories'), {
+          await sbInsertDoc('categories', {
             name: categoryName,
             slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
             description: 'Auto-generated from product edit',
@@ -425,7 +441,7 @@ export default function EditProductPage() {
       }
 
       // 1. Ambil data stok lama untuk dibandingkan (Logika Audit)
-      const oldDoc = await getDoc(doc(db, 'products', id));
+      const oldDoc = await sbGetDoc('products', id);
       const oldData = oldDoc.data();
       const oldStocks = oldData?.stockByWarehouse || {};
 
@@ -609,7 +625,7 @@ export default function EditProductPage() {
 
       // 2. Safe sync to Firestore (optional fallback)
       try {
-        await setDoc(doc(db, 'products', id), updatePayload, { merge: true });
+        await sbUpsertDoc('products', id, updatePayload, { merge: true });
       } catch (fsErr) {
         console.warn('Firestore sync skipped or failed:', fsErr);
       }
@@ -617,7 +633,7 @@ export default function EditProductPage() {
 
       // Write Logs
       if (logEntries.length > 0) {
-        const logPromises = logEntries.map(log => addDoc(collection(db, 'stock_logs'), log));
+        const logPromises = logEntries.map(log => sbInsertDoc('stock_logs', log));
         await Promise.all(logPromises);
         
         const invLogPromises = logEntries.map(log => addInventoryLog({
@@ -661,13 +677,13 @@ export default function EditProductPage() {
 
       // 2. Safe delete from Firestore
       try {
-        await deleteDoc(doc(db, 'products', id));
+        await sbDeleteDoc('products', id);
       } catch (fsErr) {
         console.warn('Firestore delete skipped or failed:', fsErr);
       }
       
       // Catat Log Hapus
-      await addDoc(collection(db, 'stock_logs'), {
+      await sbInsertDoc('stock_logs', {
           productId: id,
           productName: formData.Nama.toUpperCase(),
           warehouseId: 'SYSTEM',

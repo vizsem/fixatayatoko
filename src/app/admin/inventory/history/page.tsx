@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { collection, db, doc, getDocs, onSnapshot, orderBy, query } from '@/lib/firebase';
 import {
   History,
   ArrowLeft,

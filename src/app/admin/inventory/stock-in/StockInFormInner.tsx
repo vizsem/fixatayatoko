@@ -12,7 +12,8 @@ import { supabase } from '@/lib/supabase';
 
 
 
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, runTransaction } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, runTransaction } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -48,7 +49,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
   const loadSupportingData = useCallback(async () => {
     try {
       // Load products
-      const productsSnap = await getDocs(collection(db, 'products'));
+      const productsSnap = await sbGetDocs({ table: 'products' });
       const productList = productsSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name,
@@ -58,7 +59,7 @@ export default function StockInFormInner({ productId }: { productId: string }) {
       setProducts(productList);
 
       // Load suppliers
-      const suppliersSnap = await getDocs(collection(db, 'suppliers'));
+      const suppliersSnap = await sbGetDocs({ table: 'suppliers' });
       const supplierList = suppliersSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name
@@ -77,14 +78,14 @@ export default function StockInFormInner({ productId }: { productId: string }) {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -93,8 +94,18 @@ export default function StockInFormInner({ productId }: { productId: string }) {
       // Load data
       await loadSupportingData();
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, loadSupportingData]);
 
 

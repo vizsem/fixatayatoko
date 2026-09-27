@@ -13,7 +13,8 @@ import { stockSyncService } from '@/lib/stockSyncService';
 import { supabase } from '@/lib/supabase';
 
 
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, getDocs, orderBy, query, runTransaction, where } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -86,7 +87,7 @@ function StockInContent() {
       setProducts(productList);
 
       // Load suppliers
-      const suppliersSnap = await getDocs(collection(db, 'suppliers'));
+      const suppliersSnap = await sbGetDocs({ table: 'suppliers' });
       const supplierList = suppliersSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name
@@ -105,14 +106,14 @@ function StockInContent() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -121,8 +122,18 @@ function StockInContent() {
       // Load data
       await loadSupportingData();
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, loadSupportingData]);
 
 
@@ -159,7 +170,7 @@ function StockInContent() {
         createdAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'inventory_transactions'), transactionData);
+      await sbInsertDoc('inventory_transactions', transactionData);
 
       // 2. Update stok produk (atomik + log via util)
       await runTransaction(db, async (tx) => {

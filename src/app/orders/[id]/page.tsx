@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { db, doc, getDoc, updateDoc } from '@/lib/firebase';
+import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 type OrderItem = {
   id: string;
   name: string;
@@ -55,7 +55,7 @@ export default function PublicOrderDetailPage() {
     if (!id) return;
     const fetchOrder = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'orders', id));
+        const docSnap = await sbGetDoc('orders', id);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOrder({
@@ -90,7 +90,7 @@ export default function PublicOrderDetailPage() {
     if (!confirm('Apakah Anda yakin pesanan sudah diterima?')) return;
     setUpdating(true);
     try {
-      await updateDoc(doc(db, 'orders', order.id), { status: 'SELESAI', updatedAt: new Date().toISOString() });
+      await sbUpdateDoc('orders', order.id, { status: 'SELESAI', updatedAt: new Date().toISOString() });
       setOrder(prev => prev ? { ...prev, status: 'SELESAI' } : null);
       toast.success('Pesanan berhasil diselesaikan!');
     } catch (err) {

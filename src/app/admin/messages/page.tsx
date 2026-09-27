@@ -17,7 +17,8 @@ import { id } from 'date-fns/locale';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from '@/lib/firebase';
+import { sbDeleteDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { collection, db, doc, onSnapshot, orderBy, query } from '@/lib/firebase';
 type Message = {
   id: string;
   name: string;
@@ -55,7 +56,7 @@ export default function AdminMessages() {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'messages', id), { status: 'read' });
+      await sbUpdateDoc('messages', id, { status: 'read' });
       notify.success('Pesan ditandai sudah dibaca');
     } catch (error) {
       console.error(error);
@@ -66,7 +67,7 @@ export default function AdminMessages() {
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus pesan ini?')) return;
     try {
-      await deleteDoc(doc(db, 'messages', id));
+      await sbDeleteDoc('messages', id);
       notify.success('Pesan dihapus');
     } catch (error) {
       console.error(error);

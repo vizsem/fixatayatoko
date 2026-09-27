@@ -8,9 +8,8 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query, runTransaction } from '@/lib/firebase';
 type WarehouseType = { id: string; name: string; };
 
 export default function StockTransferPage() {
@@ -24,26 +23,43 @@ export default function StockTransferPage() {
   const [toWarehouse, setToWarehouse] = useState('');
   const [qty, setQty] = useState<number>(0);
 
+  const [adminId, setAdminId] = useState('system');
+
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      if (!isAuthorizedAdmin(user, userDocData)) {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/admin/login'); return; }
+      if (!isAuthorizedAdmin(user)) {
         notify.aksesDitolakAdmin();
-        return router.push('/profil');
+        router.push('/profil');
+        return;
       }
-    });
-    return () => unsubAuth();
+      setAdminId(user.id);
+    };
+    checkAuth();
   }, [router]);
 
   const fetchData = useCallback(async () => {
     try {
-      const pSnap = await getDocs(query(collection(db, 'products'), orderBy('name', 'asc')));
-      setProducts(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)).filter(p => (p as any).isActive !== false));
+      const { data: prods } = await supabaseAdmin
+        .from('products')
+        .select('id, name, stock, unit, raw_data')
+        .or('is_active.eq.true,is_active.is.null')
+        .order('name', { ascending: true })
+        .limit(500);
+      setProducts((prods || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        stock: Number(p.stock ?? p.raw_data?.stock ?? 0),
+        unit: p.unit || 'pcs',
+        stockByWarehouse: p.raw_data?.stockByWarehouse || {},
+      } as Product)).filter(p => (p as any).isActive !== false));
 
-      const whSnap = await getDocs(collection(db, 'warehouses'));
-      setWarehouses(whSnap.docs.map(d => ({ id: d.id, name: d.data().name } as WarehouseType)).sort((a, b) => a.name.localeCompare(b.name)));
+      const { data: whs } = await supabaseAdmin
+        .from('warehouses')
+        .select('id, name')
+        .order('name', { ascending: true });
+      setWarehouses((whs || []).map(w => ({ id: w.id, name: w.name })));
     } catch (err) {
       Sentry.captureException(err);
       notify.error("Gagal memuat data");
@@ -63,17 +79,19 @@ export default function StockTransferPage() {
     setLoading(true);
     const t = notify.admin.loading("Memproses mutasi...");
     try {
-      await runTransaction(db, async (tx) => {
-        await transferStockTx(tx, {
-          productId: selectedProduct.id,
-          amount: qty,
-          fromWarehouseId: fromWarehouse,
-          toWarehouseId: toWarehouse,
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-          source: 'TRANSFER',
-          note: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
-        });
+      const result = await transferStockTx({
+        productId: selectedProduct.id,
+        amount: qty,
+        fromWarehouseId: fromWarehouse,
+        toWarehouseId: toWarehouse,
+        adminId,
+        source: 'TRANSFER',
+        notes: `Transfer dari ${warehouses.find(w => w.id === fromWarehouse)?.name} ke ${warehouses.find(w => w.id === toWarehouse)?.name}`
       });
+      if (!result.success) {
+        notify.admin.error((result as any).error || 'Gagal mutasi', { id: t });
+        return;
+      }
       notify.admin.success('Mutasi stok berhasil!', { id: t });
       setQty(0);
       setSelectedProduct(null);

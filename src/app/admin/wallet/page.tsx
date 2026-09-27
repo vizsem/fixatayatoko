@@ -18,7 +18,8 @@ import { id as localeID } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { Timestamp, collection, db, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction } from '@/lib/firebase';
+import { sbGetDocs, sbGetDoc, sbUpdateDoc, sbInsertDoc } from '@/lib/supabase-helpers';
+import { Timestamp, collection, db, limit, onSnapshot, orderBy, query } from '@/lib/firebase';
 interface WalletLog { id: string; userId: string; amountChanged: number; type: string; description: string; createdAt: Timestamp | { toDate: () => Date } | null; orderId?: string; }
 interface UserWithWallet { id: string; displayName?: string; email?: string; walletBalance: number; }
 
@@ -42,7 +43,7 @@ export default function AdminWalletDashboard() {
     });
 
     const fetchStats = async () => {
-      const logsSnap = await getDocs(collection(db, 'wallet_logs'));
+      const logsSnap = await sbGetDocs({ table: 'wallet_logs' });
       let totalIn = 0;
       let totalOut = 0;
       logsSnap.forEach(doc => {
@@ -65,36 +66,28 @@ export default function AdminWalletDashboard() {
 
     try {
       const amountToChange = adjustData.type === 'TOPUP_ADMIN' ? adjustData.amount : -adjustData.amount;
-      const userRef = doc(db, 'users', adjustData.userId);
 
-      // Gunakan Transaction untuk Safety Net (Cegah Saldo Negatif)
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User tidak ditemukan!");
-        }
+      const userDoc = await sbGetDoc('users', adjustData.userId);
+      if (!userDoc.exists()) {
+        throw new Error("User tidak ditemukan!");
+      }
 
-        const userData = userDoc.data();
-        const currentBalance = userData?.walletBalance || 0;
-        const newBalance = currentBalance + amountToChange;
+      const userData = userDoc.data();
+      const currentBalance = userData?.walletBalance || 0;
+      const newBalance = currentBalance + amountToChange;
 
-        // Safety Net Check
-        if (newBalance < 0) {
-          throw new Error(`Saldo tidak mencukupi! Sisa saldo: Rp${currentBalance.toLocaleString()}`);
-        }
+      if (newBalance < 0) {
+        throw new Error(`Saldo tidak mencukupi! Sisa saldo: Rp${currentBalance.toLocaleString()}`);
+      }
 
-        // Update Saldo
-        transaction.update(userRef, { walletBalance: newBalance });
+      await sbUpdateDoc('users', adjustData.userId, { walletBalance: newBalance });
 
-        // Catat Log dalam transaksi yang sama (atomic)
-        const logRef = doc(collection(db, 'wallet_logs'));
-        transaction.set(logRef, {
-          userId: adjustData.userId,
-          amountChanged: amountToChange,
-          type: adjustData.type,
-          description: adjustData.reason || (adjustData.type === 'TOPUP_ADMIN' ? 'Top-up oleh Admin' : 'Penarikan oleh Admin'),
-          createdAt: new Date().toISOString()
-        });
+      await sbInsertDoc('wallet_logs', {
+        userId: adjustData.userId,
+        amountChanged: amountToChange,
+        type: adjustData.type,
+        description: adjustData.reason || (adjustData.type === 'TOPUP_ADMIN' ? 'Top-up oleh Admin' : 'Penarikan oleh Admin'),
+        createdAt: new Date().toISOString()
       });
 
       toast.success("Berhasil memperbarui saldo dompet");

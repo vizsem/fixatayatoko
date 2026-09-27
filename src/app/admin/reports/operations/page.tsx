@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/nextjs';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
+import { sbGetDocs } from '@/lib/supabase-helpers';
 import { collection, db, getDocs, limit, query, where } from '@/lib/firebase';
 type OperationalMetric = {
   id: string;
@@ -39,25 +40,25 @@ export default function OperationsReport() {
 
     const fetchData = async () => {
       try {
-        const empSnap = await getDocs(query(collection(db, 'employees'), limit(100)));
+        const empSnap = await sbGetDocs({ table: 'employees' });
         setEmployeesData(empSnap.docs.map(d => d.data()));
 
-        const userSnap = await getDocs(query(collection(db, 'users'), limit(100)));
+        const userSnap = await sbGetDocs({ table: 'users' });
         setUsersData(userSnap.docs.map(d => d.data()));
 
-        const whSnap = await getDocs(query(collection(db, 'warehouses'), limit(50)));
+        const whSnap = await sbGetDocs({ table: 'warehouses' });
         setWarehousesData(whSnap.docs.map(d => d.data()));
 
         const prodSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true), limit(100)));
         setProductsData(prodSnap.docs.map(d => d.data()));
 
-        const ordSnap = await getDocs(query(collection(db, 'orders'), limit(100)));
+        const ordSnap = await sbGetDocs({ table: 'orders' });
         setOrdersData(ordSnap.docs.map(d => d.data()));
 
-        const invSnap = await getDocs(query(collection(db, 'inventory_transactions'), limit(100)));
+        const invSnap = await sbGetDocs({ table: 'inventory_transactions' });
         setInventoryData(invSnap.docs.map(d => d.data()));
 
-        const expSnap = await getDocs(query(collection(db, 'operational_expenses'), limit(100)));
+        const expSnap = await sbGetDocs({ table: 'operational_expenses' });
         setExpensesData(expSnap.docs.map(d => d.data()));
       } catch (error) {
         console.error("Error fetching ops data", error);

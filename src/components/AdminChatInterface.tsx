@@ -10,7 +10,8 @@ import type { ChatThread, ChatMessage } from '@/types/chat';
 import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, onAuthStateChanged, onSnapshot, orderBy, query, ref, updateDoc } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { addDoc, auth, collection, db, doc, onSnapshot, orderBy, query, ref } from '@/lib/firebase';
 interface AdminChatInterfaceProps {
   onClose?: () => void;
   isModal?: boolean;
@@ -28,20 +29,30 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
 
   // 1. Auth Check
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsub = async () => {
+  const { user, userDocData } = await getUserAndRole();
+  if (!user) return;
+  const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
+  
       if (!user) {
         // Handle unauthenticated state if needed
         return;
       }
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userDoc = await sbGetDoc('users', user.uid);
         const role = userDoc.data()?.role;
         setUserRole(role);
       } catch (error) {
         console.error("Error fetching user role:", error);
       }
-    });
-    return () => unsub();
+};
+__checkAuthunsub();
+let unsub: (() => void) | undefined;
+(async () => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsub());
+  unsub = () => subscription.unsubscribe();
+})();
+    return () => { if (unsub) unsub(); };
   }, []);
 
   // 2. Fetch Chat Threads (Real-time) with Notifications
@@ -108,7 +119,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
 
     // Mark as read when opening thread
     if (!selectedThread.isReadByAdmin) {
-      updateDoc(doc(db, 'chats', selectedThread.id), {
+      sbUpdateDoc('chats', selectedThread.id, {
         isReadByAdmin: true,
         unreadCount: 0
       });
@@ -155,7 +166,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
       });
 
       // Update thread metadata
-      await updateDoc(doc(db, 'chats', selectedThread.id), {
+      await sbUpdateDoc('chats', selectedThread.id, {
         lastMessage: text,
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: true // Admin just replied, so it's read by admin

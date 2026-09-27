@@ -14,7 +14,8 @@ import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOpt
 import imageCompression from 'browser-image-compression';
 import { addProductFull, getCategories } from '@/lib/actions/product.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
-import { onSnapshot, collection, db, doc, getDoc } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
+import { onSnapshot, collection, db } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 export default function AddProductPage() {
   const router = useRouter();
@@ -126,7 +127,7 @@ export default function AddProductPage() {
 
   // Fetch Tax Settings from Firebase
   useEffect(() => {
-    getDoc(doc(db, 'settings', 'system')).then(snap => {
+    sbGetDoc('settings', 'system').then(snap => {
       if (snap.exists() && snap.data()?.tax) {
         setTaxSettings({ ...DEFAULT_TAX_SETTINGS, ...snap.data().tax });
       }

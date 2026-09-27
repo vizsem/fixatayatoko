@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Supplier = {
   id: string;
@@ -55,7 +56,7 @@ export default function AddPurchasePage() {
   const loadSupportingData = useCallback(async () => {
     try {
       // Load suppliers
-      const suppliersSnap = await getDocs(collection(db, 'suppliers'));
+      const suppliersSnap = await sbGetDocs({ table: 'suppliers' });
       const supplierList = suppliersSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name
@@ -63,7 +64,7 @@ export default function AddPurchasePage() {
       setSuppliers(supplierList);
 
       // Load warehouses
-      const warehousesSnap = await getDocs(collection(db, 'warehouses'));
+      const warehousesSnap = await sbGetDocs({ table: 'warehouses' });
       const warehouseList = warehousesSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name
@@ -71,7 +72,7 @@ export default function AddPurchasePage() {
       setWarehouses(warehouseList);
 
       // Load products
-      const productsSnap = await getDocs(collection(db, 'products'));
+      const productsSnap = await sbGetDocs({ table: 'products' });
       const productList = productsSnap.docs.map(doc => ({
         id: doc.id,
         name: doc.data().name,
@@ -86,14 +87,14 @@ export default function AddPurchasePage() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -101,8 +102,18 @@ export default function AddPurchasePage() {
 
       await loadSupportingData();
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, loadSupportingData]);
 
 
@@ -185,7 +196,7 @@ export default function AddPurchasePage() {
         createdAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'purchases'), purchaseData);
+      await sbInsertDoc('purchases', purchaseData);
       toast.success('Pembelian berhasil ditambahkan!');
       router.push('/admin/purchases');
     } catch (err) {

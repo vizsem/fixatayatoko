@@ -21,7 +21,8 @@ import { HomeSkeleton } from '@/components/home/HomeSkeleton';
 import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, signOut, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, getDocs, limit, orderBy, query, signOut, where } from '@/lib/firebase';
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +119,11 @@ export default function Home() {
     updateCartCount();
     window.addEventListener('cart-updated', updateCartCount);
     
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsubscribeAuth = async () => {
+  const { user, userDocData } = await getUserAndRole();
+  if (!user) return;
+  const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
+  
       if (!user) {
         setCurrentUserName(null);
         setCurrentUserPhotoUrl(null);
@@ -127,7 +132,7 @@ export default function Home() {
       }
       setCurrentUserPhotoUrl(user.photoURL || null);
       try {
-        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const userSnap = await sbGetDoc('users', user.uid);
         setCurrentUserName(userSnap.exists() ? userSnap.data()?.name : user.displayName || 'Pengguna');
         
         const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5));
@@ -158,11 +163,17 @@ export default function Home() {
       } catch (e) {
         console.error(e);
       }
-    });
+};
+__checkAuthunsubscribeAuth();
+let unsubscribeAuth: (() => void) | undefined;
+(async () => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubscribeAuth());
+  unsubscribeAuth = () => subscription.unsubscribe();
+})();
 
     return () => {
       window.removeEventListener('cart-updated', updateCartCount);
-      unsubscribeAuth();
+      if (unsubscribeAuth) unsubscribeAuth();
     };
   }, []);
 
@@ -170,10 +181,10 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const [promoSnap, bannerSnap, sysSnap, whSnap] = await Promise.all([
-          getDocs(collection(db, 'promotions')),
-          getDocs(collection(db, 'banners')),
-          getDoc(doc(db, 'settings', 'system')),
-          getDocs(collection(db, 'warehouses'))
+          sbGetDocs({ table: 'promotions' }),
+          sbGetDocs({ table: 'banners' }),
+          sbGetDoc('settings', 'system'),
+          sbGetDocs({ table: 'warehouses' })
         ]);
         const now = new Date();
         setActivePromos(promoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Promotion)).filter(p => p.isActive && new Date(p.startDate) <= now && new Date(p.endDate) >= now));

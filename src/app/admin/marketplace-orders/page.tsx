@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import notify from '@/lib/notify';
-import { deductStockFEFO } from '@/lib/inventory';
+import { createMarketplaceOrder } from '@/lib/actions/sales.actions';
 import { Toaster } from 'react-hot-toast';
 import {
   ChevronLeft,
@@ -23,8 +23,7 @@ import { CartTable } from '@/components/admin/marketplace/CartTable';
 import { Product } from '@/lib/types';
 import * as Sentry from '@sentry/nextjs';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-
-import { auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
@@ -106,14 +105,24 @@ export default function MarketplaceOrdersPage() {
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin } = await getUserAndRole();
       if (!user) { router.push('/profil/login'); return; }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAuthorizedAdmin(user, userDoc.data())) { router.push('/'); return; }
+      if (!isAuthorizedAdmin(user as any, userDocData)) { router.push('/'); return; }
       fetchProducts();
       fetchWarehouses();
-    });
-    return () => unsubAuth();
+    };
+    checkAuth();
+
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [router]);
 
   const fetchProducts = async () => {
@@ -286,25 +295,6 @@ export default function MarketplaceOrdersPage() {
         }
       }
 
-      // Eksekusi deduct satu per satu
-      for (const { item, baseAmount } of deductPlan) {
-        const result = await deductStockFEFO({
-          productId: item.id,
-          amount: baseAmount,
-          warehouseId,
-          source: 'MARKETPLACE',
-          adminId,
-          reference: orderId,
-          notes: `${channel} Order #${externalOrderId} | Gudang: ${warehouses.find(w => w.id === warehouseId)?.name || warehouseId}`,
-        });
-        if (!result.success) {
-          notify.error(`Gagal deduct stok ${item.name}: ${result.error}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // ── 2. Simpan order ke Supabase orders table ──
       const orderItems = deductPlan.map(({ item, baseAmount, containsPerUnit }) => ({
         id: item.id,
         name: item.name,
@@ -316,7 +306,7 @@ export default function MarketplaceOrdersPage() {
         total: item.price * item.quantity, // total harga
       }));
 
-      const orderData = {
+      const res = await createMarketplaceOrder({
         orderId,
         externalOrderId,
         customerName: customerName || `Customer ${channel}`,
@@ -328,31 +318,21 @@ export default function MarketplaceOrdersPage() {
         paymentMethod,
         warehouseId,
         warehouseName: warehouses.find(w => w.id === warehouseId)?.name || warehouseId,
-        status: 'SELESAI',
         adminId,
-        createdAt: now,
-      };
-
-      const { error: orderError } = await supabase.from('orders').insert({
-        id: dbOrderId,
-        order_id: orderId,
-        user_id: null,
-        customer_name: customerName || `Customer ${channel}`,
-        status: 'SELESAI',
-        total,
-        items: orderItems,
-        raw_data: orderData,
-        created_at: now,
-        updated_at: now,
       });
 
-      if (orderError) throw orderError;
+      if (!res.success) {
+        notify.error(`Gagal menyimpan order: ${res.error}`);
+        setLoading(false);
+        return;
+      }
 
-      notify.success(`✅ Order ${channel} berhasil disimpan ke Supabase! Stok dikurangi dari: ${warehouses.find(w => w.id === warehouseId)?.name || warehouseId}`);
+      notify.success(`✅ Order ${channel} berhasil disimpan! Stok terpotong dengan benar.`);
       setCart([]);
       setExternalOrderId('');
       setCustomerName('');
       setShippingCost(0);
+      fetchProducts(); // Refresh stok di tampilan
     } catch (err) {
       Sentry.captureException(err);
       notify.error('Gagal menyimpan pesanan');

@@ -42,10 +42,24 @@ vi.mock('@/lib/supabase', () => {
     builder.select = vi.fn().mockReturnValue(builder);
     builder.eq = vi.fn().mockReturnValue(builder);
     builder.order = vi.fn().mockReturnValue(builder);
-    builder.single = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue({ data: data[0] ?? null, error: null });
+    builder.maybeSingle = vi.fn().mockResolvedValue({ data: data[0] ?? null, error: null });
     builder.insert = vi.fn().mockReturnValue(builder);
     builder.then = (onfulfilled: any, onrejected?: any) =>
       Promise.resolve({ data, error: null }).then(onfulfilled, onrejected);
+    return builder;
+  };
+
+  const createAdminBuilder = () => {
+    const builder: any = {};
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue({ data: { id: 'admin-user', role: 'admin' }, error: null });
+    builder.maybeSingle = vi.fn().mockResolvedValue({ data: { id: 'admin-user', role: 'admin' }, error: null });
+    builder.update = vi.fn().mockReturnValue(builder);
+    builder.insert = vi.fn().mockReturnValue(builder);
+    builder.then = (onfulfilled: any, onrejected?: any) =>
+      Promise.resolve({ data: null, error: null }).then(onfulfilled, onrejected);
     return builder;
   };
 
@@ -53,11 +67,23 @@ vi.mock('@/lib/supabase', () => {
     supabase: {
       auth: {
         getUser: vi.fn(async () => ({ data: { user: { id: 'admin-user' } }, error: null })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+        signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
+        signOut: vi.fn(async () => ({ error: null })),
       },
       from: vi.fn((table: string) => createQueryBuilder(table)),
+      storage: {},
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+    supabaseAdmin: {
+      from: vi.fn((_table: string) => createAdminBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     },
   };
 });
+
 
 vi.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
@@ -79,7 +105,9 @@ vi.mock('@/lib/inventory', () => ({
   deductStockBatch: vi.fn(async () => ({ success: true })),
 }));
 
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/firebase', () => {
+  const INCREMENT_MARKER_MO = Symbol('supabase_increment');
+  return {
   auth: {},
   db: {},
   collection: vi.fn((_db: unknown, _path: string) => ({ path: _path })),
@@ -131,7 +159,10 @@ vi.mock('@/lib/firebase', () => ({
     setTimeout(() => callback({ uid: 'admin-user' }), 0);
     return () => {};
   },
-}));
+  INCREMENT_MARKER: INCREMENT_MARKER_MO,
+  increment: (n: number) => ({ [INCREMENT_MARKER_MO as any]: true, delta: n }),
+};
+});
 
 vi.mock('react-hot-toast', () => ({
   Toaster: () => <div />,

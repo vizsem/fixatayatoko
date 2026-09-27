@@ -13,7 +13,8 @@ import { UserProfile } from '@/lib/types';
 import { SkeletonList, EmptyState } from '@/components/UIState';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, increment, onAuthStateChanged, updateDoc, FirebaseUser } from '@/lib/firebase';
+import { sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth, db, doc, increment, onAuthStateChanged, updateDoc, FirebaseUser } from '@/lib/firebase';
 interface UserData extends UserProfile {
   _addresses?: unknown[]; // internal extended field
 }
@@ -62,7 +63,7 @@ export default function VoucherExchangePage() {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+        const userSnap = await sbGetDoc('users', currentUser.uid);
         if (userSnap.exists()) setUserData(userSnap.data() as UserData);
 
       } else {
@@ -77,7 +78,7 @@ export default function VoucherExchangePage() {
     // Ambil voucher dari Firestore (koleksi: vouchers)
     const fetchVouchers = async () => {
       try {
-        const snap = await getDocs(collection(db, 'vouchers'));
+        const snap = await sbGetDocs({ table: 'vouchers' });
         const docs: Voucher[] = snap.docs.map((d) => {
           const data = d.data() as Partial<Voucher>;
           return {
@@ -118,9 +119,9 @@ export default function VoucherExchangePage() {
       const voucherCode = `ATY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
       // 1. Jalankan Transaksi ke Firestore
-      await updateDoc(userRef, { points: increment(-voucher.cost) });
+      await sbUpdateDoc('users', user.uid, { points: increment(-voucher.cost) });
 
-      await addDoc(collection(db, 'user_vouchers'), {
+      await sbInsertDoc('user_vouchers', {
         userId: user.uid,
         code: voucherCode,
         name: voucher.name,
@@ -129,7 +130,7 @@ export default function VoucherExchangePage() {
         createdAt: new Date().toISOString(),
       });
 
-      await addDoc(collection(db, 'point_logs'), {
+      await sbInsertDoc('point_logs', {
         userId: user.uid,
         pointsChanged: -voucher.cost,
         type: 'VOUCHER_EXCHANGE',

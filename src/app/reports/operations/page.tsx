@@ -18,7 +18,8 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 
 type OperationalMetric = {
   id: string;
@@ -36,14 +37,16 @@ export default function OperationsReport() {
   const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin, isStaff, role } = await getUserAndRole();
+      if (!user) return;
+      // For backwards compat, expose userDoc variable matching old pattern
+      const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
+      
       if (!user) {
         router.push('/profil/login');
         return;
       }
-
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
 
       if (!isAuthorizedAdmin(user, userDocData)) {
         toast.error('Akses ditolak! Anda bukan admin.');
@@ -51,15 +54,25 @@ export default function OperationsReport() {
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
     const fetchOperationsData = async () => {
       try {
         // Ambil data pengguna
-        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const usersSnapshot = await sbGetDocs({ table: 'users' });
         const totalUsers = usersSnapshot.size;
         const activeUsers = usersSnapshot.docs.filter(doc => 
           doc.data().lastActive && 
@@ -67,7 +80,7 @@ export default function OperationsReport() {
         ).length;
 
         // Ambil data gudang
-        const warehousesSnapshot = await getDocs(collection(db, 'warehouses'));
+        const warehousesSnapshot = await sbGetDocs({ table: 'warehouses' });
         const warehouses = warehousesSnapshot.docs.map(doc => doc.data());
         const totalWarehouses = warehouses.length;
         const fullWarehouses = warehouses.filter(wh => 
@@ -75,14 +88,14 @@ export default function OperationsReport() {
         ).length;
 
         // Ambil data produk
-        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsSnapshot = await sbGetDocs({ table: 'products' });
         const products = productsSnapshot.docs.map(doc => doc.data());
         const totalProducts = products.length;
         const outOfStockProducts = products.filter(p => p.stock === 0).length;
         const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 10).length;
 
         // Ambil data pesanan
-        const ordersSnapshot = await getDocs(collection(db, 'orders'));
+        const ordersSnapshot = await sbGetDocs({ table: 'orders' });
         const orders = ordersSnapshot.docs.map(doc => doc.data());
         const totalOrders = orders.length;
         const pendingOrders = orders.filter(o => o.status === 'MENUNGGU').length;
@@ -100,7 +113,7 @@ export default function OperationsReport() {
         const tiktokOrders = orders.filter(o => o.channel === 'TIKTOK').length;
 
         // Ambil data transaksi inventaris
-        const inventorySnapshot = await getDocs(collection(db, 'inventory_transactions'));
+        const inventorySnapshot = await sbGetDocs({ table: 'inventory_transactions' });
         const inventoryTransactions = inventorySnapshot.docs.map(doc => doc.data());
         const totalTransactions = inventoryTransactions.length;
         const stockInTransactions = inventoryTransactions.filter(t => t.type === 'STOCK_IN').length;

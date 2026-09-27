@@ -13,6 +13,7 @@ vi.mock('@/lib/firebase', () => {
   const fakeDocData = {
     role: 'admin',
   };
+  const INCREMENT_MARKER = Symbol('supabase_increment');
 
   return {
     auth: { currentUser: { uid: 'admin-user' } },
@@ -98,12 +99,52 @@ vi.mock('@/lib/firebase', () => {
           return Promise.resolve({ size: 0, docs: [] });
       }
     }),
+    INCREMENT_MARKER,
+    increment: (n: number) => ({ [INCREMENT_MARKER as any]: true, delta: n }),
   };
 });
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: { storage: {}, auth: {} },
-}));
+vi.mock('@/lib/supabase', () => {
+  const createQueryBuilder = () => {
+    const builder: any = {};
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.order = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue({ data: null, error: null });
+    builder.then = (onfulfilled: any, onrejected?: any) =>
+      Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+    return builder;
+  };
+  return {
+    supabase: {
+      storage: {},
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: 'admin-user', app_metadata: { role: 'admin' } } },
+          error: null,
+        })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+        signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
+        signOut: vi.fn(async () => ({ error: null })),
+      },
+      from: vi.fn(() => createQueryBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+    supabaseAdmin: {
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = vi.fn().mockReturnValue(builder);
+        builder.eq = vi.fn().mockReturnValue(builder);
+        builder.then = (onfulfilled: any, onrejected?: any) =>
+          Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+        return builder;
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+  };
+});
 
 vi.mock('react-hot-toast', () => ({
   default: {

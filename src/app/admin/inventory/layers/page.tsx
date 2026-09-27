@@ -6,7 +6,7 @@ import { Box, Layers, Search, Warehouse, ChevronLeft, Calendar, Download } from 
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, getDocs } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 type ProductLayer = { qty: number; costPerPcs: number; ts?: any; purchaseId?: string; supplierName?: string; warehouseId?: string };
 type Product = {
   id: string;
@@ -36,7 +36,7 @@ export default function InventoryLayersPage() {
 
   useEffect(() => {
     (async () => {
-      const snap = await getDocs(collection(db, 'products'));
+      const snap = await sbGetDocs({ table: 'products' });
       const items = snap.docs.map(d => {
         const data = d.data() as any;
         return {

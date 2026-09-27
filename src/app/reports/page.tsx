@@ -24,7 +24,8 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 
 type ReportSummary = {
   totalSales: number;
@@ -55,23 +56,31 @@ export default function ReportsDashboard() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   // Fetch ringkasan laporan
@@ -83,26 +92,27 @@ export default function ReportsDashboard() {
         endDate.setHours(23, 59, 59, 999);
 
         // Penjualan & Pesanan
-        const ordersSnapshot = await getDocs(
-          query(
-            collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString())
-          )
-        );
+        const ordersSnapshot = await sbGetDocs({
+          table: 'orders',
+          where: [
+            { field: 'createdAt', op: '>=', val: startDate.toISOString() },
+            { field: 'createdAt', op: '<=', val: endDate.toISOString() },
+          ],
+        });
         const totalSales = ordersSnapshot.docs.reduce((sum, doc) => sum + doc.data().total, 0);
         const totalOrders = ordersSnapshot.size;
 
         // Produk
-        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsSnapshot = await sbGetDocs({ table: 'products' });
         const totalProducts = productsSnapshot.size;
-        const lowStockSnapshot = await getDocs(
-          query(collection(db, 'products'), where('stock', '<=', 10))
-        );
+        const lowStockSnapshot = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'stock', op: '<=', val: 10 }],
+        });
         const lowStockCount = lowStockSnapshot.size;
 
         // Pelanggan
-        const customersSnapshot = await getDocs(collection(db, 'customers'));
+        const customersSnapshot = await sbGetDocs({ table: 'customers' });
         const totalCustomers = customersSnapshot.size;
         
         // Piutang

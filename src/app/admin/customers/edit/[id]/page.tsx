@@ -17,7 +17,8 @@ import {
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 export default function EditCustomer() {
   const router = useRouter();
@@ -38,14 +39,14 @@ export default function EditCustomer() {
 
   // 1. Proteksi Admin & Fetch Data Awal
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, userDocData, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         router.push('/profil');
         return;
       }
@@ -53,7 +54,7 @@ export default function EditCustomer() {
       // Ambil data pelanggan yang akan diedit
       if (id) {
         try {
-          const customerDoc = await getDoc(doc(db, 'customers', id as string));
+          const customerDoc = await sbGetDoc('customers', id as string);
           if (customerDoc.exists()) {
             const data = customerDoc.data();
             setFormData({
@@ -75,15 +76,25 @@ export default function EditCustomer() {
           setLoading(false);
         }
       }
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [id, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'customers', id as string), {
+      await sbUpdateDoc('customers', id as string, {
         ...formData,
         updatedAt: new Date().toISOString()
       });

@@ -7,7 +7,7 @@ import {
   Activity, Gift, Zap,
   Package, DollarSign, Clock, AlertTriangle, ShieldCheck, Database, Truck, BarChart3,
   TrendingUp, Users, ShoppingCart, ArrowUpRight, ArrowRight, MoreHorizontal, Calendar,
-  RefreshCw
+  RefreshCw, Award, XCircle, ArchiveX, Wallet
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { getDashboardStats } from '@/lib/actions/dashboard.actions';
@@ -34,6 +34,12 @@ interface DailySales {
   date: string;
   amount: number;
   dayName: string;
+}
+
+interface TopCustomer {
+  name: string;
+  spent: number;
+  orders: number;
 }
 
 const QuickActionCard = ({ icon: Icon, title, description, href, color = "bg-blue-50 text-blue-600" }: { icon: LucideIcon; title: string; description: string; href: string; color?: string }) => (
@@ -79,8 +85,13 @@ export default function AdminDashboard() {
     dailySales: 0,
     weeklySales: 0,
     monthlySales: 0,
+    monthlyProfit: 0,
+    monthlyNetProfit: 0,
+    totalInventoryValue: 0,
     totalProducts: 0,
     lowStock: 0,
+    deadStock: 0,
+    cancelledOrders: 0,
     warehouses: 0,
     users: 0,
     // Kept for UI compatibility
@@ -92,6 +103,7 @@ export default function AdminDashboard() {
 
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [topProducts, setTopProducts] = useState<Product[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [salesChartData, setSalesChartData] = useState<DailySales[]>([]);
 
   useLayoutEffect(() => {
@@ -106,8 +118,13 @@ export default function AdminDashboard() {
         dailySales: data.stats.dailySales,
         weeklySales: data.stats.weeklySales,
         monthlySales: data.stats.monthlySales,
+        monthlyProfit: data.stats.monthlyProfit || 0,
+        monthlyNetProfit: data.stats.monthlyNetProfit || 0,
+        totalInventoryValue: data.stats.totalInventoryValue || 0,
         totalProducts: data.stats.totalProducts,
         lowStock: data.stats.lowStock,
+        deadStock: data.stats.deadStock || 0,
+        cancelledOrders: data.stats.cancelledOrders || 0,
         warehouses: data.stats.warehouses,
         users: data.stats.users,
         unreadOrders: data.recentOrders.filter(o => o.status === 'CONFIRMED').length,
@@ -117,6 +134,7 @@ export default function AdminDashboard() {
       });
       setRecentOrders(data.recentOrders);
       setTopProducts(data.topProducts);
+      setTopCustomers(data.topCustomers || []);
       setSalesChartData(data.salesChartData);
     } catch (e) {
       console.error('Dashboard Fetch Error:', e);
@@ -171,7 +189,7 @@ export default function AdminDashboard() {
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
         <StatBox
-          label="Total Pendapatan (Bulan Ini)"
+          label="Pendapatan (Bulan Ini)"
           value={`Rp${stats.monthlySales.toLocaleString('id-ID')}`}
           icon={DollarSign}
           color="text-emerald-600"
@@ -185,6 +203,27 @@ export default function AdminDashboard() {
           bg="bg-blue-50"
         />
         <StatBox
+          label="Keuntungan Kotor"
+          value={`Rp${stats.monthlyProfit.toLocaleString('id-ID')}`}
+          icon={TrendingUp}
+          color="text-indigo-600"
+          bg="bg-indigo-50"
+        />
+        <StatBox
+          label="Laba Bersih"
+          value={`Rp${stats.monthlyNetProfit.toLocaleString('id-ID')}`}
+          icon={Wallet}
+          color="text-blue-600"
+          bg="bg-blue-50"
+        />
+        <StatBox
+          label="Total Nilai Inventori"
+          value={`Rp${stats.totalInventoryValue.toLocaleString('id-ID')}`}
+          icon={Database}
+          color="text-teal-600"
+          bg="bg-teal-50"
+        />
+        <StatBox
           label="Total SKU Produk"
           value={stats.totalProducts}
           icon={Package}
@@ -192,11 +231,25 @@ export default function AdminDashboard() {
           bg="bg-purple-50"
         />
         <StatBox
-          label="Stok Perlu Perhatian"
+          label="Stok Perhatian"
           value={stats.lowStock}
           icon={AlertTriangle}
           color="text-amber-600"
           bg="bg-amber-50"
+        />
+        <StatBox
+          label="Produk Dead-Stock"
+          value={stats.deadStock}
+          icon={ArchiveX}
+          color="text-gray-500"
+          bg="bg-gray-100"
+        />
+        <StatBox
+          label="Pesanan Dibatalkan"
+          value={stats.cancelledOrders}
+          icon={XCircle}
+          color="text-red-500"
+          bg="bg-red-50"
         />
       </div>
 
@@ -244,7 +297,7 @@ export default function AdminDashboard() {
           {/* Recent Orders Section */}
           <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-bold text-gray-900">Pesanan Terbaru</h3>
+              <h3 className="text-lg font-bold text-gray-900">Log Transaksi Penjualan</h3>
               <Link href="/admin/orders" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
                 Lihat Semua <ArrowRight size={14} />
               </Link>
@@ -320,6 +373,32 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-400">{product.sales} terjual</p>
                     </div>
                     <p className="text-xs font-bold text-gray-900">Rp{product.price.toLocaleString('id-ID')}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Top Customers Widget */}
+          <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">Pelanggan Terbaik</h3>
+              <Award size={16} className="text-yellow-500" />
+            </div>
+            <div className="space-y-4">
+              {topCustomers.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">Belum ada data pelanggan</p>
+              ) : (
+                topCustomers.map((customer, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                      {customer.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">{customer.name}</p>
+                      <p className="text-xs text-gray-400">{customer.orders} pesanan</p>
+                    </div>
+                    <p className="text-xs font-bold text-gray-900">Rp{customer.spent.toLocaleString('id-ID')}</p>
                   </div>
                 ))
               )}

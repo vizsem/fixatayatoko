@@ -24,7 +24,8 @@ import notify from '@/lib/notify';
 import { StockSyncLog } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
-import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
+import { Timestamp, auth, collection, db, doc, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncLogsPage() {
   const router = useRouter();
@@ -69,23 +70,29 @@ export default function SyncLogsPage() {
     };
 
     // Proteksi admin
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsubscribe = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
 
       await loadLogs();
-    });
+    };
+    __checkAuthunsubscribe();
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubscribe());
+      unsubscribe = () => subscription.unsubscribe();
+    })();
 
-    return () => unsubscribe();
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [router, filter, logType, limitCount]);
 
   // Export logs

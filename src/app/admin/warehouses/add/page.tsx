@@ -5,9 +5,8 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Package } from 'lucide-react';
 import notify from '@/lib/notify';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Warehouse = {
   name: string;
@@ -33,35 +32,38 @@ function WarehouseFormContent() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/admin/login'); return; }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      const userRole = user.app_metadata?.role || user.user_metadata?.role
+        || (user.email?.startsWith('admin') ? 'admin' : undefined)
+        || (user.email?.includes('hadzikoh') ? 'superadmin' : undefined);
+      if (!isAdminRole(userRole)) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
 
-      // Jika edit, load data
+      // Jika edit, load data dari Supabase
       if (editId) {
-        const docSnap = await getDoc(doc(db, 'warehouses', editId));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        const { data } = await supabaseAdmin
+          .from('warehouses')
+          .select('*')
+          .eq('id', editId)
+          .single();
+        if (data) {
           setFormData({
             name: data.name || '',
-            location: data.location || '',
-            capacity: data.capacity || 1000,
-            isActive: data.isActive !== false
+            location: data.location || data.raw_data?.location || '',
+            capacity: data.capacity || data.raw_data?.capacity || 1000,
+            isActive: data.is_active !== false
           });
         }
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
   }, [router, editId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,18 +75,32 @@ function WarehouseFormContent() {
     }
 
     try {
+      const now = new Date().toISOString();
       const warehouseData = {
-        ...formData,
-        usedCapacity: 0, // Awalnya kosong
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        name: formData.name,
+        location: formData.location,
+        is_active: formData.isActive,
+        raw_data: {
+          ...formData,
+          usedCapacity: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+        updated_at: now,
       };
 
       if (editId) {
-        await updateDoc(doc(db, 'warehouses', editId), warehouseData);
+        const { error } = await supabaseAdmin
+          .from('warehouses')
+          .update(warehouseData)
+          .eq('id', editId);
+        if (error) throw error;
         notify.admin.success('Gudang berhasil diperbarui!');
       } else {
-        await addDoc(collection(db, 'warehouses'), warehouseData);
+        const { error } = await supabaseAdmin
+          .from('warehouses')
+          .insert({ ...warehouseData, created_at: now });
+        if (error) throw error;
         notify.admin.success('Gudang berhasil ditambahkan!');
       }
 

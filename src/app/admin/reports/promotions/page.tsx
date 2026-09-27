@@ -11,11 +11,10 @@ import {
   Sparkles, DollarSign, ArrowLeft, ArrowUpRight
 } from 'lucide-react';
 import notify from '@/lib/notify';
+import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import {
-  auth, collection, db, doc, getDoc, getDocs,
-  onAuthStateChanged, query, where
-} from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 
 type PromotionRecord = {
   id: string;
@@ -42,23 +41,31 @@ export default function PromotionsReport() {
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
@@ -66,10 +73,8 @@ export default function PromotionsReport() {
 
     const fetchPromotionsData = async () => {
       try {
-        const promotionsSnapshot = await getDocs(collection(db, 'promotions'));
-        const ordersSnapshot = await getDocs(
-          query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']))
-        );
+        const promotionsSnapshot = await sbGetDocs({ table: 'promotions' });
+        const ordersSnapshot = await sbGetDocs({ table: 'orders' });
         const orders = ordersSnapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
         const promoList: PromotionRecord[] = [];

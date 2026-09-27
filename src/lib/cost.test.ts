@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('@/lib/firebase', () => {
+  const M = Symbol('supabase_increment');
+  return {
+    db: {},
+    INCREMENT_MARKER: M,
+    increment: (n: any) => ({ [M]: true, delta: n }),
+  };
+});
 import { computeAverageCost } from './inventory';
 
 import { db } from '@/lib/firebase';

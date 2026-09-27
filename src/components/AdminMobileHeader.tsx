@@ -37,7 +37,8 @@ import {
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, doc, getDoc, query, signOut, where, getCountFromServer } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, query, signOut, where, getCountFromServer } from '@/lib/firebase';
 interface NavItem {
   label: string;
   href: string;
@@ -95,7 +96,7 @@ export default function AdminMobileHeader() {
     const fetchUserProfile = async () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.id));
+        const userDoc = await sbGetDoc('users', user.id);
         if (userDoc.exists()) {
           setUserProfile(userDoc.data());
         }

@@ -12,10 +12,8 @@ import {
   BarChart3, CheckCircle2, Power, Search, Filter
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import {
-  collection, db, deleteDoc, doc, onSnapshot,
-  orderBy, query, updateDoc
-} from '@/lib/firebase';
+import { sbDeleteDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { collection, db, doc, onSnapshot, orderBy, query } from '@/lib/firebase';
 import { PromoType } from './add/page';
 
 type Promotion = {
@@ -95,7 +93,7 @@ export default function PromotionsPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Hapus promosi "${name}" secara permanen?`)) return;
     try {
-      await deleteDoc(doc(db, 'promotions', id));
+      await sbDeleteDoc('promotions', id);
       notify.admin.success('Promosi berhasil dihapus.');
     } catch {
       notify.admin.error('Gagal menghapus promosi.');
@@ -104,7 +102,7 @@ export default function PromotionsPage() {
 
   const handleToggleActive = async (promo: Promotion) => {
     try {
-      await updateDoc(doc(db, 'promotions', promo.id), {
+      await sbUpdateDoc('promotions', promo.id, {
         isActive: !promo.isActive,
         updatedAt: new Date().toISOString(),
       });

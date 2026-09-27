@@ -4,7 +4,7 @@ import { Ticket, Save, Info, ArrowRightLeft, Coins } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { db, doc, getDoc, updateDoc } from '@/lib/firebase';
+import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 interface PointConfig {
   earningRate: number;
   redemptionValue: number;
@@ -16,7 +16,7 @@ export default function PointSettings() {
 
   useEffect(() => {
     const fetchConfig = async () => {
-      const snap = await getDoc(doc(db, 'settings', 'points'));
+      const snap = await sbGetDoc('settings', 'points');
       if (snap.exists()) setConfig(snap.data() as PointConfig);
     };
     fetchConfig();
@@ -24,7 +24,7 @@ export default function PointSettings() {
 
 
   const handleSave = async () => {
-    await updateDoc(doc(db, 'settings', 'points'), config as unknown as { [key: string]: number });
+    await sbUpdateDoc('settings', 'points', config as unknown as { [key: string]: number });
     notify.admin.success("Pengaturan point disimpan!");
   };
 

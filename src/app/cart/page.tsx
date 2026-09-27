@@ -21,7 +21,8 @@ import {
   calculateDeliveryCost
 } from '@/lib/shipping';
 
-import { auth, collection, db, doc, getDoc, getDocs, limit, query, where } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, getDocs, limit, query, where } from '@/lib/firebase';
 
 export default function CartPage() {
   const router = useRouter();
@@ -88,7 +89,7 @@ export default function CartPage() {
 
         // Fetch store delivery methods
         try {
-          const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+          const sysSnap = await sbGetDoc('settings', 'system');
           if (sysSnap.exists()) {
             const sysData = sysSnap.data() as any;
             if (Array.isArray(sysData.deliveryMethods) && sysData.deliveryMethods.length > 0) {
@@ -102,8 +103,8 @@ export default function CartPage() {
         if (user) {
           setUserId(user.id);
           const [uSnap, cSnap] = await Promise.all([
-            getDoc(doc(db, 'users', user.id)),
-            getDoc(doc(db, 'carts', user.id))
+            sbGetDoc('users', user.id),
+            sbGetDoc('carts', user.id)
           ]);
           if (uSnap.exists()) {
             const uData = uSnap.data() as UserProfile;

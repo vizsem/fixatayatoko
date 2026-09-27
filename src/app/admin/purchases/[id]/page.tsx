@@ -6,7 +6,8 @@ import toast, { Toaster } from 'react-hot-toast';
 
 
 import { getPurchaseOrderById, receivePurchaseOrder } from '@/lib/actions/purchase.actions';
-import { Timestamp, db, doc, getDoc, updateDoc } from '@/lib/firebase';
+import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { Timestamp, db, doc, getDoc } from '@/lib/firebase';
 import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
@@ -86,7 +87,7 @@ export default function PurchaseDetail() {
         total: newTotal
       };
 
-      await updateDoc(doc(db, 'purchases', purchase.id), updateData);
+      await sbUpdateDoc('purchases', purchase.id, updateData);
       
       // Update local state with the same structure as Firestore returns
       // We need to ensure dateFormatted updates correctly too
@@ -165,7 +166,7 @@ export default function PurchaseDetail() {
 
         // 2. Fallback ke Firestore
         const docRef = doc(db, 'purchases', id as string);
-        const snap = await getDoc(docRef);
+        const snap = await sbGetDoc('purchases', id as string);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);
         } else {

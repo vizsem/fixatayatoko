@@ -12,7 +12,8 @@ import {
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 type SaleItem = {
   id: string;
   date: string;
@@ -35,23 +36,31 @@ export default function SalesReport() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
@@ -61,14 +70,14 @@ export default function SalesReport() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
         
-        const ordersSnapshot = await getDocs(
-          query(
-            collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString()),
-            where('status', '==', 'SELESAI')
-          )
-        );
+        const ordersSnapshot = await sbGetDocs({
+          table: 'orders',
+          where: [
+            { field: 'createdAt', op: '>=', val: startDate.toISOString() },
+            { field: 'createdAt', op: '<=', val: endDate.toISOString() },
+            { field: 'status', op: '==', val: 'SELESAI' },
+          ],
+        });
 
         const salesList: SaleItem[] = [];
         for (const orderDoc of ordersSnapshot.docs) {

@@ -12,7 +12,8 @@ import {
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, deleteObject, doc, getDoc, getDocs, getDownloadURL, onAuthStateChanged, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth, deleteObject, doc, getDownloadURL, ref, storage, uploadBytes } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -48,14 +49,14 @@ export default function EditProductPage() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         toast.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
@@ -64,7 +65,7 @@ export default function EditProductPage() {
       // Memindahkan fetch di sini untuk menghindari dependency warning
       const fetchProductData = async () => {
         try {
-          const docSnap = await getDoc(doc(db, 'products', id));
+          const docSnap = await sbGetDoc('products', id);
           if (!docSnap.exists()) {
             setError('Produk tidak ditemukan.');
             return;
@@ -93,7 +94,7 @@ export default function EditProductPage() {
 
       const fetchWarehouses = async () => {
         try {
-          const snapshot = await getDocs(collection(db, 'warehouses'));
+          const snapshot = await sbGetDocs({ table: 'warehouses' });
           const list = snapshot.docs.map(doc => ({
             id: doc.id,
             name: doc.data().name || ''
@@ -109,8 +110,18 @@ export default function EditProductPage() {
       await fetchProductData();
       await fetchWarehouses();
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [id, router]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,7 +223,7 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, 'products', id), updateData);
+      await sbUpdateDoc('products', id, updateData);
 
       toast.success('Produk berhasil diperbarui!');
       router.push('/admin/products');

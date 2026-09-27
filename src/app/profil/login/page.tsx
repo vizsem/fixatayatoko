@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
+import { sbGetDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
 import { GoogleAuthProvider, auth, db, doc, getDoc, onAuthStateChanged, setDoc, signInWithEmailAndPassword, signInWithPopup } from '@/lib/firebase';
 
 export default function LoginPage() {
@@ -34,9 +35,9 @@ export default function LoginPage() {
       const user = result?.user;
       if (!user) return;
       const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
+      const userSnap = await sbGetDoc('users', result.user.uid);
       if (!userSnap.exists()) {
-        await setDoc(userRef, { uid: user.uid, name: user.displayName, email: user.email, role: 'customer', points: 0, createdAt: new Date().toISOString() });
+        await sbUpsertDoc('users', result.user.uid, { uid: user.uid, name: user.displayName, email: user.email, role: 'customer', points: 0, createdAt: new Date().toISOString() });
       } else {
         const userData = userSnap.data();
         if (userData.role === 'admin' || userData.role === 'cashier') {
@@ -60,7 +61,7 @@ export default function LoginPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const userRef = doc(db, 'users', result.user.uid);
-      const userSnap = await getDoc(userRef);
+      const userSnap = await sbGetDoc('users', result.user.uid);
       if (userSnap.exists()) {
         const userData = userSnap.data();
         if (userData.role === 'admin' || userData.role === 'cashier') {

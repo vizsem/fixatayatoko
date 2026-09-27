@@ -15,7 +15,8 @@ import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { Timestamp, auth, collection, db, doc, getDoc, getDocs, limit, onAuthStateChanged, orderBy, query, ref, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { Timestamp, auth, collection, db, getDocs, limit, orderBy, query, ref, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
 
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital' | 'tax';
@@ -46,16 +47,21 @@ function AuditPageContent() {
   const [taxSummary, setTaxSummary] = useState({ totalSales: 0, dpp: 0, taxAmount: 0 });
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsubAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }
-    });
-    return () => unsubAuth();
+    };
+    __checkAuthunsubAuth();
+    let unsubAuth: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubAuth());
+      unsubAuth = () => subscription.unsubscribe();
+    })();
+    return () => { if (unsubAuth) unsubAuth(); };
   }, [router]);
 
   const fetchData = useCallback(async () => {
@@ -129,7 +135,7 @@ function AuditPageContent() {
       } else if (activeTab === 'tax') {
         // Audit Audit Pajak (PPN & PPh)
         const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']));
-        const sSnap = await getDocs(collection(db, 'settings'));
+        const sSnap = await sbGetDocs({ table: 'settings' });
         let taxSettings = DEFAULT_TAX_SETTINGS;
         sSnap.docs.forEach(d => { if (d.id === 'system' && d.data()?.tax) taxSettings = { ...DEFAULT_TAX_SETTINGS, ...d.data().tax }; });
         

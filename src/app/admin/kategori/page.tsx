@@ -12,7 +12,8 @@ import * as Sentry from '@sentry/nextjs';
 import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, collection, db, deleteDoc, doc, getDocs, limit, query, updateDoc, where, getCountFromServer } from '@/lib/firebase';
+import { sbDeleteDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { collection, db, doc, limit, query, where, getCountFromServer } from '@/lib/firebase';
 type Category = {
   id: string;
   name: string;
@@ -36,7 +37,7 @@ export default function AdminCategories() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const catSnap = await getDocs(collection(db, 'categories'));
+      const catSnap = await sbGetDocs({ table: 'categories' });
       
       const categoryList = await Promise.all(catSnap.docs.map(async (doc) => {
         const data = doc.data();
@@ -89,9 +90,9 @@ export default function AdminCategories() {
 
     try {
       if (editId) {
-        await updateDoc(doc(db, 'categories', editId), { ...formData, slug, updatedAt: new Date().toISOString() });
+        await sbUpdateDoc('categories', editId, { ...formData, slug, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'categories'), { ...formData, slug, createdAt: new Date().toISOString() });
+        await sbInsertDoc('categories', { ...formData, slug, createdAt: new Date().toISOString() });
       }
       setFormData({ name: '', description: '' });
       setEditId(null);
@@ -110,7 +111,7 @@ export default function AdminCategories() {
     if (count > 0) return notify.admin.error(`Masih ada ${count} produk.`);
     if (!confirm(`Hapus "${name}"?`)) return;
     try {
-      await deleteDoc(doc(db, 'categories', id));
+      await sbDeleteDoc('categories', id);
       setCategories(prev => prev.filter(c => c.id !== id));
       notify.admin.success("Dihapus");
     } catch (err) {

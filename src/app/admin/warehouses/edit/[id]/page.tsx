@@ -9,9 +9,8 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type WarehouseData = {
   id: string;
@@ -35,20 +34,20 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
   // 1. Proteksi Admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!isAdminRole(userDoc.data()?.role)) {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/admin/login'); return; }
+      const userRole = user.app_metadata?.role || user.user_metadata?.role
+        || (user.email?.startsWith('admin') ? 'admin' : undefined)
+        || (user.email?.includes('hadzikoh') ? 'superadmin' : undefined);
+      if (!isAdminRole(userRole)) {
         notify.admin.error("Akses ditolak! Anda bukan admin.");
         router.push('/admin');
         return;
       }
       setAuthChecked(true);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
   }, [router]);
 
   // 2. Ambil Data Gudang Existing
@@ -57,11 +56,22 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
     const fetchWarehouse = async () => {
       try {
-        const docRef = doc(db, 'warehouses', id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setFormData({ id: docSnap.id, ...docSnap.data() } as WarehouseData);
+        const { data } = await supabaseAdmin
+          .from('warehouses')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (data) {
+          const raw = data.raw_data || {};
+          setFormData({
+            id: data.id,
+            name: data.name || raw.name || '',
+            address: raw.address || raw.location || '',
+            contactPerson: raw.contactPerson || '',
+            phone: raw.phone || '',
+            capacity: raw.capacity || data.capacity,
+            status: data.is_active !== false ? 'AKTIF' : 'NONAKTIF',
+          });
         } else {
           notify.admin.error('Gudang tidak ditemukan');
           router.push('/admin/warehouses');
@@ -69,11 +79,9 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
       } catch {
         notify.admin.error('Gagal mengambil data');
       } finally {
-
         setLoading(false);
       }
     };
-
     fetchWarehouse();
   }, [id, authChecked, router]);
 
@@ -84,17 +92,25 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
 
     setIsSaving(true);
     try {
-      const docRef = doc(db, 'warehouses', id);
-      await updateDoc(docRef, {
-        ...formData,
-        updatedAt: new Date().toISOString(),
-      });
+      const now = new Date().toISOString();
+      const { error } = await supabaseAdmin
+        .from('warehouses')
+        .update({
+          name: formData.name,
+          is_active: formData.status === 'AKTIF',
+          raw_data: {
+            ...formData,
+            updatedAt: now,
+          },
+          updated_at: now,
+        })
+        .eq('id', id);
+      if (error) throw error;
       notify.admin.success('Data gudang berhasil diperbarui');
       setTimeout(() => router.push('/admin/warehouses'), 1500);
     } catch {
       notify.admin.error('Gagal menyimpan perubahan');
     } finally {
-
       setIsSaving(false);
     }
   };

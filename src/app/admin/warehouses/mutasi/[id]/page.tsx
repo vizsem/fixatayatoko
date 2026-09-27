@@ -13,7 +13,7 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, doc, getDoc, getDocs, runTransaction } from '@/lib/firebase';
+import { sbGetDoc, sbGetDocs, sbUpdateDoc, sbInsertDoc } from '@/lib/supabase-helpers';
 interface Warehouse {
   id: string;
   name: string;
@@ -41,11 +41,11 @@ export default function MutasiGudangPage() {
     const fetchData = async () => {
       try {
         // 1. Ambil Detail Gudang Asal
-        const wDoc = await getDoc(doc(db, 'warehouses', sourceWarehouseId));
+        const wDoc = await sbGetDoc('warehouses', sourceWarehouseId);
         if (wDoc.exists()) setSourceWarehouse({ id: wDoc.id, ...wDoc.data() } as Warehouse);
 
         // 2. Ambil Daftar Gudang Tujuan (Semua kecuali asal)
-        const wSnap = await getDocs(collection(db, 'warehouses'));
+        const wSnap = await sbGetDocs({ table: 'warehouses' });
         setTargetWarehouses(wSnap.docs
           .map(d => ({ id: d.id, ...d.data() } as Warehouse))
           .filter(d => d.id !== sourceWarehouseId)
@@ -83,29 +83,20 @@ export default function MutasiGudangPage() {
     setSubmitting(true);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const productRef = doc(db, 'products', selectedProductId);
-        const logRef = doc(collection(db, 'inventory_logs'));
+      await sbUpdateDoc('products', selectedProductId, {
+        warehouseId: targetWarehouseId,
+        updatedAt: new Date().toISOString()
+      });
 
-        // Update Gudang & Stok Produk
-        // Catatan: Di sistem ini kita asumsikan produk pindah warehouseId
-        // Jika 1 produk bisa di banyak gudang, maka logika ini akan membuat dokumen baru
-        transaction.update(productRef, {
-          warehouseId: targetWarehouseId,
-          updatedAt: new Date().toISOString()
-        });
-
-        // Simpan Log Mutasi untuk History Inventory
-        transaction.set(logRef, {
-          productId: selectedProductId,
-          productName: selectedProduct.name,
-          fromWarehouseId: sourceWarehouseId,
-          toWarehouseId: targetWarehouseId,
-          amount: amount,
-          type: 'MUTASI',
-          date: new Date().toISOString(),
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system'
-        });
+      await sbInsertDoc('inventory_logs', {
+        productId: selectedProductId,
+        productName: selectedProduct.name,
+        fromWarehouseId: sourceWarehouseId,
+        toWarehouseId: targetWarehouseId,
+        amount: amount,
+        type: 'MUTASI',
+        date: new Date().toISOString(),
+        adminId: (await supabase.auth.getUser()).data.user?.id || 'system'
       });
 
       notify.admin.success("Mutasi Berhasil Disinkronkan");

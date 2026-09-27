@@ -24,7 +24,8 @@ import { stockSyncService } from '@/lib/stockSyncService';
 import { SyncConfig } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
-import { auth, db, doc, getDoc, onAuthStateChanged, updateDoc } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncConfigPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function SyncConfigPage() {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const configDoc = await getDoc(doc(db, 'settings', 'stockSync'));
+        const configDoc = await sbGetDoc('settings', 'stockSync');
         if (configDoc.exists()) {
           setConfig(configDoc.data() as SyncConfig);
         }
@@ -62,30 +63,36 @@ export default function SyncConfigPage() {
     };
 
     // Proteksi admin
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsubscribe = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
       }
 
       await loadConfig();
-    });
+    };
+    __checkAuthunsubscribe();
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubscribe());
+      unsubscribe = () => subscription.unsubscribe();
+    })();
 
-    return () => unsubscribe();
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [router]);
 
   // Update config
   const handleUpdateConfig = async () => {
     setIsUpdating(true);
     try {
-      await updateDoc(doc(db, 'settings', 'stockSync'), config as any);
+      await sbUpdateDoc('settings', 'stockSync', config as any);
       notify.admin.success('Konfigurasi berhasil diperbarui');
       
       // Update service config

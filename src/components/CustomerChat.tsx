@@ -5,7 +5,8 @@ import { Send, Paperclip, X, Image as ImageIcon, MessageCircle } from 'lucide-re
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, updateDoc, uploadBytes, where } from '@/lib/firebase';
+import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { addDoc, auth, collection, db, doc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, uploadBytes, where } from '@/lib/firebase';
 interface ChatMessage {
   id: string;
   text: string;
@@ -63,10 +64,10 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
           threadId = snapshot.docs[0].id;
         } else {
           // Create new chat thread
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const userDoc = await sbGetDoc('users', user.uid);
           const userData = userDoc.data();
 
-          const newThread = await addDoc(collection(db, 'chats'), {
+          const newThread = await sbInsertDoc('chats', {
             userId: user.uid,
             userInfo: {
               name: userData?.displayName || userData?.name || 'Pelanggan',
@@ -140,11 +141,11 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
       });
 
       // Update thread metadata
-      await updateDoc(doc(db, 'chats', chatId), {
+      await sbUpdateDoc('chats', chatId, {
         lastMessage: text,
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,
-        unreadCount: (await getDoc(doc(db, 'chats', chatId))).data()?.unreadCount || 0 + 1
+        unreadCount: (await sbGetDoc('chats', chatId)).data()?.unreadCount || 0 + 1
       });
 
       // Request notification permission if not granted

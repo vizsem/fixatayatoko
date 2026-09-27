@@ -12,7 +12,7 @@ import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import * as Sentry from '@sentry/nextjs';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, getDocs } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 type InventoryItem = {
   id: string;
   name: string;
@@ -45,10 +45,10 @@ export default function InventoryReport() {
     const build = async () => {
       setBuilding(true);
       try {
-        const transSnap = await getDocs(collection(db, 'inventory_transactions'));
+        const transSnap = await sbGetDocs({ table: 'inventory_transactions' });
         const transactions = transSnap.docs.map(d => d.data());
         
-        const whSnap = await getDocs(collection(db, 'warehouses'));
+        const whSnap = await sbGetDocs({ table: 'warehouses' });
         setWarehouses(whSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.id })));
 
         const inv: InventoryItem[] = products.map((p: NormalizedProduct) => {

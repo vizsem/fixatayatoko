@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 
-import { orderBy, where } from '@/lib/firebase';
 export type ProductQueryOptions = {
   isActive?: boolean
   category?: string
@@ -14,6 +13,7 @@ export type ProductQueryOptions = {
 }
 
 import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { addStock } from '@/lib/inventory';
 
 export async function getProducts(options?: ProductQueryOptions) {
   try {
@@ -618,5 +618,24 @@ export async function attachBarcodeToProduct(productId: string, barcode: string,
   } catch (err: any) {
     console.error('attachBarcodeToProduct error:', err);
     return { success: false, error: err?.message || 'Gagal menautkan barcode' };
+  }
+}
+
+export async function restockProductViaSupabase(productId: string, stokMasuk: number, hargaBaru: number, adminId?: string, warehouseId?: string) {
+  try {
+    await addStock({
+      productId,
+      amount: stokMasuk,
+      incomingPrice: hargaBaru,
+      warehouseId: warehouseId || 'gudang-utama',
+      reference: 'RESTOCK_MODAL',
+      notes: 'Restock (Avg Price) dari Kalkulator',
+    });
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+    return { success: true };
+  } catch (err: any) {
+    console.error('restockProductViaSupabase error:', err);
+    return { success: false, error: err.message || 'Gagal melakukan restock' };
   }
 }

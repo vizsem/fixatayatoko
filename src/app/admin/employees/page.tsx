@@ -16,7 +16,8 @@ import { useRouter } from 'next/navigation';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, arrayUnion, collection, db, deleteDoc, doc, getDoc, getDocs, increment, orderBy, query, ref, runTransaction, setDoc, updateDoc, where } from '@/lib/firebase';
+import { sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
+import { arrayUnion, collection, db, doc, getDocs, increment, orderBy, query, ref, runTransaction, setDoc, where } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Employee = {
   id: string;
@@ -382,7 +383,7 @@ export default function EmployeesPage() {
   const fetchAttendanceByDate = async (date: string) => {
     setAttendanceLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'attendance_records'), where('date', '==', date)));
+      const snap = await sbGetDocs({ table: 'attendance_records' });
       const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as AttendanceRecord[];
       setAttendance(rows);
     } catch {
@@ -415,7 +416,7 @@ export default function EmployeesPage() {
       setMonthAttendance(attSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as AttendanceRecord[]);
       setMonthLeave(leaveSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as LeaveRequest[]);
 
-      const adjSnap = await getDocs(query(collection(db, 'payroll_adjustments'), where('month', '==', month)));
+      const adjSnap = await sbGetDocs({ table: 'payroll_adjustments' });
       const nextAdj: Record<string, { allowances: number; deductions: number; overtimeMinutes: number; bpjsEmployee?: number; pph21?: number; }> = {};
       adjSnap.docs.forEach((d) => {
         const data = d.data() as any;
@@ -431,7 +432,7 @@ export default function EmployeesPage() {
       });
       setPayrollAdjustments(nextAdj);
 
-      const kpiSnap = await getDocs(query(collection(db, 'kpi_scores'), where('month', '==', month)));
+      const kpiSnap = await sbGetDocs({ table: 'kpi_scores' });
       const nextKpi: Record<string, { score: number; bonusAmount: number; notes: string }> = {};
       kpiSnap.docs.forEach((d) => {
         const data = d.data() as any;
@@ -450,7 +451,7 @@ export default function EmployeesPage() {
   const fetchLeaveRequests = async () => {
     setLeaveLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'leave_requests'), orderBy('createdAt', 'desc')));
+      const snap = await sbGetDocs({ table: 'leave_requests' });
       setLeaveRequests(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as LeaveRequest[]);
     } catch {
       notify.admin.error('Gagal memuat cuti/izin');
@@ -462,7 +463,7 @@ export default function EmployeesPage() {
   const logAudit = async (action: string, targetType: string, targetId: string, payload: Record<string, unknown>) => {
     if (!currentUser?.uid) return;
     try {
-      await addDoc(collection(db, 'audit_logs'), {
+      await sbInsertDoc('audit_logs', {
         action,
         targetType,
         targetId,
@@ -494,7 +495,7 @@ export default function EmployeesPage() {
   const fetchShiftTemplates = async () => {
     setShiftLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'shift_templates'), orderBy('name', 'asc')));
+      const snap = await sbGetDocs({ table: 'shift_templates' });
       const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as ShiftTemplate[];
       setShiftTemplates(rows);
     } catch {
@@ -506,7 +507,7 @@ export default function EmployeesPage() {
 
   const fetchShiftAssignmentsByDate = async (date: string) => {
     try {
-      const snap = await getDocs(query(collection(db, 'shift_assignments'), where('date', '==', date)));
+      const snap = await sbGetDocs({ table: 'shift_assignments' });
       setShiftAssignments(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as ShiftAssignment[]);
     } catch {
       setShiftAssignments([]);
@@ -525,7 +526,7 @@ export default function EmployeesPage() {
       ? template.overtimeRules
       : defaultShiftRules();
     try {
-      await setDoc(ref, {
+      await sbUpsertDoc('shift_assignments', assignmentId, {
         employeeId: employee.id,
         date,
         shiftId: template?.id || 'DEFAULT',
@@ -581,7 +582,7 @@ export default function EmployeesPage() {
 
   const fetchPayrollSettings = async () => {
     try {
-      const snap = await getDoc(doc(db, 'payroll_settings', 'default'));
+      const snap = await sbGetDoc('payroll_settings', 'default');
       if (!snap.exists()) return;
       const data = snap.data() as any;
       setPayrollSettings((prev) => ({
@@ -605,7 +606,7 @@ export default function EmployeesPage() {
 
   const fetchPayrollRun = async (month: string) => {
     try {
-      const snap = await getDoc(doc(db, 'payroll_runs', month));
+      const snap = await sbGetDoc('payroll_runs', month);
       if (!snap.exists()) {
         setPayrollRun({ id: month, month, status: 'DRAFT', includeTHR: false });
         setIncludeTHR(false);
@@ -642,7 +643,7 @@ export default function EmployeesPage() {
         base.paidBy = currentUser?.uid || '';
       }
       base.includeTHR = includeTHR;
-      await setDoc(ref, base, { merge: true });
+      await sbUpsertDoc('payroll_runs', payrollRun.month, base, { merge: true });
       await logAudit('PAYROLL_STATUS', 'payroll_run', payrollRun.month, { status });
       notify.admin.success('Status payroll diperbarui');
       fetchPayrollRun(payrollRun.month);
@@ -655,7 +656,7 @@ export default function EmployeesPage() {
     try {
       const { start, end } = monthRange(month);
       const [loansSnap, reimbSnap] = await Promise.all([
-        getDocs(query(collection(db, 'employee_loans'), where('status', '==', 'ACTIVE'))),
+        sbGetDocs({ table: 'employee_loans' }),
         getDocs(query(collection(db, 'employee_reimbursements'), where('date', '>=', start), where('date', '<=', end), where('status', '==', 'APPROVED'))),
       ]);
       setMonthLoans(loansSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as EmployeeLoan[]);
@@ -669,7 +670,7 @@ export default function EmployeesPage() {
   const fetchKpiInputs = async (month: string) => {
     setKpiLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'kpi_scores'), where('month', '==', month)));
+      const snap = await sbGetDocs({ table: 'kpi_scores' });
       const next: Record<string, { score: number; bonusAmount: number; notes: string }> = {};
       snap.docs.forEach((d) => {
         const data = d.data() as any;
@@ -692,7 +693,7 @@ export default function EmployeesPage() {
     }
     const row = kpiScores[employee.id] || { score: 0, bonusAmount: 0, notes: '' };
     try {
-      await setDoc(doc(db, 'kpi_scores', `${kpiMonth}_${employee.id}`), {
+      await sbUpsertDoc('kpi_scores', `${kpiMonth}_${employee.id}`, {
         month: kpiMonth,
         employeeId: employee.id,
         employeeName: employee.name,
@@ -711,7 +712,7 @@ export default function EmployeesPage() {
   const fetchCandidates = async () => {
     setCandidatesLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'candidates'), orderBy('createdAt', 'desc')));
+      const snap = await sbGetDocs({ table: 'candidates' });
       setCandidates(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Candidate[]);
     } catch {
       setCandidates([]);
@@ -727,7 +728,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      const ref = await addDoc(collection(db, 'candidates'), {
+      const ref = await sbInsertDoc('candidates', {
         ...candidateForm,
         expectedSalary: Number(candidateForm.expectedSalary || 0),
         createdAt: new Date().toISOString(),
@@ -748,7 +749,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await updateDoc(doc(db, 'candidates', candidate.id), { stage, updatedAt: new Date().toISOString() });
+      await sbUpdateDoc('candidates', candidate.id, { stage, updatedAt: new Date().toISOString() });
       await logAudit('CANDIDATE_STAGE', 'candidate', candidate.id, { stage });
       fetchCandidates();
     } catch {
@@ -762,7 +763,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      const empRef = await addDoc(collection(db, 'employees'), {
+      const empRef = await sbInsertDoc('employees', {
         name: candidate.name,
         role: candidate.position || 'Karyawan',
         email: candidate.email || '',
@@ -773,7 +774,7 @@ export default function EmployeesPage() {
         totalAttendance: 0,
         createdAt: new Date().toISOString(),
       });
-      await updateDoc(doc(db, 'candidates', candidate.id), { stage: 'HIRED', hiredEmployeeId: empRef.id, updatedAt: new Date().toISOString() });
+      await sbUpdateDoc('candidates', candidate.id, { stage: 'HIRED', hiredEmployeeId: empRef.id, updatedAt: new Date().toISOString() });
       await logAudit('CANDIDATE_HIRED', 'candidate', candidate.id, { employeeId: empRef.id });
       notify.admin.success('Kandidat dikonversi jadi karyawan');
       fetchEmployees();
@@ -789,7 +790,7 @@ export default function EmployeesPage() {
       const { start, end } = monthRange(month);
       const [txSnap, balSnap] = await Promise.all([
         getDocs(query(collection(db, 'employee_petty_cash_transactions'), where('date', '>=', start), where('date', '<=', end), orderBy('date', 'desc'))),
-        getDocs(query(collection(db, 'employee_petty_cash'), orderBy('employeeName', 'asc'))),
+        sbGetDocs({ table: 'employee_petty_cash' }),
       ]);
       setPettyCashTx(txSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as PettyCashTx[]);
       const map: Record<string, number> = {};
@@ -986,10 +987,10 @@ export default function EmployeesPage() {
     e.preventDefault();
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'employees', editingId), formData);
+        await sbUpdateDoc('employees', editingId, formData);
         notify.admin.success("Data berhasil diperbarui");
       } else {
-        await addDoc(collection(db, 'employees'), {
+        await sbInsertDoc('employees', {
           ...formData,
           totalAttendance: 0,
           createdAt: new Date().toISOString()
@@ -1028,7 +1029,7 @@ export default function EmployeesPage() {
     if (!confirm("Hapus data karyawan ini secara permanen?")) return;
     notify.admin.loading('Menghapus...');
     try {
-      await deleteDoc(doc(db, 'employees', id));
+      await sbDeleteDoc('employees', id);
       notify.admin.success("Berhasil dihapus");
       setEmployees(employees.filter(e => e.id !== id));
     } catch {
@@ -1210,7 +1211,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await setDoc(doc(db, 'payroll_runs', payrollMonth), { month: payrollMonth, includeTHR, updatedAt: new Date().toISOString() }, { merge: true });
+      await sbUpsertDoc('payroll_runs', payrollMonth, { month: payrollMonth, includeTHR, updatedAt: new Date().toISOString() }, { merge: true });
       notify.admin.success('Setting payroll tersimpan');
       fetchPayrollRun(payrollMonth);
     } catch {
@@ -1261,7 +1262,7 @@ export default function EmployeesPage() {
     const next = { ...current, ...patch };
     setPayrollAdjustments((prev) => ({ ...prev, [employeeId]: next }));
     try {
-      await setDoc(doc(db, 'payroll_adjustments', `${payrollMonth}_${employeeId}`), {
+      await sbUpsertDoc('payroll_adjustments', `${payrollMonth}_${employeeId}`, {
         month: payrollMonth,
         employeeId,
         allowances: Number(next.allowances || 0),
@@ -1304,7 +1305,7 @@ export default function EmployeesPage() {
         takeHomePay: row.takeHomePay,
         createdAt: new Date().toISOString(),
       };
-      await setDoc(doc(db, 'payroll_slips', row.slipId), payload, { merge: true });
+      await sbUpsertDoc('payroll_slips', row.slipId, payload, { merge: true });
       notify.admin.success('Slip tersimpan');
     } catch {
       notify.admin.error('Gagal membuat slip');
@@ -1315,7 +1316,7 @@ export default function EmployeesPage() {
 
   const downloadSlipPdf = async (slipId: string) => {
     try {
-      const snap = await getDoc(doc(db, 'payroll_slips', slipId));
+      const snap = await sbGetDoc('payroll_slips', slipId);
       if (!snap.exists()) {
         notify.admin.error('Slip belum dibuat');
         return;
@@ -1381,7 +1382,7 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await addDoc(collection(db, 'leave_requests'), {
+      await sbInsertDoc('leave_requests', {
         employeeId: emp.id,
         employeeName: emp.name,
         type: leaveForm.type,
@@ -1403,7 +1404,7 @@ export default function EmployeesPage() {
 
   const setLeaveStatus = async (req: LeaveRequest, status: LeaveRequestStatus) => {
     try {
-      await updateDoc(doc(db, 'leave_requests', req.id), { status, updatedAt: new Date().toISOString() });
+      await sbUpdateDoc('leave_requests', req.id, { status, updatedAt: new Date().toISOString() });
       notify.admin.success('Status diperbarui');
       fetchLeaveRequests();
     } catch {

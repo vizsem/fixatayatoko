@@ -60,10 +60,15 @@ vi.mock('firebase/firestore', () => ({
   writeBatch: vi.fn(),
 }));
 
-vi.mock('@/lib/firebase', () => ({
-  auth: {},
-  db: {},
-}));
+vi.mock('@/lib/firebase', () => {
+  const M = Symbol('supabase_increment');
+  return {
+    auth: {},
+    db: {},
+    INCREMENT_MARKER: M,
+    increment: (n: any) => ({ [M]: true, delta: n }),
+  };
+});
 
 vi.mock('react-hot-toast', () => ({
   default: {

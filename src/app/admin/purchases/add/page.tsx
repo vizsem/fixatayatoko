@@ -16,6 +16,7 @@ import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib
 import { createPurchaseOrder } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
+import { sbGetDoc } from '@/lib/supabase-helpers';
 import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
@@ -67,7 +68,7 @@ function AddPurchaseFormContent() {
       setIsDuplicating(true);
       try {
         const docRef = doc(db, 'purchases', duplicateFrom);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await sbGetDoc('purchases', duplicateFrom);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setSelectedSupplier(data.supplierId || '');

@@ -3,7 +3,7 @@
 import { deductStockFEFO } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
-import { limit, orderBy, where } from '@/lib/firebase';
+import { limit } from '@/lib/firebase';
 type SalesItemInput = {
   productId: string
   quantity: number
@@ -263,5 +263,80 @@ export async function getUnpaidInvoices() {
   } catch (error) {
     console.error('Failed to fetch unpaid invoices:', error);
     return [];
+  }
+}
+
+export async function createMarketplaceOrder(data: {
+  orderId: string;
+  externalOrderId: string;
+  customerName: string;
+  items: any[];
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  channel: string;
+  paymentMethod: string;
+  warehouseId: string;
+  warehouseName: string;
+  adminId: string;
+}) {
+  try {
+    const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+
+    // Deduct stock using FEFO
+    for (const item of data.items) {
+      const result = await deductStockFEFO({
+        productId: item.id,
+        warehouseId: data.warehouseId,
+        amount: item.baseQuantity, // Passed from client
+        source: 'MARKETPLACE',
+        adminId: data.adminId,
+        reference: data.orderId,
+        notes: `${data.channel} Order #${data.externalOrderId} | Gudang: ${data.warehouseName}`,
+      });
+      if (!result.success) {
+        return { success: false, error: result.error || `Stok tidak cukup untuk produk ID: ${item.id}` };
+      }
+    }
+
+    const orderData = {
+      orderId: data.orderId,
+      externalOrderId: data.externalOrderId,
+      customerName: data.customerName,
+      items: data.items,
+      subtotal: data.subtotal,
+      shippingCost: data.shippingCost,
+      total: data.total,
+      channel: data.channel,
+      paymentMethod: data.paymentMethod,
+      warehouseId: data.warehouseId,
+      warehouseName: data.warehouseName,
+      status: 'SELESAI',
+      adminId: data.adminId,
+      createdAt: now,
+    };
+
+    const { error: orderError } = await supabase.from('orders').insert({
+      id: dbOrderId,
+      order_id: data.orderId,
+      user_id: null,
+      customer_name: data.customerName,
+      status: 'SELESAI',
+      total: data.total,
+      items: data.items,
+      raw_data: orderData,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (orderError) throw orderError;
+
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/orders');
+    return { success: true, data: { id: dbOrderId, ...orderData } };
+  } catch (error: any) {
+    console.error('Failed to create marketplace order:', error);
+    return { success: false, error: error.message || 'Gagal membuat marketplace order' };
   }
 }

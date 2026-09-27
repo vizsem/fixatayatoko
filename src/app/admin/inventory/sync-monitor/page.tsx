@@ -13,7 +13,8 @@ import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 interface SyncStatus {
   id: string;
   productId: string;
@@ -51,9 +52,9 @@ export default function StockSyncMonitorPage() {
 
   const loadSyncData = useCallback(async () => {
     try {
-      const productsSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)));
-      const warehousesSnap = await getDocs(query(collection(db, 'warehouses'), where('isActive', '==', true)));
-      const warehouseStockSnap = await getDocs(collection(db, 'warehouseStock'));
+      const productsSnap = await sbGetDocs({ table: 'products' });
+      const warehousesSnap = await sbGetDocs({ table: 'warehouses' });
+      const warehouseStockSnap = await sbGetDocs({ table: 'warehouseStock' });
       
       const warehouseStocks = new Map();
       warehouseStockSnap.docs.forEach(doc => {
@@ -97,11 +98,10 @@ export default function StockSyncMonitorPage() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) return router.push('/profil/login');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
       }
@@ -109,8 +109,18 @@ export default function StockSyncMonitorPage() {
       const s = await stockSyncService.getSyncStats(timeRange);
       setSyncStats(s);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router, loadSyncData, timeRange]);
 
   useEffect(() => {

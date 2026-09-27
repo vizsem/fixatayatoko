@@ -11,7 +11,8 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, doc, getDoc, getDocs, orderBy, query, where } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
+import { collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
 type Product = {
   id: string;
   name: string;
@@ -58,7 +59,7 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
         setLoading(true);
         
         // Fetch settings first
-        const settingsSnap = await getDoc(doc(db, 'settings', 'system'));
+        const settingsSnap = await sbGetDoc('settings', 'system');
         const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
 
         // Coba query terindeks berdasarkan kategori asli (nama kategori penuh)

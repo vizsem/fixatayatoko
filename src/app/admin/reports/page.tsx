@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
-import { auth, collection, db, doc, getDocs, query, where } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import {
   AreaChart,
   Area,

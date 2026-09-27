@@ -10,7 +10,8 @@ import { Product } from '@/lib/types';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
-import { addDoc, auth, collection, db, doc, getDocs, onSnapshot, orderBy, query, runTransaction, updateDoc } from '@/lib/firebase';
+import { sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, doc, onSnapshot, orderBy, query, runTransaction } from '@/lib/firebase';
 type ReturnReq = {
   id: string;
   type: 'SALES_RETURN' | 'PURCHASE_RETURN';
@@ -49,7 +50,7 @@ export default function ReturnsPage() {
     });
 
     const fetchProducts = async () => {
-      const pSnap = await getDocs(collection(db, 'products'));
+      const pSnap = await sbGetDocs({ table: 'products' });
       setProducts(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
     };
     fetchProducts();
@@ -86,7 +87,7 @@ export default function ReturnsPage() {
     }
 
     try {
-      await addDoc(collection(db, 'returns'), {
+      await sbInsertDoc('returns', {
         ...newReturn,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -104,7 +105,7 @@ export default function ReturnsPage() {
 
     try {
       if (action === 'REJECT') {
-        await updateDoc(doc(db, 'returns', ret.id), { status: 'REJECTED', updatedAt: new Date().toISOString() });
+        await sbUpdateDoc('returns', ret.id, { status: 'REJECTED', updatedAt: new Date().toISOString() });
         notify.admin.success('Retur ditolak');
         return;
       }

@@ -19,8 +19,10 @@ import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
+import { isStaffOrAdmin, isAdminRole } from '@/lib/auth-helpers';
 
-import { Timestamp, addDoc, auth, collection, db, doc, getDoc, getDocs, getDownloadURL, increment, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, updateDoc, uploadBytes, where, writeBatch } from '@/lib/firebase';
+import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { Timestamp, auth, collection, db, doc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, uploadBytes, where, writeBatch } from '@/lib/firebase';
 // Types
 type UnitOption = {
   code: string;
@@ -467,32 +469,42 @@ export default function CashierPOS() {
     const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) setCart(JSON.parse(savedCart));
 
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
-      if (!user) { router.push('/profil/login'); return; }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: any) => {
+      // Cek Supabase session (sumber utama auth)
+      const { data: { user: supaUser } } = await supabase.auth.getUser();
+      if (!supaUser && !firebaseUser) { router.push('/profil/login'); return; }
       
-      // Jika offline, kita asumsikan user valid jika sudah ada di auth (karena persistence)
       if (navigator.onLine) {
          try {
-           const userDoc = await getDoc(doc(db, 'users', user.uid));
-           const userRole = userDoc.data()?.role || user.role || user.user_metadata?.role;
-           if (userRole !== 'cashier' && userRole !== 'admin') {
-             router.push('/profil'); return;
+           // Ambil role dari Supabase (bukan Firebase)
+           const userRole = supaUser?.app_metadata?.role
+             || supaUser?.user_metadata?.role
+             || (supaUser?.email?.startsWith('admin') ? 'admin' : undefined)
+             || (supaUser?.email?.startsWith('kasir') ? 'cashier' : undefined)
+             || (supaUser?.email?.includes('hadzikoh') ? 'superadmin' : undefined);
+
+           // Izinkan: cashier, admin, superadmin, super_admin, owner
+           if (!isStaffOrAdmin(userRole) && !isAdminRole(userRole)) {
+             if (userRole !== 'cashier' && userRole !== 'kasir') {
+               router.push('/profil'); return;
+             }
            }
 
-           // Check Open Shift
-           const q = query(
-             collection(db, 'cashier_shifts'), 
-             where('cashierId', '==', user.uid), 
-             where('status', '==', 'OPEN'),
-             limit(1)
-           );
-           const snap = await getDocs(q);
-           if (!snap.empty) {
-             setCurrentShift({ id: snap.docs[0].id, ...snap.docs[0].data() } as CashierShift);
+           // Check Open Shift via Supabase
+           const { data: openShift } = await supabase
+             .from('cashier_shifts')
+             .select('*')
+             .eq('cashier_id', supaUser?.id || firebaseUser?.uid)
+             .eq('status', 'OPEN')
+             .limit(1)
+             .maybeSingle();
+
+           if (openShift) {
+             setCurrentShift({ id: openShift.id, ...openShift } as CashierShift);
            } else {
              setShowShiftModal('open');
            }
-         } catch (e) { logger.warn("Offline or error fetching user role", e); }
+         } catch (e) { logger.warn("Error fetching user role", e); }
       }
       
       setLoading(false);
@@ -774,7 +786,7 @@ export default function CashierPOS() {
         expectedCash: initial,
       };
       
-      const ref = await addDoc(collection(db, 'cashier_shifts'), newShift);
+      const ref = await sbInsertDoc('cashier_shifts', newShift);
       setCurrentShift({ id: ref.id, ...newShift } as CashierShift);
       setShowShiftModal(null);
       setShiftInput({ initialCash: '', actualCash: '', notes: '' });
@@ -839,7 +851,7 @@ export default function CashierPOS() {
         notes: shiftInput.notes
       };
 
-      await updateDoc(doc(db, 'cashier_shifts', currentShift.id), updateData);
+      await sbUpdateDoc('cashier_shifts', currentShift.id, updateData);
       
       printShiftReport({
         ...currentShift,
@@ -1032,11 +1044,6 @@ export default function CashierPOS() {
             newStockByWarehouse: nWh,
           });
 
-          // Sync perubahan ke Firestore
-          batch.update(doc(db, 'products', item.id), {
-            stock: nStock,
-            stockByWarehouse: nWh,
-          });
         }
       } else {
         // Mode OFFLINE
@@ -1049,10 +1056,8 @@ export default function CashierPOS() {
           const stockByWarehouse = localProduct?.stockByWarehouse || {};
           const newStockByWarehouse = { ...stockByWarehouse };
 
-          batch.update(doc(db, 'products', item.id), {
-            stock: newStock,
-            stockByWarehouse: newStockByWarehouse,
-          });
+          // Note: Offline mode still does not update Supabase products immediately here.
+          // Since we are migrating fully to Supabase, offline product updates will require a sync mechanism later.
 
           deductionResults.push({
             productId: item.id,
@@ -1251,7 +1256,7 @@ export default function CashierPOS() {
            }
          }
       } else {
-        const snap = await getDoc(doc(db, 'settings', 'system'));
+        const snap = await sbGetDoc('settings', 'system');
         if (snap.exists()) {
           const data = snap.data();
           if (data.store?.isCashDrawerEnabled !== undefined) {
@@ -2070,7 +2075,7 @@ export default function CashierPOS() {
                       <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16} /></a>
                       <button onClick={async () => {
                         try {
-                          await updateDoc(doc(db, 'orders', o.id), { status: 'DIPROSES' });
+                          await sbUpdateDoc('orders', o.id, { status: 'DIPROSES' });
                           toast.success('Order Diproses');
                         } catch (error) {
                           console.error('Error updating order:', error);

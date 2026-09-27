@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { Timestamp, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { Timestamp, auth } from '@/lib/firebase';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -108,15 +110,25 @@ export default function FinanceReport() {
   });
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsub = async () => {
+  const { user, userDocData } = await getUserAndRole();
+  if (!user) return;
+  const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
+  
       if (!user) { router.push('/profil/login'); return; }
-      const ud = await getDoc(doc(db, 'users', user.uid));
+      const ud = await sbGetDoc('users', user.uid);
       if (!isAuthorizedAdmin(user, ud.exists() ? ud.data() : null)) {
         notify.aksesDitolakAdmin(); router.push('/profil'); return;
       }
       setLoading(false);
-    });
-    return () => unsub();
+};
+__checkAuthunsub();
+let unsub: (() => void) | undefined;
+(async () => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsub());
+  unsub = () => subscription.unsubscribe();
+})();
+    return () => { if (unsub) unsub(); };
   }, [router]);
 
   const setQuickPeriod = (p: 'today' | '7days' | '30days' | 'thisMonth') => {
@@ -141,7 +153,7 @@ export default function FinanceReport() {
 
         let openBal = 0;
         const allCapItems: CashFlowItem[] = [];
-        (await getDocs(collection(db, 'capital_transactions'))).docs.forEach(d => {
+        (await sbGetDocs({ table: 'capital_transactions' })).docs.forEach(d => {
           const data = d.data() as any;
           const created = parseDateAny(data.date || data.createdAt);
           const amount = Number(data.amount || 0);
@@ -162,18 +174,18 @@ export default function FinanceReport() {
         });
         setOpeningBalance(openBal);
 
-        const salesSnap = await getDocs(query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS'])));
+        const salesSnap = await sbGetDocs({ table: 'orders' });
         const pidsSet = new Set<string>();
         salesSnap.docs.forEach(od => (od.data() as any).items?.forEach((it: any) => { const pid = it.id || it.productId; if (pid) pidsSet.add(pid); }));
         const pids = Array.from(pidsSet);
         const productsMap = new Map<string, any>();
         for (let i = 0; i < pids.length; i += 10) {
           const chunk = pids.slice(i, i + 10); if (!chunk.length) continue;
-          (await getDocs(query(collection(db, 'products'), where('__name__', 'in', chunk)))).forEach(ds => productsMap.set(ds.id, ds.data()));
+          (await sbGetDocs({ table: 'products' })).forEach(ds => productsMap.set(ds.id, ds.data()));
         }
 
         const latestCostMap = new Map<string, { costPerPcs: number; ts: number }>();
-        (await getDocs(collection(db, 'purchases'))).docs.forEach(pd => {
+        (await sbGetDocs({ table: 'purchases' })).docs.forEach(pd => {
           const pdata = pd.data() as any;
           const ts = parseDateAny(pdata.createdAt).getTime();
           (pdata.items || []).forEach((it: any) => {
@@ -244,7 +256,7 @@ export default function FinanceReport() {
           }
         }
 
-        (await getDocs(collection(db, 'operational_expenses'))).docs.forEach(d => {
+        (await sbGetDocs({ table: 'operational_expenses' })).docs.forEach(d => {
           const data = d.data() as any;
           let created: Date;
           if (data.date instanceof Timestamp) created = data.date.toDate();
@@ -278,7 +290,7 @@ export default function FinanceReport() {
           });
         });
 
-        (await getDocs(collection(db, 'purchases'))).docs.forEach(d => {
+        (await sbGetDocs({ table: 'purchases' })).docs.forEach(d => {
           const data = d.data() as any;
           const created = parseDateAny(data.createdAt);
           if (!(created >= startDate && created <= endDate)) return;
@@ -309,7 +321,7 @@ export default function FinanceReport() {
           });
         });
 
-        (await getDocs(collection(db, 'returns'))).docs.forEach(rd => {
+        (await sbGetDocs({ table: 'returns' })).docs.forEach(rd => {
           const r = rd.data() as any;
           const created = parseDateAny(r.createdAt);
           if (!(created >= startDate && created <= endDate)) return;

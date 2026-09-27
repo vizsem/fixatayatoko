@@ -21,9 +21,9 @@ export async function getInventoryBatches(warehouseId?: string) {
         stockByWarehouse = { 'gudang-utama': stock };
       } else {
         const sum = Object.values(stockByWarehouse).reduce((a: number, b: any) => a + Number(b || 0), 0);
-        if (sum === 0 && stock > 0) {
+        if (sum !== stock) {
           const k = Object.keys(stockByWarehouse)[0] || 'gudang-utama';
-          stockByWarehouse[k] = stock;
+          stockByWarehouse[k] = Math.max(0, Number(stockByWarehouse[k] || 0) + (stock - sum));
         }
       }
 

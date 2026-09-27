@@ -8,7 +8,8 @@ import { User, Lock, Mail, MapPin, Phone, Eye, EyeOff, Loader2, ArrowRight } fro
 import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
-import { auth, createUserWithEmailAndPassword, db, doc, setDoc } from '@/lib/firebase';
+import { sbUpsertDoc } from '@/lib/supabase-helpers';
+import { auth, createUserWithEmailAndPassword } from '@/lib/firebase';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      await sbUpsertDoc('users', userCredential.user.uid, {
         name: formData.name, email: formData.email, phone: formData.phone,
         address: formData.address, role: 'user', points: 0,
         createdAt: new Date().toISOString(), lastActive: new Date().toISOString()

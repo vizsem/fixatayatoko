@@ -17,7 +17,8 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { auth, doc } from '@/lib/firebase';
 type Customer = {
   id: string;
   name: string;
@@ -81,23 +82,31 @@ export default function CustomerReport() {
 
   // Proteksi admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userDocData = userDoc.exists() ? userDoc.data() : null;
-
-      if (!isAuthorizedAdmin(user, userDocData)) {
+      if (!isAdmin) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
         return;
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
+
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   // Fetch data laporan
@@ -105,7 +114,7 @@ export default function CustomerReport() {
     const fetchReportData = async () => {
       try {
         // Ambil data pelanggan
-        const customersSnapshot = await getDocs(collection(db, 'customers'));
+        const customersSnapshot = await sbGetDocs({ table: 'customers' });
         const customerList: Customer[] = [];
 
         // Ambil data pesanan untuk analisis
@@ -113,13 +122,13 @@ export default function CustomerReport() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
 
-        const ordersSnapshot = await getDocs(
-          query(
-            collection(db, 'orders'),
-            where('createdAt', '>=', startDate.toISOString()),
-            where('createdAt', '<=', endDate.toISOString())
-          )
-        );
+        const ordersSnapshot = await sbGetDocs({
+          table: 'orders',
+          where: [
+            { field: 'createdAt', op: '>=', val: startDate.toISOString() },
+            { field: 'createdAt', op: '<=', val: endDate.toISOString() },
+          ],
+        });
         const orders = ordersSnapshot.docs.map(doc => doc.data());
 
         customersSnapshot.docs.forEach((doc) => {

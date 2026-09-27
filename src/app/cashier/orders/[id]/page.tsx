@@ -18,7 +18,8 @@ import toast from 'react-hot-toast';
 // Dynamic import OrderMap agar aman untuk SSR
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
-import { auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
+import { auth, db, doc, getDoc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
@@ -56,29 +57,32 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
 
   // 🔐 Cek autentikasi & role (hanya cashier atau admin)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
+    const checkAuth = async () => {
+      const { user, isAdmin, isStaff, role } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        router.push('/profil/login');
-        return;
-      }
-
-      const role = userDoc.data()?.role;
-      if (!isAdminRole(role) && role !== 'cashier') {
+      if (!isAdmin && !isStaff && role !== 'cashier') {
         toast.error('Akses ditolak! Hanya kasir atau admin yang dapat melihat halaman ini.');
         router.push('/profil');
         return;
       }
 
       setAuthChecked(true);
-    });
+    };
+    checkAuth();
 
-    return () => unsubscribe();
+    let __unsubscribe: (() => void) | undefined;
+    (async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        checkAuth();
+      });
+      __unsubscribe = () => subscription.unsubscribe();
+    })();
+
+    return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
   // 📥 Ambil data pesanan dari Firestore
@@ -88,7 +92,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
     const fetchOrder = async () => {
       try {
         const docRef = doc(db, 'orders', id);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await sbGetDoc('orders', id);
 
         if (!docSnap.exists()) {
           setError('Pesanan tidak ditemukan.');

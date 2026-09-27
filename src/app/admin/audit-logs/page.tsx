@@ -12,7 +12,8 @@ import { id } from 'date-fns/locale';
 import { ActivityLog } from '@/lib/activity';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
-import { auth, collection, db, doc, getDoc, limit, onAuthStateChanged, onSnapshot, orderBy, query } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
+import { auth, collection, db, limit, onSnapshot, orderBy, query } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 const TYPE_ICONS: Record<string, any> = {
@@ -42,17 +43,23 @@ export default function AuditLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user: any) => {
+    const __checkAuthunsubAuth = async () => {
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) {
         router.push('/profil/login');
         return;
       }
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || !isAdminRole(userDoc.data()?.role)) {
+      if (!isAdmin) {
         router.push('/profil');
         return;
       }
-    });
+    };
+__checkAuthunsubAuth();
+let unsubAuth: (() => void) | undefined;
+(async () => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubAuth());
+  unsubAuth = () => subscription.unsubscribe();
+})();
 
     const q = query(
       collection(db, 'activity_logs'),
@@ -66,7 +73,7 @@ export default function AuditLogsPage() {
     });
 
     return () => {
-      unsubAuth();
+      if (unsubAuth) unsubAuth();
       unsub();
     };
   }, [router]);

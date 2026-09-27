@@ -7,7 +7,7 @@ import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/lib/supabase';
 
-import { db, doc, getDoc } from '@/lib/firebase';
+import { sbGetDoc } from '@/lib/supabase-helpers';
 export default function PrintLabelPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
@@ -23,7 +23,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
     if (!id) return;
     const fetchProduct = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'products', id));
+        const docSnap = await sbGetDoc('products', id);
         if (docSnap.exists()) {
           setProduct({ id: docSnap.id, ...docSnap.data() });
           // Auto print dialog after load
