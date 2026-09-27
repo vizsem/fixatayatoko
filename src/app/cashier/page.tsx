@@ -21,6 +21,15 @@ import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
 
 import { Timestamp, addDoc, auth, collection, db, doc, getDoc, getDocs, getDownloadURL, increment, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, updateDoc, uploadBytes, where, writeBatch } from '@/lib/firebase';
+
+function createCashierId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function getCurrentTimestamp() {
+  return Date.now();
+}
+
 // Types
 type UnitOption = {
   code: string;
@@ -941,7 +950,7 @@ export default function CashierPOS() {
       if (paymentProof && !isOffline) {
         // PROSES KOMPRESI SEBELUM UPLOAD
         const compressedFile = await compressImage(paymentProof);
-        const sRef = ref(storage, `payment-proofs/${Date.now()}`);
+        const sRef = ref(storage, `payment-proofs/${getCurrentTimestamp()}`);
         await uploadBytes(sRef, compressedFile);
         proofUrl = await getDownloadURL(sRef);
       } else if (paymentProof && isOffline) {
@@ -1091,7 +1100,7 @@ export default function CashierPOS() {
         batch.update(custRef, { walletBalance: newBalance });
 
         await supabase.from('wallet_logs').insert({
-          id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          id: createCashierId('wal'),
           user_id: selectedCustomer.id,
           amount: -total,
           description: `Pembayaran pesanan #${newOrderRef.id}`,

@@ -42,6 +42,7 @@ type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function AdminInventory() {
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('batches');
   const [batches, setBatches] = useState<any[]>([]);
   const [lowStock, setLowStock] = useState<any[]>([]);
@@ -73,6 +74,7 @@ export default function AdminInventory() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setCurrentTime(Date.now()); }, []);
 
   const activeBatchesCount = useMemo(() => batches.filter(b => b.product?.isActive !== false).length, [batches]);
   const inactiveBatchesCount = useMemo(() => batches.filter(b => b.product?.isActive === false).length, [batches]);
@@ -122,9 +124,9 @@ export default function AdminInventory() {
   };
 
   const totalBatchQty = batches.reduce((sum, b) => sum + b.quantity, 0);
-  const expiringSoon = batches.filter(b => {
+  const expiringSoon = currentTime === null ? 0 : batches.filter(b => {
     if (!b.expiryDate) return false;
-    const diff = new Date(b.expiryDate).getTime() - Date.now();
+    const diff = new Date(b.expiryDate).getTime() - currentTime;
     return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000; // 30 hari
   }).length;
 
@@ -278,8 +280,8 @@ export default function AdminInventory() {
                         {filteredBatches.length === 0 ? (
                           <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Tidak ada data batch</td></tr>
                         ) : filteredBatches.map(b => {
-                          const isExpiringSoon = b.expiryDate && new Date(b.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
-                          const isExpired = b.expiryDate && new Date(b.expiryDate) < new Date();
+                          const isExpiringSoon = currentTime !== null && b.expiryDate && new Date(b.expiryDate).getTime() - currentTime < 30 * 24 * 60 * 60 * 1000;
+                          const isExpired = currentTime !== null && b.expiryDate && new Date(b.expiryDate).getTime() < currentTime;
                           const isActive = b.product?.isActive !== false;
                           return (
                             <tr key={b.id} className={`hover:bg-gray-50 transition-colors ${
@@ -475,4 +477,3 @@ export default function AdminInventory() {
     </>
   );
 }
-

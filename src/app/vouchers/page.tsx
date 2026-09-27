@@ -48,6 +48,15 @@ const VOUCHER_CHIPS: { key: ChipKey; label: string }[] = [
   { key: 'TOKO', label: 'Voucher Toko' },
 ];
 
+const VOUCHER_CODE_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function generateVoucherCode() {
+  const bytes = new Uint8Array(6);
+  globalThis.crypto.getRandomValues(bytes);
+  const suffix = Array.from(bytes, byte => VOUCHER_CODE_ALPHABET[byte % VOUCHER_CODE_ALPHABET.length]).join('');
+  return `ATY-${suffix}`;
+}
+
 export default function VoucherExchangePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -115,7 +124,7 @@ export default function VoucherExchangePage() {
 
 
       // Generate Kode Unik
-      const voucherCode = `ATY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const voucherCode = generateVoucherCode();
 
       // 1. Jalankan Transaksi ke Firestore
       await updateDoc(userRef, { points: increment(-voucher.cost) });

@@ -183,7 +183,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
           url: `${BASE_URL}/produk/${product.id}`,
           priceCurrency: 'IDR',
           price: product.price,
-          priceValidUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           itemCondition: 'https://schema.org/NewCondition',
           availability:
             product.stock > 0

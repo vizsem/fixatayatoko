@@ -42,7 +42,7 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 ## 🛠️ Setup Development
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20.9+
 - Firebase Project
 - Email Service (Gmail SMTP atau lainnya)
 - SMS Service (Twilio)

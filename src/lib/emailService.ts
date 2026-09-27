@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type SendMailOptions, type Transporter } from 'nodemailer';
 import { Order, User } from './types';
 import logger from './logger';
 
@@ -15,7 +15,7 @@ const SMTP_CONFIG = {
 };
 
 // Buat transporter (singleton pattern)
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 const getTransporter = () => {
   if (!transporter) {
@@ -138,7 +138,7 @@ interface EmailOptions {
  */
 export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
   try {
-    const mailOptions: nodemailer.SendMailOptions = {
+    const mailOptions: SendMailOptions = {
       from: `"AtayaToko" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       subject: options.subject,

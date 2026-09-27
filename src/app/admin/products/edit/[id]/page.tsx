@@ -42,6 +42,18 @@ interface Warehouse {
   name: string;
 }
 
+function ProfitBadge({ profit, percentage }: { profit: number; percentage: number }) {
+  const isProfitable = profit >= 0;
+  return (
+    <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+      {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+      <span>
+        {isProfitable ? '+' : ''}Rp{profit.toLocaleString('id-ID')} ({percentage.toFixed(1)}%)
+      </span>
+    </div>
+  );
+}
+
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
@@ -388,18 +400,6 @@ export default function EditProductPage() {
     const profit = sellingPrice - costPrice;
     const percentage = costPrice > 0 ? (profit / costPrice) * 100 : 0;
     return { profit, percentage };
-  };
-
-  const ProfitBadge = ({ profit, percentage }: { profit: number, percentage: number }) => {
-    const isProfitable = profit >= 0;
-    return (
-      <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-        {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-        <span>
-          {isProfitable ? '+' : ''}Rp{profit.toLocaleString('id-ID')} ({percentage.toFixed(1)}%)
-        </span>
-      </div>
-    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

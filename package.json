@@ -2,6 +2,9 @@
   "name": "marketpleace-new",
   "version": "0.2.1",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -47,7 +50,7 @@
     "lucide-react": "^0.562.0",
     "next": "^16.1.6",
     "next-auth": "^4.24.15",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^10.0.11",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-barcode": "^1.6.1",
@@ -55,7 +58,7 @@
     "react-hot-toast": "^2.6.0",
     "recharts": "^3.8.1",
     "twilio": "^5.11.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "npm:@e965/xlsx@^0.20.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
@@ -67,7 +70,6 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
-    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
@@ -87,5 +89,12 @@
     "ts-node": "^10.9.2",
     "typescript": "^5",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "serialize-javascript": "7.0.5",
+    "workbox-build": "7.4.1",
+    "workbox-core": "7.4.1",
+    "workbox-webpack-plugin": "7.4.1",
+    "workbox-window": "7.4.1"
   }
 }

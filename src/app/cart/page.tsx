@@ -167,7 +167,7 @@ export default function CartPage() {
     };
   }, [cart, getLineTotal, activeDeliveryMethod, deliveryMethod, usePoints, useWallet, userData, appliedVoucher]);
 
-  const validation = useMemo(() => {
+  const validation = (() => {
     if (cart.length === 0) return { ok: false, msg: "Keranjang belanja masih kosong" };
     if (!customer.name.trim()) return { ok: false, msg: "Nama penerima wajib diisi" };
     if (!customer.phone.trim()) return { ok: false, msg: "Nomor WhatsApp wajib diisi" };
@@ -183,7 +183,7 @@ export default function CartPage() {
     }
 
     return { ok: true, msg: "" };
-  }, [cart, customer, deliveryMethod]);
+  })();
 
   const handleCheckout = async () => {
     if (!validation.ok) return notify.user.error(validation.msg);

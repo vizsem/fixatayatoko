@@ -38,6 +38,15 @@ interface CartItem {
   units?: any[];
 }
 
+function createMarketplaceOrderIds() {
+  const timestamp = Date.now();
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return {
+    orderId: `MKT-${timestamp}`,
+    dbOrderId: `mkt_${timestamp}_${suffix}`,
+  };
+}
+
 function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCode: string): number {
   const code = unitCode.toUpperCase();
   const baseUnit = (p.unit || 'Pcs').toUpperCase();
@@ -244,8 +253,7 @@ export default function MarketplaceOrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const adminId = user?.id || 'system';
       const now = new Date().toISOString();
-      const orderId = `MKT-${Date.now()}`;
-      const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const { orderId, dbOrderId } = createMarketplaceOrderIds();
 
       const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
 
