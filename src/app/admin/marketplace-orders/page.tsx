@@ -176,15 +176,16 @@ export default function MarketplaceOrdersPage() {
     setCart(prev => {
       const existing = prev.find(item => item.id === p.id);
       if (existing) {
+        // Increment by 1 of whatever unit the existing item is in
         return prev.map(item => item.id === p.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, {
         id: p.id,
         name: p.name || '',
         price: price || 0,
-        quantity: 1,
-        unit: initialUnit,
-        stock: p.stock || 0,
+        quantity: 1,          // 1 unit of initialUnit
+        unit: initialUnit,    // unit the quantity is expressed in
+        stock: p.stock || 0,  // total base-unit stock for display
         units: p.units || []
       }];
     });
@@ -218,9 +219,10 @@ export default function MarketplaceOrdersPage() {
     setCart(prev => prev.map(item => {
       if (item.id !== id) return item;
       const p = products.find(prod => prod.id === id);
-      if (!p) return { ...item, unit };
+      if (!p) return { ...item, unit, quantity: 1 };
       const newPrice = getProductPriceForUnit(p, channel, unit);
-      return { ...item, unit, price: newPrice };
+      // Reset quantity to 1 when unit changes to avoid confusion
+      return { ...item, unit, price: newPrice, quantity: 1 };
     }));
   };
 
@@ -228,17 +230,8 @@ export default function MarketplaceOrdersPage() {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const subtotal = cart.reduce((acc, item) => {
-    const ctnUnit = item.units?.find((u: any) => 
-      ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
-    );
-    const conversion = ctnUnit?.contains || 0;
-    const isCtn = ['CTN', 'KARTON', 'DUS', 'BOX'].includes(item.unit?.toUpperCase());
-    const itemSubtotal = (isCtn && conversion > 0) 
-      ? item.price * (item.quantity / conversion) 
-      : item.price * item.quantity;
-    return acc + itemSubtotal;
-  }, 0);
+  // quantity is in the selected unit; price is per selected unit → subtotal = price × quantity
+  const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const total = subtotal + shippingCost;
 
   const handleSaveOrder = async () => {
@@ -256,22 +249,38 @@ export default function MarketplaceOrdersPage() {
 
       const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
 
-      // ── 1. Deduct stok via Supabase (satu per satu, validasi dulu semua) ──
-      const deductPlan: { item: CartItem; baseAmount: number }[] = [];
+      // ── 1. Hitung baseAmount (dalam satuan dasar / PCS) untuk setiap item ──
+      // item.quantity = jumlah dalam unit yang dipilih (PCS atau CTN)
+      // item.unit     = satuan yang dipilih user (PCS / CTN / KARTON / BOX)
+      // Untuk CTN family: baseAmount = quantity × contains
+      // Untuk satuan dasar (PCS / sesuai unit produk): baseAmount = quantity
+      const deductPlan: { item: CartItem; baseAmount: number; containsPerUnit: number }[] = [];
       for (const item of cart) {
-        const isCtnUnit = CTN_ALIASES.includes(item.unit?.toUpperCase());
-        const ctnUnit = item.units?.find((u: any) => CTN_ALIASES.includes(u.code?.toUpperCase()));
-        const contains = Number(ctnUnit?.contains || 1);
-        const baseAmount = isCtnUnit && contains > 1 ? item.quantity * contains : item.quantity;
-        deductPlan.push({ item, baseAmount });
+        const unitCode = item.unit?.toUpperCase() || '';
+        const isCtnUnit = CTN_ALIASES.includes(unitCode);
+
+        // Cari definisi unit yang dipilih di daftar units produk
+        const unitDef = item.units?.find((u: any) =>
+          u.code?.toUpperCase() === unitCode ||
+          (isCtnUnit && CTN_ALIASES.includes(u.code?.toUpperCase()))
+        );
+        const containsPerUnit = isCtnUnit && unitDef ? Number(unitDef.contains || 1) : 1;
+        // baseAmount = kuantitas dalam PCS
+        const baseAmount = item.quantity * containsPerUnit;
+        deductPlan.push({ item, baseAmount, containsPerUnit });
       }
 
-      // Validasi stok semua produk sebelum eksekusi
-      for (const { item, baseAmount } of deductPlan) {
+      // Validasi stok semua produk sebelum eksekusi (cek stok real-time di Supabase)
+      for (const { item, baseAmount, containsPerUnit } of deductPlan) {
         const { data: prod } = await supabaseAdmin.from('products').select('stock, name').eq('id', item.id).single();
         const available = Number(prod?.stock ?? 0);
         if (available < baseAmount) {
-          notify.error(`Stok ${item.name} tidak cukup! Tersedia: ${available}, Butuh: ${baseAmount} pcs`);
+          const unitLabel = containsPerUnit > 1 ? `${item.unit} (= ${containsPerUnit} pcs)` : item.unit;
+          notify.error(
+            `Stok ${item.name} tidak cukup!\n` +
+            `Diminta: ${item.quantity} ${unitLabel} = ${baseAmount} pcs\n` +
+            `Tersedia: ${available} pcs`
+          );
           setLoading(false);
           return;
         }
@@ -296,14 +305,15 @@ export default function MarketplaceOrdersPage() {
       }
 
       // ── 2. Simpan order ke Supabase orders table ──
-      const orderItems = deductPlan.map(({ item, baseAmount }) => ({
+      const orderItems = deductPlan.map(({ item, baseAmount, containsPerUnit }) => ({
         id: item.id,
         name: item.name,
-        quantity: item.quantity,
+        quantity: item.quantity,         // jumlah dalam unit yang dipilih
         unit: item.unit,
-        baseQuantity: baseAmount,
-        price: item.price,
-        total: item.price * item.quantity,
+        containsPerUnit,                  // berapa PCS per unit
+        baseQuantity: baseAmount,         // total PCS yang dikurangi dari stok
+        price: item.price,                // harga per unit yang dipilih
+        total: item.price * item.quantity, // total harga
       }));
 
       const orderData = {

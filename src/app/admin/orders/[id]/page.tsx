@@ -179,8 +179,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }, [order]);
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
+    if (typeof window !== 'undefined' && order?.id) {
+      window.open(`/admin/orders/print/${order.id}`, '_blank');
     }
   };
 

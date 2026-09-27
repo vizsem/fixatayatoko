@@ -8,7 +8,7 @@ interface CartItem {
   price: number;
   quantity: number;
   unit: string;
-  stock: number;
+  stock: number; // total base-unit (PCS) stock
   units?: any[];
 }
 
@@ -20,6 +20,8 @@ interface CartTableProps {
   onUpdateUnit: (id: string, unit: string) => void;
   onRemove: (id: string) => void;
 }
+
+const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
 
 export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdateUnit, onRemove }: CartTableProps) => {
   if (cart.length === 0) {
@@ -36,137 +38,162 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Produk</th>
-              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Harga</th>
-              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">CTN</th>
-              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">QTY</th>
+              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Produk & Satuan</th>
+              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Harga / Satuan</th>
+              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Setara PCS</th>
               <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Subtotal</th>
               <th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {cart.map((item) => {
-              const ctnUnit = item.units?.find((u: any) => 
-                ['CTN', 'KARTON', 'DUS', 'BOX'].includes(u.code?.toUpperCase())
-              );
-              const conversion = ctnUnit?.contains || 0;
-              const ctnQty = conversion > 0 ? Math.floor(item.quantity / conversion) : 0;
-              const pcsQty = conversion > 0 ? item.quantity % conversion : item.quantity;
+              const currentUnitCode = item.unit?.toUpperCase() || '';
+              const isCtnSelected = CTN_ALIASES.includes(currentUnitCode);
 
-              const isCtn = ['CTN', 'KARTON', 'DUS', 'BOX'].includes(item.unit?.toUpperCase());
+              // Find the CTN unit definition (for conversion)
+              const ctnUnit = item.units?.find((u: any) =>
+                CTN_ALIASES.includes(u.code?.toUpperCase())
+              );
+              const containsPerUnit = isCtnSelected && ctnUnit
+                ? Number(ctnUnit.contains || 1)
+                : 1;
+
+              // Total base-PCS this order line represents
+              const totalPcs = item.quantity * containsPerUnit;
+
+              // Stock in selected unit
+              const stockInUnit = isCtnSelected && containsPerUnit > 1
+                ? Math.floor(item.stock / containsPerUnit)
+                : item.stock;
+              const stockIsLow = item.stock <= 0 || (isCtnSelected && stockInUnit <= 0);
+
+              // All available unit options for this product
+              const unitOptions: { code: string; label: string; price?: number }[] = [];
+              if (item.units && item.units.length > 0) {
+                item.units.forEach((u: any) => {
+                  if (u.code) unitOptions.push({ code: u.code.toUpperCase(), label: u.code.toUpperCase(), price: u.price });
+                });
+              }
+              if (!unitOptions.some(u => u.code === currentUnitCode)) {
+                unitOptions.push({ code: currentUnitCode, label: currentUnitCode });
+              }
 
               return (
                 <tr key={item.id} className="group hover:bg-gray-50/50 transition-all">
-                  <td className="px-4 py-2.5 sm:w-2/5">
-                    <p className="text-xs font-black text-gray-800">{item.name}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <select 
-                        className="text-xs font-bold text-gray-400 uppercase bg-gray-50 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500"
+                  {/* ── Kolom: Produk & Satuan ── */}
+                  <td className="px-4 py-3 sm:w-2/5">
+                    <p className="text-xs font-black text-gray-800 mb-1">{item.name}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Unit Selector */}
+                      <select
+                        className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-2 py-0.5 outline-none focus:ring-2 focus:ring-orange-200 cursor-pointer"
                         value={item.unit}
                         onChange={(e) => onUpdateUnit(item.id, e.target.value)}
+                        title="Pilih satuan"
                       >
-                        {item.units && item.units.length > 0 ? (
-                          item.units.map((u: any) => (
-                            <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
-                          ))
-                        ) : (
-                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
-                        )}
-                        
-                        {/* Ensure current unit is an option even if not in item.units */}
-                        {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
-                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
-                        )}
+                        {unitOptions.map((u) => (
+                          <option key={u.code} value={u.code}>{u.label}</option>
+                        ))}
                       </select>
-                      <span className={`text-xs font-black px-1.5 py-0.5 rounded ${item.stock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
-                        Stok: {item.stock}
+
+                      {/* Stock Badge */}
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg ${
+                        stockIsLow ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
+                      }`}>
+                        Stok: {stockInUnit} {isCtnSelected ? item.unit : 'pcs'}
+                        {isCtnSelected && containsPerUnit > 1 && (
+                          <span className="font-normal text-blue-400"> ({item.stock} pcs)</span>
+                        )}
                       </span>
-                      {conversion > 0 && (
-                        <span className="text-xs font-black text-gray-300 uppercase">
-                          1 {ctnUnit.code} = {conversion}
+
+                      {/* Conversion info */}
+                      {ctnUnit && containsPerUnit > 1 && (
+                        <span className="text-[10px] font-semibold text-gray-300 uppercase">
+                          1 {ctnUnit.code?.toUpperCase()} = {containsPerUnit} pcs
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-gray-400">Rp</span>
-                      <input 
-                        type="number"
-                        value={item.price}
-                        onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
-                        className="w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black outline-none focus:ring-1 focus:ring-orange-500"
-                      />
-                      <select 
-                        className="text-xs font-bold text-gray-400 uppercase bg-gray-50 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500"
-                        value={item.unit}
-                        onChange={(e) => onUpdateUnit(item.id, e.target.value)}
-                      >
-                        {item.units && item.units.length > 0 ? (
-                          item.units.map((u: any) => (
-                            <option key={u.code} value={u.code}>{u.code.toUpperCase()}</option>
-                          ))
-                        ) : (
-                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
-                        )}
-                        
-                        {/* Ensure current unit is an option even if not in item.units */}
-                        {item.units && !item.units.some((u: any) => u.code.toUpperCase() === item.unit.toUpperCase()) && (
-                          <option value={item.unit}>{item.unit.toUpperCase()}</option>
-                        )}
-                      </select>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center justify-center">
-                      {conversion > 0 ? (
-                        <input 
+
+                  {/* ── Kolom: Harga per Satuan ── */}
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-semibold text-gray-400">Rp</span>
+                        <input
                           type="number"
-                          min={0}
-                          value={ctnQty}
-                          onChange={(e) => {
-                            const val = Math.max(0, Number(e.target.value));
-                            onSetQty(item.id, (val * conversion) + pcsQty);
-                          }}
-                          className="w-12 text-center text-xs font-black bg-gray-50 rounded-lg border-none p-1 outline-none focus:ring-1 focus:ring-orange-500"
+                          value={item.price}
+                          onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
+                          className="w-24 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-xs font-black outline-none focus:ring-1 focus:ring-orange-400"
                         />
-                      ) : (
-                        <span className="text-xs font-black text-gray-300">-</span>
-                      )}
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-semibold pl-1">
+                        per {currentUnitCode}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 sm:w-1/5">
-                    <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => onUpdateQty(item.id, -1)} 
-                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
+
+                  {/* ── Kolom: Qty (dalam satuan dipilih) ── */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => onUpdateQty(item.id, -1)}
+                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors active:scale-90"
                       >
-                        <Minus size={12} />
+                        <Minus size={11} />
                       </button>
-                      <input 
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => onSetQty(item.id, Math.max(1, Number(e.target.value)))}
-                        className="w-10 text-center text-xs font-black bg-gray-50 rounded-lg border-none p-1 outline-none focus:ring-1 focus:ring-orange-500"
-                      />
-                      <button 
-                        onClick={() => onUpdateQty(item.id, 1)} 
-                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors active:scale-90"
+                      <div className="text-center">
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => onSetQty(item.id, Math.max(1, Number(e.target.value)))}
+                          className="w-10 text-center text-xs font-black bg-gray-50 border border-gray-100 rounded-lg p-1 outline-none focus:ring-1 focus:ring-orange-400"
+                        />
+                        <div className="text-[10px] text-gray-400 mt-0.5">{currentUnitCode}</div>
+                      </div>
+                      <button
+                        onClick={() => onUpdateQty(item.id, 1)}
+                        className="p-1.5 bg-gray-100 rounded-lg hover:bg-green-50 hover:text-green-600 transition-colors active:scale-90"
                       >
-                        <Plus size={12} />
+                        <Plus size={11} />
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right font-black text-xs text-gray-900">
-                    Rp{((isCtn && conversion > 0) 
-                      ? item.price * (item.quantity / conversion) 
-                      : item.price * item.quantity
-                    ).toLocaleString()}
+
+                  {/* ── Kolom: Setara PCS ── */}
+                  <td className="px-4 py-3 text-center">
+                    {containsPerUnit > 1 ? (
+                      <div>
+                        <span className="text-xs font-black text-indigo-600">{totalPcs}</span>
+                        <div className="text-[10px] text-gray-400">pcs</div>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-gray-300">—</span>
+                    )}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button onClick={() => onRemove(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={16} />
+
+                  {/* ── Kolom: Subtotal ── */}
+                  <td className="px-4 py-3 text-right">
+                    <div>
+                      <div className="text-xs font-black text-gray-900">
+                        Rp{(item.price * item.quantity).toLocaleString('id-ID')}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {item.quantity} {currentUnitCode} × Rp{item.price.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* ── Kolom: Hapus ── */}
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => onRemove(item.id)}
+                      className="p-2 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-xl transition-all"
+                      title="Hapus dari keranjang"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </td>
                 </tr>

@@ -2,26 +2,44 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-
-
 import { ArrowLeft, Printer } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-
 import { Timestamp, auth, db, doc, getDoc, onAuthStateChanged } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
+
+type OrderItem = {
+  productId?: string;
+  name: string;
+  quantity: number;
+  price: number;
+  unit?: string;
+};
+
 type Order = {
   id: string;
   customerName: string;
-  customerPhone: string;
-  items: Array<{ productId: string; name: string; quantity: number; price: number; }>;
+  customerPhone?: string;
+  items: OrderItem[];
   total: number;
+  subtotal?: number;
+  shippingCost?: number;
+  discount?: number;
+  voucher?: number;
+  pointsUsed?: number;
+  walletUsed?: number;
   status: string;
   paymentMethod: string;
-  deliveryMethod: string;
+  deliveryMethod?: string;
   deliveryAddress?: string;
   createdAt: Timestamp | null;
+  dueDate?: string;
 };
 
+type StoreSettings = {
+  name: string;
+  address: string;
+  phone: string;
+  footerMsg?: string;
+};
 
 export default function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -29,6 +47,13 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
   const id = resolvedParams.id;
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    name: 'ATAYATOKO',
+    address: 'Jl. Pandan 98, Semen, Kediri',
+    phone: '0858-5316-1174',
+    footerMsg: 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan'
+  });
+  const [paperWidth, setPaperWidth] = useState<'58mm' | '80mm'>('58mm');
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -46,12 +71,28 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     if (!authChecked || !id) return;
-    const fetchOrder = async () => {
+    const fetchData = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'orders', id));
+        const [docSnap, settingsSnap] = await Promise.all([
+          getDoc(doc(db, 'orders', id)),
+          getDoc(doc(db, 'settings', 'system'))
+        ]);
+
+        if (settingsSnap.exists()) {
+          const s = settingsSnap.data();
+          setStoreSettings((prev) => ({
+            name: (s.name || prev.name).toUpperCase(),
+            address: s.address || prev.address,
+            phone: s.phone || prev.phone,
+            footerMsg: s.footerMsg || prev.footerMsg
+          }));
+        }
+
         if (docSnap.exists()) {
           setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
-          setTimeout(() => { window.print(); }, 800);
+          setTimeout(() => {
+            window.print();
+          }, 600);
         }
       } catch (err) {
         console.error(err);
@@ -59,135 +100,250 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
         setLoading(false);
       }
     };
-    fetchOrder();
+    fetchData();
   }, [id, authChecked]);
 
-  if (loading || !authChecked) return <div className="p-10 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">Generating Invoice...</div>;
-  if (!order) return <div className="p-10 text-center font-black text-red-500 uppercase">Data Kosong</div>;
+  if (loading || !authChecked) {
+    return (
+      <div className="p-10 text-center font-black uppercase text-slate-400 animate-pulse tracking-widest">
+        Memuat Struk Thermal...
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="p-10 text-center font-black text-rose-500 uppercase">
+        Data Pesanan Tidak Ditemukan
+      </div>
+    );
+  }
+
+  const subtotal = order.subtotal ?? order.items?.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0;
+  const shippingCost = order.shippingCost ?? 0;
+  const discountTotal = (order.discount || 0) + (order.voucher || 0) + (order.pointsUsed || 0) + (order.walletUsed || 0);
+
+  const dateStr = order.createdAt?.toDate
+    ? new Date(order.createdAt.toDate()).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '-';
 
   return (
-    <div className="bg-white min-h-screen text-black font-mono p-2 sm:p-0">
-      <div className="max-w-4xl mx-auto p-4 no-print">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+    <div className="min-h-screen bg-neutral-100 print:bg-white text-black py-4 print:py-0 print:p-0 flex flex-col items-center">
+      {/* Kontrol Navigasi & Pengaturan Thermal di Layar */}
+      <div className="w-full max-w-xl mx-auto px-4 mb-4 no-print">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
-              <ArrowLeft size={20} />
+            <button
+              onClick={() => router.back()}
+              className="p-2.5 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all text-slate-700"
+              title="Kembali"
+            >
+              <ArrowLeft size={18} />
             </button>
             <div>
-              <div className="p-3 bg-black text-white rounded-2xl inline-flex">
-                <Printer size={22} />
-              </div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter">Print Invoice</h1>
-              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Struk thermal siap cetak</p>
+              <h1 className="text-sm font-black uppercase tracking-tight text-slate-900">
+                Cetak Struk Thermal
+              </h1>
+              <p className="text-[11px] text-slate-500">
+                Pilih ukuran kertas thermal printer Anda
+              </p>
             </div>
           </div>
-          <button onClick={() => typeof window !== 'undefined' && window.print()} className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-            <Printer size={16} /> Cetak
-          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setPaperWidth('58mm')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  paperWidth === '58mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                }`}
+              >
+                58mm
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaperWidth('80mm')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  paperWidth === '80mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                }`}
+              >
+                80mm
+              </button>
+            </div>
+
+            <button
+              onClick={() => typeof window !== 'undefined' && window.print()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm"
+            >
+              <Printer size={15} /> Cetak
+            </button>
+          </div>
         </div>
       </div>
-      {/* Container Khusus Printer Thermal (Lebar Maksimal 80mm biasanya) */}
-      <div className="max-w-[400px] mx-auto p-4 border border-dashed border-gray-200">
 
-        {/* Header Struk */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-black tracking-tighter uppercase italic">Ataya Toko</h1>
-          <p className="text-xs font-bold uppercase tracking-widest">Official Store Invoice</p>
-          <div className="border-b border-black border-double my-2"></div>
+      {/* STRUK THERMAL AREA */}
+      <div
+        className={`thermal-receipt bg-white text-black mx-auto border border-dashed border-slate-300 print:border-none shadow-md print:shadow-none ${
+          paperWidth === '58mm' ? 'w-[58mm] max-w-[58mm]' : 'w-[80mm] max-w-[80mm]'
+        }`}
+        style={{
+          fontFamily: "'Courier New', Courier, monospace",
+          padding: paperWidth === '58mm' ? '4px 3px' : '6px 6px',
+          fontSize: paperWidth === '58mm' ? '11px' : '12px',
+          lineHeight: '1.25'
+        }}
+      >
+        {/* Header Toko */}
+        <div className="text-center pb-1">
+          <div className="font-black text-sm uppercase tracking-tight">{storeSettings.name}</div>
+          <div className="text-[10px] text-neutral-700">{storeSettings.address}</div>
+          <div className="text-[10px] text-neutral-700">Telp: {storeSettings.phone}</div>
+          <div className="border-b border-black border-dashed my-1.5" />
         </div>
 
         {/* Info Order */}
-        <div className="text-xs space-y-1 mb-4">
+        <div className="space-y-0.5 text-[10.5px]">
           <div className="flex justify-between">
-            <span>NO:</span>
-            <span className="font-black">#ORD-{order.id.substring(0, 8).toUpperCase()}</span>
+            <span>Tgl:</span>
+            <span>{dateStr}</span>
           </div>
           <div className="flex justify-between">
-            <span>TGL:</span>
-            <span>{order.createdAt?.toDate ? new Date(order.createdAt.toDate()).toLocaleString('id-ID') : '-'}</span>
+            <span>No:</span>
+            <span className="font-bold">#ORD-{order.id.slice(-8).toUpperCase()}</span>
           </div>
-          <div className="flex justify-between uppercase">
-            <span>PLG:</span>
-            <span className="font-black">{order.customerName}</span>
+          <div className="flex justify-between">
+            <span>Plg:</span>
+            <span className="font-bold uppercase truncate max-w-[140px] text-right">
+              {order.customerName || 'Umum'}
+            </span>
           </div>
+          {order.customerPhone && (
+            <div className="flex justify-between">
+              <span>Hp:</span>
+              <span>{order.customerPhone}</span>
+            </div>
+          )}
         </div>
 
-        <div className="border-b border-black border-dashed my-4"></div>
+        <div className="border-b border-black border-dashed my-1.5" />
 
-        {/* Tabel Barang */}
-        <div className="space-y-3 mb-4">
+        {/* Daftar Barang */}
+        <div className="space-y-1.5">
           {order.items?.map((item, idx) => (
-            <div key={idx} className="text-xs">
-              <div className="uppercase font-black">{item.name}</div>
-              <div className="flex justify-between">
-                <span>{item.quantity} x {item.price.toLocaleString()}</span>
-                <span className="font-bold">{(item.quantity * item.price).toLocaleString()}</span>
+            <div key={idx} className="leading-tight">
+              <div className="font-bold uppercase text-[11px] break-words">{item.name}</div>
+              <div className="flex justify-between text-[10.5px]">
+                <span>
+                  {item.quantity} {item.unit || 'pcs'} x {item.price.toLocaleString('id-ID')}
+                </span>
+                <span className="font-semibold">
+                  {(item.quantity * item.price).toLocaleString('id-ID')}
+                </span>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="border-b border-black border-dashed my-4"></div>
+        <div className="border-b border-black border-dashed my-1.5" />
 
-        {/* Total & Metode */}
-        <div className="space-y-1 text-xs">
+        {/* Totalan */}
+        <div className="space-y-0.5 text-[10.5px]">
           <div className="flex justify-between">
-            <span>Subtotal:</span>
-            <span>Rp{(order.total - (order.deliveryAddress ? 0 : 0)).toLocaleString()}</span> 
+            <span>Subtotal</span>
+            <span>Rp{subtotal.toLocaleString('id-ID')}</span>
           </div>
-          {/* Note: Logic ongkir perlu disesuaikan jika field shippingCost tersedia */}
-          <div className="flex justify-between">
-            <span>Total:</span>
-            <span className="font-black">Rp{order.total.toLocaleString()}</span>
-          </div>
-          {order.status === 'BELUM_LUNAS' && (
-             <div className="mt-2 text-center border border-black p-1">
-               <span className="font-black uppercase">BELUM LUNAS (TEMPO)</span>
-             </div>
+          {shippingCost > 0 && (
+            <div className="flex justify-between">
+              <span>Ongkir</span>
+              <span>Rp{shippingCost.toLocaleString('id-ID')}</span>
+            </div>
           )}
-          <div className="flex justify-between uppercase text-xs">
-            <span>BAYAR:</span>
-            <span>{order.paymentMethod || '-'}</span>
-          </div>
-          <div className="flex justify-between uppercase text-xs">
-            <span>KURIR:</span>
-            {/* Perbaikan Error: Optional Chaining digunakan di sini */}
-            <span>{order.deliveryMethod?.replace('_', ' ') || '-'}</span>
+          {discountTotal > 0 && (
+            <div className="flex justify-between text-neutral-700">
+              <span>Diskon/Voucher</span>
+              <span>-Rp{discountTotal.toLocaleString('id-ID')}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-black text-xs pt-1 border-t border-black border-dotted mt-1">
+            <span>TOTAL</span>
+            <span>Rp{order.total.toLocaleString('id-ID')}</span>
           </div>
         </div>
 
-        {/* Alamat Jika Ada */}
+        <div className="border-b border-black border-dashed my-1.5" />
+
+        {/* Info Pembayaran & Pengiriman */}
+        <div className="space-y-0.5 text-[10px]">
+          <div className="flex justify-between">
+            <span>Metode Bayar:</span>
+            <span className="font-bold uppercase">{order.paymentMethod || '-'}</span>
+          </div>
+          {order.deliveryMethod && (
+            <div className="flex justify-between">
+              <span>Kurir:</span>
+              <span className="font-bold uppercase">{order.deliveryMethod.replace('_', ' ')}</span>
+            </div>
+          )}
+          {order.status === 'BELUM_LUNAS' && (
+            <div className="mt-1 border border-black p-1 text-center font-black uppercase text-[10px]">
+              BELUM LUNAS (TEMPO)
+              {order.dueDate && (
+                <div className="text-[9px] font-normal">
+                  Jatuh Tempo: {new Date(order.dueDate).toLocaleDateString('id-ID')}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {order.deliveryAddress && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase text-gray-400 mb-1">Alamat:</p>
-            <p className="text-xs leading-tight uppercase italic">{order.deliveryAddress}</p>
+          <div className="mt-1.5 pt-1 border-t border-black border-dotted text-[9.5px]">
+            <span className="font-bold">Alamat Kirim:</span>
+            <p className="leading-tight uppercase break-words">{order.deliveryAddress}</p>
           </div>
         )}
 
         {/* Footer Struk */}
-        <div className="text-center mt-10 space-y-1">
-          <div className="border-b border-black border-double mb-2"></div>
-          <p className="text-xs font-black uppercase italic tracking-tighter">Terima Kasih</p>
-          <p className="text-xs font-bold text-gray-400">Barang yang sudah dibeli tidak dapat ditukar</p>
+        <div className="text-center mt-3 pt-1 border-t border-black border-dashed space-y-0.5">
+          <div className="font-black uppercase text-[11px] tracking-tight">Terima Kasih</div>
+          <div className="text-[9px] text-neutral-600 leading-tight">
+            {storeSettings.footerMsg || 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan'}
+          </div>
         </div>
-      </div>
-
-      {/* Kontrol Navigasi (Hanya muncul di Layar) */}
-      <div className="fixed bottom-6 right-6 no-print">
-        <button
-          onClick={() => router.back()}
-          className="bg-black text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-2xl hover:bg-emerald-600 transition-all"
-        >
-          Kembali
-        </button>
       </div>
 
       <style jsx global>{`
         @media print {
-          .no-print { display: none !important; }
-          body { background: white !important; padding: 0 !important; margin: 0 !important; }
-          .max-w-[400px] { border: none !important; width: 100% !important; max-width: 100% !important; }
-          @page { margin: 0; }
+          @page {
+            size: ${paperWidth} auto;
+            margin: 0mm !important;
+          }
+          html, body {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: ${paperWidth} !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .thermal-receipt {
+            border: none !important;
+            box-shadow: none !important;
+            width: ${paperWidth} !important;
+            max-width: ${paperWidth} !important;
+            margin: 0 !important;
+            padding: ${paperWidth === '58mm' ? '2mm 1mm' : '3mm 2mm'} !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+          }
         }
       `}</style>
     </div>
