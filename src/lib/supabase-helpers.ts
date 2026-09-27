@@ -356,16 +356,18 @@ export function buildWritePayload(table: string, data: any, opts?: { isInsert?: 
 
 export async function sbGetDoc(table: string, id: string, useAdmin = true): Promise<{ exists: () => boolean; data: () => any; id: string }> {
   const client = useAdmin ? supabaseAdmin : supabase;
-  const { data, error } = await client
-    .from(table)
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  let query = client.from(table).select('*');
+  if (table === 'orders') {
+    query = query.or(`id.eq.${id},order_id.eq.${id}`) as any;
+  } else {
+    query = query.eq('id', id) as any;
+  }
+  const { data, error } = await query.maybeSingle();
   if (error || !data) {
     return { exists: () => false, data: () => ({}), id };
   }
   const row = normalizeRow(data);
-  return { exists: () => true, data: () => row, id };
+  return { exists: () => true, data: () => row, id: data.id || id };
 }
 
 export interface SbDocSnapshot<T = any> {

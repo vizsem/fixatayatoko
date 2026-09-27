@@ -152,11 +152,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           sbGetDoc('orders', id),
           sbGetDoc('settings', 'system'),
         ]);
-        if (!docSnap.exists) {
+        if (!docSnap.exists()) {
           setError('Pesanan tidak ditemukan.');
           return;
         }
-        const data = { id: docSnap.id, ...docSnap.data } as Order;
+        const data = { id: docSnap.id, ...docSnap.data() } as Order;
         setOrder(data);
         if (data.items && Array.isArray(data.items)) {
           setEditableItems(
@@ -679,8 +679,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </p>
               )}
               <p className="text-xs font-bold text-slate-400 uppercase">
-                {order.createdAt?.toDate
-                  ? new Date(order.createdAt.toDate()).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+                {order.createdAt
+                  ? (typeof (order.createdAt as any)?.toDate === 'function'
+                      ? (order.createdAt as any).toDate()
+                      : new Date(order.createdAt as any)
+                    ).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
                   : '-'}
               </p>
             </div>
