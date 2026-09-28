@@ -421,6 +421,7 @@ export async function addProductFull(payload: {
   Deskripsi?: string;
   // Stok
   Satuan: string;
+  Satuan_Modal?: string;
   Stok: number;
   Min_Stok: number;
   warehouseId?: string;
@@ -487,6 +488,7 @@ export async function addProductFull(payload: {
       Deskripsi: payload.Deskripsi || '',
       description: payload.Deskripsi || '',
       Satuan: baseUnit,
+      Satuan_Modal: payload.Satuan_Modal || baseUnit,
       unit: baseUnit,
       Stok: totalStock,
       stock: totalStock,

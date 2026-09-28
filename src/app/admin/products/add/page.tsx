@@ -46,6 +46,7 @@ export default function AddProductPage() {
     expired_date: '',
     tgl_masuk: '',
     Satuan: 'Pcs',
+    Satuan_Modal: 'Pcs',
     Stok: 0,
     Min_Stok: 5,
     Modal: 0,
