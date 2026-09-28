@@ -57,6 +57,7 @@ export default function EditProductPage() {
   // State from Add Page structure
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [newUnitCode, setNewUnitCode] = useState('');
+  const [newKategoriInput, setNewKategoriInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -427,10 +428,11 @@ export default function EditProductPage() {
     const loadingToast = toast.loading("Menyimpan perubahan...");
 
     try {
-      // 0. Ensure Category exists for consistency
-      const categoryName = String(formData.Kategori || 'UMUM').trim();
+      // 0. Ensure Category exists — normalize and guard against sentinel '__NEW__'
+      const rawCat = String(formData.Kategori || 'UMUM').trim();
+      const categoryName = rawCat === '__NEW__' ? 'UMUM' : rawCat;
       const existingCat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-      if (!existingCat && categoryName) {
+      if (!existingCat && categoryName && categoryName !== 'UMUM') {
         try {
           await sbInsertDoc('categories', {
             name: categoryName,
@@ -769,19 +771,48 @@ export default function EditProductPage() {
               <div>
                 <label className="text-xs font-black uppercase text-gray-400 ml-1">Kategori</label>
                 <div className="relative">
-                  <input 
-                    list="edit-category-suggestions"
-                    className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all" 
-                    type="text" 
-                    placeholder="Pilih atau ketik kategori..."
-                    value={formData.Kategori} 
-                    onChange={e => setFormData({ ...formData, Kategori: e.target.value })} 
-                  />
-                  <datalist id="edit-category-suggestions">
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.name} />
-                    ))}
-                  </datalist>
+                  {formData.Kategori === '__NEW__' ? (
+                    <div className="flex gap-2">
+                      <input
+                        autoFocus
+                        className="flex-1 p-4 bg-yellow-50 rounded-2xl font-black outline-none border border-yellow-300 focus:border-yellow-500 transition-all"
+                        type="text"
+                        placeholder="Nama kategori baru..."
+                        value={newKategoriInput}
+                        onChange={e => setNewKategoriInput(e.target.value)}
+                        onBlur={e => {
+                          const val = e.target.value.trim();
+                          setFormData({ ...formData, Kategori: val || '' });
+                          setNewKategoriInput('');
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = newKategoriInput.trim();
+                            setFormData({ ...formData, Kategori: val });
+                            setNewKategoriInput('');
+                          }
+                          if (e.key === 'Escape') {
+                            setFormData({ ...formData, Kategori: '' });
+                            setNewKategoriInput('');
+                          }
+                        }}
+                      />
+                      <button type="button" onClick={() => { setFormData({ ...formData, Kategori: '' }); setNewKategoriInput(''); }} className="px-3 py-2 bg-gray-100 rounded-xl text-xs font-black text-gray-500 hover:bg-gray-200">✕</button>
+                    </div>
+                  ) : (
+                    <select
+                      className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all appearance-none"
+                      value={formData.Kategori}
+                      onChange={e => setFormData({ ...formData, Kategori: e.target.value })}
+                    >
+                      <option value="">— Pilih Kategori —</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                      <option value="__NEW__">＋ Tambah Kategori Baru...</option>
+                    </select>
+                  )}
                 </div>
               </div>
               <div>

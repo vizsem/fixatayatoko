@@ -32,6 +32,7 @@ export default function AddProductPage() {
     { code: 'KARTON', contains: 0, price: 0, label: '' },
   ]);
   const [newUnitCode, setNewUnitCode] = useState('');
+  const [newKategoriInput, setNewKategoriInput] = useState('');
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -240,13 +241,30 @@ export default function AddProductPage() {
             }
           : { mode: 'manual' };
 
-      // 2. Simpan ke Supabase
+      // 2. Normalisasi kategori (guard sentinel __NEW__)
+      const rawKat = String(formData.Kategori || '').trim();
+      const finalKategori = rawKat === '__NEW__' ? '' : rawKat;
+      // Auto-create kategori baru ke Supabase jika belum ada
+      if (finalKategori && !categories.some(c => c.name.toLowerCase() === finalKategori.toLowerCase())) {
+        try {
+          const { sbInsertDoc: ins } = await import('@/lib/supabase-helpers');
+          await ins('categories', {
+            name: finalKategori,
+            slug: finalKategori.toLowerCase().replace(/\s+/g, '-'),
+            description: 'Auto-generated from product add',
+            createdAt: new Date().toISOString()
+          });
+        } catch { /* non-fatal */ }
+      }
+
+      // 3. Simpan ke Supabase
       const normalizedUnits = ensuredBase.map((u) => ({
         ...u,
         contains: typeof u.contains === 'number' ? u.contains : Number(u.contains ?? 1),
       }));
       const result = await addProductFull({
         ...formData,
+        Kategori: finalKategori,
         ID: baseId,
         Ecer: nextEcer,
         units: normalizedUnits,
@@ -371,19 +389,48 @@ export default function AddProductPage() {
               <div>
                 <label className="text-xs font-black uppercase text-gray-400 ml-1">Kategori</label>
                 <div className="relative">
-                  <input 
-                    list="category-suggestions"
-                    className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all" 
-                    type="text" 
-                    placeholder="Pilih atau ketik kategori..."
-                    value={formData.Kategori} 
-                    onChange={e => setFormData({ ...formData, Kategori: e.target.value })} 
-                  />
-                  <datalist id="category-suggestions">
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.name} />
-                    ))}
-                  </datalist>
+                  {formData.Kategori === '__NEW__' ? (
+                    <div className="flex gap-2">
+                      <input
+                        autoFocus
+                        className="flex-1 p-4 bg-yellow-50 rounded-2xl font-black outline-none border border-yellow-300 focus:border-yellow-500 transition-all"
+                        type="text"
+                        placeholder="Nama kategori baru..."
+                        value={newKategoriInput}
+                        onChange={e => setNewKategoriInput(e.target.value)}
+                        onBlur={e => {
+                          const val = e.target.value.trim();
+                          setFormData({ ...formData, Kategori: val || '' });
+                          setNewKategoriInput('');
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = newKategoriInput.trim();
+                            setFormData({ ...formData, Kategori: val });
+                            setNewKategoriInput('');
+                          }
+                          if (e.key === 'Escape') {
+                            setFormData({ ...formData, Kategori: '' });
+                            setNewKategoriInput('');
+                          }
+                        }}
+                      />
+                      <button type="button" onClick={() => { setFormData({ ...formData, Kategori: '' }); setNewKategoriInput(''); }} className="px-3 py-2 bg-gray-100 rounded-xl text-xs font-black text-gray-500 hover:bg-gray-200">✕</button>
+                    </div>
+                  ) : (
+                    <select
+                      className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all appearance-none"
+                      value={formData.Kategori}
+                      onChange={e => setFormData({ ...formData, Kategori: e.target.value })}
+                    >
+                      <option value="">— Pilih Kategori —</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                      <option value="__NEW__">＋ Tambah Kategori Baru...</option>
+                    </select>
+                  )}
                 </div>
               </div>
               <div>
