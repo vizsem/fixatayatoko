@@ -5,7 +5,8 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import {
   Package, Search, AlertTriangle, Warehouse, TrendingDown,
-  ArrowDown, ArrowUp, RefreshCw, Filter, BarChart2, CheckCircle, XCircle, Ban
+  ArrowDown, ArrowUp, RefreshCw, Filter, BarChart2, CheckCircle, XCircle, Ban,
+  DollarSign
 } from 'lucide-react';
 import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjustStock, getWarehouses } from '@/lib/actions/inventory.actions';
 import { getProducts } from '@/lib/actions/product.actions';
@@ -54,6 +55,7 @@ export default function AdminInventory() {
   const [adjustModal, setAdjustModal] = useState(false);
   const [adjustForm, setAdjustForm] = useState<{ productId: string; warehouseId: string; quantity: string | number; notes: string }>({ productId: '', warehouseId: '', quantity: '', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [quickAdjust, setQuickAdjust] = useState<{ batchId: string; value: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +124,7 @@ export default function AdminInventory() {
   };
 
   const totalBatchQty = batches.reduce((sum, b) => sum + b.quantity, 0);
+  const totalNilaiStok = batches.reduce((sum, b) => sum + (b.quantity * (b.incomingPrice || b.product?.costPrice || 0)), 0);
   const expiringSoon = batches.filter(b => {
     if (!b.expiryDate) return false;
     const diff = new Date(b.expiryDate).getTime() - Date.now();
@@ -155,7 +158,7 @@ export default function AdminInventory() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 font-medium mb-1">Total Batch</p>
             <p className="text-2xl font-black text-gray-900">{batches.length}</p>
@@ -172,11 +175,15 @@ export default function AdminInventory() {
             </p>
             <p className="text-2xl font-black text-slate-700">{inactiveBatchesCount}</p>
           </div>
+          <div className="bg-purple-50 rounded-2xl border border-purple-100 shadow-sm p-4">
+            <p className="text-xs text-purple-500 font-medium mb-1 flex items-center gap-1"><DollarSign size={12} />Nilai Stok</p>
+            <p className="text-xl font-black text-purple-700">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totalNilaiStok)}</p>
+          </div>
           <div className="bg-amber-50 rounded-2xl border border-amber-100 shadow-sm p-4">
             <p className="text-xs text-amber-500 font-medium mb-1">Exp. &lt; 30 hari</p>
             <p className="text-2xl font-black text-amber-700">{expiringSoon}</p>
           </div>
-          <div className="bg-red-50 rounded-2xl border border-red-100 shadow-sm p-4 col-span-2 md:col-span-1">
+          <div className="bg-red-50 rounded-2xl border border-red-100 shadow-sm p-4">
             <p className="text-xs text-red-400 font-medium mb-1">Stok Rendah</p>
             <p className="text-2xl font-black text-red-700">{lowStock.length}</p>
           </div>
@@ -272,7 +279,9 @@ export default function AdminInventory() {
                         <th className="text-left p-3">Gudang</th>
                         <th className="text-left p-3">No. Batch</th>
                         <th className="text-center p-3">Qty</th>
+                        <th className="text-right p-3">Harga Modal</th>
                         <th className="text-left p-3">Expired</th>
+                        <th className="text-center p-3">Aksi</th>
                       </tr></thead>
                       <tbody className="divide-y divide-gray-50">
                         {filteredBatches.length === 0 ? (
@@ -316,6 +325,11 @@ export default function AdminInventory() {
                                   <StockUnitDisplay stock={b.quantity} units={b.product.units} />
                                 </div>
                               </td>
+                              <td className="p-3 text-xs text-right">
+                                {b.incomingPrice || b.product?.costPrice ? (
+                                  <span className="font-bold text-gray-700">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.incomingPrice || b.product?.costPrice || 0)}</span>
+                                ) : <span className="text-gray-400">—</span>}
+                              </td>
                               <td className="p-3 text-xs">
                                 {b.expiryDate ? (
                                   <span className={`font-bold ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-amber-600' : 'text-gray-600'}`}>
@@ -323,6 +337,42 @@ export default function AdminInventory() {
                                     {new Date(b.expiryDate).toLocaleDateString('id-ID')}
                                   </span>
                                 ) : <span className="text-gray-400">—</span>}
+                              </td>
+                              <td className="p-3 text-center">
+                                {quickAdjust?.batchId === b.id ? (
+                                  <div className="flex items-center gap-1 justify-center">
+                                    <input
+                                      type="number"
+                                      className="w-16 text-center text-xs border border-blue-300 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      value={quickAdjust.value}
+                                      onChange={e => setQuickAdjust(q => q ? { ...q, value: e.target.value } : null)}
+                                      placeholder="±"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={async () => {
+                                        const qty = Number(quickAdjust.value);
+                                        if (!qty || isNaN(qty)) { setQuickAdjust(null); return; }
+                                        setSaving(true);
+                                        const result = await adjustStock({ productId: b.product.id, warehouseId: b.warehouseId, quantity: qty, notes: 'Quick Adjust dari Inventori' });
+                                        setSaving(false);
+                                        if (result.success) { notify.success('Stok diperbarui'); setQuickAdjust(null); await load(); }
+                                        else notify.error(result.error || 'Gagal');
+                                      }}
+                                      disabled={saving}
+                                      className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 text-xs font-bold disabled:opacity-50"
+                                    >✓</button>
+                                    <button onClick={() => setQuickAdjust(null)} className="w-6 h-6 bg-gray-200 text-gray-600 rounded-lg flex items-center justify-center hover:bg-gray-300 text-xs">✕</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setQuickAdjust({ batchId: b.id, value: '' })}
+                                    className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
+                                    title="Sesuaikan stok batch ini"
+                                  >
+                                    ± Adjust
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );

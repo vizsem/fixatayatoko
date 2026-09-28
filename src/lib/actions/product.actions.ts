@@ -650,6 +650,56 @@ export async function attachBarcodeToProduct(productId: string, barcode: string,
   }
 }
 
+export async function duplicateProduct(id: string) {
+  try {
+    const { data: src, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (fetchErr || !src) throw new Error('Produk tidak ditemukan');
+
+    const newId = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+    const baseName = src.name || 'Produk';
+    const newName = baseName.endsWith('(Duplikat)') ? baseName : `${baseName} (Duplikat)`;
+    const newSku = `${src.sku || newId}-DUP-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+    const raw_data = {
+      ...(src.raw_data || {}),
+      name: newName,
+      sku: newSku,
+      stock: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const { error: insertErr } = await supabaseAdmin.from('products').insert({
+      id: newId,
+      name: newName,
+      sku: newSku,
+      description: src.description,
+      price: src.price,
+      cost_price: src.cost_price,
+      category: src.category,
+      unit: src.unit,
+      stock: 0,
+      barcode: null, // barcode tidak ikut diduplikat (harus unik)
+      is_active: true,
+      raw_data,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (insertErr) throw insertErr;
+    revalidatePath('/admin/products');
+    return { success: true, newId, name: newName };
+  } catch (err: any) {
+    console.error('duplicateProduct error:', err);
+    return { success: false, error: err?.message || 'Gagal menduplikasi produk' };
+  }
+}
+
 export async function restockProductViaSupabase(productId: string, stokMasuk: number, hargaBaru: number, adminId?: string, warehouseId?: string) {
   try {
     await addStock({

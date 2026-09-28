@@ -43,6 +43,7 @@ export async function getInventoryBatches(warehouseId?: string) {
           id: `${p.id}-${whId}`,
           batchNumber: `BATCH-${p.sku || p.id.substring(0, 6).toUpperCase()}`,
           quantity: qNum,
+          incomingPrice: Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? 0),
           expiryDate: raw.expiredDate || raw.Expired ? new Date(raw.expiredDate || raw.Expired) : null,
           createdAt: p.created_at ? new Date(p.created_at) : new Date(),
           warehouseId: whId,
@@ -52,6 +53,7 @@ export async function getInventoryBatches(warehouseId?: string) {
             sku: p.sku || raw.sku || raw.Barcode || p.id,
             unit: (p.unit || raw.unit || 'pcs').toUpperCase(),
             units: Array.isArray(raw.units) ? raw.units : undefined,
+            costPrice: Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? 0),
             isActive
           },
           warehouse: {

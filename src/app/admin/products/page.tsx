@@ -8,7 +8,7 @@ import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
 
 
-import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus, restockProductViaSupabase } from '@/lib/actions/product.actions';
+import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus, restockProductViaSupabase, duplicateProduct } from '@/lib/actions/product.actions';
 
 
 import Link from 'next/link';
@@ -16,7 +16,7 @@ import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare, Printer, Square, Archive, RotateCcw
+  CheckSquare, Printer, Square, Archive, RotateCcw, Copy
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -323,6 +323,7 @@ export default function AdminProducts() {
   };
   // States
   const [loading, setLoading] = useState(true);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showScannerModal, setShowScannerModal] = useState(false);
@@ -641,6 +642,22 @@ export default function AdminProducts() {
     } catch (error: any) {
       console.error('Gagal mengubah status arsip produk:', error);
       notify.admin.error(error?.message || `Gagal ${actionLabel.toLowerCase()} produk`, { id: t });
+    }
+  };
+
+  const handleDuplicate = async (product: ProductRow) => {
+    if (!confirm(`Duplikat produk "${product.name || product.Nama}"? Produk baru akan dibuat dengan stok 0.`)) return;
+    setDuplicatingId(product.id);
+    const t = notify.admin.loading('Menduplikasi produk...');
+    try {
+      const res = await duplicateProduct(product.id);
+      if (!res?.success) throw new Error(res?.error || 'Gagal menduplikasi produk');
+      notify.admin.success(`Produk "${res.name}" berhasil diduplikasi!`, { id: t });
+      setTimeout(() => window.location.reload(), 800);
+    } catch (error: any) {
+      notify.admin.error(error?.message || 'Gagal menduplikasi produk', { id: t });
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -1133,6 +1150,14 @@ export default function AdminProducts() {
                         >
                           <Edit size={12} />
                         </Link>
+                        <button 
+                          onClick={() => handleDuplicate(p)} 
+                          disabled={duplicatingId === p.id}
+                          className="w-7 h-7 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                          title="Duplikat Produk"
+                        >
+                          {duplicatingId === p.id ? <RefreshCw size={12} className="animate-spin" /> : <Copy size={12} />}
+                        </button>
                         <button 
                           onClick={() => handleArchive(p, p.isActive !== false)} 
                           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
