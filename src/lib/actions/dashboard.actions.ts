@@ -111,10 +111,12 @@ export async function getDashboardStats() {
         for (const it of items) {
           const pid = it.id || it.productId || '';
           const qty = Number(it.quantity || it.qty || 1);
+          const conversion = Number(it.containsPerUnit || it.contains || it.conversion || 1);
+          const baseQty = Number(it.baseQuantity || (qty * conversion));
           const price = Number(it.price || 0);
           const costPrice = pid ? (productCostMap.get(pid) || 0) : 0;
           if (costPrice > 0) {
-             monthlyProfit += (price - costPrice) * qty;
+             monthlyProfit += (price * qty) - (costPrice * baseQty);
           } else {
              // Fallback estimate if cost price is unknown (e.g., 20% margin)
              monthlyProfit += (price * 0.2) * qty;
@@ -134,8 +136,13 @@ export async function getDashboardStats() {
         for (const it of items) {
           const pid = it.id || it.productId || '';
           if (!pid) continue;
+          
+          const qty = Number(it.quantity || it.qty || 1);
+          const conversion = Number(it.containsPerUnit || it.contains || it.conversion || 1);
+          const baseQty = Number(it.baseQuantity || (qty * conversion));
+          
           const prev = topMap.get(pid) || { name: it.name || 'Produk', qty: 0, price: Number(it.price || 0) };
-          topMap.set(pid, { ...prev, qty: prev.qty + Number(it.quantity || it.qty || 1) });
+          topMap.set(pid, { ...prev, qty: prev.qty + baseQty });
         }
       }
       

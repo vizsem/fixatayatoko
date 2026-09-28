@@ -37,7 +37,7 @@ async function exportAllUsers() {
   // Fetch Firestore user documents for role information
   const snapshot = await admin.firestore().collection('users').get();
   const roleMap: Record<string, string> = {};
-  snapshot.forEach(doc => {
+  snapshot.forEach((doc: any) => {
     const data = doc.data();
     if (data.role) {
       roleMap[doc.id] = data.role as string;
@@ -46,7 +46,7 @@ async function exportAllUsers() {
 
   do {
     const result = await admin.auth().listUsers(1000, nextPageToken);
-    result.users.forEach(u => {
+    result.users.forEach((u: any) => {
       const role = roleMap[u.uid];
       const customClaims = u.customClaims || {};
       if (role) {

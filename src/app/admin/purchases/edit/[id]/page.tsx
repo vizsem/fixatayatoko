@@ -244,8 +244,9 @@ function EditPurchaseFormContent() {
         notes: notes || undefined,
         items: cart.map(item => ({
           productId: item.id,
-          quantity: item.quantity * (item.conversion || 1),
-          unitPrice: (item.purchasePrice || 0) / (item.conversion || 1),
+          quantity: item.quantity,          // qty asli (misal 1 Dus) — backend yang konversi
+          unitPrice: item.purchasePrice,    // harga beli per satuan — backend yang konversi
+          unit: item.unit,                  // satuan beli (Dus, Karton, dll)
         })),
       });
 

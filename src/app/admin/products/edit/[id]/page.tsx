@@ -956,8 +956,25 @@ export default function EditProductPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Modal</label>
-                <input required type="number" className="w-full p-4 bg-gray-100 rounded-2xl border-none font-black" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Modal / Satuan</label>
+                <div className="flex bg-gray-100 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                  <input required type="number" className="w-full p-4 bg-transparent border-none font-black focus:ring-0" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
+                  <select 
+                    className="bg-gray-200 border-none font-bold text-gray-600 px-4 focus:ring-0"
+                    value={formData.Satuan_Modal || 'Pcs'}
+                    onChange={e => setFormData({ ...formData, Satuan_Modal: e.target.value })}
+                  >
+                    <option value="Pcs">Pcs</option>
+                    <option value="Dus">Dus</option>
+                    <option value="Pack">Pack</option>
+                    <option value="Box">Box</option>
+                    <option value="Karton">Karton</option>
+                    <option value="Lusin">Lusin</option>
+                    <option value="Kodi">Kodi</option>
+                    <option value="Gross">Gross</option>
+                    <option value="Roll">Roll</option>
+                  </select>
+                </div>
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between items-center">

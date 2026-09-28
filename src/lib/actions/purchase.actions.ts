@@ -257,7 +257,7 @@ export async function createPurchaseOrder(data: {
             expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
             reference: poNumber,
             notes: `Pembelian Langsung (${item.quantity} ${item.unit || 'PCS'}): ${poNumber}`,
-            incomingPrice: item.unitPrice,
+            incomingPrice: item.conversion ? (item.unitPrice / item.conversion) : item.unitPrice,
           });
         }
       }
@@ -313,7 +313,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
           expiryDate: expiryDate ? new Date(expiryDate) : undefined,
           reference: raw.poNumber || poId,
           notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${raw.poNumber || poId}`,
-          incomingPrice: item.unitPrice,
+          incomingPrice: conversion ? (item.unitPrice / conversion) : item.unitPrice,
         });
       }
     }
@@ -386,15 +386,52 @@ export async function updatePurchaseOrder(
     const oldItems = raw.items || [];
     const oldWarehouseId = raw.warehouseId || 'gudang-utama';
     
-    // 1. Calculate Deltas
-    const newItems = data.items;
+    // 1. Calculate Enriched Items first so we have accurate conversions
+    let supplierName = raw.supplierName || 'Supplier';
+    try {
+      const { data: sup } = await supabaseAdmin.from('suppliers').select('raw_data, name').eq('id', data.supplierId).single();
+      if (sup) supplierName = sup.name || sup.raw_data?.name || supplierName;
+    } catch {}
+
+    const enrichedItems = await Promise.all(
+      data.items.map(async (item, idx) => {
+        let name = `Produk ${item.productId}`;
+        let unit = item.unit || 'PCS';
+        let conversion = 1;
+        try {
+          const { data: prod } = await supabaseAdmin.from('products').select('name, unit, raw_data').eq('id', item.productId).single();
+          if (prod) {
+            name = prod.name || prod.raw_data?.name || name;
+            if (!item.unit) {
+              unit = prod.unit || prod.raw_data?.unit || unit;
+            }
+            const rawUnits = prod.raw_data?.units || [];
+            const found = rawUnits.find((u: any) => u.code === unit);
+            if (found && found.contains) conversion = Number(found.contains);
+          }
+        } catch {}
+        return {
+          id: `item_${idx}_${Date.now()}`,
+          productId: item.productId,
+          name,
+          unit,
+          conversion,
+          quantity: item.quantity,
+          purchasePrice: item.unitPrice,
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice,
+        };
+      })
+    );
+
+    const newItems = enrichedItems;
     
     // We only need to adjust stock if PO is already received
     if (normStatus === 'RECEIVED' || data.autoReceive) {
       for (const newItem of newItems) {
         const oldItem = oldItems.find((oi: any) => oi.productId === newItem.productId);
         const oldQty = oldItem ? Number(oldItem.quantity || 1) * Number(oldItem.conversion || 1) : 0;
-        const newQty = newItem.quantity;
+        const newQty = Number(newItem.quantity || 1) * Number(newItem.conversion || 1);
         const delta = newQty - oldQty;
         
         if (delta > 0) {
@@ -407,7 +444,7 @@ export async function updatePurchaseOrder(
             expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
             reference: id,
             notes: `Edit PO (Penambahan ${delta}): ${id}`,
-            incomingPrice: newItem.unitPrice,
+            incomingPrice: newItem.conversion ? (newItem.unitPrice / newItem.conversion) : newItem.unitPrice,
           });
         } else if (delta < 0) {
           // Kurangi stok
@@ -447,43 +484,6 @@ export async function updatePurchaseOrder(
 
     // 2. Update Purchase Order Record
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    
-    let supplierName = raw.supplierName || 'Supplier';
-    try {
-      const { data: sup } = await supabaseAdmin.from('suppliers').select('raw_data, name').eq('id', data.supplierId).single();
-      if (sup) supplierName = sup.name || sup.raw_data?.name || supplierName;
-    } catch {}
-
-    const enrichedItems = await Promise.all(
-      data.items.map(async (item, idx) => {
-        let name = `Produk ${item.productId}`;
-        let unit = item.unit || 'PCS';
-        let conversion = 1;
-        try {
-          const { data: prod } = await supabaseAdmin.from('products').select('name, unit, raw_data').eq('id', item.productId).single();
-          if (prod) {
-            name = prod.name || prod.raw_data?.name || name;
-            if (!item.unit) {
-              unit = prod.unit || prod.raw_data?.unit || unit;
-            }
-            const rawUnits = prod.raw_data?.units || [];
-            const found = rawUnits.find((u: any) => u.code === unit);
-            if (found && found.contains) conversion = Number(found.contains);
-          }
-        } catch {}
-        return {
-          id: `item_${idx}_${Date.now()}`,
-          productId: item.productId,
-          name,
-          unit,
-          conversion,
-          quantity: item.quantity,
-          purchasePrice: item.unitPrice,
-          unitPrice: item.unitPrice,
-          totalPrice: item.quantity * item.unitPrice,
-        };
-      })
-    );
 
     const updatedRaw = {
       ...raw,

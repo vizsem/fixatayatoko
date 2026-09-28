@@ -91,7 +91,7 @@ async function run() {
 
   for (const product of allProducts) {
     // Only update if category is empty, GENERAL, TIDAK ADA KATEGORI, or null
-    const currentCategory = product.category || (product.raw_data && (product.raw_data.category || product.raw_data.Kategori));
+    const currentCategory = String(product.category || (product.raw_data && (product.raw_data.category || product.raw_data.Kategori)) || '');
     const isUncategorized = !currentCategory || 
                             currentCategory === '' || 
                             currentCategory.toUpperCase() === 'GENERAL' || 
