@@ -344,14 +344,14 @@ export default function AdminInventory() {
                                     <input
                                       type="number"
                                       className="w-16 text-center text-xs border border-blue-300 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                      value={quickAdjust.value}
+                                      value={quickAdjust!.value}
                                       onChange={e => setQuickAdjust(q => q ? { ...q, value: e.target.value } : null)}
                                       placeholder="±"
                                       autoFocus
                                     />
                                     <button
                                       onClick={async () => {
-                                        const qty = Number(quickAdjust.value);
+                                        const qty = Number(quickAdjust!.value);
                                         if (!qty || isNaN(qty)) { setQuickAdjust(null); return; }
                                         setSaving(true);
                                         const result = await adjustStock({ productId: b.product.id, warehouseId: b.warehouseId, quantity: qty, notes: 'Quick Adjust dari Inventori' });
