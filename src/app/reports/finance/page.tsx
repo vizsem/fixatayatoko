@@ -13,8 +13,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, doc, getDocs, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 
 type FinancialRecord = {
   id: string;
@@ -70,48 +69,43 @@ export default function FinanceReport() {
         const endDate = new Date(dateRange.endDate);
         endDate.setHours(23, 59, 59, 999);
         
-        // Ambil data penjualan (pendapatan)
-        const salesSnapshot = await getDocs(
-          query(
-            collection(db, 'orders'),
-            where('createdAt', '>=', startDate),
-            where('createdAt', '<=', endDate),
-            where('status', 'in', ['SELESAI', 'SUCCESS'])
-          )
-        );
-        
-        // Ambil data pembelian (pengeluaran)
-        const purchasesSnapshot = await getDocs(
-          query(
-            collection(db, 'purchases'),
-            where('createdAt', '>=', startDate),
-            where('createdAt', '<=', endDate)
-          )
-        );
+        // Ambil data penjualan & pembelian dari Supabase
+        const [salesSnapshot, purchasesSnapshot] = await Promise.all([
+          sbGetDocs({ table: 'orders' }),
+          sbGetDocs({ table: 'purchases' })
+        ]);
         
         const financeRecords: FinancialRecord[] = [];
         
         // Tambahkan pendapatan dari penjualan
         salesSnapshot.docs.forEach(doc => {
           const data = doc.data();
+          const pDate = data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date());
+          if (pDate < startDate || pDate > endDate) return;
+          const status = String(data.status || '').toUpperCase();
+          if (status !== 'SELESAI' && status !== 'SUCCESS') return;
+
           financeRecords.push({
             id: doc.id,
-            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
+            date: pDate.toISOString(),
             description: `Penjualan #${doc.id.substring(0, 8)}`,
             category: 'Penjualan',
             type: 'income',
             amount: Number(data.total || 0),
-            paymentMethod: data.payment?.method || data.paymentMethod || 'CASH'
+            paymentMethod: data.payment?.method || data.paymentMethod || data.payment_method || 'CASH'
           });
         });
         
         // Tambahkan pengeluaran dari pembelian
         purchasesSnapshot.docs.forEach(doc => {
           const data = doc.data();
+          const pDate = data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date());
+          if (pDate < startDate || pDate > endDate) return;
+
           financeRecords.push({
             id: `PUR-${doc.id}`,
-            date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt || new Date().toISOString()),
-            description: `Pembelian dari ${data.supplierName}`,
+            date: pDate.toISOString(),
+            description: `Pembelian dari ${data.supplierName || 'Supplier'}`,
             category: 'Pembelian',
             type: 'expense',
             amount: Number(data.total || 0),

@@ -17,6 +17,7 @@ import { createPurchaseOrder } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
+import { supabase } from '@/lib/supabase';
 import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
@@ -67,7 +68,6 @@ function AddPurchaseFormContent() {
     const fetchDuplicateData = async () => {
       setIsDuplicating(true);
       try {
-        const docRef = doc(db, 'purchases', duplicateFrom);
         const docSnap = await sbGetDoc('purchases', duplicateFrom);
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -111,27 +111,25 @@ function AddPurchaseFormContent() {
   }, [duplicateFrom, productsLoading, liveProducts, duplicateLoaded]);
 
   useEffect(() => {
-    getSuppliers().then(s => {
-      if (s && s.length > 0) setSuppliers(s as any[]);
-    }).catch(() => {});
-    getWarehouses().then(w => {
-      if (w && w.length > 0) setWarehouses(w as any[]);
-    }).catch(() => {});
+    const loadMeta = () => {
+      getSuppliers().then(s => {
+        if (s && s.length > 0) setSuppliers(s as any[]);
+      }).catch(() => {});
+      getWarehouses().then(w => {
+        if (w && w.length > 0) setWarehouses(w as any[]);
+      }).catch(() => {});
+    };
 
-    const unsubSup = onSnapshot(collection(db, 'suppliers'), (s) => {
-      if (!s.empty) {
-        setSuppliers(s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Supplier)));
-      }
-    }, () => {});
-    const unsubWar = onSnapshot(collection(db, 'warehouses'), (s) => {
-      if (!s.empty) {
-        const base = s.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Warehouse));
-        setWarehouses(base.sort((a, b) => a.name.localeCompare(b.name)));
-      }
-    }, () => {});
+    loadMeta();
+
+    const channel = supabase
+      .channel('purchases_add_meta_rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, loadMeta)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'warehouses' }, loadMeta)
+      .subscribe();
+
     return () => {
-      unsubSup();
-      unsubWar();
+      supabase.removeChannel(channel);
     };
   }, [liveProducts]);
 

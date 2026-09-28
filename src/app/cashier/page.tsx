@@ -679,10 +679,46 @@ export default function CashierPOS() {
     
     fetchProducts();
     
-    // Refresh data setiap 2 menit
+    // Refresh data setiap 2 menit + realtime subscription
     const interval = setInterval(fetchProducts, 120000);
-    return () => clearInterval(interval);
+    const prodChannel = supabase
+      .channel('cashier_products_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(prodChannel);
+    };
   }, [loading]);
+
+  // Helper untuk normalisasi baris order dari Supabase
+  const mapOrderRow = useCallback((d: any): Order => {
+    const raw = d.raw_data || {};
+    return {
+      id: d.id,
+      customerName: d.customer_name || raw.customerName || 'Pelanggan',
+      customerPhone: d.customer_phone || raw.customerPhone || '',
+      items: (Array.isArray(d.items) && d.items.length > 0 ? d.items : raw.items) || [],
+      total: Number(d.total ?? raw.total ?? 0),
+      paymentMethod: raw.paymentMethod || d.payment?.method || d.payment_method || 'CASH',
+      deliveryMethod: raw.deliveryMethod || d.delivery?.method || 'PICKUP',
+      status: d.status || raw.status || 'SELESAI',
+      createdAt: d.created_at ? new Date(d.created_at) : (raw.createdAt ? new Date(raw.createdAt) : new Date()),
+      subtotal: Number(raw.subtotal ?? d.total ?? 0),
+      shippingCost: Number(raw.shippingCost ?? 0),
+      transactionType: raw.transactionType || 'STORE',
+      payAmount: Number(raw.payAmount ?? 0),
+      changeAmount: Number(raw.changeAmount ?? 0),
+      shiftId: raw.shiftId || '',
+    };
+  }, []);
 
   // Listen for Unread Chats (Admin)
   useEffect(() => {
@@ -722,12 +758,38 @@ export default function CashierPOS() {
 
   useEffect(() => {
     if (activeTab !== 'orders') return;
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCompletedOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
-    });
-    return () => unsubscribe();
-  }, [activeTab]);
+    
+    const fetchCompleted = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (!error && data) {
+          setCompletedOrders(data.map(mapOrderRow));
+        }
+      } catch (err) {
+        console.error('Error fetching completed orders:', err);
+      }
+    };
+    fetchCompleted();
+
+    const channel = supabase
+      .channel('cashier_completed_orders_rt')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          fetchCompleted();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTab, mapOrderRow]);
 
   useEffect(() => {
     const term = searchQuery.toLowerCase().trim();
@@ -752,17 +814,41 @@ export default function CashierPOS() {
 
   useEffect(() => {
     if (loading) return;
-    const q = query(collection(db, 'orders'), where('status', '==', 'MENUNGGU'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRecentOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
-      setNewOrderCount(snapshot.docs.length);
-      if (!snapshot.empty) {
-        // setShowNotification(true);
-        // setTimeout(() => setShowNotification(false), 5000);
+
+    const fetchPending = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('status', 'MENUNGGU')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          const mapped = data.map(mapOrderRow);
+          setRecentOrders(mapped);
+          setNewOrderCount(mapped.length);
+        }
+      } catch (err) {
+        console.error('Error fetching pending orders:', err);
       }
-    });
-    return () => unsubscribe();
-  }, [loading]);
+    };
+    fetchPending();
+
+    const channel = supabase
+      .channel('cashier_pending_orders_rt')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          fetchPending();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loading, mapOrderRow]);
 
 
   // --- SHIFT MANAGEMENT ---
@@ -801,25 +887,31 @@ export default function CashierPOS() {
     if (!currentShift) return;
     setLoading(true);
     try {
-      // Calculate totals from orders
-      const q = query(
-        collection(db, 'orders'), 
-        where('shiftId', '==', currentShift.id),
-        where('status', 'in', ['SELESAI', 'DIPROSES'])
-      );
-      const snap = await getDocs(q);
-      
+      // Calculate totals from Supabase orders
+      const { data: shiftOrders, error: ordersErr } = await supabase
+        .from('orders')
+        .select('*');
+
       let cashSales = 0;
       let nonCashSales = 0;
-      
-      snap.forEach(d => {
-        const data = d.data() as Order;
-        if (data.paymentMethod === 'CASH') {
-          cashSales += (data.payAmount || data.total);
-        } else {
-          nonCashSales += data.total;
-        }
-      });
+
+      if (!ordersErr && shiftOrders) {
+        shiftOrders.forEach((d: any) => {
+          const raw = d.raw_data || {};
+          const status = d.status || raw.status;
+          const shiftId = raw.shiftId || d.shift_id;
+          if (shiftId === currentShift.id && (status === 'SELESAI' || status === 'DIPROSES')) {
+            const payMethod = raw.paymentMethod || d.payment?.method || d.payment_method || 'CASH';
+            const total = Number(d.total ?? raw.total ?? 0);
+            const payAmount = Number(raw.payAmount ?? total);
+            if (payMethod === 'CASH') {
+              cashSales += (payAmount || total);
+            } else {
+              nonCashSales += total;
+            }
+          }
+        });
+      }
       
       setShiftSummary({
         totalCash: cashSales,

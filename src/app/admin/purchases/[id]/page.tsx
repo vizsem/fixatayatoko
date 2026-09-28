@@ -164,8 +164,7 @@ export default function PurchaseDetail() {
           return;
         }
 
-        // 2. Fallback ke Firestore
-        const docRef = doc(db, 'purchases', id as string);
+        // 2. Fetch data via sbGetDoc
         const snap = await sbGetDoc('purchases', id as string);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);

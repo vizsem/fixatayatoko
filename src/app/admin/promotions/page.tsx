@@ -12,8 +12,8 @@ import {
   BarChart3, CheckCircle2, Power, Search, Filter
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import { sbDeleteDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { collection, db, doc, onSnapshot, orderBy, query } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { sbDeleteDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { PromoType } from './add/page';
 
 type Promotion = {
@@ -66,28 +66,43 @@ export default function PromotionsPage() {
     }
   }, [authLoading, adminId]);
 
-  // Fetch promosi real-time
+  // Fetch promosi real-time via Supabase
   useEffect(() => {
     if (loading) return;
 
-    const q = query(collection(db, 'promotions'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const promoList = snapshot.docs.map((doc) => ({
+    const fetchPromotions = async () => {
+      try {
+        const snap = await sbGetDocs({ table: 'promotions' });
+        const promoList = snap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Promotion[];
 
+        promoList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setPromotions(promoList);
         setError(null);
-      },
-      () => {
+      } catch (err) {
+        console.error('Error fetching promotions:', err);
         setError('Gagal memuat data promosi.');
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchPromotions();
+
+    const channel = supabase
+      .channel('admin_promotions_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'promotions' },
+        () => {
+          fetchPromotions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loading]);
 
   const handleDelete = async (id: string, name: string) => {
