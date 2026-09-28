@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
+import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import { supabase } from '@/lib/supabase';
 import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
@@ -383,7 +384,7 @@ export default function EditProductPage() {
 
   const handleAddUnit = () => {
     if (!newUnitCode) return;
-    const code = newUnitCode.toUpperCase();
+    const code = normalizeSatuan(newUnitCode);
     if (units.some(u => u.code === code)) {
       toast.error('Satuan sudah ada');
       return;
@@ -963,18 +964,12 @@ export default function EditProductPage() {
                   <input required type="number" className="w-full p-4 bg-transparent border-none font-black focus:ring-0" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
                   <select 
                     className="bg-gray-200 border-none font-bold text-gray-600 px-4 focus:ring-0"
-                    value={formData.Satuan_Modal || 'Pcs'}
+                    value={formData.Satuan_Modal || SATUAN_DEFAULT}
                     onChange={e => setFormData({ ...formData, Satuan_Modal: e.target.value })}
                   >
-                    <option value="Pcs">Pcs</option>
-                    <option value="Dus">Dus</option>
-                    <option value="Pack">Pack</option>
-                    <option value="Box">Box</option>
-                    <option value="Karton">Karton</option>
-                    <option value="Lusin">Lusin</option>
-                    <option value="Kodi">Kodi</option>
-                    <option value="Gross">Gross</option>
-                    <option value="Roll">Roll</option>
+                    {SATUAN_LIST.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1186,18 +1181,21 @@ export default function EditProductPage() {
                 <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
               </div>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Kode Satuan (Ex: LUSIN)"
-                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500 w-40"
+                <select
+                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
                   value={newUnitCode}
                   onChange={(e) => setNewUnitCode(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
-                />
+                >
+                  <option value="">-- Pilih Satuan --</option>
+                  {SATUAN_LIST.filter(s => !units.some(u => u.code === s.value)).map(s => (
+                    <option key={s.value} value={s.value}>{s.label} – {s.desc}</option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   onClick={handleAddUnit}
-                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all"
+                  disabled={!newUnitCode}
+                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all disabled:opacity-40"
                 >
                   + Tambah
                 </button>

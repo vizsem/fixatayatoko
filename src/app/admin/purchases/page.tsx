@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
   ChevronRight, Download, Filter, Truck, ClipboardList
@@ -450,16 +451,9 @@ export default function AdminPurchases() {
                             ))
                           ) : (
                             <>
-                              <option value="PCS">PCS</option>
-                              <option value="DUS">DUS</option>
-                              <option value="KARTON">KARTON</option>
-                              <option value="SLOP">SLOP</option>
-                              <option value="PAK">PAK</option>
-                              <option value="BAL">BAL</option>
-                              <option value="POUCH">POUCH</option>
-                              <option value="BANTAL">BANTAL</option>
-                              <option value="KG">KG</option>
-                              <option value="LITER">LITER</option>
+                              {SATUAN_LIST.map(s => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                              ))}
                             </>
                           )}
                         </select>
