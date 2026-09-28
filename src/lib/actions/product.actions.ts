@@ -253,6 +253,20 @@ export async function saveEditedProduct(id: string, payload: {
 
     if (error) throw error;
 
+    if (payload.category) {
+      const { data: existingCat } = await supabaseAdmin.from('categories').select('id').ilike('name', payload.category).maybeSingle();
+      if (!existingCat) {
+        const catId = `cat_${Date.now()}`;
+        await supabaseAdmin.from('categories').insert({
+          id: catId,
+          name: payload.category,
+          raw_data: { name: payload.category, createdAt: now },
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    }
+
     revalidatePath('/admin/products');
     revalidatePath('/admin/inventory');
     revalidatePath(`/admin/products/edit/${id}`);
@@ -539,6 +553,21 @@ export async function addProductFull(payload: {
     });
 
     if (error) throw error;
+
+    if (payload.Kategori) {
+      const { data: existingCat } = await supabaseAdmin.from('categories').select('id').ilike('name', payload.Kategori).maybeSingle();
+      if (!existingCat) {
+        const catId = `cat_${Date.now()}`;
+        await supabaseAdmin.from('categories').insert({
+          id: catId,
+          name: payload.Kategori,
+          raw_data: { name: payload.Kategori, createdAt: now },
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    }
+
     revalidatePath('/admin/products');
     return { success: true, data: { id, name: displayName, sku } };
   } catch (error: any) {
