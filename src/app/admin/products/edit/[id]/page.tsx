@@ -1195,7 +1195,7 @@ export default function EditProductPage() {
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={code} className="p-4 rounded-2xl border bg-gray-50 relative group">
+                  <div key={idx} className="p-4 rounded-2xl border bg-gray-50 relative group">
                     {code !== 'PCS' && (
                       <button
                         type="button"
@@ -1360,6 +1360,26 @@ export default function EditProductPage() {
                           }}
                         />
                       </div>
+                      {code !== 'PCS' && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-orange-600 uppercase">Modal / {code}</span>
+                            <span className="text-[10px] font-bold text-gray-400">Kalkulator otomatis</span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="Ketik modal..."
+                            className="w-32 bg-orange-50 p-3 rounded-xl text-sm font-black text-orange-700 text-right outline-none border border-orange-100 placeholder:text-orange-300"
+                            value={formData.Modal && contains ? formData.Modal * contains : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              if (contains && contains > 0) {
+                                setFormData({ ...formData, Modal: Math.round(val / contains) });
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-black text-gray-500 uppercase">Min Qty</span>
                         <input

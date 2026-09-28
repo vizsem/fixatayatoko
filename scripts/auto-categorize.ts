@@ -45,7 +45,7 @@ const categoryMapping = [
   { category: 'Perlengkapan', keywords: ['korek', 'baterai', 'alkaline', 'abc'] }
 ];
 
-function determineCategory(name) {
+function determineCategory(name: string): string | null {
   const lowerName = name.toLowerCase();
   for (const mapping of categoryMapping) {
     if (mapping.keywords.some(keyword => lowerName.includes(keyword))) {
@@ -59,7 +59,7 @@ async function run() {
   console.log('Fetching all products...');
   
   // Ambil semua produk
-  let allProducts = [];
+  let allProducts: Array<{ id: string; name: string; category: string | null; raw_data: Record<string, unknown> }> = [];
   let page = 0;
   const limit = 1000;
   let hasMore = true;
@@ -87,7 +87,7 @@ async function run() {
 
   let updatedCount = 0;
   const updates = [];
-  const categoryCounts = {};
+  const categoryCounts: Record<string, number> = {};
 
   for (const product of allProducts) {
     // Only update if category is empty, GENERAL, TIDAK ADA KATEGORI, or null
@@ -124,7 +124,7 @@ async function run() {
 
   // Print summary of what will be updated
   console.log('\nCategory assignment summary:');
-  for (const [cat, count] of Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])) {
+  for (const [cat, count] of Object.entries(categoryCounts).sort((a, b) => (b[1] as number) - (a[1] as number))) {
     console.log(`- ${cat}: ${count} products`);
   }
 
