@@ -1,6 +1,6 @@
 'use server'
 
-import { deductStockFEFO } from '../inventory'
+import { deductStockFEFO, addInventoryLog } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
 import { limit } from '@/lib/firebase';
@@ -10,7 +10,7 @@ type SalesItemInput = {
   unitPrice: number
 }
 
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function getSalesOrders(filters?: { status?: string; customerId?: string; limit?: number }) {
   try {
@@ -171,15 +171,145 @@ export async function createSalesOrder(data: {
   }
 }
 
-export async function updateSalesOrderStatus(id: string, status: string) {
+export async function cancelSalesOrder(params: {
+  orderId: string;
+  restockStock?: boolean;
+  reason?: string;
+  adminId?: string;
+}) {
+  try {
+    const { orderId, restockStock = true, reason, adminId = 'system' } = params;
+    const now = new Date().toISOString();
+
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .or(`id.eq.${orderId},order_id.eq.${orderId}`)
+      .maybeSingle();
+
+    if (orderErr || !order) {
+      return { success: false, error: 'Pesanan tidak ditemukan' };
+    }
+
+    const currentStatus = (order.status || '').toUpperCase();
+    if (currentStatus === 'CANCELLED' || currentStatus === 'DIBATALKAN') {
+      return { success: false, error: 'Pesanan sudah dibatalkan sebelumnya' };
+    }
+
+    const raw = order.raw_data || {};
+    const items = order.items || raw.items || [];
+    const warehouseId = raw.warehouseId || order.warehouse_id || 'gudang-utama';
+
+    // 1. Jika restockStock dipilih, kembalikan stok untuk setiap item ke tabel products
+    if (restockStock && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        const productId = item.productId || item.id;
+        if (!productId) continue;
+
+        const contains = Number(item.containsPerUnit || item.contains || 1);
+        const qtyToReturn = Number(item.baseQuantity || (Number(item.quantity || 0) * contains));
+
+        if (qtyToReturn <= 0) continue;
+
+        const { data: prod } = await supabaseAdmin
+          .from('products')
+          .select('stock, stockByWarehouse, name')
+          .eq('id', productId)
+          .maybeSingle();
+
+        if (prod) {
+          const currentTotalStock = Number(prod.stock || 0);
+          const stockByWarehouse = (prod.stockByWarehouse as Record<string, number>) || {};
+          const currentWarehouseStock = Number(stockByWarehouse[warehouseId] || 0);
+
+          const newTotalStock = currentTotalStock + qtyToReturn;
+          const newWarehouseStock = currentWarehouseStock + qtyToReturn;
+          const updatedStockByWarehouse = {
+            ...stockByWarehouse,
+            [warehouseId]: newWarehouseStock,
+          };
+
+          await supabaseAdmin
+            .from('products')
+            .update({
+              stock: newTotalStock,
+              stockByWarehouse: updatedStockByWarehouse,
+              updated_at: now,
+            })
+            .eq('id', productId);
+
+          await addInventoryLog({
+            productId,
+            productName: prod.name || item.name,
+            amount: qtyToReturn,
+            quantity: qtyToReturn,
+            type: 'IN',
+            source: 'ORDER_CANCEL',
+            warehouseId,
+            adminId,
+            referenceId: order.order_id || order.id,
+            notes: `Pengembalian stok pembatalan pesanan #${order.order_id || order.id}${reason ? ` (${reason})` : ''}`,
+            prevStock: currentTotalStock,
+            nextStock: newTotalStock,
+          });
+        }
+      }
+    }
+
+    // 2. Update status order menjadi CANCELLED
+    raw.status = 'CANCELLED';
+    raw.cancelledAt = now;
+    raw.cancelledBy = adminId;
+    raw.cancelReason = reason || 'Dibatalkan oleh admin';
+    raw.isRestocked = restockStock;
+    raw.updatedAt = now;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'CANCELLED',
+        raw_data: raw,
+        updated_at: now,
+      })
+      .eq('id', order.id);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/reports/finance');
+    revalidatePath('/admin/reports/sales');
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error cancelling order:', err);
+    return { success: false, error: err.message || 'Gagal membatalkan pesanan' };
+  }
+}
+
+export async function updateSalesOrderStatus(
+  id: string,
+  status: string,
+  options?: { restockStock?: boolean; reason?: string; adminId?: string }
+) {
+  if (status === 'CANCELLED' || status === 'DIBATALKAN') {
+    return cancelSalesOrder({
+      orderId: id,
+      restockStock: options?.restockStock ?? true,
+      reason: options?.reason,
+      adminId: options?.adminId,
+    });
+  }
+
   try {
     const now = new Date().toISOString();
-    const { data: existing } = await supabase.from('orders').select('*').eq('id', id).single();
+    const { data: existing } = await supabaseAdmin.from('orders').select('*').eq('id', id).single();
     const raw = existing?.raw_data || {};
     raw.status = status;
     raw.updatedAt = now;
 
-    const { error } = await supabase.from('orders').update({
+    const { error } = await supabaseAdmin.from('orders').update({
       status,
       raw_data: raw,
       updated_at: now,

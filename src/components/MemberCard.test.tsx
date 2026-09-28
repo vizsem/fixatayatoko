@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import MemberCard from './MemberCard';
 
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: () => <div data-testid="qr-code">QR Code</div>
+}));
+
 describe('MemberCard', () => {
   const defaultProps = {
     name: 'John Doe',

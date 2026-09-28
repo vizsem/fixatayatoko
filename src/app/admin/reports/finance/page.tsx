@@ -203,6 +203,11 @@ let unsub: (() => void) | undefined;
           const order = od.data() as any;
           const created = parseDateAny(order.createdAt);
           if (!(created >= startDate && created <= endDate)) continue;
+
+          // Lewati pesanan yang dibatalkan agar tidak terhitung di pendapatan, HPP, & arus kas
+          const orderStatus = (order.status || '').toUpperCase();
+          if (['CANCELLED', 'DIBATALKAN', 'BATAL'].includes(orderStatus)) continue;
+
           let goodsRev = 0, totalCost = 0;
           (order.items || []).forEach((it: any) => {
             const price = Number(it.price || 0), qty = Number(it.quantity || 1), pid = it.id || it.productId;

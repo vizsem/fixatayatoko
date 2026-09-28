@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import {
   ShoppingCart, Search, Truck, Printer,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
-  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar
+  Clock, CheckCircle2, Trash2, RefreshCcw, Calendar,
+  AlertTriangle, Ban, X, Loader2, Package
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
-import { getSalesOrders, updateSalesOrderStatus } from '@/lib/actions/sales.actions';
+import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder } from '@/lib/actions/sales.actions';
 
 import { limit } from '@/lib/firebase';
 type Order = {
@@ -34,6 +35,12 @@ export default function AdminOrders() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
+
+  // State Modal Pembatalan & Restock
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [restockStock, setRestockStock] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -65,7 +72,31 @@ export default function AdminOrders() {
     loadOrders();
   };
 
-  const handleBulkCancel = () => handleBulkUpdate('CANCELLED');
+  const handleConfirmCancel = async () => {
+    if (selectedOrders.length === 0 || isCancelling) return;
+    setIsCancelling(true);
+    const t = notify.admin.loading(`Membatalkan ${selectedOrders.length} pesanan...`);
+    let successCount = 0;
+    for (const orderId of selectedOrders) {
+      const result = await cancelSalesOrder({
+        orderId,
+        restockStock,
+        reason: cancelReason || 'Dibatalkan massal oleh admin',
+      });
+      if (result.success) successCount++;
+    }
+    notify.dismiss(t);
+    setIsCancelling(false);
+    setIsCancelModalOpen(false);
+    setCancelReason('');
+    if (successCount > 0) {
+      notify.admin.success(
+        `${successCount} pesanan dibatalkan${restockStock ? ' & stok telah dikembalikan ke gudang' : ''}`
+      );
+    }
+    setSelectedOrders([]);
+    loadOrders();
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
@@ -219,13 +250,143 @@ export default function AdminOrders() {
         </div>
       )}
 
+      {/* Floating Action Bar Proporsional & Modern */}
       {selectedOrders.length > 0 && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 p-2 rounded-[2.5rem] shadow-2xl flex items-center gap-2 z-[100] animate-in slide-in-from-bottom-10">
-          <div className="px-4 py-2 bg-white/10 rounded-full text-xs font-black text-white">{selectedOrders.length} SELECTED</div>
-          <button onClick={handleBulkCancel} className="px-5 py-2.5 bg-rose-600 text-white rounded-full text-xs font-black uppercase">Cancel</button>
-          <button onClick={() => handleBulkUpdate('PICKING')} className="px-5 py-2.5 bg-amber-500 text-white rounded-full text-xs font-black uppercase">Process</button>
-          <button onClick={() => handleBulkUpdate('DELIVERING')} className="px-5 py-2.5 bg-blue-600 text-white rounded-full text-xs font-black uppercase">Ship</button>
-          <button onClick={() => handleBulkUpdate('COMPLETED')} className="px-5 py-2.5 bg-emerald-600 text-white rounded-full text-xs font-black uppercase">Done</button>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] max-w-[95vw] animate-in slide-in-from-bottom-6 duration-200">
+          <div className="bg-slate-950/95 backdrop-blur-xl border border-slate-800 shadow-2xl rounded-2xl p-1.5 md:p-2 flex items-center gap-1.5 md:gap-2.5 text-white">
+            {/* Counter & Clear Selection */}
+            <div className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white/10 rounded-xl text-xs font-bold text-slate-200 whitespace-nowrap">
+              <span>{selectedOrders.length} Dipilih</span>
+              <button
+                onClick={() => setSelectedOrders([])}
+                className="text-slate-400 hover:text-white p-0.5 rounded-lg transition-colors"
+                title="Batal pilih semua"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Tombol Cancel / Batal (Aksi Destruktif yang Aman) */}
+            <button
+              onClick={() => setIsCancelModalOpen(true)}
+              className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+              title="Batalkan pesanan dan kembalikan stok"
+            >
+              <Ban size={14} />
+              <span>Batalkan</span>
+            </button>
+
+            {/* Divider Halus */}
+            <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+
+            {/* Operational Pipeline Actions */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleBulkUpdate('PICKING')}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Ubah status ke Proses (Picking/Packing)"
+              >
+                <Package size={14} className="text-amber-400" />
+                <span className="hidden sm:inline">Proses</span>
+              </button>
+
+              <button
+                onClick={() => handleBulkUpdate('DELIVERING')}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Ubah status ke Pengiriman (Delivering)"
+              >
+                <Truck size={14} className="text-blue-400" />
+                <span className="hidden sm:inline">Kirim</span>
+              </button>
+
+              <button
+                onClick={() => handleBulkUpdate('COMPLETED')}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Selesaikan pesanan (Completed)"
+              >
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                <span className="hidden sm:inline">Selesai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Pembatalan & Pengembalian Stok */}
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 z-[110] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
+              <AlertTriangle size={24} />
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">
+              Batalkan {selectedOrders.length} Pesanan Terpilih?
+            </h3>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1 mb-5">
+              Pesanan yang dibatalkan akan otomatis dikeluarkan dari perhitungan Laporan Keuangan (omzet, HPP, & laba).
+            </p>
+
+            {/* Opsi Pengembalian Stok */}
+            <div className="mb-4">
+              <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl cursor-pointer border border-slate-200/70 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={restockStock}
+                  onChange={e => setRestockStock(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                />
+                <div className="text-xs">
+                  <p className="font-bold text-slate-800">Kembalikan Stok ke Gudang (Restock)</p>
+                  <p className="text-slate-500 mt-0.5 leading-relaxed">
+                    Jumlah barang yang dipesan akan ditambahkan kembali ke inventaris dan tercatat di kartu stok (inventory log).
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Alasan Pembatalan (Opsional) */}
+            <div className="mb-6">
+              <label className="text-xs font-bold text-slate-600 mb-1.5 block">Alasan Pembatalan (Opsional)</label>
+              <input
+                type="text"
+                placeholder="Contoh: Permintaan pembeli, stok bermasalah, dsb."
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 transition-all placeholder:text-slate-400"
+              />
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCancelModalOpen(false);
+                  setCancelReason('');
+                }}
+                disabled={isCancelling}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={isCancelling}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Membatalkan...</span>
+                  </>
+                ) : (
+                  <span>Konfirmasi Pembatalan</span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
