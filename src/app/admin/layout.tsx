@@ -10,7 +10,7 @@ import {
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
   Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
-  DollarSign, AlertTriangle
+  DollarSign, AlertTriangle, ClipboardCheck
 } from 'lucide-react';
 
 import AdminMobileHeader from '@/components/AdminMobileHeader';
@@ -138,7 +138,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       group: "Katalog & Stok", items: [
         { name: 'Produk', href: '/admin/products', icon: Package },
+        { name: 'HPP & Margin Harga', href: '/admin/products/pricing-hpp', icon: DollarSign },
         { name: 'Harga per Channel', href: '/admin/products/channel-pricing', icon: Tag },
+        { name: 'Sampling Harian (5 Menit)', href: '/admin/inventory/daily-check', icon: ClipboardCheck },
         { name: 'Kategori', href: '/admin/kategori', icon: Tag },
         { name: 'Gudang', href: '/admin/warehouses', icon: Database },
         { name: 'Inventory', href: '/admin/inventory', icon: History },

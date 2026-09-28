@@ -11,8 +11,9 @@ import {
   Filter, Lightbulb, ArrowUpCircle, ArrowDownCircle, Wallet,
   FileText, BarChart3, CheckCircle, PieChart as PieChartIcon,
   Search, X, RotateCcw, Layers, ShoppingBag, Truck, DollarSign,
-  ArrowRight, Tag
+  ArrowRight, Tag, CalendarCheck
 } from 'lucide-react';
+import MonthlyClosingTab from '@/components/admin/finance/MonthlyClosingTab';
 import notify from '@/lib/notify';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { supabase } from '@/lib/supabase';
@@ -48,7 +49,7 @@ type CashFlowItem = {
   reference?: string;
 };
 
-type ActiveTab = 'overview' | 'income_statement' | 'cashflow';
+type ActiveTab = 'overview' | 'income_statement' | 'cashflow' | 'closing';
 
 const idr = (n: number) => `Rp${Math.abs(n).toLocaleString('id-ID')}`;
 function toLocal(d: Date) {
@@ -82,6 +83,7 @@ export default function FinanceReport() {
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [cashflowItems, setCashflowItems] = useState<CashFlowItem[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
+  const [totalInventoryValue, setTotalInventoryValue] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   // Overview Filters State
@@ -179,10 +181,15 @@ let unsub: (() => void) | undefined;
         salesSnap.docs.forEach(od => (od.data() as any).items?.forEach((it: any) => { const pid = it.id || it.productId; if (pid) pidsSet.add(pid); }));
         const pids = Array.from(pidsSet);
         const productsMap = new Map<string, any>();
-        for (let i = 0; i < pids.length; i += 10) {
-          const chunk = pids.slice(i, i + 10); if (!chunk.length) continue;
-          (await sbGetDocs({ table: 'products' })).forEach(ds => productsMap.set(ds.id, ds.data()));
-        }
+        const allProdSnap = await sbGetDocs({ table: 'products' });
+        allProdSnap.docs.forEach(ds => productsMap.set(ds.id, ds.data()));
+        let calculatedInv = 0;
+        productsMap.forEach((p: any) => {
+          const stk = Number(p.stock || p.Stok || 0);
+          const cst = Number(p.cost_price || p.Modal || p.purchasePrice || 0);
+          calculatedInv += Math.max(0, stk * cst);
+        });
+        setTotalInventoryValue(calculatedInv);
 
         const latestCostMap = new Map<string, { costPerPcs: number; ts: number }>();
         (await sbGetDocs({ table: 'purchases' })).docs.forEach(pd => {
@@ -688,6 +695,7 @@ let unsub: (() => void) | undefined;
     { key: 'overview', label: 'Ringkasan & Visual', Icon: LayoutDashboard },
     { key: 'income_statement', label: 'Laba Rugi (P&L)', Icon: TrendingUp },
     { key: 'cashflow', label: 'Arus Kas (Cash Flow)', Icon: Wallet },
+    { key: 'closing', label: 'Tutup Buku & Transisi Tanggal 1', Icon: CalendarCheck },
   ];
 
   return (
@@ -1635,6 +1643,16 @@ let unsub: (() => void) | undefined;
             </div>
           );
         })()}
+
+        {activeTab === 'closing' && (
+          <MonthlyClosingTab
+            incomeStatement={IS}
+            cashflow={CF}
+            inventoryValue={totalInventoryValue}
+            currentDateRange={dateRange}
+            onRefreshParent={() => setDateRange(prev => ({ ...prev }))}
+          />
+        )}
       </div>
 
       <style jsx global>{`
