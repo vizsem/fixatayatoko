@@ -423,8 +423,8 @@ export default function AdminPurchases() {
                 </div>
                 <div className="space-y-2">
                   {items.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-4">
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-gray-50/80 sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border border-gray-100 sm:border-0 relative">
+                      <div className="col-span-12 sm:col-span-4">
                         <ProductSearchCombobox
                           value={item.productId}
                           products={products}
@@ -432,7 +432,7 @@ export default function AdminPurchases() {
                           placeholder="Pilih / Cari Produk..."
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-6 sm:col-span-2">
                         <select
                           value={item.unit || 'PCS'}
                           onChange={e => {
@@ -443,7 +443,7 @@ export default function AdminPurchases() {
                               updateItem(idx, 'unitPrice', found.price);
                             }
                           }}
-                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold uppercase"
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white sm:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold uppercase"
                         >
                           {item.availableUnits && item.availableUnits.length > 0 ? (
                             item.availableUnits.map(u => (
@@ -458,25 +458,25 @@ export default function AdminPurchases() {
                           )}
                         </select>
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-6 sm:col-span-2">
                         <input
                           type="number" min="1" value={item.quantity}
                           onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
                           placeholder="Qty"
-                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white sm:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-10 sm:col-span-3">
                         <input
                           type="number" min="0" value={item.unitPrice}
                           onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))}
                           placeholder="Harga/unit"
-                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white sm:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
-                      <div className="col-span-1 flex justify-center">
+                      <div className="col-span-2 sm:col-span-1 flex justify-center">
                         {items.length > 1 && (
-                          <button onClick={() => removeItem(idx)} className="p-1 text-red-400 hover:text-red-600">
+                          <button onClick={() => removeItem(idx)} className="p-2 sm:p-1 text-red-400 hover:text-red-600 bg-red-50 sm:bg-transparent rounded-lg">
                             <X size={14} />
                           </button>
                         )}

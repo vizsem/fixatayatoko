@@ -180,7 +180,7 @@ export default function AdminMobileHeader() {
           </div>
 
           {/* Center: Search Bar */}
-          <div className="flex-1 max-w-md mx-4">
+          <div className="flex-1 max-w-[130px] xs:max-w-[180px] sm:max-w-xs md:max-w-md mx-1 sm:mx-4">
             <div className="relative">
               <input
                 type="search"
@@ -188,9 +188,9 @@ export default function AdminMobileHeader() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchOpen(true)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-green-500 transition-all"
+                className="w-full pl-8 sm:pl-10 pr-2 sm:pr-4 py-1.5 sm:py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-green-500 transition-all placeholder:text-gray-400"
               />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             </div>
           </div>
 

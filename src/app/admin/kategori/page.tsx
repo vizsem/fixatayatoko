@@ -202,9 +202,9 @@ export default function AdminCategories() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowModal(false)} />
-          <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 relative z-10 shadow-2xl animate-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 md:p-10 relative z-10 shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-10">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">{editId ? 'Edit Matrix' : 'New Matrix'}</h2>
