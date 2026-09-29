@@ -23,6 +23,22 @@ export type InventoryLogData = {
   [key: string]: any
 };
 
+/**
+ * Kalkulasi Harga Modal rata-rata (WAC — Weighted Average Cost / Moving Average).
+ *
+ * Formula: AVG_Baru = (Stok_Lama × AVG_Lama + Qty_Beli × Harga_Beli) / (Stok_Lama + Qty_Beli)
+ *
+ * Perilaku reset:
+ * - Jika currentStock = 0 (stok habis), maka AVG_Baru = incomingPrice secara otomatis,
+ *   karena tidak ada nilai persediaan lama yang perlu di-average. Ini sesuai standar
+ *   akuntansi (IFRS, SAK ETAP, SAK UMKM).
+ *
+ * @param currentStock  - Stok saat ini (satuan dasar / pcs)
+ * @param currentCost   - HPP/AVG saat ini per satuan dasar
+ * @param incomingQty   - Jumlah stok masuk (dalam satuan pembelian, mis. dus/karton)
+ * @param incomingPrice - Harga beli per satuan dasar (sudah dikonversi ke pcs)
+ * @param conversionRate - Konversi satuan pembelian → satuan dasar (default 1)
+ */
 export function computeAverageCost(
   currentStock: number,
   currentCost: number,
@@ -30,12 +46,25 @@ export function computeAverageCost(
   incomingPrice: number,
   conversionRate: number = 1
 ): number {
-  const incomingBaseQty = incomingQty * (conversionRate || 1);
-  const costPerBaseUnit = incomingBaseQty > 0 ? incomingPrice / (conversionRate || 1) : incomingPrice;
+  // Konversi qty beli ke satuan dasar (pcs)
+  const incomingBaseQty = Math.max(0, incomingQty * (conversionRate || 1));
+
+  // Harga per satuan dasar setelah konversi
+  const costPerBaseUnit = conversionRate > 1
+    ? incomingPrice / conversionRate
+    : incomingPrice;
+
   const totalQty = currentStock + incomingBaseQty;
+
+  // Guard: jika tidak ada stok sama sekali setelah pembelian, kembalikan harga beli
   if (totalQty <= 0) return Math.round(costPerBaseUnit);
-  const totalVal = (currentStock * currentCost) + (incomingQty * incomingPrice);
-  return Math.round(totalVal / totalQty);
+
+  // Jika stok lama = 0 (habis), AVG otomatis reset ke harga beli terbaru
+  // (formula WAC menghasilkan ini secara natural: 0 × oldCost + qty × price = qty × price)
+  const oldInventoryValue = Math.max(0, currentStock) * currentCost;
+  const newInventoryValue = incomingBaseQty * costPerBaseUnit;
+
+  return Math.round((oldInventoryValue + newInventoryValue) / totalQty);
 }
 
 export const addInventoryLog = async (logData: InventoryLogData, _batch?: any) => {
@@ -294,12 +323,26 @@ export const addStock = async (params: {
       newCostPrice = computeAverageCost(currentStock, currentCost, amount, incomingPrice, 1);
     }
 
+    // Sinkronkan modal/HPP ke seluruh unit (Satuan Lainnya) jika ada
+    let updatedUnits = raw.units;
+    if (Array.isArray(updatedUnits)) {
+      updatedUnits = updatedUnits.map((u: any) => {
+        const contains = Number(u.contains || (u.code === (raw.Satuan || raw.unit || 'PCS') ? 1 : 1));
+        return {
+          ...u,
+          modal: Math.round(newCostPrice * contains),
+          costPrice: Math.round(newCostPrice * contains),
+        };
+      });
+    }
+
     const now = new Date().toISOString();
     const updatedRaw = {
       ...raw,
       stock: newStock,
       stockByWarehouse,
       Modal: newCostPrice,
+      units: updatedUnits,
       updatedAt: now,
     };
 

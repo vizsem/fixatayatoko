@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
-import { collection, db, doc, getDocs, limit, orderBy, query, where, addDoc, Timestamp } from '@/lib/firebase';
+import { collection, db, getDocs, limit, orderBy, query, addDoc } from '@/lib/firebase';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
+import { updateProductPrice } from '@/lib/actions/product.actions';
 
 interface ProductItem {
   id: string;
@@ -89,7 +90,7 @@ export default function PricingHPPPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabase
         .from('products')
         .select('*')
         .or('is_active.eq.true,is_active.is.null')
@@ -98,7 +99,7 @@ export default function PricingHPPPage() {
 
       if (error) throw error;
 
-      const rawItems = (data || []).map((p: any) => {
+      const rawItems = (data || []).map((p: Record<string, any>) => {
         const raw = p.raw_data || {};
         const cost = Number(p.cost_price ?? raw.Modal ?? raw.purchasePrice ?? 0);
         const ecer = Number(p.price ?? raw.Ecer ?? raw.price ?? 0);
@@ -226,14 +227,13 @@ export default function PricingHPPPage() {
     setEditMinGrosir(p.minGrosir);
   };
 
-  // Save Quick Edit
+  // Save Quick Edit — menggunakan Server Action agar supabaseAdmin berjalan di server
   const handleSaveEdit = async () => {
     if (!editingProduct) return;
     setSavingEdit(true);
     try {
       const userRes = await supabase.auth.getUser();
       const adminEmail = userRes.data.user?.email || 'admin';
-      const now = new Date().toISOString();
 
       const oldCost = editingProduct.costPrice;
       const newCost = Number(editModalCost || 0);
@@ -242,10 +242,20 @@ export default function PricingHPPPage() {
       const newGrosir = Number(editPriceGrosir || 0);
       const newMinGrosir = Number(editMinGrosir || 1);
 
-      // 1. Catat log jika modal atau harga jual berubah
+      // 1. Simpan ke Supabase via Server Action (berjalan di server, bukan browser)
+      const result = await updateProductPrice({
+        productId: editingProduct.id,
+        newCost,
+        newPrice,
+        newGrosir,
+        newMinGrosir,
+      });
+
+      if (!result.success) throw new Error(result.error || 'Gagal menyimpan');
+
+      // 2. Catat log audit jika ada perubahan harga (opsional, bisa gagal tanpa blokir)
       const hasCostChanged = oldCost !== newCost;
       const hasPriceChanged = oldPrice !== newPrice;
-
       if (hasCostChanged || hasPriceChanged) {
         try {
           await addDoc(collection(db, 'product_cost_logs'), {
@@ -262,43 +272,9 @@ export default function PricingHPPPage() {
               : (hasCostChanged ? 'Update cepat harga modal' : 'Update cepat harga jual ecer'),
           });
         } catch (logErr) {
-          console.warn('Gagal tulis log Firebase:', logErr);
+          console.warn('Gagal tulis log audit:', logErr);
         }
       }
-
-      // 2. Update Supabase
-      const { data: currentProd } = await supabaseAdmin
-        .from('products')
-        .select('raw_data')
-        .eq('id', editingProduct.id)
-        .single();
-
-      const existingRaw = currentProd?.raw_data || {};
-      const updatedRaw = {
-        ...existingRaw,
-        Modal: newCost,
-        purchasePrice: newCost,
-        Ecer: newPrice,
-        price: newPrice,
-        priceEcer: newPrice,
-        Grosir: newGrosir,
-        wholesalePrice: newGrosir,
-        priceGrosir: newGrosir,
-        Min_Grosir: newMinGrosir,
-        updatedAt: now,
-      };
-
-      const { error: updateErr } = await supabaseAdmin
-        .from('products')
-        .update({
-          cost_price: newCost,
-          price: newPrice,
-          raw_data: updatedRaw,
-          updated_at: now,
-        })
-        .eq('id', editingProduct.id);
-
-      if (updateErr) throw updateErr;
 
       notify.success(`Harga ${editingProduct.name} berhasil diperbarui!`);
       setEditingProduct(null);

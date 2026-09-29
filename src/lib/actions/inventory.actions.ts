@@ -255,7 +255,7 @@ export async function adjustStock(data: {
 
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
-    return { success: true, newStock: nextTotalStock, newWhStock };
+    return { success: true, newStock: nextTotalStock, newWhStock: nextWhStock };
   } catch (error) {
     console.error('Failed to adjust stock:', error);
     return { success: false, error: 'Gagal melakukan penyesuaian stok' };

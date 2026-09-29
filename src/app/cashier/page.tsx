@@ -21,8 +21,9 @@ import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
 import { isStaffOrAdmin, isAdminRole } from '@/lib/auth-helpers';
 
+import { uploadToSupabase } from '@/lib/supabase';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { Timestamp, auth, collection, db, doc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, uploadBytes, where, writeBatch } from '@/lib/firebase';
+import { collection, db, onSnapshot, query, where } from '@/lib/firebase';
 // Types
 type UnitOption = {
   code: string;
@@ -174,61 +175,72 @@ export default function CashierPOS() {
   const handleScan = useCallback(async (code: string) => {
     try {
       if (!code) return;
-      // Cari produk by barcode (dua variasi field)
-      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
-      const s1 = await getDocs(q1);
-      let prod: any | null = null;
-      if (!s1.empty) {
-        const d = s1.docs[0];
-        prod = { id: d.id, ...d.data() };
-      } else {
-        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
-        const s2 = await getDocs(q2);
-        if (!s2.empty) {
-          const d2 = s2.docs[0];
-          prod = { id: d2.id, ...d2.data() };
+      const cleanCode = code.trim();
+
+      // 1. Cari dulu dari state lokal produk yang sudah dimuat
+      let matchedProd = products.find(p =>
+        p.barcode === cleanCode ||
+        (p.units && p.units.some((u: any) => u.barcode === cleanCode))
+      );
+
+      // 2. Jika tidak ditemukan di memori, query langsung ke Supabase
+      if (!matchedProd) {
+        const { data: supaProds, error } = await supabase
+          .from('products')
+          .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active')
+          .or(`barcode.eq.${cleanCode},raw_data->>Barcode.eq.${cleanCode}`)
+          .limit(1);
+
+        if (!error && supaProds && supaProds.length > 0) {
+          const d = supaProds[0];
+          const raw = d.raw_data || {};
+          const isArchived =
+            d.is_active === false ||
+            raw.isActive === false ||
+            raw.isActive === 'false' ||
+            raw.status === 'ARCHIVED';
+
+          if (isArchived) {
+            toast.error('Produk ini telah diarsipkan dan tidak aktif');
+            return;
+          }
+
+          const baseUnit = String(d.unit || raw.unit || raw.Satuan || 'PCS').toUpperCase();
+          const basePrice = Number(d.price ?? raw.price ?? raw.priceEcer ?? raw.Ecer ?? 0);
+          const baseCost = Number(d.cost_price ?? raw.cost ?? raw.Modal ?? raw.purchasePrice ?? 0);
+
+          matchedProd = {
+            id: d.id,
+            name: d.name || raw.name || raw.Nama || 'Produk',
+            price: basePrice,
+            cost: baseCost,
+            unit: baseUnit,
+            stock: Number(d.stock ?? raw.stock ?? 0),
+            barcode: d.barcode || raw.barcode || raw.Barcode || '',
+            image: d.image_url || raw.image || raw.imageUrl || raw.URL_Produk || '',
+            units: raw.units || [],
+            channelPricing: raw.channelPricing || {},
+            Kategori: raw.Kategori || raw.kategori || 'UMUM',
+            kategori: raw.Kategori || raw.kategori || 'UMUM',
+            stockByWarehouse: raw.stockByWarehouse || {},
+          };
         }
       }
-      if (!prod) {
+
+      if (!matchedProd) {
         toast.error('Barcode tidak ditemukan');
         return;
       }
 
-      // Pastikan produk berstatus aktif
-      const raw = prod.raw_data || prod;
-      const isArchived =
-        prod.is_active === false ||
-        raw.isActive === false ||
-        raw.isActive === 'false' ||
-        raw.status === 'ARCHIVED' ||
-        raw.Status === 1 ||
-        raw.Status === '1';
-
-      if (isArchived) {
-        toast.error('Produk ini telah diarsipkan dan tidak aktif');
-        return;
-      }
-
-      const mapped: Product = {
-        id: prod.id,
-        name: prod.name || prod.Nama || 'Produk',
-        price: Number(prod.price || prod.Ecer || 0),
-        cost: Number(prod.cost || prod.Modal || 0),
-        unit: (prod.unit || prod.Satuan || 'PCS').toUpperCase(),
-        stock: Number(prod.stock || 0),
-        barcode: prod.Barcode || prod.barcode || '',
-        image: prod.image || prod.URL_Produk || '',
-        units: prod.units || [],
-        channelPricing: prod.channelPricing || {}
-      };
       playScanBeep();
-      setScannedProduct(mapped);
-      toast.success(`Produk ditemukan: ${mapped.name}`);
+      setScannedProduct(matchedProd);
+      toast.success(`Produk ditemukan: ${matchedProd.name}`);
       setShowScanner(false);
-    } catch {
+    } catch (err) {
+      console.error('Scan error:', err);
       toast.error('Gagal membaca barcode');
     }
-  }, []);
+  }, [products]);
 
   // NOTE: Auth & shift loading is handled by the main useEffect below.
   // Removed duplicate auth listener that caused race conditions.
@@ -469,48 +481,63 @@ export default function CashierPOS() {
     const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) setCart(JSON.parse(savedCart));
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: any) => {
+    const checkAuthAndShift = async () => {
       // Cek Supabase session (sumber utama auth)
       const { data: { user: supaUser } } = await supabase.auth.getUser();
-      if (!supaUser && !firebaseUser) { router.push('/profil/login'); return; }
-      
-      if (navigator.onLine) {
-         try {
-           // Ambil role dari Supabase (bukan Firebase)
-           const userRole = supaUser?.app_metadata?.role
-             || supaUser?.user_metadata?.role
-             || (supaUser?.email?.startsWith('admin') ? 'admin' : undefined)
-             || (supaUser?.email?.startsWith('kasir') ? 'cashier' : undefined)
-             || (supaUser?.email?.includes('hadzikoh') ? 'superadmin' : undefined);
-
-           // Izinkan: cashier, admin, superadmin, super_admin, owner
-           if (!isStaffOrAdmin(userRole) && !isAdminRole(userRole)) {
-             if (userRole !== 'cashier' && userRole !== 'kasir') {
-               router.push('/profil'); return;
-             }
-           }
-
-           // Check Open Shift via Supabase
-           const { data: openShift } = await supabase
-             .from('cashier_shifts')
-             .select('*')
-             .eq('cashier_id', supaUser?.id || firebaseUser?.uid)
-             .eq('status', 'OPEN')
-             .limit(1)
-             .maybeSingle();
-
-           if (openShift) {
-             setCurrentShift({ id: openShift.id, ...openShift } as CashierShift);
-           } else {
-             setShowShiftModal('open');
-           }
-         } catch (e) { logger.warn("Error fetching user role", e); }
+      if (!supaUser) {
+        router.push('/profil/login');
+        return;
       }
-      
+
+      if (navigator.onLine) {
+        try {
+          // Ambil role dari Supabase
+          const userRole = supaUser?.app_metadata?.role
+            || supaUser?.user_metadata?.role
+            || (supaUser?.email?.startsWith('admin') ? 'admin' : undefined)
+            || (supaUser?.email?.startsWith('kasir') ? 'cashier' : undefined)
+            || (supaUser?.email?.includes('hadzikoh') ? 'superadmin' : undefined);
+
+          // Izinkan: cashier, admin, superadmin, super_admin, owner
+          if (!isStaffOrAdmin(userRole) && !isAdminRole(userRole)) {
+            if (userRole !== 'cashier' && userRole !== 'kasir') {
+              router.push('/profil');
+              return;
+            }
+          }
+
+          // Check Open Shift via Supabase
+          const { data: openShift } = await supabase
+            .from('cashier_shifts')
+            .select('*')
+            .eq('cashier_id', supaUser.id)
+            .eq('status', 'OPEN')
+            .limit(1)
+            .maybeSingle();
+
+          if (openShift) {
+            setCurrentShift({ id: openShift.id, ...openShift } as CashierShift);
+          } else {
+            setShowShiftModal('open');
+          }
+        } catch (e) {
+          logger.warn("Error fetching user role", e);
+        }
+      }
+
       setLoading(false);
+    };
+
+    checkAuthAndShift();
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push('/profil/login');
+      }
     });
+
     return () => {
-      unsubscribe();
+      authSub.unsubscribe();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -1038,26 +1065,37 @@ export default function CashierPOS() {
     }
 
     setIsProcessing(true);
-    const batch = writeBatch(db);
 
     try {
-      let proofUrl = null;
+      let proofUrl: string | null = null;
       if (paymentProof && !isOffline) {
-        // PROSES KOMPRESI SEBELUM UPLOAD
+        // PROSES KOMPRESI SEBELUM UPLOAD KE SUPABASE
         const compressedFile = await compressImage(paymentProof);
-        const sRef = ref(storage, `payment-proofs/${Date.now()}`);
-        await uploadBytes(sRef, compressedFile);
-        proofUrl = await getDownloadURL(sRef);
+        const fileName = `payment-proofs/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+        const { success: upSuccess, url: upUrl, error: upErr } = await uploadToSupabase(
+          'products',
+          fileName,
+          compressedFile,
+          compressedFile.type || 'image/jpeg'
+        );
+        if (upSuccess && upUrl) {
+          proofUrl = upUrl;
+        } else {
+          console.warn('Gagal upload bukti ke Supabase storage:', upErr);
+        }
       } else if (paymentProof && isOffline) {
          console.warn("Offline: Skipping image upload");
-         // Bisa simpan di indexedDB jika mau canggih, tapi untuk sekarang skip
       }
 
-    // Hitung dulu sebelum membuat orderData
-    const finalPayAmount = paymentMethod === 'CASH' ? (parseFloat(cashGiven) || total) : total;
-    const finalChange = paymentMethod === 'CASH' ? change : 0;
+      // Hitung dulu sebelum membuat orderData
+      const finalPayAmount = paymentMethod === 'CASH' ? (parseFloat(cashGiven) || total) : total;
+      const finalChange = paymentMethod === 'CASH' ? change : 0;
+      const orderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const now = new Date().toISOString();
+      const selectedWhObj = warehouses.find(w => w.id === selectedWarehouse);
+      const warehouseName = selectedWhObj ? selectedWhObj.name : (selectedWarehouse === 'auto' ? 'Otomatis' : selectedWarehouse);
 
-    const orderData = {
+      const orderData = {
         customerName: paymentMethod === 'TEMPO' ? customerName : (paymentMethod === 'DOMPET' ? selectedCustomer?.name : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko')),
         customerPhone: paymentMethod === 'TEMPO' ? customerPhone : '',
         items: cart,
@@ -1066,22 +1104,16 @@ export default function CashierPOS() {
         deliveryMethod, transactionType,
         status: paymentMethod === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI',
         dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
         payAmount: finalPayAmount,
         changeAmount: finalChange,
         shiftId: currentShift.id,
       };
 
-      const newOrderRef = doc(collection(db, 'orders'));
-      batch.set(newOrderRef, orderData);
-
       // FIX: Fetch auth user once outside the loop
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const currentUserId = currentUser?.id || 'cashier';
-      const now = new Date().toISOString();
-      const selectedWhObj = warehouses.find(w => w.id === selectedWarehouse);
-      const warehouseName = selectedWhObj ? selectedWhObj.name : (selectedWarehouse === 'auto' ? 'Otomatis' : selectedWarehouse);
 
       // 1. Validasi kecukupan stok sebelum proses eksekusi
       for (const item of cart) {
@@ -1110,7 +1142,7 @@ export default function CashierPOS() {
             productId: item.id,
             amount: pcsToDeduct,
             warehouseId: selectedWarehouse,
-            reference: newOrderRef.id,
+            reference: orderId,
             notes: `Transaksi Kasir (${paymentMethod}) - ${item.quantity} ${item.unit} [Gudang: ${warehouseName}]`,
             source: 'CASHIER',
             adminId: currentUserId,
@@ -1120,7 +1152,7 @@ export default function CashierPOS() {
             throw new Error(`Gagal memotong stok ${item.name}: ${res.error}`);
           }
 
-          // Fetch state terkini untuk sync ke batch Firestore & state lokal
+          // Fetch state terkini untuk sync ke state lokal
           const { data: updatedProd } = await supabaseAdmin
             .from('products')
             .select('stock, raw_data')
@@ -1148,9 +1180,6 @@ export default function CashierPOS() {
           const stockByWarehouse = localProduct?.stockByWarehouse || {};
           const newStockByWarehouse = { ...stockByWarehouse };
 
-          // Note: Offline mode still does not update Supabase products immediately here.
-          // Since we are migrating fully to Supabase, offline product updates will require a sync mechanism later.
-
           deductionResults.push({
             productId: item.id,
             newStock,
@@ -1164,17 +1193,17 @@ export default function CashierPOS() {
             amount: pcsToDeduct,
             adminId: currentUserId,
             source: 'CASHIER',
-            referenceId: newOrderRef.id,
-            orderId: newOrderRef.id,
+            referenceId: orderId,
+            orderId: orderId,
             note: `Transaksi Kasir Offline (${paymentMethod})`,
             fromWarehouseId: selectedWarehouse === 'auto' ? 'gudang-utama' : selectedWarehouse,
             prevStock: currentStock,
             nextStock: newStock,
-          }, batch);
+          });
         }
       }
 
-      // --- LOGIKA BARU UNTUK DOMPET ---
+      // --- LOGIKA UNTUK DOMPET VIA SUPABASE ---
       if (paymentMethod === 'DOMPET' && selectedCustomer) {
         const newBalance = selectedCustomer.walletBalance - total;
         await supabase
@@ -1184,27 +1213,24 @@ export default function CashierPOS() {
           })
           .eq('id', selectedCustomer.id);
 
-        const custRef = doc(db, 'customers', selectedCustomer.id);
-        batch.update(custRef, { walletBalance: newBalance });
-
         await supabase.from('wallet_logs').insert({
           id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           user_id: selectedCustomer.id,
           amount: -total,
-          description: `Pembayaran pesanan #${newOrderRef.id}`,
-          created_at: new Date().toISOString(),
+          description: `Pembayaran pesanan #${orderId}`,
+          created_at: now,
           raw_data: {
             type: 'payment',
             userId: selectedCustomer.id,
             amount: -total,
-            orderId: newOrderRef.id,
-            createdAt: new Date().toISOString(),
+            orderId: orderId,
+            createdAt: now,
           }
         });
       }
       // --- AKHIR LOGIKA DOMPET ---
 
-      // --- DOUBLE-ENTRY ACCOUNTING ---
+      // --- DOUBLE-ENTRY ACCOUNTING KE SUPABASE ---
       let debitAcc: any = 'Cash';
       if (paymentMethod === 'TEMPO') debitAcc = 'AccountsReceivable';
       else if (paymentMethod === 'DOMPET') debitAcc = 'CustomerWallet';
@@ -1213,10 +1239,10 @@ export default function CashierPOS() {
         debitAccount: debitAcc,
         creditAccount: 'Sales',
         amount: total,
-        memo: `Penjualan Kasir #${newOrderRef.id}`,
+        memo: `Penjualan Kasir #${orderId}`,
         refType: 'ORDER',
-        refId: newOrderRef.id
-      }, batch);
+        refId: orderId
+      });
 
       let totalCogs = 0;
       for (const item of cart) {
@@ -1230,53 +1256,45 @@ export default function CashierPOS() {
           debitAccount: 'COGS',
           creditAccount: 'Inventory',
           amount: totalCogs,
-          memo: `HPP Penjualan #${newOrderRef.id}`,
+          memo: `HPP Penjualan #${orderId}`,
           refType: 'ORDER',
-          refId: newOrderRef.id
-        }, batch);
+          refId: orderId
+        });
       }
       // --- AKHIR DOUBLE-ENTRY ---
   
-      // EKSEKUSI BATCH BERDASARKAN STATUS JARINGAN
-      if (isOffline) {
-        batch.commit().catch(err => logger.warn('Offline commit queued:', err));
-        toast.success('Disimpan Offline (Akan sinkron saat koneksi kembali)');
-      } else {
-        await batch.commit();
+      // Simpan ke tabel orders Supabase secara native
+      const { error: insertErr } = await supabaseAdmin.from('orders').insert({
+        id: orderId,
+        order_id: orderId,
+        user_id: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
+        customer_name: orderData.customerName,
+        status: orderData.status,
+        total,
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          unit: item.unit,
+          contains: item.contains || 1,
+          cost: item.cost,
+        })),
+        raw_data: {
+          ...orderData,
+          warehouseId: selectedWarehouse,
+          warehouseName,
+          source: 'CASHIER',
+        },
+        created_at: now,
+        updated_at: now,
+      });
 
-        // 3. Simpan juga ke tabel orders Supabase secara native
-        try {
-          await supabaseAdmin.from('orders').insert({
-            id: newOrderRef.id,
-            order_id: newOrderRef.id,
-            user_id: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
-            customer_name: orderData.customerName,
-            status: orderData.status,
-            total,
-            items: cart.map(item => ({
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-              unit: item.unit,
-              contains: item.contains || 1,
-              cost: item.cost,
-            })),
-            raw_data: {
-              ...orderData,
-              warehouseId: selectedWarehouse,
-              warehouseName,
-              source: 'CASHIER',
-            },
-            created_at: now,
-            updated_at: now,
-          });
-        } catch (sbErr) {
-          console.warn('Gagal insert order ke Supabase:', sbErr);
-        }
-
-        toast.success('Transaksi Berhasil! Stok diperbarui.');
+      if (insertErr) {
+        console.warn('Gagal insert order ke Supabase:', insertErr);
       }
+
+      toast.success('Transaksi Berhasil! Stok diperbarui.');
 
       // 4. Update stok di state produk kasir secara realtime
       if (deductionResults.length > 0) {
@@ -1306,7 +1324,7 @@ export default function CashierPOS() {
       
       printReceipt({ 
         ...orderData, 
-        id: newOrderRef.id, 
+        id: orderId, 
         createdAt: new Date()
       });
 

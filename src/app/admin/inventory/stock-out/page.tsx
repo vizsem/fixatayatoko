@@ -22,6 +22,7 @@ export default function StockOutPage() {
   const [reason, setReason] = useState('Barang Rusak');
 
   const [selectedUnitCode, setSelectedUnitCode] = useState<string>('');
+  const [adminId, setAdminId] = useState<string>('');
 
   useEffect(() => {
     const checkAuth = async () => {

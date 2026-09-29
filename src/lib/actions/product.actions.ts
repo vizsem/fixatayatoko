@@ -704,6 +704,69 @@ export async function duplicateProduct(id: string) {
   }
 }
 
+/**
+ * Update harga modal (HPP), harga jual ecer, harga grosir, dan min qty grosir sebuah produk.
+ * Digunakan dari Quick Update Harga modal di halaman Struktur HPP.
+ * Wajib dijalankan sebagai Server Action agar supabaseAdmin bisa diakses dengan aman.
+ */
+export async function updateProductPrice(payload: {
+  productId: string;
+  newCost: number;
+  newPrice: number;
+  newGrosir: number;
+  newMinGrosir: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { productId, newCost, newPrice, newGrosir, newMinGrosir } = payload;
+
+    // Ambil raw_data saat ini untuk di-merge (jangan overwrite field lain)
+    const { data: currentProd, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('raw_data')
+      .eq('id', productId)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    const existingRaw = currentProd?.raw_data || {};
+    const now = new Date().toISOString();
+
+    const updatedRaw = {
+      ...existingRaw,
+      Modal: newCost,
+      purchasePrice: newCost,
+      Ecer: newPrice,
+      price: newPrice,
+      priceEcer: newPrice,
+      Grosir: newGrosir,
+      wholesalePrice: newGrosir,
+      priceGrosir: newGrosir,
+      Min_Grosir: newMinGrosir,
+      updatedAt: now,
+    };
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('products')
+      .update({
+        cost_price: newCost,
+        price: newPrice,
+        raw_data: updatedRaw,
+        updated_at: now,
+      })
+      .eq('id', productId);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products');
+    return { success: true };
+  } catch (err: any) {
+    console.error('updateProductPrice error:', err);
+    return { success: false, error: err.message || 'Gagal memperbarui harga produk' };
+  }
+}
+
 export async function restockProductViaSupabase(productId: string, stokMasuk: number, hargaBaru: number, adminId?: string, warehouseId?: string) {
   try {
     await addStock({
