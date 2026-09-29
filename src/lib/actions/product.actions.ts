@@ -785,3 +785,133 @@ export async function restockProductViaSupabase(productId: string, stokMasuk: nu
     return { success: false, error: err.message || 'Gagal melakukan restock' };
   }
 }
+
+/**
+ * Menghitung AVG HPP semua produk dari riwayat PO (purchases) dalam satu query.
+ * Mengembalikan Map: productId -> { avgCost, totalQty, poCount }
+ */
+export async function getAllProductsAvgHpp(): Promise<
+  Record<string, { avgCost: number; totalQty: number; poCount: number }>
+> {
+  try {
+    const { data: rows, error } = await supabaseAdmin
+      .from('purchases')
+      .select('raw_data, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error || !rows) return {};
+
+    // productId -> { totalCost, totalQty, poCount }
+    const accumulator: Record<string, { totalCost: number; totalQty: number; poCount: number }> = {};
+
+    for (const p of rows) {
+      const raw = p.raw_data || {};
+      const status = (raw.status || '').toUpperCase();
+      // Hanya hitung PO yang sudah RECEIVED/DITERIMA, skip yang dibatalkan
+      if (status === 'CANCELLED' || status === 'DIBATALKAN') continue;
+
+      const items: any[] = raw.items || [];
+      for (const item of items) {
+        const pid: string | undefined =
+          item.productId || item.product_id || undefined;
+        if (!pid) continue;
+
+        const qty = Number(item.quantity ?? item.qty ?? 1);
+        const price = Number(item.unitPrice ?? item.purchasePrice ?? 0);
+        if (qty <= 0 || price <= 0) continue;
+
+        if (!accumulator[pid]) {
+          accumulator[pid] = { totalCost: 0, totalQty: 0, poCount: 0 };
+        }
+        accumulator[pid].totalCost += qty * price;
+        accumulator[pid].totalQty += qty;
+        accumulator[pid].poCount += 1;
+      }
+    }
+
+    const result: Record<string, { avgCost: number; totalQty: number; poCount: number }> = {};
+    for (const [pid, val] of Object.entries(accumulator)) {
+      result[pid] = {
+        avgCost: val.totalQty > 0 ? Math.round(val.totalCost / val.totalQty) : 0,
+        totalQty: val.totalQty,
+        poCount: val.poCount,
+      };
+    }
+
+    return result;
+  } catch (err) {
+    console.error('getAllProductsAvgHpp error:', err);
+    return {};
+  }
+}
+
+/**
+ * Reset HPP (cost_price) produk terpilih ke nilai AVG berdasarkan riwayat PO.
+ * Memperbarui cost_price + raw_data.Modal + raw_data.purchasePrice di Supabase.
+ */
+export async function resetAvgHppForProducts(
+  productIds: string[],
+  avgMap: Record<string, { avgCost: number; totalQty: number; poCount: number }>,
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; skipped: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0, skipped: 0 };
+
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+    let skipped = 0;
+
+    for (const pid of productIds) {
+      const stats = avgMap[pid];
+      if (!stats || stats.avgCost <= 0) {
+        skipped++;
+        continue;
+      }
+
+      // Fetch raw_data to merge
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data, cost_price')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) { skipped++; continue; }
+
+      const existingRaw = prod.raw_data || {};
+      const updatedRaw = {
+        ...existingRaw,
+        Modal: stats.avgCost,
+        purchasePrice: stats.avgCost,
+        avgHppResetAt: now,
+        avgHppResetBy: adminEmail,
+        avgHppPOCount: stats.poCount,
+        avgHppTotalQty: stats.totalQty,
+      };
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          cost_price: stats.avgCost,
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (upErr) {
+        console.error(`resetAvgHpp failed for ${pid}:`, upErr);
+        skipped++;
+      } else {
+        updated++;
+      }
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+
+    return { success: true, updated, skipped };
+  } catch (err: any) {
+    console.error('resetAvgHppForProducts error:', err);
+    return { success: false, updated: 0, skipped: productIds.length, error: err.message };
+  }
+}
