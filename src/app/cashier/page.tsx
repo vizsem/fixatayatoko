@@ -155,7 +155,18 @@ export default function CashierPOS() {
   const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
   const [showShiftModal, setShowShiftModal] = useState<'open' | 'close' | null>(null);
   const [shiftInput, setShiftInput] = useState({ initialCash: '', actualCash: '', notes: '' });
-  const [shiftSummary, setShiftSummary] = useState<{ totalCash: number, totalNonCash: number, expected: number } | null>(null);
+  const [shiftSummary, setShiftSummary] = useState<{
+    totalCash: number;
+    totalNonCash: number;
+    expected: number;
+    totalTransactions: number;
+    qrisSales: number;
+    transferSales: number;
+    tempoSales: number;
+    walletSales: number;
+    cashTransactions: number;
+    nonCashTransactions: number;
+  } | null>(null);
 
   // Filter States
   const [categories, setCategories] = useState<string[]>([]);
@@ -956,13 +967,12 @@ export default function CashierPOS() {
     if (!currentShift) return;
     setLoading(true);
     try {
-      // Calculate totals from Supabase orders
       const { data: shiftOrders, error: ordersErr } = await supabase
         .from('orders')
         .select('*');
 
-      let cashSales = 0;
-      let nonCashSales = 0;
+      let cashSales = 0, qrisSales = 0, transferSales = 0, tempoSales = 0, walletSales = 0;
+      let cashTx = 0, nonCashTx = 0;
 
       if (!ordersErr && shiftOrders) {
         shiftOrders.forEach((d: any) => {
@@ -970,22 +980,45 @@ export default function CashierPOS() {
           const status = d.status || raw.status;
           const shiftId = raw.shiftId || d.shift_id;
           if (shiftId === currentShift.id && (status === 'SELESAI' || status === 'DIPROSES')) {
-            const payMethod = raw.paymentMethod || d.payment?.method || d.payment_method || 'CASH';
+            const payMethod = (raw.paymentMethod || d.payment?.method || d.payment_method || 'CASH').toUpperCase();
             const total = Number(d.total ?? raw.total ?? 0);
             const payAmount = Number(raw.payAmount ?? total);
             if (payMethod === 'CASH') {
               cashSales += (payAmount || total);
+              cashTx++;
+            } else if (payMethod === 'QRIS') {
+              qrisSales += total;
+              nonCashTx++;
+            } else if (payMethod === 'TRANSFER') {
+              transferSales += total;
+              nonCashTx++;
+            } else if (payMethod === 'TEMPO') {
+              tempoSales += total;
+              nonCashTx++;
+            } else if (payMethod === 'WALLET') {
+              walletSales += total;
+              nonCashTx++;
             } else {
-              nonCashSales += total;
+              // fallback non-cash
+              qrisSales += total;
+              nonCashTx++;
             }
           }
         });
       }
-      
+
+      const nonCashTotal = qrisSales + transferSales + tempoSales + walletSales;
       setShiftSummary({
         totalCash: cashSales,
-        totalNonCash: nonCashSales,
-        expected: (currentShift.initialCash || 0) + cashSales
+        totalNonCash: nonCashTotal,
+        expected: (currentShift.initialCash || 0) + cashSales,
+        totalTransactions: cashTx + nonCashTx,
+        qrisSales,
+        transferSales,
+        tempoSales,
+        walletSales,
+        cashTransactions: cashTx,
+        nonCashTransactions: nonCashTx,
       });
       setShowShiftModal('close');
     } catch (e) {
@@ -1017,8 +1050,9 @@ export default function CashierPOS() {
       printShiftReport({
         ...currentShift,
         ...updateData,
+        expectedCash: shiftSummary.expected,
         closedAt: new Date()
-      });
+      }, shiftSummary);
       
       setCurrentShift(null);
       setShowShiftModal(null);
@@ -1034,57 +1068,101 @@ export default function CashierPOS() {
     } finally { setLoading(false); }
   };
 
-  const printShiftReport = useCallback((shift: Partial<CashierShift>) => {
+  const printShiftReport = useCallback((shift: Partial<CashierShift>, summary?: typeof shiftSummary) => {
     const w = window.open('', '_blank');
     if (!w) return;
 
-    const dateStr = new Date().toLocaleString('id-ID');
-    const formatRp = (num: number = 0) => 'Rp' + num.toLocaleString('id-ID');
+    const fmt = (n: number = 0) => 'Rp' + n.toLocaleString('id-ID');
+    const fmtDate = (d: any) => d ? new Date(d).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const durasi = () => {
+      if (!shift.openedAt || !shift.closedAt) return '-';
+      const ms = new Date(shift.closedAt).getTime() - new Date(shift.openedAt).getTime();
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      return `${h}j ${m}m`;
+    };
+    const diff = (shift.actualCash || 0) - (shift.expectedCash || 0);
+    const diffColor = diff === 0 ? '#16a34a' : diff > 0 ? '#2563eb' : '#dc2626';
+    const diffLabel = diff === 0 ? 'BALANCE ✓' : diff > 0 ? `LEBIH +${fmt(diff)}` : `KURANG ${fmt(diff)}`;
 
-    w.document.write(`
-      <html>
-        <head>
-          <title>Laporan Shift Kasir</title>
-          <style>
-            @page { size: 58mm auto; margin: 0; }
-            body { font-family: 'Courier New', monospace; width: 58mm; margin: 0; padding: 5px; font-size: 10px; }
-            .text-center { text-align: center; }
-            .bold { font-weight: bold; }
-            .flex { display: flex; justify-content: space-between; }
-            .line { border-bottom: 1px dashed black; margin: 5px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="text-center bold">LAPORAN TUTUP KASIR</div>
-          <div class="text-center">${dateStr}</div>
-          <div class="line"></div>
-          
-          <div class="flex"><span>Kasir</span><span>${shift.cashierName}</span></div>
-          <div class="flex"><span>Shift ID</span><span>#${(shift.id || '').slice(-4)}</span></div>
-          
-          <div class="line"></div>
-          
-          <div class="flex"><span>Modal Awal</span><span>${formatRp(shift.initialCash)}</span></div>
-          <div class="flex"><span>Total Tunai</span><span>${formatRp(shift.totalCashSales)}</span></div>
-          <div class="flex"><span>Total Non-Tunai</span><span>${formatRp(shift.totalNonCashSales)}</span></div>
-          
-          <div class="line"></div>
-          
-          <div class="flex bold"><span>Total Diharapkan</span><span>${formatRp(shift.expectedCash)}</span></div>
-          <div class="flex bold"><span>Uang Fisik</span><span>${formatRp(shift.actualCash || 0)}</span></div>
-          
-          <div class="line"></div>
-          
-          <div class="flex bold"><span>Selisih</span><span>${formatRp(shift.difference || 0)}</span></div>
-          
-          <br>
-          <div class="text-center">Tanda Tangan</div>
-          <br><br>
-          <div class="text-center">( ${shift.cashierName} )</div>
-        </body>
-        <script>window.print();window.close();</script>
-      </html>
-    `);
+    w.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <title>Laporan Shift #${(shift.id || '').slice(-6).toUpperCase()}</title>
+      <style>
+        @page { size: 80mm auto; margin: 4mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Courier New', monospace; width: 72mm; font-size: 9.5px; color: #111; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .row { display: flex; justify-content: space-between; padding: 1.5px 0; }
+        .row.total { font-weight: bold; font-size: 10.5px; border-top: 1px solid #000; padding-top: 3px; margin-top: 2px; }
+        .section { margin: 5px 0; }
+        .divider { border: none; border-top: 1px dashed #555; margin: 5px 0; }
+        .divider-solid { border: none; border-top: 1px solid #000; margin: 5px 0; }
+        .header { text-align:center; margin-bottom:4px; }
+        .badge { display:inline-block; padding:1px 5px; border-radius:3px; font-weight:bold; font-size:9px; }
+        .badge-ok { background:#d1fae5; color:#065f46; }
+        .badge-more { background:#dbeafe; color:#1e40af; }
+        .badge-less { background:#fee2e2; color:#991b1b; }
+        .method-row { display:flex; justify-content:space-between; font-size:8.5px; padding:1px 0; }
+        .method-label { color: #555; }
+        .signature-box { border-top: 1px solid #000; margin-top: 30px; text-align:center; font-size:8.5px; }
+        @media print { body { -webkit-print-color-adjust: exact; } }
+      </style>
+    </head><body>
+
+      <div class="header">
+        <div class="bold" style="font-size:13px; letter-spacing:1px;">LAPORAN SHIFT KASIR</div>
+        <div style="font-size:8px; color:#555;">ATAYA TOKO — SISTEM KASIR TERINTEGRASI</div>
+        <hr class="divider-solid" style="margin:4px 0;">
+        <div style="font-size:8.5px;">Dicetak: ${new Date().toLocaleString('id-ID')}</div>
+      </div>
+
+      <div class="section">
+        <div class="row"><span>Kasir</span><span class="bold">${shift.cashierName || '-'}</span></div>
+        <div class="row"><span>Shift ID</span><span>#${(shift.id || '').slice(-6).toUpperCase()}</span></div>
+        <div class="row"><span>Buka Kasir</span><span>${fmtDate(shift.openedAt)}</span></div>
+        <div class="row"><span>Tutup Kasir</span><span>${fmtDate(shift.closedAt)}</span></div>
+        <div class="row"><span>Durasi Shift</span><span>${durasi()}</span></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="bold" style="font-size:9px; margin-bottom:3px;">── RINGKASAN TRANSAKSI ──</div>
+      <div class="section">
+        <div class="row"><span>Total Transaksi</span><span class="bold">${(summary?.totalTransactions || 0)} transaksi</span></div>
+        <div class="row"><span style="color:#555;">└ Tunai (${summary?.cashTransactions || 0}x)</span><span>${fmt(summary?.totalCash)}</span></div>
+        ${ summary?.qrisSales ? `<div class="row"><span style="color:#555;">└ QRIS</span><span>${fmt(summary?.qrisSales)}</span></div>` : '' }
+        ${ summary?.transferSales ? `<div class="row"><span style="color:#555;">└ Transfer</span><span>${fmt(summary?.transferSales)}</span></div>` : '' }
+        ${ summary?.tempoSales ? `<div class="row"><span style="color:#555;">└ Tempo</span><span>${fmt(summary?.tempoSales)}</span></div>` : '' }
+        ${ summary?.walletSales ? `<div class="row"><span style="color:#555;">└ Wallet</span><span>${fmt(summary?.walletSales)}</span></div>` : '' }
+        <div class="row total"><span>TOTAL OMZET</span><span>${fmt((summary?.totalCash || 0) + (summary?.totalNonCash || 0))}</span></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="bold" style="font-size:9px; margin-bottom:3px;">── REKONSILIASI LACI ──</div>
+      <div class="section">
+        <div class="row"><span>Modal Awal (Laci)</span><span>${fmt(shift.initialCash)}</span></div>
+        <div class="row"><span>+ Penjualan Tunai</span><span>${fmt(summary?.totalCash)}</span></div>
+        <div class="row total"><span>HARUSNYA DI LACI</span><span>${fmt(summary?.expected)}</span></div>
+        <div class="row"><span>Hitung Fisik</span><span class="bold">${fmt(shift.actualCash || 0)}</span></div>
+        <div style="text-align:right; margin-top:3px;">
+          <span class="badge ${diff === 0 ? 'badge-ok' : diff > 0 ? 'badge-more' : 'badge-less'}">${diffLabel}</span>
+        </div>
+      </div>
+
+      ${ shift.notes ? `<hr class="divider"><div style="font-size:8.5px;"><span class="bold">Catatan: </span>${shift.notes}</div>` : '' }
+
+      <hr class="divider-solid" style="margin-top:8px;">
+
+      <div class="signature-box">
+        <div>Tanda Tangan Kasir</div>
+        <div style="margin-top:20px;">(${shift.cashierName || ''})</div>
+        <div style="margin-top:4px; font-size:8px;">Shift #${(shift.id || '').slice(-6).toUpperCase()}</div>
+      </div>
+
+    </body><script>window.print(); window.close();</script></html>`);
     w.document.close();
   }, [useBluetoothPrinter]);
 
@@ -2248,91 +2326,176 @@ export default function CashierPOS() {
 
       {/* SHIFT MODALS */}
       {showShiftModal === 'open' && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h2 className="text-lg font-black mb-4 text-center uppercase text-green-600">Buka Kasir</h2>
-            <div className="space-y-4">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-br from-green-500 to-emerald-600 px-6 py-5 text-white">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ShoppingBag size={18} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black">Buka Kasir</h2>
+                  <p className="text-green-100 text-xs">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                </div>
+              </div>
+              <p className="text-green-100 text-xs mt-2 bg-white/10 rounded-lg px-3 py-2">
+                ⏰ {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} — Masukkan uang yang ada di laci sebagai modal awal shift.
+              </p>
+            </div>
+            {/* Body */}
+            <div className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Modal Awal (Cash)</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">💰 Modal Awal (Uang di Laci)</label>
                 <input 
                   autoFocus
                   type="number" 
                   value={shiftInput.initialCash}
                   onChange={e => setShiftInput({ ...shiftInput, initialCash: e.target.value })}
-                  className="w-full p-3 text-lg font-black border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-center"
-                  placeholder="Rp0"
+                  onKeyDown={e => e.key === 'Enter' && handleOpenShift()}
+                  className="w-full p-3 text-2xl font-black border-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center tabular-nums"
+                  placeholder="0"
                 />
+                {shiftInput.initialCash && (
+                  <p className="text-center text-green-600 font-bold text-sm mt-1">
+                    Rp{parseInt(shiftInput.initialCash || '0').toLocaleString('id-ID')}
+                  </p>
+                )}
               </div>
-              <button onClick={handleOpenShift} className="w-full py-3 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 uppercase text-sm">
-                BUKA KASIR
+              <button 
+                onClick={handleOpenShift} 
+                disabled={loading}
+                className="w-full py-3.5 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 active:scale-95 transition-all uppercase text-sm shadow-lg shadow-green-200 disabled:opacity-60"
+              >
+                {loading ? 'Membuka...' : '🟢 MULAI SHIFT'}
               </button>
+              <p className="text-center text-xs text-gray-400">Data shift tersimpan otomatis di sistem</p>
             </div>
           </div>
         </div>
       )}
 
       {showShiftModal === 'close' && shiftSummary && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-            <h2 className="text-lg font-black mb-4 text-center uppercase text-red-600">Tutup Kasir</h2>
-            
-            <div className="space-y-2 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-              <div className="flex justify-between text-xs uppercase font-bold">
-                <span className="text-gray-400">Modal Awal</span>
-                <span className="text-gray-700">Rp{(currentShift?.initialCash || 0).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-xs uppercase font-bold">
-                <span className="text-gray-400">Penjualan Tunai</span>
-                <span className="text-green-600">+ Rp{shiftSummary.totalCash.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-xs uppercase font-bold border-b border-dashed pb-2">
-                <span className="text-gray-400">Non-Tunai (Info)</span>
-                <span className="text-blue-600">Rp{shiftSummary.totalNonCash.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm font-black pt-2">
-                <span>Total Diharapkan (Tunai)</span>
-                <span>Rp{shiftSummary.expected.toLocaleString()}</span>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-br from-red-500 to-rose-600 px-6 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                  <CheckCircle size={18} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black">Tutup Kasir</h2>
+                  <p className="text-red-100 text-xs">{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })} · {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
+                  <p className="text-xs text-green-600 font-bold uppercase">Tunai</p>
+                  <p className="text-sm font-black text-green-700">Rp{shiftSummary.totalCash.toLocaleString()}</p>
+                  <p className="text-[10px] text-green-500">{shiftSummary.cashTransactions}x transaksi</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-center">
+                  <p className="text-xs text-blue-600 font-bold uppercase">Non-Tunai</p>
+                  <p className="text-sm font-black text-blue-700">Rp{shiftSummary.totalNonCash.toLocaleString()}</p>
+                  <p className="text-[10px] text-blue-500">{shiftSummary.nonCashTransactions}x transaksi</p>
+                </div>
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-2.5 text-center">
+                  <p className="text-xs text-purple-600 font-bold uppercase">Total</p>
+                  <p className="text-sm font-black text-purple-700">Rp{(shiftSummary.totalCash + shiftSummary.totalNonCash).toLocaleString()}</p>
+                  <p className="text-[10px] text-purple-500">{shiftSummary.totalTransactions}x transaksi</p>
+                </div>
+              </div>
+
+              {/* Breakdown Non-Cash */}
+              {shiftSummary.totalNonCash > 0 && (
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-xs space-y-1">
+                  <p className="font-bold text-gray-500 uppercase text-[10px] mb-1.5">Detail Non-Tunai</p>
+                  {shiftSummary.qrisSales > 0 && <div className="flex justify-between"><span className="text-gray-500">📱 QRIS</span><span className="font-bold">Rp{shiftSummary.qrisSales.toLocaleString()}</span></div>}
+                  {shiftSummary.transferSales > 0 && <div className="flex justify-between"><span className="text-gray-500">🏦 Transfer</span><span className="font-bold">Rp{shiftSummary.transferSales.toLocaleString()}</span></div>}
+                  {shiftSummary.tempoSales > 0 && <div className="flex justify-between"><span className="text-gray-500">📋 Tempo/Piutang</span><span className="font-bold text-orange-600">Rp{shiftSummary.tempoSales.toLocaleString()}</span></div>}
+                  {shiftSummary.walletSales > 0 && <div className="flex justify-between"><span className="text-gray-500">👛 Wallet</span><span className="font-bold">Rp{shiftSummary.walletSales.toLocaleString()}</span></div>}
+                </div>
+              )}
+
+              {/* Rekonsiliasi Laci */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-1.5">
+                <p className="font-bold text-gray-500 uppercase text-[10px] mb-1.5">🗄️ Rekonsiliasi Laci</p>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Modal Awal</span>
+                  <span className="font-bold">Rp{(currentShift?.initialCash || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">+ Penjualan Tunai</span>
+                  <span className="font-bold text-green-600">Rp{shiftSummary.totalCash.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs font-black border-t border-dashed border-gray-200 pt-1.5 mt-1">
+                  <span>Harusnya di Laci</span>
+                  <span>Rp{shiftSummary.expected.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Input Hitung Fisik */}
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Uang Fisik di Laci</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">💵 Hitung Fisik Uang di Laci</label>
                 <input 
                   autoFocus
                   type="number" 
                   value={shiftInput.actualCash}
                   onChange={e => setShiftInput({ ...shiftInput, actualCash: e.target.value })}
-                  className="w-full p-3 text-lg font-black border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-center"
-                  placeholder="Rp0"
+                  onKeyDown={e => e.key === 'Enter' && handleCloseShift()}
+                  className="w-full p-3 text-2xl font-black border-2 rounded-xl outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400 text-center tabular-nums"
+                  placeholder="0"
                 />
               </div>
               
-              {shiftInput.actualCash && (
-                <div className={`text-center p-2 rounded-lg font-black text-xs uppercase ${
-                  (parseInt(shiftInput.actualCash.replace(/\D/g, '')) - shiftSummary.expected) === 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
-                  Selisih: Rp{(parseInt(shiftInput.actualCash.replace(/\D/g, '')) - shiftSummary.expected).toLocaleString()}
-                </div>
-              )}
+              {shiftInput.actualCash && (() => {
+                const actual = parseInt(shiftInput.actualCash.replace(/\D/g, '')) || 0;
+                const diff = actual - shiftSummary.expected;
+                const isBalance = diff === 0;
+                const isMore = diff > 0;
+                return (
+                  <div className={`rounded-xl p-3 text-center border-2 ${
+                    isBalance ? 'bg-green-50 border-green-200' : isMore ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'
+                  }`}>
+                    <p className={`text-xs uppercase font-bold mb-0.5 ${
+                      isBalance ? 'text-green-600' : isMore ? 'text-blue-600' : 'text-red-600'
+                    }`}>{isBalance ? '✅ Balance' : isMore ? '🔵 Kelebihan' : '🔴 Kekurangan'}</p>
+                    <p className={`text-lg font-black ${
+                      isBalance ? 'text-green-700' : isMore ? 'text-blue-700' : 'text-red-700'
+                    }`}>{isBalance ? 'Rp0' : `${diff > 0 ? '+' : ''}Rp${Math.abs(diff).toLocaleString()}`}</p>
+                  </div>
+                );
+              })()}
 
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Catatan (Opsional)</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">📝 Catatan (Opsional)</label>
                 <textarea 
                   value={shiftInput.notes}
                   onChange={e => setShiftInput({ ...shiftInput, notes: e.target.value })}
-                  className="w-full p-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-gray-300"
-                  placeholder="Catatan..."
+                  className="w-full p-2.5 text-sm border-2 rounded-xl outline-none focus:ring-2 focus:ring-gray-300 resize-none"
+                  placeholder="Catatan tambahan untuk admin..."
                   rows={2}
                 />
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => setShowShiftModal(null)} className="flex-1 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl hover:bg-gray-200 text-xs uppercase">
-                  BATAL
+              <div className="flex gap-2 pt-1">
+                <button 
+                  onClick={() => setShowShiftModal(null)} 
+                  className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 text-xs uppercase"
+                >
+                  Batal
                 </button>
-                <button onClick={handleCloseShift} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 text-xs uppercase">
-                  TUTUP & CETAK
+                <button 
+                  onClick={handleCloseShift} 
+                  disabled={loading || !shiftInput.actualCash}
+                  className="flex-2 flex-grow-[2] py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 active:scale-95 transition-all text-xs uppercase shadow-lg shadow-red-200 disabled:opacity-60"
+                >
+                  {loading ? 'Memproses...' : '🖨️ TUTUP & CETAK LAPORAN'}
                 </button>
               </div>
             </div>

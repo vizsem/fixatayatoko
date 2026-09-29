@@ -26,7 +26,10 @@ type SaleItem = {
   total: number;
   paymentMethod: string;
   customerName: string;
+  status: string;
 };
+
+const VALID_STATUSES = ['SELESAI', 'DIPROSES', 'COMPLETED', 'DONE', 'SUCCESS'];
 
 export default function SalesReport() {
   const router = useRouter();
@@ -79,6 +82,11 @@ export default function SalesReport() {
         const salesList: SaleItem[] = [];
         for (const orderDoc of ordersSnapshot.docs) {
           const order = orderDoc.data();
+          const rawStatus = (order.status || order.raw_data?.status || '').toUpperCase();
+
+          // Skip transaksi yang dibatalkan
+          if (!VALID_STATUSES.includes(rawStatus)) continue;
+
           const created =
             order.createdAt?.toDate
               ? order.createdAt.toDate()
@@ -91,8 +99,9 @@ export default function SalesReport() {
               productName: String(item.name || ''),
               quantity: Number(item.quantity || 0),
               total: Number(item.price || 0) * Number(item.quantity || 0),
-              paymentMethod: order.payment?.method || order.paymentMethod || 'CASH',
-              customerName: order.customerName || 'Pelanggan'
+              paymentMethod: order.payment?.method || order.paymentMethod || order.raw_data?.paymentMethod || 'CASH',
+              customerName: order.customerName || order.raw_data?.customerName || 'Pelanggan',
+              status: rawStatus,
             });
           }
         }
