@@ -217,7 +217,10 @@ export default function CashierPOS() {
             unit: baseUnit,
             stock: Number(d.stock ?? raw.stock ?? 0),
             barcode: d.barcode || raw.barcode || raw.Barcode || '',
-            image: d.image_url || raw.image || raw.imageUrl || raw.URL_Produk || '',
+            image: (() => {
+              const url = d.image_url || raw.image || raw.imageUrl || raw.URL_Produk || raw.Link_Foto || raw.photo || '';
+              return url.trim().startsWith('http') ? url.trim() : '';
+            })(),
             units: raw.units || [],
             channelPricing: raw.channelPricing || {},
             Kategori: raw.Kategori || raw.kategori || 'UMUM',
@@ -506,7 +509,37 @@ export default function CashierPOS() {
             }
           }
 
-          // Check Open Shift via Supabase
+          // --- SHIFT CACHE: Cek sessionStorage dulu untuk menghindari modal berulang ---
+          const cachedShiftRaw = sessionStorage.getItem('pos-current-shift');
+          if (cachedShiftRaw) {
+            try {
+              const cachedShift = JSON.parse(cachedShiftRaw) as CashierShift;
+              // Pastikan cache milik user yang sama
+              if (cachedShift.cashierId === supaUser.id) {
+                setCurrentShift(cachedShift);
+                setLoading(false);
+                // Background verification: pastikan shift masih OPEN di DB
+                supabase
+                  .from('cashier_shifts')
+                  .select('id, status')
+                  .eq('id', cachedShift.id)
+                  .maybeSingle()
+                  .then(({ data }) => {
+                    if (!data || data.status !== 'OPEN') {
+                      // Shift sudah ditutup dari tempat lain, hapus cache
+                      sessionStorage.removeItem('pos-current-shift');
+                      setCurrentShift(null);
+                      setShowShiftModal('open');
+                    }
+                  });
+                return;
+              }
+            } catch {
+              sessionStorage.removeItem('pos-current-shift');
+            }
+          }
+
+          // Tidak ada cache valid – query Supabase
           const { data: openShift } = await supabase
             .from('cashier_shifts')
             .select('*')
@@ -516,7 +549,10 @@ export default function CashierPOS() {
             .maybeSingle();
 
           if (openShift) {
-            setCurrentShift({ id: openShift.id, ...openShift } as CashierShift);
+            const shift = { id: openShift.id, ...openShift } as CashierShift;
+            setCurrentShift(shift);
+            // Simpan ke cache untuk navigasi berikutnya
+            sessionStorage.setItem('pos-current-shift', JSON.stringify(shift));
           } else {
             setShowShiftModal('open');
           }
@@ -683,7 +719,10 @@ export default function CashierPOS() {
             unit: baseUnit,
             stock: Number(d.stock ?? raw.stock ?? raw.Stok ?? 0),
             barcode: d.barcode || raw.barcode || raw.Barcode || '',
-            image: d.image_url || raw.image || raw.imageUrl || raw.photo || null,
+            image: (() => {
+              const url = d.image_url || raw.image || raw.imageUrl || raw.URL_Produk || raw.Link_Foto || raw.photo || '';
+              return url.trim().startsWith('http') ? url.trim() : '';
+            })(),
             units,
             Kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
             kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
@@ -900,7 +939,10 @@ export default function CashierPOS() {
       };
       
       const ref = await sbInsertDoc('cashier_shifts', newShift);
-      setCurrentShift({ id: ref.id, ...newShift } as CashierShift);
+      const openedShift = { id: ref.id, ...newShift } as CashierShift;
+      setCurrentShift(openedShift);
+      // Simpan ke sessionStorage agar tidak muncul modal saat pindah tab
+      sessionStorage.setItem('pos-current-shift', JSON.stringify(openedShift));
       setShowShiftModal(null);
       setShiftInput({ initialCash: '', actualCash: '', notes: '' });
       toast.success('Kasir Dibuka!');
@@ -982,6 +1024,8 @@ export default function CashierPOS() {
       setShowShiftModal(null);
       setShiftInput({ initialCash: '', actualCash: '', notes: '' });
       setShiftSummary(null);
+      // Hapus cache shift agar modal muncul kembali saat kasir dibuka berikutnya
+      sessionStorage.removeItem('pos-current-shift');
       toast.success('Kasir Ditutup!');
       router.push('/profil');
     } catch (e) {
@@ -1708,12 +1752,13 @@ export default function CashierPOS() {
                     <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
                   )}
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
-                  {p.image ? (
+                   {p.image ? (
                     <img 
                       src={p.image} 
                       alt={p.name}
                       className={`w-full h-full object-cover ${(p.stock || 0) <= 0 ? 'grayscale' : ''}`}
                       loading="lazy"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                     />
                   ) : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
                 </div>
