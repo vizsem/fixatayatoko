@@ -915,3 +915,75 @@ export async function resetAvgHppForProducts(
     return { success: false, updated: 0, skipped: productIds.length, error: err.message };
   }
 }
+
+/**
+ * Update harga jual ecer berdasarkan target margin (%) dari HPP.
+ */
+export async function bulkUpdateTargetMargin(
+  productIds: string[],
+  targetMarginPct: number,
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0 };
+  
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data, cost_price, name, price')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+      
+      const cost = Number(prod.cost_price || 0);
+      if (cost <= 0) continue; // skip if cost is 0
+
+      // Calculate new price based on margin formula: Price = Cost / (1 - Margin%)
+      // Using Math.ceil to round up to the nearest integer
+      let newPrice = cost;
+      if (targetMarginPct > 0 && targetMarginPct < 100) {
+        newPrice = Math.ceil(cost / (1 - (targetMarginPct / 100)));
+      } else if (targetMarginPct >= 100) {
+        // Fallback to markup if margin is >= 100%
+        newPrice = Math.ceil(cost + (cost * (targetMarginPct / 100)));
+      }
+
+      // Bulatkan ke ratusan terdekat untuk harga yang lebih rapi (opsional tapi disarankan)
+      newPrice = Math.ceil(newPrice / 100) * 100;
+
+      const existingRaw = prod.raw_data || {};
+      const updatedRaw = {
+        ...existingRaw,
+        Ecer: newPrice,
+        price: newPrice,
+        priceEcer: newPrice,
+        updatedAt: now,
+      };
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          price: newPrice,
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (!upErr) {
+        updated++;
+      }
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('bulkUpdateTargetMargin error:', err);
+    return { success: false, updated: 0, error: err.message };
+  }
+}

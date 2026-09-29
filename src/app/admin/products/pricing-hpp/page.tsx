@@ -20,6 +20,7 @@ import {
   updateProductPrice,
   getAllProductsAvgHpp,
   resetAvgHppForProducts,
+  bulkUpdateTargetMargin,
 } from '@/lib/actions/product.actions';
 
 interface ProductItem {
@@ -82,6 +83,8 @@ export default function PricingHPPPage() {
   // Multi-select States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showMarginModal, setShowMarginModal] = useState(false);
+  const [targetMarginValue, setTargetMarginValue] = useState<number>(20);
   const [isResetting, startResetTransition] = useTransition();
 
   // Quick Edit Modal
@@ -342,6 +345,42 @@ export default function PricingHPPPage() {
       } catch (err: any) {
         setShowResetModal(false);
         notify.error(err.message || 'Gagal mereset AVG HPP');
+      }
+    });
+  };
+
+  // Bulk Target Margin Handlers
+  const handleSetTargetMargin = () => {
+    if (selectedIds.size === 0) {
+      notify.error('Pilih minimal 1 produk terlebih dahulu');
+      return;
+    }
+    setShowMarginModal(true);
+  };
+
+  const handleConfirmTargetMargin = () => {
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+
+        const result = await bulkUpdateTargetMargin(
+          Array.from(selectedIds),
+          targetMarginValue,
+          adminEmail,
+        );
+
+        setShowMarginModal(false);
+
+        if (!result.success) throw new Error(result.error);
+
+        notify.success(`✅ Berhasil menyesuaikan harga jual ecer untuk ${result.updated} produk`);
+
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (err: any) {
+        setShowMarginModal(false);
+        notify.error(err.message || 'Gagal mengatur target margin');
       }
     });
   };
@@ -666,6 +705,13 @@ export default function PricingHPPPage() {
                     <RotateCcw size={13} />
                     Restart AVG HPP ({selectedWithAvg.length})
                   </button>
+                  <button
+                    onClick={handleSetTargetMargin}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400"
+                  >
+                    <TrendingUp size={13} />
+                    Set Margin Otomatis
+                  </button>
                 </div>
               </div>
             )}
@@ -864,14 +910,23 @@ export default function PricingHPPPage() {
                     Menampilkan <span className="text-slate-700">{filteredProducts.length}</span> dari <span className="text-slate-700">{products.length}</span> produk aktif
                   </p>
                   {selectedCount > 0 && (
-                    <button
-                      onClick={handleResetAvgHpp}
-                      disabled={selectedWithAvg.length === 0}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-50"
-                    >
-                      <RotateCcw size={13} />
-                      Restart AVG HPP ({selectedCount} produk)
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleResetAvgHpp}
+                        disabled={selectedWithAvg.length === 0}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      >
+                        <RotateCcw size={13} />
+                        Restart AVG HPP
+                      </button>
+                      <button
+                        onClick={handleSetTargetMargin}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all"
+                      >
+                        <TrendingUp size={13} />
+                        Set Margin
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1152,6 +1207,84 @@ export default function PricingHPPPage() {
                   <>
                     <Zap size={14} />
                     Ya, Restart AVG HPP ({selectedWithAvg.length})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== SET MARGIN OTOMATIS MODAL ===================== */}
+      {showMarginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-100 rounded-2xl shrink-0">
+                <TrendingUp size={22} className="text-emerald-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Set Harga Jual Otomatis</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">
+                  Atur ulang Harga Jual (Ecer) berdasarkan HPP aktif dan persentase margin yang diinginkan.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="font-bold text-slate-600">Produk dipilih</span>
+                <span className="font-black text-slate-900">{selectedCount} produk</span>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-slate-500">Target Margin Laba</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={targetMarginValue}
+                    onChange={e => setTargetMarginValue(Number(e.target.value))}
+                    className="w-full pl-4 pr-10 py-3 bg-white border border-slate-300 rounded-2xl font-black text-lg text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-lg">%</span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 text-right">
+                  Rumus: Harga Baru = HPP / (1 - Margin%)
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-2">
+              <Info size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-emerald-700 font-bold">
+                Harga baru akan dibulatkan ke atas (ke kelipatan Rp100 terdekat) agar terlihat rapi. Produk dengan HPP Rp0 akan dilewati.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setShowMarginModal(false)}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmTargetMargin}
+                disabled={isResetting || targetMarginValue <= 0}
+                className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm shadow-emerald-200 disabled:opacity-60"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    Terapkan Margin ({selectedCount})
                   </>
                 )}
               </button>
