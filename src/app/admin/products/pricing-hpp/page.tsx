@@ -8,7 +8,7 @@ import {
   ArrowUpDown, Download, Edit3, AlertTriangle,
   History, ArrowLeft, RefreshCw, X, Save, Layers,
   ChevronRight, Percent, Sparkles, AlertCircle, RotateCcw,
-  CheckSquare, Square, CheckCircle2, Info, Zap
+  CheckSquare, Square, CheckCircle2, Info, Zap, Split
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
@@ -21,6 +21,7 @@ import {
   getAllProductsAvgHpp,
   resetAvgHppForProducts,
   bulkUpdateTargetMargin,
+  bulkDivideHpp,
 } from '@/lib/actions/product.actions';
 
 interface ProductItem {
@@ -85,6 +86,8 @@ export default function PricingHPPPage() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [showMarginModal, setShowMarginModal] = useState(false);
   const [targetMarginValue, setTargetMarginValue] = useState<number>(20);
+  const [showDivideModal, setShowDivideModal] = useState(false);
+  const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
   // Quick Edit Modal
@@ -381,6 +384,42 @@ export default function PricingHPPPage() {
       } catch (err: any) {
         setShowMarginModal(false);
         notify.error(err.message || 'Gagal mengatur target margin');
+      }
+    });
+  };
+
+  // Bulk Divide HPP Handlers
+  const handleSetDivideHpp = () => {
+    if (selectedIds.size === 0) {
+      notify.error('Pilih minimal 1 produk terlebih dahulu');
+      return;
+    }
+    setShowDivideModal(true);
+  };
+
+  const handleConfirmDivideHpp = () => {
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+
+        const result = await bulkDivideHpp(
+          Array.from(selectedIds),
+          divideValue,
+          adminEmail,
+        );
+
+        setShowDivideModal(false);
+
+        if (!result.success) throw new Error(result.error);
+
+        notify.success(`✅ Berhasil membagi HPP untuk ${result.updated} produk`);
+
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (err: any) {
+        setShowDivideModal(false);
+        notify.error(err.message || 'Gagal mengkonversi HPP');
       }
     });
   };
@@ -712,6 +751,13 @@ export default function PricingHPPPage() {
                     <TrendingUp size={13} />
                     Set Margin Otomatis
                   </button>
+                  <button
+                    onClick={handleSetDivideHpp}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-amber-400"
+                  >
+                    <Split size={13} />
+                    Bagi HPP (Konversi)
+                  </button>
                 </div>
               </div>
             )}
@@ -925,6 +971,13 @@ export default function PricingHPPPage() {
                       >
                         <TrendingUp size={13} />
                         Set Margin
+                      </button>
+                      <button
+                        onClick={handleSetDivideHpp}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all"
+                      >
+                        <Split size={13} />
+                        Bagi HPP
                       </button>
                     </div>
                   )}
@@ -1285,6 +1338,84 @@ export default function PricingHPPPage() {
                   <>
                     <Zap size={14} />
                     Terapkan Margin ({selectedCount})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== BAGI HPP (KONVERSI) MODAL ===================== */}
+      {showDivideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-100 rounded-2xl shrink-0">
+                <Split size={22} className="text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Bagi HPP (Konversi Satuan)</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">
+                  Membagi harga modal (HPP) aktif produk untuk memperbaiki data PO yang masuk dalam kemasan besar (misal: CTN dibagi isi per PCS).
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="font-bold text-slate-600">Produk dipilih</span>
+                <span className="font-black text-slate-900">{selectedCount} produk</span>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-slate-500">Angka Pembagi</label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-lg">÷</div>
+                  <input
+                    type="number"
+                    min="2"
+                    step="1"
+                    value={divideValue}
+                    onChange={e => setDivideValue(Number(e.target.value))}
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-300 rounded-2xl font-black text-lg text-amber-700 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 text-right">
+                  Contoh: Jika modal Rp120.000/CTN, dibagi 24 = Rp5.000/PCS
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-2">
+              <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-amber-700 font-bold">
+                Tindakan ini akan membagi HPP aktif (Modal) saat ini dengan angka di atas. Harga jual (Ecer/Grosir) TIDAK akan diubah.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setShowDivideModal(false)}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmDivideHpp}
+                disabled={isResetting || divideValue <= 1}
+                className="px-6 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm shadow-amber-200 disabled:opacity-60"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    Bagi HPP ({selectedCount})
                   </>
                 )}
               </button>

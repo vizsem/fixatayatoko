@@ -987,3 +987,81 @@ export async function bulkUpdateTargetMargin(
     return { success: false, updated: 0, error: err.message };
   }
 }
+
+/**
+ * Bagi HPP produk secara bulk (Konversi CTN -> PCS dsb).
+ * Ini akan membagi `cost_price` dan field modal lainnya dengan angka pembagi (divider).
+ */
+export async function bulkDivideHpp(
+  productIds: string[],
+  divider: number,
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  if (!productIds.length || divider <= 1) return { success: true, updated: 0 };
+  
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data, cost_price, name')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+      
+      const oldCost = Number(prod.cost_price || 0);
+      if (oldCost <= 0) continue; 
+
+      // Divide and round to nearest whole number
+      const newCost = Math.round(oldCost / divider);
+
+      const existingRaw = prod.raw_data || {};
+      const updatedRaw = {
+        ...existingRaw,
+        Modal: newCost,
+        purchasePrice: newCost,
+        costPrice: newCost,
+        updatedAt: now,
+      };
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          cost_price: newCost,
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (!upErr) {
+        updated++;
+        // Log the change
+        try {
+          await supabaseAdmin.from('product_cost_logs').insert({
+            productId: pid,
+            productName: prod.name,
+            oldCost,
+            newCost,
+            adminEmail,
+            changeDate: now,
+            notes: `Konversi HPP (Dibagi ${divider})`,
+          });
+        } catch (e) {
+          console.warn('Failed to log cost change:', e);
+        }
+      }
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+    
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('bulkDivideHpp error:', err);
+    return { success: false, updated: 0, error: err.message };
+  }
+}
