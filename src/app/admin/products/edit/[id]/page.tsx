@@ -71,13 +71,22 @@ export default function EditProductPage() {
     latestSupplierWa: string | null;
     latestPrice: number;
     totalQty: number;
+    suppliers?: Array<{
+      name: string;
+      phone: string | null;
+      count: number;
+      totalQty: number;
+      lastPrice: number;
+      lastDate: string | null;
+    }>;
   }>({
     count: 0,
     avgCost: 0,
     latestSupplier: null,
     latestSupplierWa: null,
     latestPrice: 0,
-    totalQty: 0
+    totalQty: 0,
+    suppliers: [],
   });
 
   const isInitialLoadedRef = useRef(false);
@@ -1143,35 +1152,103 @@ export default function EditProductPage() {
 
             {/* NOMINAL AVG HPP CARD FROM PO */}
             {poStats.count > 0 ? (
-              <div className="mb-6 p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shrink-0">
-                    <TrendingUp size={20} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-xs font-black uppercase tracking-wider text-emerald-900">Nominal Avg HPP (PO)</p>
-                      <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full text-[10px] font-black">
-                        {poStats.count} PO ({poStats.totalQty} unit)
-                      </span>
+              <div className="mb-6 p-4 sm:p-5 bg-emerald-50/80 rounded-2xl border border-emerald-200/90 shadow-sm transition-all">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shrink-0 mt-0.5 shadow-sm">
+                      <TrendingUp size={20} />
                     </div>
-                    <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">
-                      Rp {poStats.avgCost.toLocaleString('id-ID')}
-                      {poStats.latestPrice > 0 && poStats.latestPrice !== poStats.avgCost && (
-                        <span className="ml-2 text-xs font-bold text-slate-500">
-                          (PO Terakhir: Rp {poStats.latestPrice.toLocaleString('id-ID')})
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs font-black uppercase tracking-wider text-emerald-900">Nominal Avg HPP (PO)</p>
+                        <span className="px-2.5 py-0.5 bg-emerald-200/90 text-emerald-900 rounded-full text-[10px] font-black border border-emerald-300/60">
+                          {poStats.count} PO ({poStats.totalQty} {formData.Satuan || 'unit'})
                         </span>
-                      )}
-                    </p>
+                      </div>
+                      {(() => {
+                        const roundedAvg = Math.round(poStats.avgCost || 0);
+                        const roundedLatest = Math.round(poStats.latestPrice || 0);
+                        return (
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">
+                              Rp {roundedAvg.toLocaleString('id-ID')}
+                              <span className="text-xs font-bold text-emerald-700 ml-1">/ {formData.Satuan || 'Pcs'}</span>
+                              {roundedLatest > 0 && roundedLatest !== roundedAvg && (
+                                <span className="ml-2 text-xs font-bold text-slate-500">
+                                  (PO Terakhir: Rp {roundedLatest.toLocaleString('id-ID')} / {formData.Satuan || 'Pcs'})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })()}
+
+                      {/* RINCIAN AVG HPP PER SATUAN YANG DITAMBAHKAN */}
+                      {(() => {
+                        const baseUnitName = String(formData.Satuan || 'PCS').trim().toUpperCase();
+                        const breakdownList: Array<{ code: string; contains: number; avgCost: number; latestPrice: number }> = [];
+
+                        const roundedAvg = Math.round(poStats.avgCost || 0);
+                        const roundedLatest = Math.round(poStats.latestPrice || 0);
+
+                        (units || []).forEach((u) => {
+                          const code = String(u.code || '').trim().toUpperCase();
+                          if (!code) return;
+                          const contains = Number(u.contains || (code === baseUnitName ? 1 : 0));
+                          if (contains <= 1 || code === baseUnitName) return;
+
+                          breakdownList.push({
+                            code,
+                            contains,
+                            avgCost: Math.round(roundedAvg * contains),
+                            latestPrice: roundedLatest > 0 ? Math.round(roundedLatest * contains) : 0,
+                          });
+                        });
+
+                        if (breakdownList.length === 0) return null;
+
+                        return (
+                          <div className="pt-2 border-t border-emerald-200/60 mt-2">
+                            <p className="text-[10px] font-black uppercase text-emerald-800/80 tracking-wider mb-1.5">
+                              Rincian Avg Modal Per Satuan:
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {breakdownList.map((ub) => (
+                                <div
+                                  key={ub.code}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 border border-emerald-300/80 rounded-xl text-xs font-black text-emerald-950 shadow-2xs"
+                                >
+                                  <span className="text-emerald-700 font-extrabold">
+                                    1 {ub.code} ({ub.contains} {formData.Satuan || 'Pcs'}):
+                                  </span>
+                                  <span className="text-emerald-900 font-black">
+                                    Rp {ub.avgCost.toLocaleString('id-ID')}
+                                  </span>
+                                  {ub.latestPrice > 0 && ub.latestPrice !== ub.avgCost && (
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      (PO Terakhir: Rp {ub.latestPrice.toLocaleString('id-ID')})
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const roundedAvg = Math.round(poStats.avgCost || 0);
+                      setFormData(prev => ({ ...prev, Modal: roundedAvg }));
+                      toast.success(`Avg Modal HPP (Rp ${roundedAvg.toLocaleString('id-ID')} / ${formData.Satuan || 'Pcs'}) berhasil diterapkan ke seluruh satuan!`);
+                    }}
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5 self-stretch sm:self-auto"
+                  >
+                    <Check size={14} /> Terapkan Avg Modal
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, Modal: poStats.avgCost }))}
-                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5"
-                >
-                  <Check size={14} /> Terapkan Avg Modal
-                </button>
               </div>
             ) : (
               <div className="mb-6 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 flex items-center gap-2 text-xs text-slate-400 font-bold">
@@ -1527,7 +1604,7 @@ export default function EditProductPage() {
                             type="number"
                             placeholder="Nominal modal..."
                             className="w-32 bg-amber-50/80 p-2.5 rounded-xl text-xs font-black text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
-                            value={formData.Modal && contains ? Number((formData.Modal * contains).toFixed(2)) : ''}
+                            value={formData.Modal && contains ? Math.round(formData.Modal * contains) : ''}
                             onChange={(e) => {
                               const inputValStr = e.target.value;
                               if (inputValStr === '') {
@@ -1536,7 +1613,7 @@ export default function EditProductPage() {
                               }
                               const val = Number(inputValStr);
                               const c = contains && contains > 0 ? contains : 1;
-                              const perPcsModal = val / c;
+                              const perPcsModal = Math.round(val / c);
                               setFormData(prev => ({ ...prev, Modal: perPcsModal }));
                             }}
                           />
@@ -1691,22 +1768,22 @@ export default function EditProductPage() {
               </div>
             </div>
 
-            {/* SUPPLIER CARD WITH AUTO PO INTEGRATION */}
+            {/* SUPPLIER CARD WITH AUTO PO INTEGRATION & HISTORICAL VENDORS */}
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[2.5rem] shadow-xl text-white">
               <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
                 <h3 className="text-xs font-black uppercase text-blue-100 flex items-center gap-2">
                   <Truck size={16} /> Supplier / Vendor
                 </h3>
-                {poStats.latestSupplier && (
+                {poStats.suppliers && poStats.suppliers.length > 0 && (
                   <span className="text-[10px] font-black px-2.5 py-1 bg-white/20 text-white rounded-full uppercase tracking-wider backdrop-blur-sm">
-                    PO Terintegrasi
+                    {poStats.suppliers.length} Supplier PO Recorded
                   </span>
                 )}
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">Nama Supplier</label>
+                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">Nama Supplier Utaman / Pilihan</label>
                   <input 
                     type="text" 
                     placeholder="Nama Supplier" 
@@ -1726,23 +1803,63 @@ export default function EditProductPage() {
                   />
                 </div>
 
-                {poStats.latestSupplier && formData.Supplier !== poStats.latestSupplier && (
-                  <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
-                    <div className="text-xs truncate">
-                      <p className="text-[10px] text-blue-200 uppercase font-black">PO Terakhir Data Supplier</p>
-                      <p className="font-bold text-white truncate">{poStats.latestSupplier}</p>
+                {/* DAFTAR RIWAYAT SUPPLIER / VENDOR DARI PO */}
+                {poStats.suppliers && poStats.suppliers.length > 0 && (
+                  <div className="pt-3 border-t border-white/10 space-y-2">
+                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-wider">
+                      Riwayat Supplier / Vendor (Pernah Beli):
+                    </p>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {poStats.suppliers.map((sup, idx) => {
+                        const isSelected = formData.Supplier && formData.Supplier.trim().toLowerCase() === sup.name.trim().toLowerCase();
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                              isSelected
+                                ? 'bg-white/25 border-white text-white shadow-sm'
+                                : 'bg-white/10 border-white/15 hover:bg-white/20 text-blue-50'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-black text-xs text-white truncate">{sup.name}</span>
+                                {isSelected && (
+                                  <span className="px-2 py-0.5 bg-emerald-500 text-white rounded-full text-[9px] font-black uppercase shadow-xs">
+                                    ✓ Aktif
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-blue-100 font-bold mt-0.5">
+                                {sup.count}x PO ({sup.totalQty} {formData.Satuan || 'unit'})
+                                {sup.lastPrice > 0 && ` • Terakhir: Rp ${Math.round(sup.lastPrice).toLocaleString('id-ID')}`}
+                              </p>
+                              {sup.phone && (
+                                <p className="text-[10px] text-blue-300 font-mono mt-0.5">WA: {sup.phone}</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  Supplier: sup.name,
+                                  No_WA_Supplier: sup.phone || prev.No_WA_Supplier,
+                                }));
+                                toast.success(`Supplier "${sup.name}" dipilih`);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all shrink-0 shadow-sm ${
+                                isSelected
+                                  ? 'bg-emerald-500 text-white cursor-default'
+                                  : 'bg-white text-blue-900 hover:bg-blue-50 active:scale-95'
+                              }`}
+                            >
+                              {isSelected ? 'Terpilih' : 'Gunakan'}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        Supplier: poStats.latestSupplier || prev.Supplier,
-                        No_WA_Supplier: poStats.latestSupplierWa || prev.No_WA_Supplier
-                      }))}
-                      className="px-3 py-1.5 bg-white text-blue-800 rounded-xl text-xs font-black uppercase hover:bg-blue-50 transition-all shrink-0 shadow-sm"
-                    >
-                      ⚡ Ikuti PO
-                    </button>
                   </div>
                 )}
               </div>

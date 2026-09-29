@@ -576,6 +576,15 @@ export async function cancelPurchaseOrder(id: string) {
   }
 }
 
+export type PurchaseSupplierHistory = {
+  name: string;
+  phone: string | null;
+  count: number;
+  totalQty: number;
+  lastPrice: number;
+  lastDate: string | null;
+};
+
 export async function getPurchaseStatsByProductId(productId: string) {
   try {
     const { data: rows, error } = await supabaseAdmin
@@ -583,7 +592,17 @@ export async function getPurchaseStatsByProductId(productId: string) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !rows) return { count: 0, avgCost: 0, latestSupplier: null, latestSupplierWa: null, latestPrice: 0, totalQty: 0 };
+    if (error || !rows) {
+      return {
+        count: 0,
+        avgCost: 0,
+        latestSupplier: null,
+        latestSupplierWa: null,
+        latestPrice: 0,
+        totalQty: 0,
+        suppliers: [] as PurchaseSupplierHistory[],
+      };
+    }
 
     let totalQty = 0;
     let totalCost = 0;
@@ -591,6 +610,8 @@ export async function getPurchaseStatsByProductId(productId: string) {
     let latestSupplier: string | null = null;
     let latestSupplierWa: string | null = null;
     let latestPrice = 0;
+
+    const supplierMap = new Map<string, PurchaseSupplierHistory>();
 
     for (const p of rows) {
       const raw = p.raw_data || {};
@@ -608,26 +629,65 @@ export async function getPurchaseStatsByProductId(productId: string) {
         totalQty += qty;
         totalCost += (qty * price);
 
-        if (!latestSupplier) {
-          latestSupplier = raw.supplierName || raw.supplier?.name || (typeof p.supplier === 'object' ? p.supplier?.name : null) || null;
-          latestSupplierWa = raw.supplierPhone || raw.supplierWa || raw.No_WA_Supplier || null;
-          latestPrice = price;
+        const sName = (
+          raw.supplierName || 
+          raw.supplier?.name || 
+          (typeof p.supplier === 'object' ? p.supplier?.name : (typeof p.supplier === 'string' ? p.supplier : null)) || 
+          ''
+        ).trim();
+
+        const sPhone = raw.supplierPhone || raw.supplierWa || raw.No_WA_Supplier || p.supplier_phone || null;
+
+        if (sName) {
+          const key = sName.toLowerCase();
+          const existing = supplierMap.get(key);
+          if (!existing) {
+            supplierMap.set(key, {
+              name: sName,
+              phone: sPhone,
+              count: 1,
+              totalQty: qty,
+              lastPrice: price,
+              lastDate: p.created_at || raw.createdAt || null,
+            });
+          } else {
+            existing.count += 1;
+            existing.totalQty += qty;
+            if (!existing.phone && sPhone) existing.phone = sPhone;
+          }
+
+          if (!latestSupplier) {
+            latestSupplier = sName;
+            latestSupplierWa = sPhone;
+            latestPrice = price;
+          }
         }
       }
     }
 
     const avgCost = totalQty > 0 ? Math.round(totalCost / totalQty) : 0;
+    const suppliers = Array.from(supplierMap.values());
+
     return {
       count,
       avgCost,
       latestSupplier,
       latestSupplierWa,
       latestPrice,
-      totalQty
+      totalQty,
+      suppliers,
     };
   } catch (err) {
     console.error('Failed to get purchase stats by product id:', err);
-    return { count: 0, avgCost: 0, latestSupplier: null, latestSupplierWa: null, latestPrice: 0, totalQty: 0 };
+    return {
+      count: 0,
+      avgCost: 0,
+      latestSupplier: null,
+      latestSupplierWa: null,
+      latestPrice: 0,
+      totalQty: 0,
+      suppliers: [] as PurchaseSupplierHistory[],
+    };
   }
 }
 
