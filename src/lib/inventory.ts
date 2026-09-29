@@ -127,6 +127,10 @@ export async function deductStockFEFO(
     notes = notesArg;
   }
 
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return { success: false, error: 'Jumlah pengeluaran stok harus berupa angka positif lebih dari 0' };
+  }
+
   try {
     const { data: product, error: fetchErr } = await supabaseAdmin
       .from('products')
@@ -139,20 +143,33 @@ export async function deductStockFEFO(
     }
 
     const raw = product.raw_data || {};
+    const unit = product.unit || raw.unit || 'pcs';
     const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
 
+    // 🛑 VALIDASI UTAMA: Jangan pernah izinkan barang keluar lebih banyak dari stok asli!
     if (currentStock < amount) {
       return {
         success: false,
-        error: `Stok tidak cukup: ${product.name || productId}. Tersedia: ${currentStock}, Dibutuhkan: ${amount}`,
+        error: `Stok tidak cukup: "${product.name || productId}". Tersedia: ${currentStock} ${unit}, Diminta keluar: ${amount} ${unit}. Stok tidak boleh negatif!`,
       };
     }
 
     // ── Warehouse waterfall: deduct dari gudang dipilih, sisa dari gudang lain ──
     const MAIN_WH = 'gudang-utama';
     const stockByWarehouse: Record<string, number> = {
-      ...(raw.stockByWarehouse || { [MAIN_WH]: currentStock }),
+      ...(raw.stockByWarehouse || {}),
     };
+
+    // Sinkronisasi saldo gudang jika belum diinisialisasi
+    if (Object.keys(stockByWarehouse).length === 0) {
+      stockByWarehouse[MAIN_WH] = currentStock;
+    } else {
+      const sum = Object.values(stockByWarehouse).reduce((a, b) => a + Number(b || 0), 0);
+      if (sum < currentStock) {
+        stockByWarehouse[MAIN_WH] = Number(stockByWarehouse[MAIN_WH] || 0) + (currentStock - sum);
+      }
+    }
+
     let remainingToDeduct = amount;
     const warehousesUsed: string[] = [];
 
@@ -181,7 +198,21 @@ export async function deductStockFEFO(
       deductionsPerWh.push({ whId, amount: deduct, prevWhStock: available, nextWhStock });
     }
 
-    const newStock = Math.max(0, currentStock - amount);
+    if (remainingToDeduct > 0) {
+      return {
+        success: false,
+        error: `Stok gudang tidak mencukupi untuk mengeluarkan ${amount} ${unit} produk "${product.name || productId}". Sisa yang tidak dapat dipenuhi: ${remainingToDeduct} ${unit}.`,
+      };
+    }
+
+    const newStock = currentStock - amount;
+    if (newStock < 0) {
+      return {
+        success: false,
+        error: `Pengurangan stok dibatalkan karena stok akhir bernilai negatif (${newStock}).`,
+      };
+    }
+
     const now = new Date().toISOString();
     const updatedRaw = { ...raw, stock: newStock, stockByWarehouse, updatedAt: now };
 

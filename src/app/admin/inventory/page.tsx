@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjustStock, getWarehouses } from '@/lib/actions/inventory.actions';
 import { getProducts } from '@/lib/actions/product.actions';
+import HppCalculatorModal from '@/components/admin/inventory/HppCalculatorModal';
 
 import { limit } from '@/lib/firebase';
 
@@ -53,9 +54,12 @@ export default function AdminInventory() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [adjustModal, setAdjustModal] = useState(false);
+  const [adjustMode, setAdjustMode] = useState<'SET' | 'DELTA'>('SET');
+  const [targetStockInput, setTargetStockInput] = useState<string | number>('');
   const [adjustForm, setAdjustForm] = useState<{ productId: string; warehouseId: string; quantity: string | number; notes: string }>({ productId: '', warehouseId: '', quantity: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [quickAdjust, setQuickAdjust] = useState<{ batchId: string; value: string } | null>(null);
+  const [hppModalOpen, setHppModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,22 +104,54 @@ export default function AdminInventory() {
   }), [lowStock, search, statusFilter]);
 
   const handleAdjust = async () => {
-    const qty = Number(adjustForm.quantity);
-    if (!adjustForm.productId || !adjustForm.warehouseId || adjustForm.quantity === '' || isNaN(qty) || qty === 0) {
-      notify.error('Isi semua kolom yang diperlukan dan jumlah selain 0');
+    if (!adjustForm.productId || !adjustForm.warehouseId) {
+      notify.error('Pilih produk dan gudang terlebih dahulu');
       return;
     }
+
+    const selectedProd = products.find(p => p.id === adjustForm.productId);
+    const raw = selectedProd?.raw_data || {};
+    const stockMap = raw.stockByWarehouse || { 'gudang-utama': selectedProd?.stock || 0 };
+    const curWhStock = Number(stockMap[adjustForm.warehouseId] ?? (adjustForm.warehouseId === 'gudang-utama' ? (selectedProd?.stock || 0) : 0));
+    const unit = selectedProd?.unit || raw.unit || 'pcs';
+
+    let delta = 0;
+    if (adjustMode === 'SET') {
+      const target = Number(targetStockInput);
+      if (targetStockInput === '' || isNaN(target) || target < 0) {
+        notify.error('Masukkan stok fisik aktual yang valid (minimal 0)');
+        return;
+      }
+      delta = target - curWhStock;
+      if (delta === 0) {
+        notify.error('Stok fisik sama dengan stok sistem, tidak ada perubahan');
+        return;
+      }
+    } else {
+      delta = Number(adjustForm.quantity);
+      if (adjustForm.quantity === '' || isNaN(delta) || delta === 0) {
+        notify.error('Masukkan jumlah perubahan selain 0');
+        return;
+      }
+      if (delta < 0 && Math.abs(delta) > curWhStock) {
+        notify.error(`Pengurangan (${Math.abs(delta)} ${unit}) melebihi stok yang ada di gudang ini (${curWhStock} ${unit})! Stok tidak boleh minus.`);
+        return;
+      }
+    }
+
     setSaving(true);
     const result = await adjustStock({
       productId: adjustForm.productId,
       warehouseId: adjustForm.warehouseId,
-      quantity: qty,
-      notes: adjustForm.notes || undefined,
+      quantity: delta,
+      notes: adjustForm.notes || (adjustMode === 'SET' ? `Set stok fisik ke ${targetStockInput} ${unit}` : undefined),
     });
+
     if (result.success) {
       notify.success('Stok berhasil disesuaikan');
       setAdjustModal(false);
       setAdjustForm({ productId: '', warehouseId: '', quantity: '', notes: '' });
+      setTargetStockInput('');
       await load();
     } else {
       notify.error(result.error || 'Gagal menyesuaikan stok');
@@ -147,7 +183,14 @@ export default function AdminInventory() {
             <h1 className="text-xl font-black text-gray-900">Manajemen Inventori</h1>
             <p className="text-xs text-gray-500 mt-0.5">FEFO (First Expired First Out) aktif · Pemisahan Produk Aktif & Tidak Aktif</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setHppModalOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white px-3.5 py-2.5 rounded-xl text-sm font-bold hover:from-amber-600 hover:to-orange-700 shadow-sm transition-all"
+              title="Buka Kalkulator & Skema Penentuan HPP Modal Produk"
+            >
+              <DollarSign size={16} /> Kalkulator HPP
+            </button>
             <button onClick={load} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 shadow-sm">
               <RefreshCw size={15} /> Refresh
             </button>
@@ -343,7 +386,7 @@ export default function AdminInventory() {
                                   <div className="flex items-center gap-1 justify-center">
                                     <input
                                       type="number"
-                                      className="w-16 text-center text-xs border border-blue-300 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      className="w-16 text-center text-xs border border-blue-300 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
                                       value={quickAdjust!.value}
                                       onChange={e => setQuickAdjust(q => q ? { ...q, value: e.target.value } : null)}
                                       placeholder="±"
@@ -353,11 +396,26 @@ export default function AdminInventory() {
                                       onClick={async () => {
                                         const qty = Number(quickAdjust!.value);
                                         if (!qty || isNaN(qty)) { setQuickAdjust(null); return; }
+                                        // 🛑 Validasi ketat: Cegah minus melebihi stok batch!
+                                        if (qty < 0 && Math.abs(qty) > b.quantity) {
+                                          notify.error(`Pengurangan (${Math.abs(qty)}) melebihi stok batch (${b.quantity} ${b.product.unit})!`);
+                                          return;
+                                        }
                                         setSaving(true);
-                                        const result = await adjustStock({ productId: b.product.id, warehouseId: b.warehouseId, quantity: qty, notes: 'Quick Adjust dari Inventori' });
+                                        const result = await adjustStock({
+                                          productId: b.product.id,
+                                          warehouseId: b.warehouseId,
+                                          quantity: qty,
+                                          notes: `Quick Adjust dari Inventori (${qty >= 0 ? '+' : ''}${qty} ${b.product.unit})`
+                                        });
                                         setSaving(false);
-                                        if (result.success) { notify.success('Stok diperbarui'); setQuickAdjust(null); await load(); }
-                                        else notify.error(result.error || 'Gagal');
+                                        if (result.success) {
+                                          notify.success('Stok berhasil diperbarui');
+                                          setQuickAdjust(null);
+                                          await load();
+                                        } else {
+                                          notify.error(result.error || 'Gagal');
+                                        }
                                       }}
                                       disabled={saving}
                                       className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 text-xs font-bold disabled:opacity-50"
@@ -465,63 +523,209 @@ export default function AdminInventory() {
         </div>
       </div>
 
-      {/* Adjust Stock Modal */}
-      {adjustModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAdjustModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-black text-gray-900">Penyesuaian Stok</h2>
-              <button onClick={() => setAdjustModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100">✕</button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Produk *</label>
-                <select value={adjustForm.productId} onChange={e => setAdjustForm(p => ({ ...p, productId: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Pilih Produk</option>
-                  <optgroup label="Produk Aktif">
-                    {products.filter((p: any) => p.isActive !== false).map((p: any) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Produk Tidak Aktif">
-                    {products.filter((p: any) => p.isActive === false).map((p: any) => (
-                      <option key={p.id} value={p.id}>[Tidak Aktif] {p.name}</option>
-                    ))}
-                  </optgroup>
-                </select>
+      {/* Adjust Stock Modal with Safety Locks & Opname Mode */}
+      {adjustModal && (() => {
+        const selectedProd = products.find(p => p.id === adjustForm.productId);
+        const raw = selectedProd?.raw_data || {};
+        const stockMap = raw.stockByWarehouse || { 'gudang-utama': selectedProd?.stock || 0 };
+        const curWhStock = Number(stockMap[adjustForm.warehouseId] ?? (adjustForm.warehouseId === 'gudang-utama' ? (selectedProd?.stock || 0) : 0));
+        const unit = selectedProd?.unit || raw.unit || 'pcs';
+
+        let deltaPreview = 0;
+        if (adjustMode === 'SET') {
+          const target = targetStockInput === '' ? curWhStock : Number(targetStockInput);
+          deltaPreview = target - curWhStock;
+        } else {
+          deltaPreview = adjustForm.quantity === '' ? 0 : Number(adjustForm.quantity);
+        }
+        const nextWhStockPreview = curWhStock + deltaPreview;
+        const isNegativeError = nextWhStockPreview < 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAdjustModal(false)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">Penyesuaian Stok (Anti-Minus)</h2>
+                  <p className="text-xs text-gray-400">Pastikan stok keluar tidak melebihi stok yang ada di gudang</p>
+                </div>
+                <button onClick={() => setAdjustModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Gudang *</label>
-                <select value={adjustForm.warehouseId} onChange={e => setAdjustForm(p => ({ ...p, warehouseId: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Pilih Gudang</option>
-                  {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
+
+              {/* Mode Selector */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setAdjustMode('SET')}
+                  className={`py-2 px-3 rounded-lg text-xs font-black transition-all ${
+                    adjustMode === 'SET'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  1. Set Stok Fisik (Opname)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdjustMode('DELTA')}
+                  className={`py-2 px-3 rounded-lg text-xs font-black transition-all ${
+                    adjustMode === 'DELTA'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  2. Tambah / Kurang (±)
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Jumlah (positif = tambah, negatif = kurangi) *</label>
-                <input type="number" value={adjustForm.quantity} onChange={e => setAdjustForm(p => ({ ...p, quantity: e.target.value }))}
-                  placeholder="Contoh: 50 atau -10"
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Pilih Produk *</label>
+                  <select
+                    value={adjustForm.productId}
+                    onChange={e => setAdjustForm(p => ({ ...p, productId: e.target.value }))}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Produk --</option>
+                    <optgroup label="Produk Aktif">
+                      {products.filter((p: any) => p.isActive !== false).map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name} (Total: {p.stock} {p.unit || 'pcs'})</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Produk Tidak Aktif">
+                      {products.filter((p: any) => p.isActive === false).map((p: any) => (
+                        <option key={p.id} value={p.id}>[Tidak Aktif] {p.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Gudang Penyimpanan *</label>
+                  <select
+                    value={adjustForm.warehouseId}
+                    onChange={e => setAdjustForm(p => ({ ...p, warehouseId: e.target.value }))}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Gudang --</option>
+                    {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Info Stok Gudang Terpilih */}
+                {adjustForm.productId && adjustForm.warehouseId && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-between text-xs">
+                    <span className="text-blue-700 font-bold">Stok Saat Ini di Gudang Ini:</span>
+                    <span className="font-black text-blue-900 text-sm">{curWhStock} {unit}</span>
+                  </div>
+                )}
+
+                {/* Input Sesuai Mode */}
+                {adjustMode === 'SET' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Jumlah Stok Fisik Riil yang Ditemukan *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={targetStockInput}
+                      onChange={e => setTargetStockInput(e.target.value)}
+                      placeholder={`Ketik jumlah stok fisik riil (${curWhStock})`}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      Sistem akan otomatis menghitung selisih (kurang/tambah) dari stok sistem ({curWhStock} {unit}).
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Jumlah Perubahan (Positif = Tambah, Negatif = Kurangi) *
+                    </label>
+                    <input
+                      type="number"
+                      value={adjustForm.quantity}
+                      onChange={e => setAdjustForm(p => ({ ...p, quantity: e.target.value }))}
+                      placeholder="Contoh: 10 untuk tambah, atau -5 untuk kurangi"
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      Maksimal pengurangan dari gudang ini adalah <strong>-{curWhStock} {unit}</strong>.
+                    </span>
+                  </div>
+                )}
+
+                {/* Live Preview Box */}
+                {adjustForm.productId && adjustForm.warehouseId && (
+                  <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                    isNegativeError
+                      ? 'bg-rose-50 border-rose-200 text-rose-800'
+                      : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                  }`}>
+                    <div className="flex justify-between items-center font-bold">
+                      <span>Simulasi Stok Akhir:</span>
+                      <span className="font-mono text-sm">
+                        {curWhStock} {deltaPreview >= 0 ? `+ ${deltaPreview}` : `- ${Math.abs(deltaPreview)}`} = <strong className={isNegativeError ? 'text-rose-600' : 'text-emerald-700'}>{nextWhStockPreview} {unit}</strong>
+                      </span>
+                    </div>
+                    {isNegativeError && (
+                      <p className="text-[11px] font-black text-rose-600 flex items-center gap-1">
+                        ⚠️ Pengurangan melebihi stok yang ada! Stok akhir tidak boleh bernilai negatif.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Catatan / Alasan Penyesuaian</label>
+                  <input
+                    value={adjustForm.notes}
+                    onChange={e => setAdjustForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="Contoh: Barang rusak saat display, penyesuaian opname..."
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Catatan</label>
-                <input value={adjustForm.notes} onChange={e => setAdjustForm(p => ({ ...p, notes: e.target.value }))}
-                  placeholder="Alasan penyesuaian..."
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+              <div className="flex gap-3 mt-5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAdjustModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdjust}
+                  disabled={saving || isNegativeError || !adjustForm.productId || !adjustForm.warehouseId}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-500/20"
+                >
+                  {saving ? 'Memproses...' : 'Terapkan Penyesuaian'}
+                </button>
               </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setAdjustModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
-              <button onClick={handleAdjust} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
-                {saving ? 'Memproses...' : 'Terapkan'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Kalkulator & Skema HPP Modal Modal */}
+      <HppCalculatorModal
+        isOpen={hppModalOpen}
+        onClose={() => setHppModalOpen(false)}
+        products={products.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          unit: p.unit,
+          stock: p.stock,
+          costPrice: Number(p.cost_price ?? p.raw_data?.Modal ?? 0),
+          price: Number(p.price ?? p.raw_data?.Ecer ?? 0),
+        }))}
+        onProductUpdated={load}
+      />
     </>
   );
 }

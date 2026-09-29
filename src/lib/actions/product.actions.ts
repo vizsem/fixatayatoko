@@ -300,9 +300,9 @@ export async function updateProduct(id: string, data: {
       ...(data.description !== undefined ? { description: data.description } : {}),
       ...(data.categoryId ? { category: data.categoryId } : {}),
       ...(data.supplierId ? { supplierId: data.supplierId } : {}),
-      ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
-      ...(data.sellPrice !== undefined ? { price: data.sellPrice } : {}),
-      ...(data.unit ? { unit: data.unit } : {}),
+      ...(data.costPrice !== undefined ? { costPrice: data.costPrice, Modal: data.costPrice, purchasePrice: data.costPrice } : {}),
+      ...(data.sellPrice !== undefined ? { price: data.sellPrice, Ecer: data.sellPrice, priceEcer: data.sellPrice } : {}),
+      ...(data.unit ? { unit: data.unit, Satuan: data.unit } : {}),
       updatedAt: now,
     };
 
@@ -322,6 +322,8 @@ export async function updateProduct(id: string, data: {
     if (error) throw error;
 
     revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+    revalidatePath('/admin/products/pricing-hpp');
     return { success: true, data: { id, ...data } };
   } catch (error: any) {
     console.error('Failed to update product:', error);

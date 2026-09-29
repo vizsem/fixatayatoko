@@ -150,7 +150,9 @@ export async function getInventoryMovements(filters?: { productId?: string; ware
 export async function adjustStock(data: {
   productId: string
   warehouseId: string
-  quantity: number // Positif = tambah, Negatif = kurangi
+  quantity?: number // Positif = tambah, Negatif = kurangi (jika mode DELTA)
+  targetStock?: number // Alternatif: jika ingin langsung menyetel stok fisik aktual
+  mode?: 'DELTA' | 'SET'
   notes?: string
   createdById?: string
 }) {
@@ -166,18 +168,53 @@ export async function adjustStock(data: {
     }
 
     const raw = p.raw_data || {};
+    const unit = p.unit || raw.unit || 'pcs';
     const currentStock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
-    const newStock = Math.max(0, currentStock + data.quantity);
     const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
     const curWhStock = Number(stockByWarehouse[data.warehouseId] ?? currentStock);
-    stockByWarehouse[data.warehouseId] = Math.max(0, curWhStock + data.quantity);
+
+    // Hitung quantity delta yang akan diterapkan
+    let deltaQty = 0;
+    if (data.mode === 'SET' && data.targetStock !== undefined) {
+      const target = Number(data.targetStock);
+      if (isNaN(target) || target < 0) {
+        return { success: false, error: 'Stok target fisik tidak boleh negatif' };
+      }
+      deltaQty = target - curWhStock;
+    } else {
+      deltaQty = Number(data.quantity || 0);
+    }
+
+    if (isNaN(deltaQty) || deltaQty === 0) {
+      return { success: false, error: 'Jumlah perubahan stok tidak boleh 0 atau kosong' };
+    }
+
+    // 🛑 VALIDASI KETAT: Cegah produk quantity keluar melebihi stok asli!
+    const nextWhStock = curWhStock + deltaQty;
+    const nextTotalStock = currentStock + deltaQty;
+
+    if (nextWhStock < 0) {
+      return {
+        success: false,
+        error: `Pengurangan gagal: Jumlah keluar (${Math.abs(deltaQty)} ${unit}) melebihi stok asli yang tersedia di gudang terpilih (${curWhStock} ${unit}). Stok tidak boleh negatif!`,
+      };
+    }
+
+    if (nextTotalStock < 0) {
+      return {
+        success: false,
+        error: `Pengurangan gagal: Jumlah keluar (${Math.abs(deltaQty)} ${unit}) melebihi total stok produk (${currentStock} ${unit}). Stok tidak boleh negatif!`,
+      };
+    }
+
+    stockByWarehouse[data.warehouseId] = nextWhStock;
 
     const now = new Date().toISOString();
     const { error: updateErr } = await supabaseAdmin
       .from('products')
       .update({
-        stock: newStock,
-        raw_data: { ...raw, stock: newStock, stockByWarehouse, updatedAt: now },
+        stock: nextTotalStock,
+        raw_data: { ...raw, stock: nextTotalStock, stockByWarehouse, updatedAt: now },
         updated_at: now,
       })
       .eq('id', data.productId);
@@ -191,25 +228,25 @@ export async function adjustStock(data: {
       product_id: data.productId,
       product_name: p.name || raw.name || 'Produk',
       warehouse_id: data.warehouseId,
-      quantity: data.quantity,
-      amount: Math.abs(data.quantity),
-      type: data.quantity >= 0 ? 'MASUK' : 'KELUAR',
+      quantity: deltaQty,
+      amount: Math.abs(deltaQty),
+      type: deltaQty >= 0 ? 'MASUK' : 'KELUAR',
       source: 'OPNAME',
       prev_stock: currentStock,
-      next_stock: newStock,
-      note: data.notes || 'Penyesuaian stok manual',
+      next_stock: nextTotalStock,
+      note: data.notes || (data.mode === 'SET' ? `Set stok fisik ke ${data.targetStock} ${unit}` : 'Penyesuaian stok manual'),
       raw_data: {
         productId: data.productId,
         productName: p.name || raw.name || 'Produk',
         warehouseId: data.warehouseId,
-        quantity: data.quantity,
-        amount: Math.abs(data.quantity),
-        type: data.quantity >= 0 ? 'MASUK' : 'KELUAR',
+        quantity: deltaQty,
+        amount: Math.abs(deltaQty),
+        type: deltaQty >= 0 ? 'MASUK' : 'KELUAR',
         action: 'ADJUSTMENT',
-        notes: data.notes || 'Penyesuaian stok manual',
+        notes: data.notes || (data.mode === 'SET' ? `Set stok fisik ke ${data.targetStock} ${unit}` : 'Penyesuaian stok manual'),
         createdById: data.createdById,
         prevStock: currentStock,
-        nextStock: newStock,
+        nextStock: nextTotalStock,
         createdAt: now,
       },
       created_at: now,
@@ -218,7 +255,7 @@ export async function adjustStock(data: {
 
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
-    return { success: true };
+    return { success: true, newStock: nextTotalStock, newWhStock };
   } catch (error) {
     console.error('Failed to adjust stock:', error);
     return { success: false, error: 'Gagal melakukan penyesuaian stok' };
