@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
-  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package
+  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package, Check, Info, Sparkles, Plus
 } from 'lucide-react';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -17,12 +17,13 @@ import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib
 import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import { supabase } from '@/lib/supabase';
 import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
+import { getPurchaseStatsByProductId } from '@/lib/actions/purchase.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
-
 import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
+import { collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
+
 type ChannelPrices = {
   offline?: number;
   website?: number;
@@ -54,13 +55,32 @@ export default function EditProductPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   
-  // State from Add Page structure
+  // State for Units and Categories
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [newUnitCode, setNewUnitCode] = useState('');
   const [newKategoriInput, setNewKategoriInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Purchase Stats State (PO Avg HPP & Supplier)
+  const [poStats, setPoStats] = useState<{
+    count: number;
+    avgCost: number;
+    latestSupplier: string | null;
+    latestSupplierWa: string | null;
+    latestPrice: number;
+    totalQty: number;
+  }>({
+    count: 0,
+    avgCost: 0,
+    latestSupplier: null,
+    latestSupplierWa: null,
+    latestPrice: 0,
+    totalQty: 0
+  });
+
+  const isInitialLoadedRef = useRef(false);
 
   const [formData, setFormData] = useState({
     ID: '',
@@ -146,9 +166,6 @@ export default function EditProductPage() {
   }, [barcodeBuffer]);
   // ========================================
 
-
-  const formDataRef = useRef(formData); // Ref to keep track of latest formData for logs if needed
-  
   const pricingRec = useMemo(() => {
     if (pricingMode !== 'RECOMMENDED') return null;
     return recommendSellingPrice({
@@ -207,18 +224,31 @@ export default function EditProductPage() {
     }
   }, [id]);
 
+  const fetchPurchaseStats = useCallback(async () => {
+    try {
+      const stats = await getPurchaseStatsByProductId(id);
+      setPoStats(stats);
+      if (stats.latestSupplier) {
+        setFormData(prev => ({
+          ...prev,
+          Supplier: prev.Supplier || stats.latestSupplier || '',
+          No_WA_Supplier: prev.No_WA_Supplier || stats.latestSupplierWa || ''
+        }));
+      }
+    } catch (e) {
+      console.error("Gagal load purchase stats:", e);
+    }
+  }, [id]);
+
   const fetchProductData = useCallback(async () => {
     try {
-      // Try Supabase first (primary DB via server action)
       let data: any = null;
       const spRow = await getProductByIdForEdit(id);
 
       if (spRow) {
-        // Merge Supabase row with raw_data
         const raw = spRow.raw_data || {};
         data = {
           ...raw,
-          // Supabase top-level columns take precedence
           ID: spRow.id,
           Nama: spRow.name || raw.Nama || raw.name || '',
           Kategori: spRow.category || raw.Kategori || raw.category || 'UMUM',
@@ -234,7 +264,6 @@ export default function EditProductPage() {
           Status: spRow.is_active ? 1 : 0,
         };
       } else {
-        // Fallback to Firestore
         const docSnap = await sbGetDoc('products', id);
         if (!docSnap.exists()) {
           toast.error('Produk tidak ditemukan');
@@ -249,13 +278,13 @@ export default function EditProductPage() {
 
       setFormData(prev => ({
         ...prev,
-        ID: data.ID || '',
+        ID: data.ID || id,
         Barcode: data.Barcode || '',
         Parent_ID: data.Parent_ID || '',
         Nama: data.Nama || data.name || '',
         Kategori: data.Kategori || 'UMUM',
         Brand: data.Brand || '',
-        Expired_Default: data.expired_date || '', // Map expired_date to Expired_Default for UI
+        Expired_Default: data.expired_date || '',
         expired_date: data.expired_date || '',
         tgl_masuk: data.tgl_masuk || '',
         Satuan: baseUnit,
@@ -303,48 +332,42 @@ export default function EditProductPage() {
 
       // Handle Units
       const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
-      
-      // Ensure base unit exists
       let mergedUnits = [...existingUnits];
-      if (!mergedUnits.find(u => u.code === baseUnit)) {
-          mergedUnits.unshift({ code: baseUnit, contains: 1, price: basePrice });
+
+      // Ensure base unit is at index 0
+      const baseIdx = mergedUnits.findIndex(u => u.code?.toUpperCase() === baseUnit);
+      if (baseIdx >= 0) {
+        const [baseObj] = mergedUnits.splice(baseIdx, 1);
+        mergedUnits.unshift({ ...baseObj, code: baseUnit, contains: 1, price: basePrice });
+      } else {
+        mergedUnits.unshift({ code: baseUnit, contains: 1, price: basePrice });
       }
 
-      // Add default units if missing (to match Add Product)
-      const defaultOptions = ['BOX', 'CTN'];
-      defaultOptions.forEach(defCode => {
-        if (!mergedUnits.some(u => u.code === defCode)) {
-          mergedUnits.push({ code: defCode, contains: 0, price: 0, label: '' });
-        }
-      });
-      
       // Clean up units
       mergedUnits = mergedUnits.map(u => {
-          const code = u.code.toUpperCase();
-          const prices: ChannelPrices = {
-            offline: cp.offline?.[code]?.price,
-            website: cp.website?.[code]?.price,
-            shopee: cp.shopee?.[code]?.price,
-            tiktok: cp.tiktok?.[code]?.price,
-          };
+        const code = String(u.code || '').toUpperCase();
+        const prices: ChannelPrices = {
+          offline: cp.offline?.[code]?.price ?? u.prices?.offline,
+          website: cp.website?.[code]?.price ?? u.prices?.website,
+          shopee: cp.shopee?.[code]?.price ?? u.prices?.shopee,
+          tiktok: cp.tiktok?.[code]?.price ?? u.prices?.tiktok,
+        };
 
-          return {
-            ...u,
-            code,
-            contains: Number(u.contains || 0),
-            price: Number(u.price || 0),
-            minQty: Number(u.minQty || 0),
-            prices
-          };
+        return {
+          ...u,
+          code,
+          contains: Number(u.contains || (code === baseUnit ? 1 : 0)),
+          price: Number(u.price || 0),
+          minQty: Number(u.minQty || 0),
+          label: u.label || '',
+          prices
+        };
       });
 
       setUnits(mergedUnits);
-
-      const currentPhoto = data.Link_Foto || data.image_url || data.URL_Produk || data.imageUrl || data.image || '';
-      setImagePreview(currentPhoto || null);
     } catch (e) {
       console.error(e);
-      toast.error("Gagal sinkron data");
+      toast.error("Gagal sinkron data produk");
     }
   }, [id, router]);
 
@@ -358,17 +381,18 @@ export default function EditProductPage() {
     setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
   }, []);
 
+  // Prevent re-fetching on tab focus / auth state change
   useEffect(() => {
     const checkAuth = async () => {
-      const { user, userDocData, isAdmin, isStaff, role } = await getUserAndRole();
-      if (!user) return;
-      // For backwards compat, expose userDoc variable matching old pattern
-      const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
-      
+      const { user } = await getUserAndRole();
       if (!user) return router.push('/profil/login');
       if (!isOperationalUser(user)) return router.push('/profil');
-      await Promise.all([fetchProductData(), fetchWarehouses(), fetchCategories(), fetchCostHistory()]);
-      setLoading(false);
+      
+      if (!isInitialLoadedRef.current) {
+        isInitialLoadedRef.current = true;
+        await Promise.all([fetchProductData(), fetchWarehouses(), fetchCategories(), fetchCostHistory(), fetchPurchaseStats()]);
+        setLoading(false);
+      }
     };
     checkAuth();
 
@@ -381,17 +405,37 @@ export default function EditProductPage() {
     })();
 
     return () => { if (__unsubscribe) __unsubscribe(); };
-  }, [id, router, fetchProductData, fetchWarehouses]);
+  }, [id, router, fetchProductData, fetchWarehouses, fetchCategories, fetchCostHistory, fetchPurchaseStats]);
+
+  const handleSaveNewCategory = () => {
+    const name = newKategoriInput.trim();
+    if (!name) {
+      toast.error('Nama kategori tidak boleh kosong');
+      return;
+    }
+    const exists = categories.some(c => c.name.toLowerCase() === name.toLowerCase());
+    if (!exists) {
+      setCategories(prev => [...prev, { id: 'cat_' + Date.now(), name }]);
+    }
+    setFormData(prev => ({ ...prev, Kategori: name }));
+    setNewKategoriInput('');
+    toast.success(`Kategori "${name}" berhasil dipilih`);
+  };
 
   const handleAddUnit = () => {
     if (!newUnitCode) return;
-    const code = normalizeSatuan(newUnitCode);
+    const code = normalizeSatuan(newUnitCode).toUpperCase();
     if (units.some(u => u.code === code)) {
       toast.error('Satuan sudah ada');
       return;
     }
     setUnits([...units, { code, contains: 0, price: 0, label: '' }]);
     setNewUnitCode('');
+  };
+
+  const handleRemoveUnit = (index: number) => {
+    setUnits(prev => prev.filter((_, i) => i !== index));
+    toast.success('Satuan berhasil dihapus');
   };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -428,9 +472,16 @@ export default function EditProductPage() {
     const loadingToast = toast.loading("Menyimpan perubahan...");
 
     try {
-      // 0. Ensure Category exists — normalize and guard against sentinel '__NEW__'
-      const rawCat = String(formData.Kategori || 'UMUM').trim();
-      const categoryName = rawCat === '__NEW__' ? 'UMUM' : rawCat;
+      // 0. Ensure Category exists — normalize and resolve '__NEW__' or input
+      let categoryName = String(formData.Kategori || 'UMUM').trim();
+      if (categoryName === '__NEW__' || !categoryName) {
+        if (newKategoriInput.trim()) {
+          categoryName = newKategoriInput.trim();
+        } else {
+          categoryName = 'UMUM';
+        }
+      }
+
       const existingCat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
       if (!existingCat && categoryName && categoryName !== 'UMUM') {
         try {
@@ -555,10 +606,11 @@ export default function EditProductPage() {
         ...formData,
         ID: formData.ID,
         Nama: String(formData.Nama || '').toUpperCase(),
+        Kategori: categoryName,
         Satuan: baseUnit,
         sku: formData.ID,
         name: String(formData.Nama || '').toUpperCase(),
-        category: formData.Kategori,
+        category: categoryName,
         unit: baseUnit,
         description: formData.Deskripsi || '',
         stock: totalStock,
@@ -587,6 +639,8 @@ export default function EditProductPage() {
         expired_date: formData.expired_date || formData.Expired_Default || '',
         expiredDate: formData.expired_date || formData.Expired_Default || '',
         Lokasi: formData.Lokasi || '',
+        Supplier: formData.Supplier || '',
+        No_WA_Supplier: formData.No_WA_Supplier || '',
         units: ensuredBase,
         channelPricing,
         minPurchase: Number(formData.minPurchase || 1),
@@ -609,10 +663,10 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString(),
       };
 
-      // 1. Save to Supabase (primary read DB via server action with admin privileges)
+      // 1. Save to Supabase
       const saveRes = await saveEditedProduct(id, {
         name: String(formData.Nama || '').toUpperCase(),
-        category: formData.Kategori,
+        category: categoryName,
         unit: baseUnit,
         price: nextEcer,
         cost_price: Number(formData.Modal || 0),
@@ -628,13 +682,12 @@ export default function EditProductPage() {
         throw new Error(saveRes.error || 'Gagal menyimpan produk ke database');
       }
 
-      // 2. Safe sync to Firestore (optional fallback)
+      // 2. Safe sync to Firestore
       try {
         await sbUpsertDoc('products', id, updatePayload, { merge: true });
       } catch (fsErr) {
         console.warn('Firestore sync skipped or failed:', fsErr);
       }
-
 
       // Write Logs
       if (logEntries.length > 0) {
@@ -674,20 +727,17 @@ export default function EditProductPage() {
     setIsDeleting(true);
     const toastId = toast.loading('Menghapus produk...');
     try {
-      // 1. Delete from Supabase (primary DB)
       const res = await deleteProduct(id);
       if (!res.success) {
         throw new Error(res.error || 'Gagal menghapus produk');
       }
 
-      // 2. Safe delete from Firestore
       try {
         await sbDeleteDoc('products', id);
       } catch (fsErr) {
         console.warn('Firestore delete skipped or failed:', fsErr);
       }
       
-      // Catat Log Hapus
       await sbInsertDoc('stock_logs', {
           productId: id,
           productName: formData.Nama.toUpperCase(),
@@ -712,38 +762,48 @@ export default function EditProductPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div></div>;
 
   return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-24 text-black font-sans">
-      <div className="max-w-4xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 bg-slate-50/70 min-h-screen pb-24 text-slate-800 font-sans">
+      <div className="max-w-5xl mx-auto space-y-6">
 
         {/* Header Navigation */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link href="/admin/products" className="p-3 bg-white rounded-2xl shadow-sm hover:bg-black hover:text-white transition-all">
+        <div className="flex items-center justify-between bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <Link href="/admin/products" className="p-2.5 bg-slate-100 rounded-2xl hover:bg-slate-900 hover:text-white transition-all">
               <ChevronLeft size={20} />
             </Link>
             <div>
-              <h1 className="text-xl font-black uppercase tracking-tighter">Edit Produk</h1>
-              <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Update Data Inventaris</p>
+              <h1 className="text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900">Edit Produk</h1>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Inventaris & Informasi Produk</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/admin/products')}
+              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase hover:bg-slate-200 transition-all hidden sm:block"
+            >
+              Kembali
+            </button>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-            <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
-              <Tag size={16} />
+          {/* BAGIAN 1: IDENTITAS BARANG */}
+          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
+              <Tag size={18} />
               Identitas Barang
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">ID Produk *</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">ID Produk *</label>
                 <input
                   required
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm"
                   type="text"
                   value={formData.ID}
                   onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
@@ -751,60 +811,82 @@ export default function EditProductPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Parent ID</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Parent ID</label>
                 <input
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none"
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm"
                   type="text"
                   value={formData.Parent_ID}
                   onChange={(e) => setFormData({ ...formData, Parent_ID: e.target.value })}
                   placeholder="Opsional"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Nama Produk</label>
-                <input required className="w-full p-4 bg-gray-100 rounded-2xl font-black outline-none" type="text" value={formData.Nama} onChange={e => setFormData({ ...formData, Nama: e.target.value })} />
+              <div className="sm:col-span-2 lg:col-span-1">
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Lokasi Rak</label>
+                <input 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
+                  type="text" 
+                  value={formData.Lokasi} 
+                  onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} 
+                  placeholder="Contoh: Rak A-01"
+                />
               </div>
-              <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Lokasi Rak</label>
-                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Lokasi} onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} />
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Nama Produk *</label>
+                <input 
+                  required 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
+                  type="text" 
+                  value={formData.Nama} 
+                  onChange={e => setFormData({ ...formData, Nama: e.target.value })} 
+                />
               </div>
-              <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Kategori</label>
-                <div className="relative">
-                  {formData.Kategori === '__NEW__' ? (
-                    <div className="flex gap-2">
-                      <input
-                        autoFocus
-                        className="flex-1 p-4 bg-yellow-50 rounded-2xl font-black outline-none border border-yellow-300 focus:border-yellow-500 transition-all"
-                        type="text"
-                        placeholder="Nama kategori baru..."
-                        value={newKategoriInput}
-                        onChange={e => setNewKategoriInput(e.target.value)}
-                        onBlur={e => {
-                          const val = e.target.value.trim();
-                          setFormData({ ...formData, Kategori: val || '' });
-                          setNewKategoriInput('');
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const val = newKategoriInput.trim();
-                            setFormData({ ...formData, Kategori: val });
-                            setNewKategoriInput('');
-                          }
-                          if (e.key === 'Escape') {
-                            setFormData({ ...formData, Kategori: '' });
-                            setNewKategoriInput('');
-                          }
-                        }}
-                      />
-                      <button type="button" onClick={() => { setFormData({ ...formData, Kategori: '' }); setNewKategoriInput(''); }} className="px-3 py-2 bg-gray-100 rounded-xl text-xs font-black text-gray-500 hover:bg-gray-200">✕</button>
-                    </div>
-                  ) : (
+
+              {/* KATEGORI SELECTION WITH INSTANT ADD */}
+              <div className="sm:col-span-2 lg:col-span-2">
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Kategori Produk</label>
+                {formData.Kategori === '__NEW__' ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      className="flex-1 p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl font-black text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                      type="text"
+                      placeholder="Ketik nama kategori baru..."
+                      value={newKategoriInput}
+                      onChange={e => setNewKategoriInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveNewCategory();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveNewCategory}
+                      className="px-4 py-3.5 bg-amber-600 text-white rounded-2xl text-xs font-black uppercase hover:bg-amber-700 transition-all shrink-0 flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Simpan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setFormData({ ...formData, Kategori: 'UMUM' }); setNewKategoriInput(''); }}
+                      className="px-3 py-3.5 bg-slate-100 text-slate-500 rounded-2xl text-xs font-black hover:bg-slate-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
                     <select
-                      className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border border-transparent focus:border-blue-500 transition-all appearance-none"
+                      className="flex-1 p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs"
                       value={formData.Kategori}
-                      onChange={e => setFormData({ ...formData, Kategori: e.target.value })}
+                      onChange={e => {
+                        if (e.target.value === '__NEW__') {
+                          setFormData({ ...formData, Kategori: '__NEW__' });
+                        } else {
+                          setFormData({ ...formData, Kategori: e.target.value });
+                        }
+                      }}
                     >
                       <option value="">— Pilih Kategori —</option>
                       {categories.map(cat => (
@@ -812,23 +894,35 @@ export default function EditProductPage() {
                       ))}
                       <option value="__NEW__">＋ Tambah Kategori Baru...</option>
                     </select>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
+
               <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Brand / Merk</label>
-                <input className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Brand} onChange={e => setFormData({ ...formData, Brand: e.target.value })} />
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Brand / Merk</label>
+                <input 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
+                  type="text" 
+                  value={formData.Brand} 
+                  onChange={e => setFormData({ ...formData, Brand: e.target.value })} 
+                />
               </div>
-              <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1 flex justify-between">
+
+              <div className="sm:col-span-2 lg:col-span-1">
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 flex justify-between items-center mb-1">
                   <span>Barcode / SKU</span>
-                  <button type="button" onClick={() => setScannerReady(true)} className="text-blue-500 hover:text-blue-700 flex items-center gap-1">
-                    <Camera size={12} /> Scan Kamera
+                  <button type="button" onClick={() => setScannerReady(true)} className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold">
+                    <Camera size={12} /> Scan
                   </button>
                 </label>
                 <div className="relative">
-                  <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="text" value={formData.Barcode} onChange={e => setFormData({ ...formData, Barcode: e.target.value })} />
+                  <Barcode size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
+                    type="text" 
+                    value={formData.Barcode} 
+                    onChange={e => setFormData({ ...formData, Barcode: e.target.value })} 
+                  />
                 </div>
                 <CameraBarcodeScannerModal
                   isOpen={scannerReady}
@@ -837,93 +931,151 @@ export default function EditProductPage() {
                   description="Arahkan kamera ke barcode / QR code produk"
                   onScan={(code) => {
                     setFormData(prev => ({ ...prev, Barcode: code }));
-                    toast.success(`Barcode berhasil dipindai: ${code}`);
+                    toast.success(`Barcode dipindai: ${code}`);
                   }}
                 />
               </div>
+
               <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Kadaluarsa</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Tgl Kadaluarsa</label>
                 <div className="relative">
-                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.Expired_Default} onChange={e => setFormData({ ...formData, Expired_Default: e.target.value })} />
+                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs" 
+                    type="date" 
+                    value={formData.Expired_Default} 
+                    onChange={e => setFormData({ ...formData, Expired_Default: e.target.value, expired_date: e.target.value })} 
+                  />
                 </div>
               </div>
+
               <div>
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Tanggal Masuk</label>
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Tgl Masuk Stok</label>
                 <div className="relative">
-                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                  <input className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl font-black outline-none" type="date" value={formData.tgl_masuk} onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} />
+                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs" 
+                    type="date" 
+                    value={formData.tgl_masuk} 
+                    onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} 
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* BAGIAN 2: STOK & KATEGORI */}
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-emerald-600">
+          {/* BAGIAN 2: STOK & GUDANG */}
+          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-6 text-emerald-600 border-b pb-4">
               <Layers size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Kategori & Stok</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest">Stok & Gudang</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Satuan</label>
-                <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Satuan Utama</label>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Pcs/Dus/Kg" 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-black text-sm uppercase focus:bg-white focus:border-emerald-500 outline-none" 
+                  value={formData.Satuan} 
+                  onChange={e => {
+                    const newBase = e.target.value;
+                    setFormData({ ...formData, Satuan: newBase });
+                    setUnits(prev => {
+                      if (prev.length === 0) return [{ code: newBase.toUpperCase() || 'PCS', contains: 1, price: formData.Ecer }];
+                      const next = [...prev];
+                      next[0] = { ...next[0], code: newBase.toUpperCase() || 'PCS' };
+                      return next;
+                    });
+                  }} 
+                />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Saat Ini</label>
-                <input required type="number" className="w-full p-4 bg-emerald-50 rounded-2xl border-none font-black text-emerald-700" value={formData.Stok} onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-emerald-600 ml-1 block">Stok Saat Ini</label>
+                <input 
+                  required 
+                  type="number" 
+                  className="w-full p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 font-black text-emerald-800 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500" 
+                  value={formData.Stok} 
+                  onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} 
+                />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-red-500">Min. Stok</label>
-                <input required type="number" className="w-full p-4 bg-red-50 rounded-2xl border-none font-black text-red-600" value={formData.Min_Stok} onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-rose-500 ml-1 block">Min. Stok Warning</label>
+                <input 
+                  required 
+                  type="number" 
+                  className="w-full p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200 font-black text-rose-700 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-rose-400" 
+                  value={formData.Min_Stok} 
+                  onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} 
+                />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Gudang</label>
-                <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.warehouseId} onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}>
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Gudang Utama</label>
+                <select 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none" 
+                  value={formData.warehouseId} 
+                  onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}
+                >
                   <option value="">Pilih Gudang (Opsional)</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
-                <p className="text-xs text-gray-400 px-2">Pilih gudang untuk update stok spesifik</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-5 mt-5">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-blue-600">Min. Pembelian</label>
-                <input type="number" min="1" className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700" value={formData.minPurchase} onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} />
-                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MINIMAL DALAM SATU TRANSAKSI</p>
+                <label className="text-xs font-black uppercase text-blue-600 ml-1 block">Min. Pembelian Trx</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  className="w-full p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 font-black text-blue-800 text-sm outline-none" 
+                  value={formData.minPurchase} 
+                  onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} 
+                />
+                <p className="text-[10px] text-slate-400 font-bold px-1 uppercase">Jumlah minimal dalam 1 transaksi</p>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2 text-rose-600">Max. Pembelian</label>
-                <input type="number" min="0" className="w-full p-4 bg-rose-50 rounded-2xl border-none font-black text-rose-700" value={formData.maxPurchase} onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} />
-                <p className="text-xs text-gray-400 font-bold px-2">JUMLAH MAKSIMAL (0 = TANPA BATAS)</p>
+                <label className="text-xs font-black uppercase text-rose-600 ml-1 block">Max. Pembelian Trx</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  className="w-full p-3.5 bg-rose-50/60 rounded-2xl border border-rose-200 font-black text-rose-800 text-sm outline-none" 
+                  value={formData.maxPurchase} 
+                  onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} 
+                />
+                <p className="text-[10px] text-slate-400 font-bold px-1 uppercase">Jumlah maksimal (0 = Tanpa batas)</p>
               </div>
             </div>
 
             {/* DETAIL STOK PER GUDANG */}
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <h4 className="text-xs font-black uppercase text-gray-400 mb-3 ml-1">Rincian Stok Per Gudang</h4>
-              <div className="mb-3">
-                <label className="text-xs font-black uppercase text-gray-400 ml-1">Alasan Perubahan</label>
-                <select
-                  className="w-full p-3 bg-gray-50 rounded-xl text-xs font-bold outline-none"
-                  value={stockReason}
-                  onChange={(e) => setStockReason(e.target.value as any)}
-                >
-                  <option value="MANUAL">Adjust (Manual)</option>
-                  <option value="OPNAME">Opname</option>
-                  <option value="TRANSFER">Transfer</option>
-                </select>
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <h4 className="text-xs font-black uppercase text-slate-400 ml-1">Rincian Stok Per Gudang</h4>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-400">Alasan Log Audit:</label>
+                  <select
+                    className="p-2 bg-slate-100 rounded-xl text-xs font-bold outline-none"
+                    value={stockReason}
+                    onChange={(e) => setStockReason(e.target.value as any)}
+                  >
+                    <option value="MANUAL">Adjust (Manual)</option>
+                    <option value="OPNAME">Stock Opname</option>
+                    <option value="TRANSFER">Transfer Gudang</option>
+                  </select>
+                </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {warehouses.map((w) => {
                   const qty = Number(formData.stockByWarehouse?.[w.id] || 0);
                   return (
-                    <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{w.name}</label>
+                    <div key={w.id} className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200/70">
+                      <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1 truncate">{w.name}</label>
                       <input
                         type="number"
                         min={0}
-                        className="w-full bg-white p-2 rounded-lg text-xs font-black text-gray-800 outline-none border border-gray-200"
+                        className="w-full bg-white p-2.5 rounded-xl text-xs font-black text-slate-800 outline-none border border-slate-200 focus:border-emerald-500"
                         value={qty}
                         onChange={(e) => {
                           const nextVal = Number(e.target.value || 0);
@@ -944,57 +1096,103 @@ export default function EditProductPage() {
           </div>
           
           {/* BAGIAN 2.5: DIMENSI & VOLUME */}
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-blue-600">
+          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-6 text-blue-600 border-b pb-4">
               <Package size={18} />
               <h3 className="text-xs font-black uppercase tracking-widest">Dimensi & Volume (Kapasitas Gudang)</h3>
             </div>
-            <div className="grid grid-cols-3 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Panjang (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimLength || ''} onChange={e => {
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Panjang (cm)</label>
+                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimLength || ''} onChange={e => {
                   const l = Number(e.target.value);
                   const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
                   setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
                 }} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Lebar (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimWidth || ''} onChange={e => {
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Lebar (cm)</label>
+                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimWidth || ''} onChange={e => {
                   const w = Number(e.target.value);
                   const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
                   setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
                 }} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Tinggi (cm)</label>
-                <input type="number" step="0.1" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.dimHeight || ''} onChange={e => {
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Tinggi (cm)</label>
+                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimHeight || ''} onChange={e => {
                   const h = Number(e.target.value);
                   const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
                   setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
                 }} />
               </div>
-              <div className="col-span-3 md:col-span-1 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                <p className="text-xs font-black text-blue-400 uppercase mb-1">Volume Setara</p>
-                <p className="text-lg font-black text-blue-600 leading-none">{formData.volumeInCtn} <span className="text-xs uppercase">CTN</span></p>
-                <p className="text-xs font-bold text-blue-300 mt-1 uppercase italic">* Standard: 34x20x24 cm</p>
+              <div className="col-span-3 sm:col-span-1 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-100 flex flex-col justify-center">
+                <p className="text-[10px] font-black text-blue-500 uppercase mb-0.5">Volume Setara</p>
+                <p className="text-lg font-black text-blue-700 leading-none">{formData.volumeInCtn} <span className="text-xs uppercase">CTN</span></p>
+                <p className="text-[10px] font-bold text-blue-400 mt-1 uppercase">* Std: 34x20x24 cm</p>
               </div>
             </div>
           </div>
 
-          {/* BAGIAN 3: HARGA & GROSIR */}
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 text-orange-600">
+          {/* BAGIAN 3: HARGA & STRUKTUR HARGA */}
+          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-6 text-amber-600 border-b pb-4">
               <Tag size={18} />
               <h3 className="text-xs font-black uppercase tracking-widest">Struktur Harga</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+
+            {/* NOMINAL AVG HPP CARD FROM PO */}
+            {poStats.count > 0 ? (
+              <div className="mb-6 p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shrink-0">
+                    <TrendingUp size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs font-black uppercase tracking-wider text-emerald-900">Nominal Avg HPP (PO)</p>
+                      <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full text-[10px] font-black">
+                        {poStats.count} PO ({poStats.totalQty} unit)
+                      </span>
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">
+                      Rp {poStats.avgCost.toLocaleString('id-ID')}
+                      {poStats.latestPrice > 0 && poStats.latestPrice !== poStats.avgCost && (
+                        <span className="ml-2 text-xs font-bold text-slate-500">
+                          (PO Terakhir: Rp {poStats.latestPrice.toLocaleString('id-ID')})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, Modal: poStats.avgCost }))}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5"
+                >
+                  <Check size={14} /> Terapkan Avg Modal
+                </button>
+              </div>
+            ) : (
+              <div className="mb-6 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 flex items-center gap-2 text-xs text-slate-400 font-bold">
+                <Info size={16} className="shrink-0 text-slate-400" />
+                <span>Nominal Avg HPP belum tersedia (belum ada riwayat Purchase Order tercatat untuk produk ini).</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Modal / Satuan</label>
-                <div className="flex bg-gray-100 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
-                  <input required type="number" className="w-full p-4 bg-transparent border-none font-black focus:ring-0" value={formData.Modal} onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Harga Modal / Satuan Utama</label>
+                <div className="flex bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500">
+                  <input 
+                    required 
+                    type="number" 
+                    className="w-full p-3.5 bg-transparent border-none font-black text-sm outline-none" 
+                    value={formData.Modal} 
+                    onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} 
+                  />
                   <select 
-                    className="bg-gray-200 border-none font-bold text-gray-600 px-4 focus:ring-0"
+                    className="bg-slate-200 border-none font-bold text-slate-700 px-3 text-xs outline-none"
                     value={formData.Satuan_Modal || SATUAN_DEFAULT}
                     onChange={e => setFormData({ ...formData, Satuan_Modal: e.target.value })}
                   >
@@ -1006,16 +1204,28 @@ export default function EditProductPage() {
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                  <label className="text-xs font-black uppercase text-slate-400 ml-1">Harga Ecer (Jual Utama)</label>
                   {formData.Ecer > 0 && formData.Modal > 0 && (
                     <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
                   )}
                 </div>
-                <input required type="number" disabled={pricingMode === 'RECOMMENDED'} className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600 disabled:opacity-70" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
+                <input 
+                  required 
+                  type="number" 
+                  disabled={pricingMode === 'RECOMMENDED'} 
+                  className="w-full p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200 font-black text-blue-700 text-sm focus:ring-2 focus:ring-blue-600 disabled:opacity-70 outline-none" 
+                  value={formData.Ecer} 
+                  onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} 
+                />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Coret</label>
-                <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Harga Coret (Diskon)</label>
+                <input 
+                  type="number" 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-black text-slate-400 text-sm line-through outline-none" 
+                  value={formData.Harga_Coret} 
+                  onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} 
+                />
               </div>
             </div>
 
@@ -1032,19 +1242,19 @@ export default function EditProductPage() {
               return (
                 <div className={`mb-5 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center gap-4 ${
                   !taxSettings.enabled
-                    ? 'bg-gray-50 border-gray-100'
+                    ? 'bg-slate-50 border-slate-200/60'
                     : breakdown.isExempt
-                    ? 'bg-amber-50 border-amber-100'
-                    : 'bg-indigo-50 border-indigo-100'
+                    ? 'bg-amber-50/70 border-amber-200'
+                    : 'bg-indigo-50/70 border-indigo-200'
                 }`}>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
                     <div>
                       <p className={`text-xs font-black uppercase tracking-widest ${
-                        !taxSettings.enabled ? 'text-gray-400' : breakdown.isExempt ? 'text-amber-700' : 'text-indigo-700'
+                        !taxSettings.enabled ? 'text-slate-400' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
                       }`}>Status Pajak</p>
                       <p className={`text-xs font-black ${
-                        !taxSettings.enabled ? 'text-gray-500' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
+                        !taxSettings.enabled ? 'text-slate-500' : breakdown.isExempt ? 'text-amber-900' : 'text-indigo-900'
                       }`}>{breakdown.taxLabel}</p>
                     </div>
                   </div>
@@ -1053,15 +1263,15 @@ export default function EditProductPage() {
                       <div className="w-px h-8 bg-indigo-200 hidden md:block" />
                       <div className="grid grid-cols-3 gap-4 flex-1">
                         <div>
-                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
-                          <p className="text-sm font-black text-indigo-900">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
+                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                          <p className="text-sm font-black text-indigo-950">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
                           <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
                           <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                             {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
                           </p>
@@ -1069,37 +1279,29 @@ export default function EditProductPage() {
                       </div>
                     </>
                   )}
-                  {taxSettings.enabled && breakdown.isExempt && (
-                    <p className="text-xs font-bold text-amber-700">
-                      Kategori ini bebas PPN (0%) sesuai PP 49/2022 / UU HPP — tidak ada pajak yang dikenakan.
-                    </p>
-                  )}
-                  {!taxSettings.enabled && (
-                    <p className="text-xs font-bold text-gray-400">
-                      Pajak belum diaktifkan. Aktifkan di <span className="underline">Pengaturan → Pajak</span> untuk melihat DPP & kewajiban pajak.
-                    </p>
-                  )}
                 </div>
               );
             })()}
-            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 mb-5">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+            {/* RECOMMENDATION MODE */}
+            <div className="p-4 sm:p-5 bg-slate-50/80 rounded-2xl border border-slate-200/70 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Mode Harga</label>
+                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Mode Penentuan Harga</label>
                   <select
-                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm"
+                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm outline-none"
                     value={pricingMode}
                     onChange={(e) => setPricingMode(e.target.value === 'RECOMMENDED' ? 'RECOMMENDED' : 'MANUAL')}
                   >
                     <option value="MANUAL">Manual</option>
-                    <option value="RECOMMENDED">Ikuti rekomendasi</option>
+                    <option value="RECOMMENDED">Ikuti rekomendasi margin</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Profil Margin</label>
+                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Profil Margin Target</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
                     value={pricingRuleKey}
                     onChange={(e) => setPricingRuleKey(e.target.value)}
                   >
@@ -1111,21 +1313,21 @@ export default function EditProductPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Margin (%)</label>
+                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Margin (%)</label>
                   <input
                     type="number"
                     disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
                     value={pricingMarginPercent || ''}
                     onChange={(e) => setPricingMarginPercent(Number(e.target.value || 0))}
                     placeholder={pricingRec ? String(pricingRec.marginPercent.toFixed(1)) : ''}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-400 ml-2">Pembulatan</label>
+                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Pembulatan</label>
                   <select
                     disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xs shadow-sm disabled:opacity-60"
+                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
                     value={pricingRoundingStep}
                     onChange={(e) => setPricingRoundingStep(Number(e.target.value || 100))}
                   >
@@ -1138,65 +1340,67 @@ export default function EditProductPage() {
                 </div>
               </div>
               {pricingMode === 'RECOMMENDED' && pricingRec && (
-                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-3">
                   <div className="text-xs font-black text-slate-700">
                     Rekomendasi: Rp{pricingRec.recommendedPrice.toLocaleString('id-ID')} ({pricingRec.rule.label}, {pricingRec.rule.min}-{pricingRec.rule.max}%)
                   </div>
-                  <div className="text-xs font-black uppercase tracking-widest text-slate-400">
+                  <div className="text-xs font-black uppercase tracking-wider text-slate-500">
                     Efektif: {pricingRec.effectiveMarginPercent.toFixed(2)}%
                   </div>
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 bg-orange-50 rounded-3xl border border-orange-100">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 sm:p-5 bg-amber-50/60 rounded-2xl border border-amber-200/80">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-black uppercase text-orange-600 ml-2">Harga Grosir</label>
+                  <label className="text-xs font-black uppercase text-amber-800 ml-1">Harga Grosir</label>
                   {formData.Grosir > 0 && formData.Modal > 0 && (
                     <ProfitBadge {...calculateProfit(formData.Grosir, formData.Modal)} />
                   )}
                 </div>
-                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
+                <input type="number" className="w-full p-3.5 bg-white rounded-xl border border-amber-200 font-black text-amber-900 text-sm shadow-sm outline-none" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-orange-600 ml-2">Min. Beli Grosir</label>
-                <input type="number" className="w-full p-4 bg-white rounded-2xl border-none font-black text-orange-700 shadow-sm" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
+                <label className="text-xs font-black uppercase text-amber-800 ml-1 block">Min. Beli Grosir</label>
+                <input type="number" className="w-full p-3.5 bg-white rounded-xl border border-amber-200 font-black text-amber-900 text-sm shadow-sm outline-none" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
               </div>
             </div>
+
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-xs font-black uppercase text-gray-400">Status</span>
-              <select className="p-3 bg-gray-50 rounded-xl text-xs font-bold" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
-                <option value={1}>Aktif</option>
-                <option value={0}>Arsip</option>
+              <span className="text-xs font-black uppercase text-slate-400">Status Produk</span>
+              <select className="p-2.5 bg-slate-100 rounded-xl text-xs font-bold border outline-none" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
+                <option value={1}>Aktif (Bisa Transaksi)</option>
+                <option value={0}>Non-Aktif (Arsip)</option>
               </select>
             </div>
           </div>
 
-          {/* Riwayat Perubahan Modal */}
+          {/* RIWAYAT PERUBAHAN MODAL */}
           {costHistory.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <h4 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
-                <HistoryIcon size={14} /> Riwayat Perubahan Modal (Average Cost)
+            <div className="bg-white p-5 sm:p-6 rounded-[2rem] shadow-sm border border-slate-100">
+              <h4 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2 border-b pb-3">
+                <HistoryIcon size={16} /> Riwayat Perubahan Modal (HPP Audit Log)
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="text-xs text-gray-400 uppercase border-b">
-                      <th className="py-2">Tanggal</th>
-                      <th className="py-2">Admin</th>
-                      <th className="py-2 text-right">Lama</th>
-                      <th className="py-2 text-right">Baru</th>
+                    <tr className="text-xs text-slate-400 uppercase border-b">
+                      <th className="py-2.5">Tanggal</th>
+                      <th className="py-2.5">Admin</th>
+                      <th className="py-2.5 text-right">Modal Lama</th>
+                      <th className="py-2.5 text-right">Modal Baru</th>
                     </tr>
                   </thead>
-                  <tbody className="text-xs font-bold text-gray-700">
+                  <tbody className="text-xs font-bold text-slate-700">
                     {costHistory.map((log: any) => (
-                      <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="py-3">
+                      <tr key={log.id} className="border-b border-slate-50 hover:bg-slate-50">
+                        <td className="py-2.5">
                           {log.changeDate?.seconds ? new Date(log.changeDate.seconds * 1000).toLocaleDateString('id-ID') : '-'}
                         </td>
-                        <td className="py-3">{log.adminEmail || 'System'}</td>
-                        <td className="py-3 text-right text-gray-400">Rp{Number(log.oldCost || 0).toLocaleString('id-ID')}</td>
-                        <td className="py-3 text-right text-gray-800">Rp{Number(log.newCost || 0).toLocaleString('id-ID')}</td>
+                        <td className="py-2.5">{log.adminEmail || 'System'}</td>
+                        <td className="py-2.5 text-right text-slate-400">Rp{Number(log.oldCost || 0).toLocaleString('id-ID')}</td>
+                        <td className="py-2.5 text-right text-slate-800 font-black">Rp{Number(log.newCost || 0).toLocaleString('id-ID')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1205,19 +1409,20 @@ export default function EditProductPage() {
             </div>
           )}
 
-          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2 text-gray-800">
+          {/* BAGIAN 3.5: SATUAN JUAL MULTI-LEVEL */}
+          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4">
+              <div className="flex items-center gap-2 text-slate-800">
                 <Tag size={18} />
-                <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest">Satuan & Multilevel Harga</h3>
               </div>
               <div className="flex gap-2">
                 <select
-                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
+                  className="bg-slate-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
                   value={newUnitCode}
                   onChange={(e) => setNewUnitCode(e.target.value)}
                 >
-                  <option value="">-- Pilih Satuan --</option>
+                  <option value="">-- Pilih Satuan Tambahan --</option>
                   {SATUAN_LIST.filter(s => !units.some(u => u.code === s.value)).map(s => (
                     <option key={s.value} value={s.value}>{s.label} – {s.desc}</option>
                   ))}
@@ -1226,45 +1431,45 @@ export default function EditProductPage() {
                   type="button"
                   onClick={handleAddUnit}
                   disabled={!newUnitCode}
-                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all disabled:opacity-40"
+                  className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase hover:bg-slate-800 transition-all disabled:opacity-40"
                 >
                   + Tambah
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {units.map((u, index) => {
                 const code = u.code || '';
                 const idx = index;
                 const current = u;
+                const baseUnit = String(formData.Satuan || 'PCS').toUpperCase();
                 const basePrice = Number(formData.Ecer || 0);
-                const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
+                const contains = Number(current.contains || (idx === 0 ? 1 : 0));
                 const unitPrice = Number(current.price || 0);
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={idx} className="p-4 rounded-2xl border bg-gray-50 relative group">
-                    {code !== 'PCS' && (
+                  <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 relative group space-y-3">
+                    {idx > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = [...units];
-                          next.splice(idx, 1);
-                          setUnits(next);
-                        }}
-                        className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-200"
+                        onClick={() => handleRemoveUnit(idx)}
+                        className="absolute top-3 right-3 p-1.5 bg-rose-100 text-rose-600 rounded-lg opacity-80 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-200"
+                        title="Hapus Satuan"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        <X size={14} />
                       </button>
                     )}
-                      <div className="flex items-center justify-between gap-3 mb-2">
+
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex-1">
-                        <label className="text-xs font-black text-gray-400 uppercase mb-1 block">Kode Satuan</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Kode Satuan</label>
                         <input 
                            type="text" 
-                           className="w-full bg-white p-2 rounded-xl text-xs font-black text-gray-800 outline-none border focus:ring-2 focus:ring-blue-500 uppercase"
+                           className="w-full bg-white p-2.5 rounded-xl text-xs font-black text-slate-800 outline-none border focus:ring-2 focus:ring-blue-500 uppercase disabled:bg-slate-100 disabled:text-slate-500"
                            value={code}
-                           disabled={code === 'PCS'}
+                           disabled={idx === 0}
                            onChange={(e) => {
                              const val = e.target.value.toUpperCase();
                              const next = [...units];
@@ -1274,11 +1479,11 @@ export default function EditProductPage() {
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="text-xs font-black text-gray-400 uppercase mb-1 block">Label</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Label / Description</label>
                         <input
                           type="text"
-                          className="w-full bg-white p-2 rounded-xl text-xs font-black text-gray-700 outline-none border"
-                          placeholder="Nama satuan"
+                          className="w-full bg-white p-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none border"
+                          placeholder="Nama Satuan"
                           value={current.label || ''}
                           onChange={(e) => {
                             const next = [...units];
@@ -1288,18 +1493,19 @@ export default function EditProductPage() {
                         />
                       </div>
                     </div>
-                    <div className="space-y-3">
+
+                    <div className="space-y-2.5">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-gray-500 uppercase">Harga Dasar</span>
+                        <span className="text-xs font-black text-slate-600 uppercase">Harga Jual</span>
                         {Number(current.price) > 0 && formData.Modal > 0 && (
-                           <span className={`text-xs font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                           <span className={`text-[11px] font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                              {calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? '+' : ''}
                              {((calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
                            </span>
                         )}
                         <input
                           type="number"
-                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
+                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200 focus:border-blue-500"
                           value={current.price || ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
@@ -1309,19 +1515,73 @@ export default function EditProductPage() {
                           }}
                         />
                       </div>
-                      
+
+                      {/* MODAL INPUT UNTUK SATUAN DUS / NON-BASE UNIT (FIXED MANUAL INPUT BUG) */}
+                      {idx > 0 && (
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-dashed border-slate-200">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-amber-700 uppercase">Modal / {code || 'Satuan'}</span>
+                            <span className="text-[10px] font-bold text-slate-400">Total modal 1 {code || 'satuan'}</span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="Nominal modal..."
+                            className="w-32 bg-amber-50/80 p-2.5 rounded-xl text-xs font-black text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
+                            value={formData.Modal && contains ? Number((formData.Modal * contains).toFixed(2)) : ''}
+                            onChange={(e) => {
+                              const inputValStr = e.target.value;
+                              if (inputValStr === '') {
+                                setFormData(prev => ({ ...prev, Modal: 0 }));
+                                return;
+                              }
+                              const val = Number(inputValStr);
+                              const c = contains && contains > 0 ? contains : 1;
+                              const perPcsModal = val / c;
+                              setFormData(prev => ({ ...prev, Modal: perPcsModal }));
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black text-slate-600 uppercase">Isi / Konversi ({baseUnit})</span>
+                        <input
+                          type="number"
+                          disabled={idx === 0}
+                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200 disabled:opacity-60"
+                          value={idx === 0 ? 1 : (current.contains || '')}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            next[idx] = { ...current, contains: idx === 0 ? 1 : val };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black text-slate-600 uppercase">Min Qty Jual</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200"
+                          value={current.minQty || ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                            const next = [...units];
+                            next[idx] = { ...current, minQty: val };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
+
                       {/* CHANNEL PRICING */}
                       <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-                        <p className="text-xs font-black text-blue-600 uppercase mb-2">Harga Khusus Channel</p>
+                        <p className="text-[10px] font-black text-blue-600 uppercase">Harga Khusus Channel</p>
                         <div className="grid grid-cols-2 gap-2">
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
-                                {current.prices?.offline && formData.Modal > 0 && (
-                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {((calculateProfit(current.prices.offline, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
-                                  </span>
-                                )}
+                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
                               </div>
                               <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
                                 value={current.prices?.offline || ''}
@@ -1335,12 +1595,7 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
-                                {current.prices?.website && formData.Modal > 0 && (
-                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {((calculateProfit(current.prices.website, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
-                                  </span>
-                                )}
+                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
                               </div>
                               <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
                                 value={current.prices?.website || ''}
@@ -1354,12 +1609,7 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
-                                {current.prices?.shopee && formData.Modal > 0 && (
-                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {((calculateProfit(current.prices.shopee, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
-                                  </span>
-                                )}
+                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
                               </div>
                               <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
                                 value={current.prices?.shopee || ''}
@@ -1373,12 +1623,7 @@ export default function EditProductPage() {
                            </div>
                            <div>
                               <div className="flex justify-between">
-                                <label className="text-xs text-gray-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
-                                {current.prices?.tiktok && formData.Modal > 0 && (
-                                  <span className={`text-xs font-bold ${calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {((calculateProfit(current.prices.tiktok, formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
-                                  </span>
-                                )}
+                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
                               </div>
                               <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
                                 value={current.prices?.tiktok || ''}
@@ -1393,60 +1638,9 @@ export default function EditProductPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-gray-500 uppercase">Isi (Konversi)</span>
-                        <input
-                          type="number"
-                          disabled={code === 'PCS'}
-                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
-                          value={code === 'PCS' ? 1 : (current.contains || '')}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                            const next = [...units];
-                            next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
-                            setUnits(next);
-                          }}
-                        />
-                      </div>
-                      {code !== 'PCS' && (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-orange-600 uppercase">Modal / {code}</span>
-                            <span className="text-[10px] font-bold text-gray-400">Kalkulator otomatis</span>
-                          </div>
-                          <input
-                            type="number"
-                            placeholder="Ketik modal..."
-                            className="w-32 bg-orange-50 p-3 rounded-xl text-sm font-black text-orange-700 text-right outline-none border border-orange-100 placeholder:text-orange-300"
-                            value={formData.Modal && contains ? formData.Modal * contains : ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : Number(e.target.value);
-                              if (contains && contains > 0) {
-                                setFormData({ ...formData, Modal: Math.round(val / contains) });
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-gray-500 uppercase">Min Qty</span>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border"
-                          value={current.minQty || ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                            const next = [...units];
-                            next[idx] = { ...current, minQty: val };
-                            setUnits(next);
-                          }}
-                        />
-                      </div>
-                      <div className="text-xs font-black text-gray-500 pt-2 border-t border-gray-200">
-                        {code} - Rp{basePrice.toLocaleString('id-ID')}{' '}
-                        <span className="mx-1 font-bold text-gray-800">Rp{Number(unitPrice || 0).toLocaleString('id-ID')}</span>
-                        / Isi {contains || 0} ( Rp {perPcs.toLocaleString('id-ID')} /pcs )
+                      <div className="text-[11px] font-black text-slate-500 pt-2 border-t border-slate-200">
+                        {code} - Rp{Number(unitPrice || 0).toLocaleString('id-ID')}{' '}
+                        <span className="text-[10px] font-bold text-slate-400 block">Isi {contains || 1} {baseUnit} ( Rp {perPcs.toLocaleString('id-ID')} /{baseUnit} )</span>
                       </div>
                     </div>
                   </div>
@@ -1457,18 +1651,20 @@ export default function EditProductPage() {
 
           {/* BAGIAN 4: MEDIA & SUPPLIER */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-              <h3 className="text-xs font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><ImageIcon size={14} /> Media</h3>
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
+              <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2 border-b pb-3">
+                <ImageIcon size={16} /> Foto & Deskripsi Produk
+              </h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-gray-50">
+                  <div className="w-28 h-28 border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden relative flex items-center justify-center bg-slate-50 shrink-0">
                     {imagePreview ? (
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" width={112} height={112} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                     ) : (
-                      <ImageIcon size={20} className="text-gray-300" />
+                      <ImageIcon size={24} className="text-slate-300" />
                     )}
                   </div>
-                  <label className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer text-xs font-bold text-gray-700">
+                  <label className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-2xl cursor-pointer text-xs font-black text-slate-700 transition-all">
                     Ganti Foto
                     <input
                       type="file"
@@ -1478,34 +1674,96 @@ export default function EditProductPage() {
                     />
                   </label>
                 </div>
-                <input type="text" placeholder="URL Foto Produk" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Link_Foto} onChange={e => { setFormData({ ...formData, Link_Foto: e.target.value }); setImagePreview(e.target.value || null); }} />
-                <textarea rows={3} placeholder="Deskripsi Singkat..." className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs" value={formData.Deskripsi} onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}></textarea>
+                <input 
+                  type="text" 
+                  placeholder="URL Foto Produk (Opsional)" 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none focus:bg-white focus:border-blue-500" 
+                  value={formData.Link_Foto} 
+                  onChange={e => { setFormData({ ...formData, Link_Foto: e.target.value }); setImagePreview(e.target.value || null); }} 
+                />
+                <textarea 
+                  rows={3} 
+                  placeholder="Deskripsi Singkat Produk..." 
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none focus:bg-white focus:border-blue-500" 
+                  value={formData.Deskripsi} 
+                  onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}
+                ></textarea>
               </div>
             </div>
-            <div className="bg-blue-600 p-6 rounded-[2.5rem] shadow-xl text-white">
-              <h3 className="text-xs font-black uppercase text-blue-200 mb-4 flex items-center gap-2"><Truck size={14} /> Supplier</h3>
+
+            {/* SUPPLIER CARD WITH AUTO PO INTEGRATION */}
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[2.5rem] shadow-xl text-white">
+              <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                <h3 className="text-xs font-black uppercase text-blue-100 flex items-center gap-2">
+                  <Truck size={16} /> Supplier / Vendor
+                </h3>
+                {poStats.latestSupplier && (
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-white/20 text-white rounded-full uppercase tracking-wider backdrop-blur-sm">
+                    PO Terintegrasi
+                  </span>
+                )}
+              </div>
+
               <div className="space-y-4">
-                <input type="text" placeholder="Nama Supplier" className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.Supplier} onChange={e => setFormData({ ...formData, Supplier: e.target.value })} />
-                <input type="text" placeholder="WA: 628..." className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.No_WA_Supplier} onChange={e => setFormData({ ...formData, No_WA_Supplier: e.target.value })} />
+                <div>
+                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">Nama Supplier</label>
+                  <input 
+                    type="text" 
+                    placeholder="Nama Supplier" 
+                    className="w-full p-3.5 bg-white/10 rounded-2xl border border-white/20 font-bold placeholder:text-blue-200 text-white text-sm outline-none focus:bg-white/20 focus:border-white transition-all" 
+                    value={formData.Supplier} 
+                    onChange={e => setFormData({ ...formData, Supplier: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">No. WA Supplier</label>
+                  <input 
+                    type="text" 
+                    placeholder="628123456789" 
+                    className="w-full p-3.5 bg-white/10 rounded-2xl border border-white/20 font-bold placeholder:text-blue-200 text-white text-sm outline-none focus:bg-white/20 focus:border-white transition-all" 
+                    value={formData.No_WA_Supplier} 
+                    onChange={e => setFormData({ ...formData, No_WA_Supplier: e.target.value })} 
+                  />
+                </div>
+
+                {poStats.latestSupplier && formData.Supplier !== poStats.latestSupplier && (
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                    <div className="text-xs truncate">
+                      <p className="text-[10px] text-blue-200 uppercase font-black">PO Terakhir Data Supplier</p>
+                      <p className="font-bold text-white truncate">{poStats.latestSupplier}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        Supplier: poStats.latestSupplier || prev.Supplier,
+                        No_WA_Supplier: poStats.latestSupplierWa || prev.No_WA_Supplier
+                      }))}
+                      className="px-3 py-1.5 bg-white text-blue-800 rounded-xl text-xs font-black uppercase hover:bg-blue-50 transition-all shrink-0 shadow-sm"
+                    >
+                      ⚡ Ikuti PO
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col-reverse md:flex-row gap-4 pt-6">
+          <div className="flex flex-col-reverse sm:flex-row gap-4 pt-4">
             <button 
                 type="button" 
                 onClick={handleDelete}
                 disabled={isSubmitting || isDeleting}
-                className="p-5 bg-red-50 text-red-600 font-black uppercase text-xs rounded-[2rem] shadow-sm border border-red-100 hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                className="p-4 sm:p-5 bg-rose-50 text-rose-600 font-black uppercase text-xs rounded-2xl shadow-sm border border-rose-100 hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
             >
                <Trash2 size={18} /> Hapus Produk
             </button>
-            <div className="flex-1 flex gap-4">
-                <button type="button" onClick={() => router.back()} className="flex-1 p-5 bg-white text-gray-400 font-black uppercase text-xs rounded-[2rem] shadow-sm border hover:bg-gray-100 transition-all">
+            <div className="flex-1 flex gap-3">
+                <button type="button" onClick={() => router.back()} className="flex-1 p-4 sm:p-5 bg-white text-slate-500 font-black uppercase text-xs rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-100 transition-all">
                 Batal
                 </button>
-                <button type="submit" disabled={isSubmitting || isDeleting} className="flex-[2] p-5 bg-black text-white font-black uppercase text-xs rounded-[2rem] shadow-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-widest">
+                <button type="submit" disabled={isSubmitting || isDeleting} className="flex-[2] p-4 sm:p-5 bg-slate-900 text-white font-black uppercase text-xs rounded-2xl shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-wider">
                 {isSubmitting ? 'MENYIMPAN...' : <><Save size={18} /> Simpan Perubahan</>}
                 </button>
             </div>

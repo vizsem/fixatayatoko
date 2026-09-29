@@ -576,3 +576,59 @@ export async function cancelPurchaseOrder(id: string) {
   }
 }
 
+export async function getPurchaseStatsByProductId(productId: string) {
+  try {
+    const { data: rows, error } = await supabaseAdmin
+      .from('purchases')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !rows) return { count: 0, avgCost: 0, latestSupplier: null, latestSupplierWa: null, latestPrice: 0, totalQty: 0 };
+
+    let totalQty = 0;
+    let totalCost = 0;
+    let count = 0;
+    let latestSupplier: string | null = null;
+    let latestSupplierWa: string | null = null;
+    let latestPrice = 0;
+
+    for (const p of rows) {
+      const raw = p.raw_data || {};
+      const items = raw.items || [];
+      const match = items.find((it: any) => 
+        it.productId === productId || 
+        it.product_id === productId || 
+        it.id === productId
+      );
+
+      if (match) {
+        count++;
+        const qty = Number(match.quantity ?? match.qty ?? 1);
+        const price = Number(match.unitPrice ?? match.purchasePrice ?? 0);
+        totalQty += qty;
+        totalCost += (qty * price);
+
+        if (!latestSupplier) {
+          latestSupplier = raw.supplierName || raw.supplier?.name || (typeof p.supplier === 'object' ? p.supplier?.name : null) || null;
+          latestSupplierWa = raw.supplierPhone || raw.supplierWa || raw.No_WA_Supplier || null;
+          latestPrice = price;
+        }
+      }
+    }
+
+    const avgCost = totalQty > 0 ? Math.round(totalCost / totalQty) : 0;
+    return {
+      count,
+      avgCost,
+      latestSupplier,
+      latestSupplierWa,
+      latestPrice,
+      totalQty
+    };
+  } catch (err) {
+    console.error('Failed to get purchase stats by product id:', err);
+    return { count: 0, avgCost: 0, latestSupplier: null, latestSupplierWa: null, latestPrice: 0, totalQty: 0 };
+  }
+}
+
+
