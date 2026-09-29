@@ -185,8 +185,9 @@ let unsub: (() => void) | undefined;
         allProdSnap.docs.forEach(ds => productsMap.set(ds.id, ds.data()));
         let calculatedInv = 0;
         productsMap.forEach((p: any) => {
-          const stk = Number(p.stock || p.Stok || 0);
-          const cst = Number(p.cost_price || p.Modal || p.purchasePrice || 0);
+          const raw = p.raw_data || {};
+          const stk = Number(p.stock ?? raw.Stok ?? 0);
+          const cst = Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
           calculatedInv += Math.max(0, stk * cst);
         });
         setTotalInventoryValue(calculatedInv);
@@ -208,24 +209,31 @@ let unsub: (() => void) | undefined;
 
         for (const od of salesSnap.docs) {
           const order = od.data() as any;
-          const created = parseDateAny(order.createdAt);
+          const orderRaw = order.raw_data || {};
+          const created = parseDateAny(order.createdAt || orderRaw.createdAt);
           if (!(created >= startDate && created <= endDate)) continue;
 
           // Lewati pesanan yang dibatalkan agar tidak terhitung di pendapatan, HPP, & arus kas
-          const orderStatus = (order.status || '').toUpperCase();
+          const orderStatus = (order.status || orderRaw.status || '').toUpperCase();
           if (['CANCELLED', 'DIBATALKAN', 'BATAL'].includes(orderStatus)) continue;
 
+          // items bisa di kolom langsung atau di raw_data
+          const orderItems = order.items || orderRaw.items || [];
+
           let goodsRev = 0, totalCost = 0;
-          (order.items || []).forEach((it: any) => {
+          orderItems.forEach((it: any) => {
             const price = Number(it.price || 0), qty = Number(it.quantity || 1), pid = it.id || it.productId;
             const prod = productsMap.get(pid || '');
-            const modal = Number(prod?.Modal ?? prod?.purchasePrice ?? 0);
+            const raw = prod?.raw_data || {};
+            // Prioritas: cost_price (kolom Supabase) > raw.costPrice > raw.Modal > raw.purchasePrice > latestCostMap (dari purchase) > fallback 85%
+            const costFromProd = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
             const fallback = latestCostMap.get(pid || '')?.costPerPcs || 0;
-            const cost = modal > 0 ? modal : (fallback > 0 ? fallback : price * 0.85);
+            const cost = costFromProd > 0 ? costFromProd : (fallback > 0 ? fallback : price * 0.85);
+            const hppSource: FinancialRecord['hppSource'] = costFromProd > 0 ? 'FIFO' : (fallback > 0 ? 'Fallback' : 'Estimate (85%)');
             goodsRev += price * qty; totalCost += cost * qty;
           });
-          const pm = (order.payment?.method || order.paymentMethod || 'CASH').toUpperCase();
-          const ch = (order.channel || 'OFFLINE').toUpperCase();
+          const pm = (order.payment?.method || order.paymentMethod || orderRaw.paymentMethod || 'CASH').toUpperCase();
+          const ch = (order.channel || orderRaw.channel || orderRaw.transactionType || 'OFFLINE').toUpperCase();
 
           financeRecords.push({
             id: `SALE-${od.id}`,
@@ -341,7 +349,8 @@ let unsub: (() => void) | undefined;
           let retRev = 0, retCost = 0;
           (r.items || []).forEach((it: any) => {
             const prod = productsMap.get(it.productId || '');
-            const modal = Number(prod?.Modal ?? prod?.purchasePrice ?? 0);
+            const raw = prod?.raw_data || {};
+            const modal = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
             retRev += Number(it.price || 0) * Number(it.quantity || 0);
             retCost += (modal > 0 ? modal : Number(it.price || 0) * 0.85) * Number(it.quantity || 0);
           });
