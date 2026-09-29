@@ -1003,6 +1003,10 @@ export async function bulkDivideHpp(
     const now = new Date().toISOString();
     let updated = 0;
 
+    // Pre-fetch all purchases to find historical POs to update
+    const { data: allPurchases } = await supabaseAdmin.from('purchases').select('*');
+    const purchases = allPurchases || [];
+
     for (const pid of productIds) {
       const { data: prod } = await supabaseAdmin
         .from('products')
@@ -1047,10 +1051,40 @@ export async function bulkDivideHpp(
             newCost,
             adminEmail,
             changeDate: now,
-            notes: `Konversi HPP (Dibagi ${divider})`,
+            notes: `Konversi HPP (Dibagi ${divider}) & Koreksi Histori PO`,
           });
         } catch (e) {
           console.warn('Failed to log cost change:', e);
+        }
+
+        // Koreksi riwayat PO agar AVG PO juga ikut turun akurat
+        for (const po of purchases) {
+          const poRaw = po.raw_data || {};
+          const items = poRaw.items || [];
+          let poUpdated = false;
+
+          const newItems = items.map((it: any) => {
+            if (it.productId === pid || it.product_id === pid || it.id === pid) {
+              poUpdated = true;
+              return {
+                ...it,
+                quantity: (Number(it.quantity || it.qty || 1)) * divider,
+                qty: (Number(it.quantity || it.qty || 1)) * divider,
+                unitPrice: Math.round(Number(it.unitPrice || it.purchasePrice || 0) / divider),
+                purchasePrice: Math.round(Number(it.unitPrice || it.purchasePrice || 0) / divider),
+              };
+            }
+            return it;
+          });
+
+          if (poUpdated) {
+            await supabaseAdmin.from('purchases').update({
+              raw_data: {
+                ...poRaw,
+                items: newItems,
+              }
+            }).eq('id', po.id);
+          }
         }
       }
     }
