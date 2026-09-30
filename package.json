@@ -28,7 +28,10 @@
     "export:users": "ts-node ./scripts/export-firebase-users.ts",
     "compare:firestore-supabase": "ts-node ./scripts/compare-firestore-supabase.ts",
     "verify:schema": "node scripts/verify-supabase-schema.mjs",
-    "verify:schema:verbose": "node scripts/verify-supabase-schema.mjs --verbose"
+    "verify:schema:verbose": "node scripts/verify-supabase-schema.mjs --verbose",
+    "verify:table": "node scripts/inspect-columns.mjs",
+    "verify:table:count": "node scripts/inspect-columns.mjs --count",
+    "verify:table:types": "node scripts/inspect-types.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
