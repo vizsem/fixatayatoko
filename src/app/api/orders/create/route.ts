@@ -201,24 +201,100 @@ export async function POST(req: Request) {
 
     let pointsUsed = 0;
     let walletUsed = 0;
-    let userData: any = null;
     if (userId && (usePoints || useWallet)) {
-      const { data: userRec } = await supabaseAdmin.from('users').select('*').eq('id', userId).single();
-      if (userRec) {
-        userData = userRec.raw_data || {};
-        const curPoints = Number(userRec.points ?? userData.points ?? 0);
-        const curWallet = Number(userRec.wallet_balance ?? userData.walletBalance ?? 0);
+      // Catatan: versi sebelumnya membaca `userRec.raw_data`, padahal tabel
+      // `users` tidak punya kolom itu. Akibatnya saldo selalu terbaca 0 dan
+      // poin/dompet tidak pernah aktif saat checkout. Sekarang dibaca dari
+      // kolom aslinya.
+      const { data: userRec, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('points, wallet_balance')
+        .eq('id', userId)
+        .maybeSingle();
 
-        if (usePoints) pointsUsed = Math.min(curPoints, calculatedSubtotal * 0.5);
-        if (useWallet) walletUsed = Math.min(curWallet, Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount));
+      if (userError) {
+        // Kolom `points` belum ada bila migrasi 20261002 belum dijalankan.
+        console.warn(
+          `[orders/create] Saldo pengguna tidak terbaca (${userError.message}). ` +
+            'Poin/dompet dianggap 0. Jalankan migrasi 20261002_loyalty_wallet_hardening.sql.'
+        );
+      }
+
+      const curPoints = Number(userRec?.points ?? 0);
+      const curWallet = Number(userRec?.wallet_balance ?? 0);
+
+      if (Number.isFinite(curPoints) && usePoints) {
+        pointsUsed = Math.max(0, Math.min(curPoints, calculatedSubtotal * 0.5));
+      }
+      if (Number.isFinite(curWallet) && useWallet) {
+        walletUsed = Math.max(0, Math.min(curWallet, Math.max(0, calculatedSubtotal - pointsUsed - voucherDiscount)));
+      }
+    }
+
+    // Identitas pesanan dibuat lebih awal karena dipakai sebagai keterangan
+    // pada baris ledger poin/dompet di bawah.
+    const orderId = generateOrderId();
+    const dbOrderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+
+    // Potong poin & saldo dompet SEBELUM pesanan dibuat, memakai fungsi atomik.
+    // Urutan ini penting: bila pemotongan gagal, belum ada pesanan maupun
+    // diskon yang tercatat, sehingga tidak ada pembeli yang mendapat potongan
+    // tanpa membayar. Versi lama menulis ke `users.raw_data` yang tidak ada,
+    // jadi pemotongan tidak pernah tersimpan walaupun diskon tetap diberikan.
+    if (userId && pointsUsed > 0) {
+      const { error: pointsError } = await supabaseAdmin.rpc('adjust_user_points', {
+        p_user_id: userId,
+        p_delta: -pointsUsed,
+        p_type: 'REDEEM',
+        p_description: `Order #${orderId}`,
+      });
+
+      if (pointsError) {
+        console.error(`[orders/create] Gagal memotong poin untuk ${orderId}:`, pointsError.message);
+        return NextResponse.json(
+          { error: 'Gagal memotong poin. Silakan ulangi pesanan tanpa menggunakan poin.' },
+          { status: 409 }
+        );
+      }
+    }
+
+    if (userId && walletUsed > 0) {
+      const { error: walletError } = await supabaseAdmin.rpc('adjust_user_wallet', {
+        p_user_id: userId,
+        p_delta: -walletUsed,
+        p_type: 'WALLET_PAYMENT',
+        p_description: `Order #${orderId}`,
+      });
+
+      if (walletError) {
+        console.error(`[orders/create] Gagal memotong saldo untuk ${orderId}:`, walletError.message);
+
+        // Kembalikan poin yang sempat terpotong agar tidak hilang.
+        if (pointsUsed > 0) {
+          const { error: refundError } = await supabaseAdmin.rpc('adjust_user_points', {
+            p_user_id: userId,
+            p_delta: pointsUsed,
+            p_type: 'REFUND',
+            p_description: `Pembatalan pemotongan poin Order #${orderId}`,
+          });
+          if (refundError) {
+            console.error(
+              `[orders/create] GAGAL mengembalikan poin ${pointsUsed} untuk ${orderId}:`,
+              refundError.message
+            );
+          }
+        }
+
+        return NextResponse.json(
+          { error: 'Gagal memotong saldo dompet. Silakan ulangi pesanan tanpa menggunakan dompet.' },
+          { status: 409 }
+        );
       }
     }
 
     const shippingCost = Number(delivery?.cost || 0);
     const total = Math.max(0, calculatedSubtotal + shippingCost - pointsUsed - voucherDiscount - walletUsed);
-    const orderId = generateOrderId();
-    const dbOrderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const now = new Date().toISOString();
 
     const orderData = {
       orderId,
@@ -262,6 +338,39 @@ export async function POST(req: Request) {
 
     if (orderError) {
       console.error('Failed to insert order:', orderError);
+
+      // Kembalikan poin & saldo yang sudah dipotong: pesanannya batal, jadi
+      // diskonnya juga harus dibatalkan.
+      if (userId && pointsUsed > 0) {
+        const { error: refundError } = await supabaseAdmin.rpc('adjust_user_points', {
+          p_user_id: userId,
+          p_delta: pointsUsed,
+          p_type: 'REFUND',
+          p_description: `Pembatalan Order #${orderId} (gagal menyimpan pesanan)`,
+        });
+        if (refundError) {
+          console.error(
+            `[orders/create] GAGAL mengembalikan poin ${pointsUsed} untuk ${orderId}:`,
+            refundError.message
+          );
+        }
+      }
+
+      if (userId && walletUsed > 0) {
+        const { error: refundError } = await supabaseAdmin.rpc('adjust_user_wallet', {
+          p_user_id: userId,
+          p_delta: walletUsed,
+          p_type: 'REFUND',
+          p_description: `Pembatalan Order #${orderId} (gagal menyimpan pesanan)`,
+        });
+        if (refundError) {
+          console.error(
+            `[orders/create] GAGAL mengembalikan saldo ${walletUsed} untuk ${orderId}:`,
+            refundError.message
+          );
+        }
+      }
+
       return NextResponse.json({ error: 'Gagal menyimpan pesanan: ' + orderError.message }, { status: 500 });
     }
 
@@ -299,44 +408,9 @@ export async function POST(req: Request) {
       });
     }
 
-    // 3. Update points & wallet
-    if (userId && (pointsUsed > 0 || walletUsed > 0)) {
-      const curPoints = Number(userData?.points || 0);
-      const curWallet = Number(userData?.walletBalance || 0);
-      const newPoints = Math.max(0, curPoints - pointsUsed);
-      const newWallet = Math.max(0, curWallet - walletUsed);
-
-      await supabaseAdmin.from('users').update({
-        wallet_balance: newWallet,
-        raw_data: {
-          ...userData,
-          points: newPoints,
-          walletBalance: newWallet,
-          updatedAt: now,
-        },
-        updated_at: now,
-      }).eq('id', userId);
-
-      if (pointsUsed > 0) {
-        await supabaseAdmin.from('point_logs').insert({
-          id: `pt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          user_id: userId,
-          points: -pointsUsed,
-          description: `Order #${orderId}`,
-          created_at: now,
-        });
-      }
-
-      if (walletUsed > 0) {
-        await supabaseAdmin.from('wallet_logs').insert({
-          id: `wl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          user_id: userId,
-          amount: -walletUsed,
-          description: `Order #${orderId}`,
-          created_at: now,
-        });
-      }
-    }
+    // 3. Poin & saldo dompet sudah dipotong lebih awal (lihat blok sebelum
+    //    "Insert order") beserta penulisan ledger-nya di dalam fungsi atomik
+    //    `adjust_user_points` / `adjust_user_wallet`.
 
     // 4. Update voucher if used
     if (appliedVoucherId) {
