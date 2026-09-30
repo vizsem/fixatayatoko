@@ -83,6 +83,15 @@ kode, jadi **wajib diverifikasi manual** di Dashboard → Authentication → Hoo
 
 Tanpa hook tersebut, seluruh policy berbasis peran akan selalu gagal.
 
+> **Ini kini risiko aktif.** Sejak migrasi di-apply, RLS benar-benar menyala di 7 tabel
+> baru. Akibatnya: operasi lewat `supabaseAdmin` (service role) tetap jalan karena
+> mem-bypass RLS, tetapi operasi dari **client component** (publishable key, berperan
+> `anon`) langsung ditolak HTTP 401. Untuk user yang login, klaim `role` berisi
+> `authenticated` — yang juga **tidak cocok** dengan daftar peran bisnis di policy.
+>
+> Karena itu, verifikasi Auth Hook ini adalah prioritas berikutnya sebelum halaman
+> admin yang membaca tabel baru tersebut dipakai.
+
 ### Temuan: `product_cost_logs` RLS tidak aktif
 
 Diverifikasi lewat REST API: tabel ini **dapat dibaca memakai publishable key**, padahal
@@ -123,9 +132,9 @@ Urutan yang disarankan (dari risiko rendah ke tinggi):
 ## Catatan Skema
 
 `supabase/migrations/` berisi 4 file yang mendefinisikan **32 tabel**.
-Kondisi remote saat verifikasi terakhir: **26 ada, 6 belum di-apply**.
+Kondisi remote saat verifikasi terakhir (**2026-10-01**): **32 ada, 0 belum — LENGKAP.** ✅
 
-Tabel yang belum ada (semuanya dari `20260930_missing_tables.sql`):
+`20260930_missing_tables.sql` sudah di-apply. Ketujuh tabelnya kini ada:
 
 | Tabel | Dipakai oleh |
 |---|---|
@@ -135,14 +144,25 @@ Tabel yang belum ada (semuanya dari `20260930_missing_tables.sql`):
 | `activity_logs` | log aktivitas admin |
 | `operational_expenses_proofs` | bukti pengeluaran operasional |
 | `stockValidationLogs` | log validasi stok |
+| `product_cost_logs` | riwayat perubahan HPP (sudah ada sebelumnya, kini dilengkapi kolom asli) |
 
-**Cara apply:**
+**Hasil verifikasi pasca-apply:**
+
+- Seluruh kolom pada 7 tabel tersebut ada ✅
+- Backfill berhasil: **36 baris** `product_cost_logs` yang datanya sebelumnya terkubur
+  di `raw_data` kini punya kolom `productId`, `oldCost`, `newCost`, `changeDate`,
+  `adminEmail`, `notes` yang terisi ✅
+- **RLS aktif**: `anon` kini menerima **HTTP 401** untuk `product_cost_logs`,
+  `warehouseStock`, dan `activity_logs` — lubang keamanan sebelumnya (anon bisa
+  membaca `product_cost_logs`) sudah tertutup ✅
+
+**Cara apply ulang (bila suatu saat diperlukan):**
 ```bash
 # Opsi A - SQL Editor (tercepat)
 # Supabase Dashboard > SQL Editor > tempel isi file > Run
 
 # Opsi B - Supabase CLI
-supabase link --project-ref <project-ref>
+supabase link --project-ref cnxuzqlcmosymcwcraoa
 supabase db push
 ```
 
