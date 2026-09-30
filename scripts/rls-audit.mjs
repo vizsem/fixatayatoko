@@ -134,13 +134,34 @@ async function signIn() {
   return body.access_token;
 }
 
-/** Beri baris di `users` dengan role admin, supaya policy berbasis peran ikut teruji. */
+/**
+ * Beri baris di `users` dengan role admin, supaya policy berbasis peran ikut teruji.
+ *
+ * PENTING: kolom tabel `users` yang benar adalah id, full_name, role.
+ * TIDAK ada kolom `name` maupun `email`. Versi awal fungsi ini mengirim `name`
+ * dan `email`, sehingga PostgREST menolaknya dan grant SELALU gagal — akibatnya
+ * kolom "auth+admin" pada audit ini tidak pernah benar-benar menguji peran admin,
+ * dan tabel-tabel yang seharusnya terbuka untuk staf tampak tertutup.
+ */
 async function grantAdminRow(uid) {
   const res = await fetch(`${url}/rest/v1/users`, {
     method: 'POST',
     headers: headers(serviceKey, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
-    body: JSON.stringify({ id: uid, role: 'admin', email: TEMP_EMAIL, name: 'RLS Audit (sementara)' }),
+    body: JSON.stringify({
+      id: uid,
+      role: 'admin',
+      full_name: 'RLS Audit (sementara)',
+    }),
   });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(
+      `  ! GAGAL membuat baris users.role=admin (HTTP ${res.status}). ` +
+        `Kolom "auth+admin" TIDAK bermakna. Penyebab: ${body}`
+    );
+  }
+
   return res.ok;
 }
 
