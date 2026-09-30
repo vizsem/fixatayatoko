@@ -15,9 +15,22 @@ import { Toaster } from 'react-hot-toast';
 import { logActivity } from '@/lib/activity';
 import { supabase } from '@/lib/supabase';
 
-import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, doc, getDocs, ref, writeBatch } from '@/lib/firebase';
-import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
+// Seluruh akses data halaman ini kini lewat Server Action yang memeriksa peran
+// pemanggilnya. Sebelumnya halaman membaca dan menulis `settings`,
+// `categories`, `employees`, `banners`, dan `warehouses` langsung dari browser,
+// sehingga RLS menolaknya dan halaman gagal memuat data.
+import {
+  createInTable,
+  deleteFromTable,
+  getBackupData,
+  getBackupTableNames,
+  getSettingsDoc,
+  listTable,
+  replaceTableContents,
+  saveSettingsDoc,
+  updateInTable,
+} from '@/lib/actions/settings.actions';
 import {
   DEFAULT_DELIVERY_METHODS,
   ATAYATOKO_WAREHOUSE,
@@ -144,42 +157,43 @@ export default function AdminSettings() {
   }, [router]);
 
   const loadSettings = async () => {
-    const snap = await sbGetDoc('settings', 'system');
-    if (snap.exists()) {
-      const data = snap.data() as SystemSettings;
+    const result = await getSettingsDoc('system');
+    if (result.ok && result.data) {
+      const data = result.data as unknown as SystemSettings;
       setSettings({ ...defaultSettings, ...data, store: { ...defaultSettings.store, ...data.store }, deliveryMethods: data.deliveryMethods || defaultSettings.deliveryMethods });
     }
   };
 
   const loadPointSettings = async () => {
-    const snap = await sbGetDoc('settings', 'points');
-    if (snap.exists()) setPointConfig(snap.data() as PointSettings);
+    const result = await getSettingsDoc('points');
+    if (result.ok && result.data) setPointConfig(result.data as unknown as PointSettings);
   };
 
   const loadCategories = async () => {
-    const snap = await sbGetDocs({ table: 'categories' });
-    setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
+    const result = await listTable('categories');
+    if (result.ok) setCategories(result.data as unknown as Category[]);
   };
 
   const loadEmployees = async () => {
-    const snap = await sbGetDocs({ table: 'employees' });
-    setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
+    const result = await listTable('employees');
+    if (result.ok) setEmployees(result.data as unknown as Employee[]);
   };
 
   const loadBanners = async () => {
-    const snap = await sbGetDocs({ table: 'banners' });
-    setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)));
+    const result = await listTable('banners');
+    if (result.ok) setBanners(result.data as unknown as Banner[]);
   };
 
   const loadWarehouses = async () => {
-    const snap = await sbGetDocs({ table: 'warehouses' });
-    setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
+    const result = await listTable('warehouses');
+    if (result.ok) setWarehouses(result.data as unknown as Warehouse[]);
   };
 
   const handleSaveSystem = async () => {
     setSaving(true);
     try {
-      await sbUpsertDoc('settings', 'system', { ...settings, updatedAt: new Date().toISOString() });
+      const result = await saveSettingsDoc('system', { ...settings } as unknown as Record<string, unknown>);
+      if (!result.ok) throw new Error(result.error);
       await logActivity({ type: 'SETTING_UPDATE', description: 'Updated system settings (Store, Payment, Shipping)' });
       notify.admin.success('Sistem diperbarui!');
     } catch { notify.admin.error('Gagal menyimpan.'); }
@@ -189,7 +203,8 @@ export default function AdminSettings() {
   const handleSavePoints = async () => {
     setSaving(true);
     try {
-      await sbUpsertDoc('settings', 'points', pointConfig);
+      const result = await saveSettingsDoc('points', pointConfig as unknown as Record<string, unknown>);
+      if (!result.ok) throw new Error(result.error);
       await logActivity({ type: 'SETTING_UPDATE', description: 'Updated loyalty point configuration' });
       notify.admin.success('Konfigurasi Point disimpan!');
     } finally { setSaving(false); }
@@ -198,20 +213,14 @@ export default function AdminSettings() {
   const handleBackup = async () => {
     setBackupStatus('Exporting...');
     try {
-      const colls = ['products', 'orders', 'customers', 'suppliers', 'categories', 'employees', 'banners', 'settings', 'inventory_logs'];
+      const result = await getBackupData();
+      if (!result.ok) throw new Error(result.error);
+
       const wb = XLSX.utils.book_new();
-      for (const colName of colls) {
-        let data: any[] = [];
-        if (colName === 'settings') {
-           const sys = await sbGetDoc('settings', 'system');
-           const pts = await sbGetDoc('settings', 'points');
-           if (sys.exists()) data.push({ id: 'system', ...sys.data() });
-           if (pts.exists()) data.push({ id: 'points', ...pts.data() });
-        } else {
-           const snap = await getDocs(collection(db, colName));
-           data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      for (const [table, rows] of Object.entries(result.data)) {
+        if (rows.length > 0) {
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), table);
         }
-        if (data.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), colName);
       }
       XLSX.writeFile(wb, `ataya-backup-${new Date().toISOString().split('T')[0]}.xlsx`);
       await logActivity({ type: 'BACKUP_CREATED', description: 'System backup generated (.xlsx)' });
@@ -228,35 +237,33 @@ export default function AdminSettings() {
     reader.onload = async (evt) => {
       try {
         const wb = XLSX.read(evt.target?.result, { type: 'binary' });
-        const processCollection = async (sheetName: string) => {
-            if (!wb.SheetNames.includes(sheetName)) return;
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]) as Record<string, unknown>[];
-            const oldSnap = await getDocs(collection(db, sheetName));
-            const deleteBatch = writeBatch(db);
-            oldSnap.docs.forEach(d => deleteBatch.delete((d as any).ref || doc(db, sheetName, d.id)));
-            await deleteBatch.commit();
-            for (let i = 0; i < data.length; i += 500) {
-              const batch = writeBatch(db);
-              data.slice(i, i + 500).forEach(row => {
-                const { id, ...rest } = row;
-                const docRef = typeof id === 'string' && id ? doc(db, sheetName, id) : doc(collection(db, sheetName));
-                batch.set(docRef, rest);
-              });
-              await batch.commit();
-            }
+
+        const allowedResult = await getBackupTableNames();
+        if (!allowedResult.ok) throw new Error(allowedResult.error);
+        const allowed = allowedResult.data;
+
+        for (const sheetName of wb.SheetNames) {
+          // Lembar yang tidak termasuk daftar resmi diabaikan, bukan ditolak
+          // seluruhnya — berkas backup bisa saja punya lembar tambahan.
+          if (!allowed.includes(sheetName)) continue;
+
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]) as Record<string, unknown>[];
+
+          // `settings` hanya ditimpa (merge); tabel lain diganti seluruhnya,
+          // persis seperti perilaku impor yang lama.
+          const mode = sheetName === 'settings' ? 'merge' : 'replace';
+          const written = await replaceTableContents(sheetName, rows, mode);
+          if (!written.ok) throw new Error(`${sheetName}: ${written.error}`);
         }
-        if (wb.SheetNames.includes('settings')) {
-           const settingsData = XLSX.utils.sheet_to_json(wb.Sheets['settings']) as any[];
-           const batch = writeBatch(db);
-           settingsData.forEach(s => { if (s.id) batch.set(doc(db, 'settings', s.id), s); });
-           await batch.commit();
-        }
-        const collections = ['products', 'orders', 'customers', 'suppliers', 'categories', 'employees', 'banners'];
-        for (const col of collections) await processCollection(col);
+
         await logActivity({ type: 'RESTORE_PERFORMED', description: 'System database restored from file' });
         notify.success("Restore berhasil! Reloading...");
         setTimeout(() => window.location.reload(), 1500);
-      } catch (e) { console.error(e); notify.error("Restore gagal"); setIsRestoring(false); }
+      } catch (e) {
+        console.error(e);
+        notify.error(e instanceof Error ? e.message : "Restore gagal");
+        setIsRestoring(false);
+      }
     };
     reader.readAsBinaryString(file);
   };
@@ -285,49 +292,56 @@ export default function AdminSettings() {
   const handleAddCategory = async () => {
     if (!newCat) return;
     const slug = newCat.toLowerCase().replace(/\s+/g, '-');
-    const docRef = await sbInsertDoc('categories', { name: newCat, slug });
-    setCategories([...categories, { id: docRef.id, name: newCat, slug }]);
+    const result = await createInTable('categories', { name: newCat, slug });
+    if (!result.ok) return notify.error(result.error);
+    setCategories([...categories, { id: result.data.id, name: newCat, slug }]);
     setNewCat('');
     notify.success("Kategori ditambahkan");
   };
 
   const handleDeleteCategory = async (id: string) => {
     if (!confirm("Hapus kategori ini?")) return;
-    await sbDeleteDoc('categories', id);
+    const result = await deleteFromTable('categories', id);
+    if (!result.ok) return notify.error(result.error);
     setCategories(categories.filter(c => c.id !== id));
     notify.success("Kategori dihapus");
   };
 
   const handleAddEmployee = async () => {
     if (!newEmp.name || !newEmp.email) return notify.error("Nama & Email wajib");
-    const docRef = await sbInsertDoc('employees', newEmp);
-    setEmployees([...employees, { id: docRef.id, ...newEmp }]);
+    const result = await createInTable('employees', newEmp as unknown as Record<string, unknown>);
+    if (!result.ok) return notify.error(result.error);
+    setEmployees([...employees, { id: result.data.id, ...newEmp }]);
     setNewEmp({ name: '', role: 'kasir', phone: '', email: '', isActive: true });
     notify.success("Staff ditambahkan");
   };
 
   const handleToggleEmployee = async (emp: Employee) => {
     const updated = { ...emp, isActive: !emp.isActive };
-    await sbUpdateDoc('employees', emp.id!, { isActive: !emp.isActive });
+    const result = await updateInTable('employees', emp.id!, { isActive: !emp.isActive });
+    if (!result.ok) return notify.error(result.error);
     setEmployees(employees.map(e => e.id === emp.id ? updated : e));
   };
 
   const handleDeleteEmployee = async (id: string) => {
     if (!confirm("Hapus staff?")) return;
-    await sbDeleteDoc('employees', id);
+    const result = await deleteFromTable('employees', id);
+    if (!result.ok) return notify.error(result.error);
     setEmployees(employees.filter(e => e.id !== id));
   };
 
   const handleAddBanner = async () => {
     if (!newBanner.title || !newBanner.imageUrl) return notify.error("Title & Image URL wajib");
-    const docRef = await sbInsertDoc('banners', newBanner);
-    setBanners([...banners, { id: docRef.id, ...newBanner }]);
+    const result = await createInTable('banners', newBanner as unknown as Record<string, unknown>);
+    if (!result.ok) return notify.error(result.error);
+    setBanners([...banners, { id: result.data.id, ...newBanner }]);
     setNewBanner({ title: '', subtitle: '', buttonText: 'Lihat', gradient: 'from-green-600 to-emerald-800', imageUrl: '', linkUrl: '', isActive: true });
     notify.success("Banner ditambahkan");
   };
 
   const handleDeleteBanner = async (id: string) => {
-    await sbDeleteDoc('banners', id);
+    const result = await deleteFromTable('banners', id);
+    if (!result.ok) return notify.error(result.error);
     setBanners(banners.filter(b => b.id !== id));
   };
 
