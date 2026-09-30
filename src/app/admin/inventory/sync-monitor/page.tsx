@@ -12,20 +12,13 @@ import { stockSyncService } from '@/lib/stockSyncService';
 import * as Sentry from '@sentry/nextjs';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth, doc } from '@/lib/firebase';
-interface SyncStatus {
-  id: string;
-  productId: string;
-  productName: string;
-  warehouseId: string;
-  warehouseName: string;
-  systemStock: number;
-  warehouseStock: number;
-  difference: number;
-  status: 'SYNCED' | 'OUT_OF_SYNC' | 'PENDING' | 'ERROR';
-}
+import { getUserAndRole } from '@/lib/supabase-helpers';
+import { getStockSyncMatrix } from '@/lib/actions/stock-sync.actions';
+import type { StockSyncRow } from '@/lib/stock-sync-matrix';
+
+// Bentuk baris matriks kini didefinisikan bersama di src/lib/stock-sync-matrix.ts,
+// agar klien dan server memakai tipe yang sama.
+type SyncStatus = StockSyncRow;
 
 export default function StockSyncMonitorPage() {
   const router = useRouter();
@@ -52,42 +45,9 @@ export default function StockSyncMonitorPage() {
 
   const loadSyncData = useCallback(async () => {
     try {
-      const productsSnap = await sbGetDocs({ table: 'products' });
-      const warehousesSnap = await sbGetDocs({ table: 'warehouses' });
-      const warehouseStockSnap = await sbGetDocs({ table: 'warehouseStock' });
-      
-      const warehouseStocks = new Map();
-      warehouseStockSnap.docs.forEach(doc => {
-        const d = doc.data();
-        warehouseStocks.set(`${d.productId}_${d.warehouseId}`, d.quantity || 0);
-      });
-
-      const syncData: SyncStatus[] = [];
-      productsSnap.docs.forEach(pDoc => {
-        const p = pDoc.data();
-        warehousesSnap.docs.forEach(wDoc => {
-          const w = wDoc.data();
-          const wStock = warehouseStocks.get(`${pDoc.id}_${wDoc.id}`) || 0;
-          const sStock = (p.stockByWarehouse || {})[wDoc.id] || 0;
-          const diff = Math.abs(wStock - sStock);
-          
-          let status: SyncStatus['status'] = 'SYNCED';
-          if (diff > 5) status = 'OUT_OF_SYNC';
-          else if (diff > 0) status = 'PENDING';
-
-          syncData.push({
-            id: `${pDoc.id}_${wDoc.id}`,
-            productId: pDoc.id,
-            productName: p.name || 'Untitled',
-            warehouseId: wDoc.id,
-            warehouseName: w.name || 'Unknown',
-            systemStock: sStock,
-            warehouseStock: wStock,
-            difference: diff,
-            status
-          });
-        });
-      });
+      // Dihitung di server (service role) — klien tidak lagi membaca
+      // products/warehouses/warehouseStock secara langsung.
+      const syncData = await getStockSyncMatrix();
 
       setSyncStatuses(syncData);
       setLastRefresh(new Date());

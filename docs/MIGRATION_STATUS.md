@@ -361,6 +361,38 @@ pengguna login (peran dibaca lewat `current_app_role()`). Migrasi ke Server Acti
 disarankan untuk mengurangi permukaan serangan dan agar akses `anon` tidak pernah
 diperlukan — tetapi sekarang bukan lagi prasyarat agar aplikasi jalan.
 
+### Progres: pola migrasi (percontohan)
+
+Migrasi dilakukan **per file**, bukan borongan, dengan pola berikut:
+
+1. Logika murni dipindah ke modul biasa agar bisa diuji (`src/lib/*.ts`).
+2. Server Action ber-`'use server'` membaca dengan `supabaseAdmin` lalu memanggil logika itu.
+3. Komponen klien memanggil action tersebut; import bridge dihapus.
+4. Tipe hasil dipakai bersama klien + server (tidak ada duplikasi tipe).
+
+| File | Status | Tabel yang dibebaskan dari akses klien |
+|---|---|---|
+| `app/admin/inventory/sync-monitor/page.tsx` | ✅ **selesai** | `products`, `warehouses`, `warehouseStock` |
+
+Hasilnya bukan sekadar perpindahan: payload ke browser mengecil (hanya matriks hasil,
+bukan seluruh tabel mentah) dan logika perbandingannya kini punya 10 unit test
+(`src/lib/stock-sync-matrix.test.ts`).
+
+**Belum dimigrasikan: 68 file.** Kandidat berikutnya (read-only lebih dulu, karena
+paling aman):
+
+| File | Tabel |
+|---|---|
+| `app/admin/audit/page.tsx` | 7 (read-only) |
+| `app/admin/reports/operations/page.tsx` | 7 |
+| `app/admin/wallet/page.tsx` | 2 |
+| `app/admin/points/page.tsx` | 2 |
+
+> ⚠️ **Celah yang belum ditutup:** tidak ada satu pun Server Action di `src/lib/actions/*`
+> yang memeriksa peran di dalam action-nya. Saat ini mereka mengandalkan middleware
+> `/admin/*` (action dipanggil via POST ke route halaman, sehingga middleware tetap jalan).
+> Menutupnya butuh klien Supabase yang sadar-cookie untuk membaca sesi di server.
+
 ## Kualitas Kode
 
 ### React Compiler tidak aktif
