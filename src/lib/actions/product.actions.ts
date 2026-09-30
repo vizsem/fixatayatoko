@@ -1413,3 +1413,165 @@ export async function bulkDivideHpp(
     return { success: false, updated: 0, error: err.message };
   }
 }
+
+/**
+ * Reset AVG PO dari Stok Terkini (Skenario Produk Pernah Kosong / Stock = 0).
+ *
+ * Logika Profesional:
+ * - Jika produk pernah mencapai stok 0, riwayat PO lama sudah TIDAK RELEVAN
+ *   untuk perhitungan Moving Average ke depan.
+ * - Proses:
+ *   1. Hapus referensi produk ini dari semua items PO lama (RECEIVED, non-CANCELLED).
+ *      PO yang hanya berisi produk ini → hapus seluruh record PO tersebut.
+ *      PO yang berisi banyak item → strip item ini saja, update total PO.
+ *   2. Buat dokumen PO Baru sebagai Titik Awal Stok Terkini:
+ *      qty = stok aktual (min 1), unitPrice = HPP aktif saat ini.
+ *   3. Audit log tercatat di product_cost_logs.
+ * - Hasil: AVG PO = HPP aktif, Moving Average ke depan bersih & akurat dari stok baru.
+ */
+export async function resetAvgFromCurrentStock(
+  productIds: string[],
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; skipped: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0, skipped: 0 };
+
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+    let skipped = 0;
+
+    // Pre-fetch semua purchases non-CANCELLED
+    const { data: allPurchases } = await supabaseAdmin
+      .from('purchases')
+      .select('*');
+    const purchases = (allPurchases || []).filter((po: any) => {
+      const s = (po.raw_data?.status || '').toUpperCase();
+      return s !== 'CANCELLED';
+    });
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('*')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) { skipped++; continue; }
+
+      const cost = Number(prod.cost_price || 0);
+      if (cost <= 0) { skipped++; continue; }
+
+      const stockQty = Number(prod.stock || 0);
+      const baselineQty = Math.max(1, stockQty);
+
+      // STEP 1: Hapus / strip referensi produk ini dari semua PO lama
+      for (const po of purchases) {
+        const poRaw = po.raw_data || {};
+        const items: any[] = poRaw.items || [];
+
+        const hasThisProduct = items.some((it: any) =>
+          it.productId === pid || it.product_id === pid || it.id === pid
+        );
+        if (!hasThisProduct) continue;
+
+        const remainingItems = items.filter((it: any) =>
+          it.productId !== pid && it.product_id !== pid && it.id !== pid
+        );
+
+        if (remainingItems.length === 0) {
+          // PO ini hanya berisi produk ini → hapus seluruh record PO
+          await supabaseAdmin.from('purchases').delete().eq('id', po.id);
+        } else {
+          // PO berisi banyak produk → strip item ini saja, update total
+          const newTotal = remainingItems.reduce(
+            (acc: number, it: any) =>
+              acc + Number(it.totalPrice || (Number(it.quantity || it.qty || 1) * Number(it.unitPrice || 0))),
+            0
+          );
+          await supabaseAdmin.from('purchases').update({
+            total: newTotal,
+            raw_data: {
+              ...poRaw,
+              total: newTotal,
+              subtotal: newTotal,
+              items: remainingItems,
+              updatedAt: now,
+            },
+            updated_at: now,
+          }).eq('id', po.id);
+        }
+      }
+
+      // STEP 2: Buat PO Baru sebagai Titik Awal Stok Terkini
+      const totalAmount = cost * baselineQty;
+      const poNumber = `RESTOK-AWAL-${Date.now().toString().slice(-8)}`;
+      const poId = `po_restok_${pid}_${Date.now()}`;
+
+      const newPoRaw = {
+        poNumber,
+        supplierId: 'restok_baseline',
+        supplierName: 'TITIK AWAL STOK (Setelah Stok Kosong)',
+        createdById: adminEmail,
+        warehouseId: 'gudang-utama',
+        notes: `Reset AVG PO dari stok terkini. Stok aktual: ${stockQty} ${prod.unit || 'pcs'}. HPP: Rp ${cost.toLocaleString('id-ID')}`,
+        status: 'RECEIVED',
+        paymentStatus: 'LUNAS',
+        paymentMethod: 'INITIAL_BALANCE',
+        total: totalAmount,
+        subtotal: totalAmount,
+        items: [
+          {
+            id: `item_restok_${pid}`,
+            productId: pid,
+            name: prod.name,
+            unit: prod.unit || 'PCS',
+            quantity: baselineQty,
+            qty: baselineQty,
+            unitPrice: cost,
+            purchasePrice: cost,
+            totalPrice: totalAmount,
+          }
+        ],
+        isBaselineRecord: true,
+        baselineReason: 'Produk pernah stock_0 — AVG dihitung ulang dari stok terkini',
+        createdAt: now,
+        updatedAt: now,
+        receivedAt: now,
+      };
+
+      await supabaseAdmin.from('purchases').insert({
+        id: poId,
+        total: totalAmount,
+        raw_data: newPoRaw,
+        created_at: now,
+        updated_at: now,
+      });
+
+      // STEP 3: Audit log
+      try {
+        await supabaseAdmin.from('product_cost_logs').insert({
+          productId: pid,
+          productName: prod.name,
+          oldCost: cost,
+          newCost: cost,
+          adminEmail,
+          changeDate: now,
+          notes: `Reset AVG dari stok terkini [Stok=${stockQty} ${prod.unit || 'pcs'}, HPP=Rp ${cost.toLocaleString('id-ID')}] — Riwayat PO lama dihapus.`,
+        });
+      } catch (e) {
+        console.warn('Audit log insert error (resetAvgFromCurrentStock):', e);
+      }
+
+      updated++;
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+
+    return { success: true, updated, skipped };
+  } catch (err: any) {
+    console.error('resetAvgFromCurrentStock error:', err);
+    return { success: false, updated: 0, skipped: 0, error: err.message };
+  }
+}

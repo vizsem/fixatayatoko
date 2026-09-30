@@ -25,6 +25,7 @@ import {
   bulkDivideHpp,
   toggleLockProductHpp,
   syncAvgPoToActiveHpp,
+  resetAvgFromCurrentStock,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -105,6 +106,7 @@ export default function PricingHPPPage() {
   const [marginUnitTarget, setMarginUnitTarget] = useState<string>('BASE_ONLY');
   const [showDivideModal, setShowDivideModal] = useState(false);
   const [showSyncAvgModal, setShowSyncAvgModal] = useState(false);
+  const [showResetStockModal, setShowResetStockModal] = useState(false);
   const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
@@ -548,6 +550,32 @@ export default function PricingHPPPage() {
     });
   };
 
+  // Reset AVG dari Stok Terkini (skenario produk pernah kosong)
+  const handleConfirmResetFromStock = () => {
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+
+        const result = await resetAvgFromCurrentStock(Array.from(selectedIds), adminEmail);
+        setShowResetStockModal(false);
+
+        if (!result.success) throw new Error(result.error);
+
+        let msg = `✅ Berhasil reset AVG dari stok terkini untuk ${result.updated} produk!`;
+        if (result.skipped > 0) msg += ` · ${result.skipped} dilewati (HPP 0 atau tidak ditemukan)`;
+        notify.success(msg);
+
+        setSelectedIds(new Set());
+        await fetchData();
+        await fetchAvgHpp();
+      } catch (err: any) {
+        setShowResetStockModal(false);
+        notify.error(err.message || 'Gagal reset AVG dari stok terkini');
+      }
+    });
+  };
+
   // Inisialisasi Saldo Awal Baseline AVG PO = HPP Aktif
   const handleConfirmSyncAvgPo = (specificIds?: string[]) => {
     const idsToSync = specificIds || Array.from(selectedIds);
@@ -930,6 +958,14 @@ export default function PricingHPPPage() {
                   >
                     <Sparkles size={13} />
                     Set AVG PO = HPP ({selectedCount})
+                  </button>
+                  <button
+                    onClick={() => setShowResetStockModal(true)}
+                    className="px-3.5 py-2 bg-violet-500 hover:bg-violet-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-violet-400"
+                    title="Hapus riwayat PO lama & mulai AVG baru dari stok terkini — cocok untuk produk yang pernah habis"
+                  >
+                    <RefreshCw size={13} />
+                    Reset AVG dari Stok Kini ({selectedCount})
                   </button>
                   <button
                     onClick={handleSetTargetMargin}
@@ -2207,6 +2243,104 @@ export default function PricingHPPPage() {
                   <>
                     <Sparkles size={14} />
                     Mulai Inisialisasi AVG ({selectedCount})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== RESET AVG DARI STOK TERKINI MODAL ===================== */}
+      {showResetStockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-violet-100 rounded-2xl shrink-0">
+                <RefreshCw size={22} className="text-violet-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Reset AVG dari Stok Terkini</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">
+                  Khusus untuk produk yang pernah habis (stok = 0). Riwayat PO lama dihapus & AVG dihitung ulang dari stok aktual × HPP saat ini.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Total Produk Dipilih</span>
+                <span className="font-black text-slate-900">{selectedCount} produk</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Telah Memiliki Data AVG PO</span>
+                <span className="font-black text-amber-700">{selectedWithAvg.length} produk (riwayat lama akan dihapus)</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Belum Memiliki AVG PO</span>
+                <span className="font-black text-slate-500">{selectedWithoutAvg.length} produk (akan dibuat baru)</span>
+              </div>
+            </div>
+
+            {/* Penjelasan 3 langkah proses */}
+            <div className="p-3.5 bg-violet-50/80 rounded-2xl border border-violet-200/80 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldCheck size={16} className="text-violet-600 shrink-0" />
+                <span className="text-xs font-black text-violet-950">Proses yang Akan Dijalankan:</span>
+              </div>
+              <ol className="text-[11px] text-violet-900 space-y-1.5 font-medium list-decimal list-inside pl-0.5">
+                <li>
+                  <span className="font-bold">Hapus riwayat PO lama</span> — semua item produk ini di PO lama akan dihapus.
+                  PO yang hanya berisi produk ini akan dihapus seluruhnya.
+                </li>
+                <li>
+                  <span className="font-bold">Buat PO Titik Awal baru</span> — dokumen faktur baru
+                  <span className="font-mono text-[10px] font-bold mx-1">TITIK AWAL STOK (Setelah Stok Kosong)</span>
+                  dibuat dengan <em>qty = stok aktual</em> × <em>HPP aktif</em>.
+                </li>
+                <li>
+                  <span className="font-bold">AVG PO = HPP aktif</span> — selisih merah/drift hilang.
+                  PO baru berikutnya akan otomatis dihitung Moving Average secara proporsional.
+                </li>
+              </ol>
+            </div>
+
+            {/* Warning khusus jika produk sudah ada AVG */}
+            {selectedWithAvg.length > 0 && (
+              <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 flex items-start gap-2">
+                <AlertTriangle size={14} className="text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-rose-700 font-bold">
+                  ⚠️ <span className="font-black">{selectedWithAvg.length} produk</span> sudah memiliki riwayat PO.
+                  Riwayat PO lama tersebut akan <span className="underline">dihapus permanen</span> dan digantikan titik awal baru.
+                  Pastikan ini memang yang Anda inginkan.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowResetStockModal(false)}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmResetFromStock}
+                disabled={isResetting || selectedCount === 0}
+                className="px-6 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm shadow-violet-200 disabled:opacity-60"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Memproses Reset...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={14} />
+                    Reset AVG dari Stok Terkini ({selectedCount})
                   </>
                 )}
               </button>
