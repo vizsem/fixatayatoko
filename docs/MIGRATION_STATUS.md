@@ -103,6 +103,7 @@ Dashboard → Table Editor → RLS.
 - [ ] Pilih satu arah: Supabase native (`.from().select()`) **atau** Prisma untuk ERP.
       Saat ini `prisma/schema.prisma` (model `User`, `Cart`, `Promotion`, dll.) hanya
       dipakai oleh 1 file, sementara bridge dan PostgREST jalan sendiri-sendiri.
+- [x] Definisi tabel & kolom dipusatkan di `src/lib/db-schema.ts` (satu sumber kebenaran).
 - [ ] Buat helper query bersama + tipe hasil dari `src/types/supabase.d.ts`.
 
 ### Fase 3 — Migrasi per domain
@@ -111,7 +112,7 @@ Urutan yang disarankan (dari risiko rendah ke tinggi):
 2. `orders`, `purchases`, `inventory` — butuh transaksi/atomicity, migrasi bersama test.
 3. `users`, `auth`, `vouchers`, `wallet` — sensitif, terakhir.
 - [ ] Setiap domain: ganti bridge → Supabase native, hapus import `@/lib/firebase`.
-- [ ] Jaga `src/lib/*.test.ts` tetap hijau (saat ini 17 file / 86 test lulus).
+- [ ] Jaga `src/lib/*.test.ts` tetap hijau (saat ini 18 file / 109 test lulus).
 
 ### Fase 4 — Bersihkan
 - [ ] Hapus `src/lib/firebase.ts` setelah 0 importer.
@@ -185,25 +186,35 @@ Migrasi menyatukan keduanya: kolom asli dibuat, dan baris lama di-*backfill* dar
 `raw_data`. Backfill hanya menyentuh baris legacy (`"productId" IS NULL`) sehingga
 aman diulang.
 
-### ⚠️ Divergensi `TABLES_WITH_RAW_DATA`
+### ✅ Divergensi konstanta skema — SUDAH DIPERBAIKI (2026-10-01)
 
-Konstanta ini **diduplikasi** di dua modul dan isinya sudah berbeda:
+Sebelumnya konstanta skema **diduplikasi** dan menyimpang:
 
-| Modul | Entri | Selisih |
+| Konstanta | `firebase.ts` | `supabase-helpers.ts` |
 |---|---|---|
-| `src/lib/firebase.ts` | 17 | — |
-| `src/lib/supabase-helpers.ts` | 19 | + `inventory_transactions`, + `product_cost_logs` |
+| `TABLES_WITH_RAW_DATA` | 17 entri | 19 entri |
+| `CAMEL_TO_SNAKE` | tanpa `isActive` | dengan `isActive` |
+| `extractTableColumns` | tanpa `Status → is_active` | dengan |
 
-Konsekuensinya, `product_cost_logs` diperlakukan berbeda oleh dua jalur query:
-`firebase.ts` memetakan `changeDate` ke **kolom asli**, sedangkan
-`supabase-helpers.ts` memetakannya ke **`raw_data->>changeDate`**.
+Dampaknya nyata: `inventory_transactions` ditulis ke `raw_data` oleh `sbInsertDoc`
+tetapi **tidak** oleh bridge `setDoc`, karena hanya salah satu modul yang
+mendaftarkannya — sehingga sebagian baris kehilangan data.
 
-Karena migrasi ini kini membuat kolom asli `"changeDate"`, entri `product_cost_logs`
-di `supabase-helpers.ts` sebaiknya dihapus agar kedua modul konsisten. Belum diubah
-karena mengubah semantik query — perlu ditinjau dulu.
+**Perbaikan:** seluruh 7 deklarasi yang terduplikasi dipindahkan ke
+`src/lib/db-schema.ts` sebagai satu sumber kebenaran; `firebase.ts` dan
+`supabase-helpers.ts` kini mengimpor dari sana (−295 baris).
 
-**Rekomendasi jangka panjang:** jadikan satu sumber kebenaran (mis. `src/lib/db-schema.ts`)
-dan impor dari kedua modul, agar tidak bisa drift lagi.
+Nilai yang dipakai adalah gabungan yang **diverifikasi terhadap skema remote**:
+
+| Keputusan | Alasan |
+|---|---|
+| `inventory_transactions` **dimasukkan** ke `TABLES_WITH_RAW_DATA` | Terbukti punya kolom `raw_data` di remote |
+| `isActive` **dimasukkan** ke `CAMEL_TO_SNAKE` | Menyelaraskan kedua modul |
+| `Status → is_active` **dimasukkan** ke `extractTableColumns` | Melengkapi pemetaan produk |
+| `product_cost_logs` **ditambahkan** ke `TABLE_COLUMNS` + `extractTableColumns` | Agar konsisten dengan migrasi 20260930; tanpa ini baris baru dari bridge tidak muncul di halaman audit yang mengurutkan `changeDate` |
+
+**Guard:** `src/lib/db-schema.test.ts` membaca kedua modul sebagai teks dan gagal
+bila konstanta tersebut dideklarasikan ulang di tempat lain.
 
 ## Kualitas Kode
 
