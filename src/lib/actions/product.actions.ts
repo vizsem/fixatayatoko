@@ -1,6 +1,7 @@
 'use server'
 
-import { requireAdmin, requireStaff } from '@/lib/actions/session';
+import { authorize } from '@/lib/actions/guard';
+import { requireAdmin, requireStaff, resolveAccessToken } from '@/lib/actions/session';
 
 import { revalidatePath } from 'next/cache'
 
@@ -17,7 +18,62 @@ export type ProductQueryOptions = {
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { addStock } from '@/lib/inventory';
 
+/**
+ * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
+ *
+ * Dipakai untuk membatasi ISI jawaban, bukan untuk menolak permintaan.
+ * Halaman toko harus tetap dapat dibaca pengunjung anonim.
+ */
+async function viewerIsStaff(): Promise<boolean> {
+  try {
+    const token = await resolveAccessToken();
+    if (!token) return false;
+    const result = await authorize(token, 'staff');
+    return result.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Buang harga modal dari daftar satuan.
+ *
+ * Setiap entri `units` membawa `modal` dan `costPrice` (harga modal per
+ * satuan). Nilai ini sempat ikut terkirim ke pengunjung anonim lewat
+ * `units[]` walaupun `costPrice` tingkat produk sudah dikosongkan.
+ */
+function stripUnitCosts(units: unknown): unknown {
+  if (!Array.isArray(units)) return undefined;
+  return units.map((unit) => {
+    if (!unit || typeof unit !== 'object') return unit;
+    const copy: Record<string, unknown> = { ...(unit as Record<string, unknown>) };
+    delete copy.modal;
+    delete copy.Modal;
+    delete copy.costPrice;
+    delete copy.purchasePrice;
+    return copy;
+  });
+}
+
+/**
+ * Ambil daftar produk.
+ *
+ * SENGAJA tidak memakai `requireStaff()`: beranda, halaman pencarian, dan
+ * `semua-produk` memanggilnya, dan pengunjung anonim harus tetap bisa melihat
+ * katalog.
+ *
+ * Yang dibatasi adalah ISINYA. Sebelumnya action ini memakai `supabaseAdmin`
+ * (yang melewati RLS) dan selalu menyertakan `costPrice`/`purchasePrice`,
+ * sehingga siapa pun yang memanggilnya langsung dapat membaca harga modal —
+ * informasi margin yang tidak seharusnya beredar. Sekarang harga modal hanya
+ * dikirim bila pemanggil terbukti staf.
+ *
+ * Staf selalu punya cookie yang sah saat memanggil ini, karena halaman admin
+ * sudah melewati `proxy.ts` sebelum sempat memanggil action mana pun.
+ */
 export async function getProducts(options?: ProductQueryOptions) {
+  const canSeeCost = await viewerIsStaff();
+
   try {
     let query = supabaseAdmin.from('products').select('*');
 
@@ -85,8 +141,8 @@ export async function getProducts(options?: ProductQueryOptions) {
         description: p.description || raw.description || raw.Deskripsi || '',
         category: p.category || raw.category || raw.Kategori || 'Semua',
         categoryId: p.category || 'cat_umum',
-        supplierId: raw.supplierId || '',
-        supplierName: raw.Supplier || raw.supplierName || '',
+        supplierId: canSeeCost ? (raw.supplierId || '') : '',
+        supplierName: canSeeCost ? (raw.Supplier || raw.supplierName || '') : '',
         warehouseId: raw.warehouseId || 'gudang-utama',
         stock,
         stockByWarehouse,
@@ -94,11 +150,13 @@ export async function getProducts(options?: ProductQueryOptions) {
         priceEcer,
         priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? priceEcer),
         unit: p.unit || raw.unit || raw.Satuan || 'pcs',
-        units: Array.isArray(raw.units) && raw.units.length > 0 ? raw.units : undefined,
-        costPrice: purchasePrice,
+        units: Array.isArray(raw.units) && raw.units.length > 0
+          ? (canSeeCost ? raw.units : stripUnitCosts(raw.units))
+          : undefined,
+        costPrice: canSeeCost ? purchasePrice : 0,
         isActive,
         imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image,
-        purchasePrice,
+        purchasePrice: canSeeCost ? purchasePrice : 0,
         createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
         updatedAt: p.updated_at ? new Date(p.updated_at).getTime() : Date.now(),
         expired_date: raw.expiredDate || raw.Expired || undefined,
