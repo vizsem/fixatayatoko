@@ -1,72 +1,27 @@
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { isAdminRole, isAuthorizedAdmin, isStaffOrAdmin } from '@/lib/auth-helpers';
 import { INCREMENT_MARKER } from '@/lib/firebase';
+import {
+  TABLES_WITH_RAW_DATA,
+  TABLE_COLUMNS,
+  CAMEL_TO_SNAKE,
+  resolveQueryField,
+  parseFirestoreTimestamp,
+  extractTableColumns,
+  generateId,
+} from '@/lib/db-schema';
 
-// --- Constants (mirror src/lib/firebase.ts) ---
-
-export const TABLES_WITH_RAW_DATA = new Set([
-  'products', 'orders', 'customers', 'suppliers', 'purchases',
-  'warehouses', 'categories', 'cashier_shifts', 'inventory_logs', 'stock_logs',
-  'chats', 'ledger_entries', 'capital_transactions', 'wallet_logs', 'notifications', 'settings',
-  'operational_expenses', 'inventory_transactions', 'product_cost_logs',
-]);
-
-export const TABLE_COLUMNS: Record<string, Set<string>> = {
-  products: new Set(['id', 'name', 'description', 'price', 'stock', 'created_at', 'updated_at', 'sku', 'category', 'unit', 'cost_price', 'image_url', 'barcode', 'is_active', 'raw_data']),
-  orders: new Set(['id', 'user_id', 'status', 'total', 'created_at', 'updated_at', 'order_id', 'customer_name', 'customer_phone', 'items', 'payment', 'delivery', 'raw_data']),
-  customers: new Set(['id', 'name', 'email', 'phone', 'address', 'created_at', 'updated_at', 'raw_data']),
-  suppliers: new Set(['id', 'name', 'contact', 'created_at', 'updated_at', 'raw_data']),
-  purchases: new Set(['id', 'supplier_id', 'total', 'status', 'created_at', 'updated_at', 'raw_data']),
-  warehouses: new Set(['id', 'name', 'location', 'created_at', 'updated_at', 'raw_data']),
-  categories: new Set(['id', 'name', 'created_at', 'updated_at', 'raw_data']),
-  users: new Set(['id', 'full_name', 'avatar_url', 'wallet_balance', 'role', 'created_at', 'updated_at']),
-  cashier_shifts: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  inventory_logs: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  stock_logs: new Set(['id', 'product_id', 'qty_before', 'qty_after', 'created_at', 'updated_at', 'raw_data']),
-  chats: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  ledger_entries: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  capital_transactions: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  wallet_logs: new Set(['id', 'user_id', 'amount', 'description', 'created_at', 'raw_data']),
-  notifications: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
-  settings: new Set(['id', 'key', 'value', 'created_at', 'updated_at', 'raw_data']),
-  operational_expenses: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
+// Sumber kebenaran tunggal ada di `@/lib/db-schema`.
+// Di-reekspor agar konsumen lama tetap bekerja.
+export {
+  TABLES_WITH_RAW_DATA,
+  TABLE_COLUMNS,
+  CAMEL_TO_SNAKE,
+  resolveQueryField,
+  parseFirestoreTimestamp,
+  extractTableColumns,
+  generateId,
 };
-
-export const CAMEL_TO_SNAKE: Record<string, string> = {
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  orderId: 'order_id',
-  userId: 'user_id',
-  customerId: 'customer_id',
-  customerName: 'customer_name',
-  customerPhone: 'customer_phone',
-  supplierId: 'supplier_id',
-  productId: 'product_id',
-  warehouseId: 'warehouse_id',
-  costPrice: 'cost_price',
-  imageUrl: 'image_url',
-  walletBalance: 'wallet_balance',
-  fullName: 'full_name',
-  shiftId: 'shift_id',
-  Barcode: 'barcode',
-  barcode: 'barcode',
-  Status: 'status',
-  status: 'status',
-  isActive: 'is_active',
-};
-
-export function parseFirestoreTimestamp(ts: any): Date {
-  if (!ts) return new Date();
-  if (typeof ts === 'object' && ts !== null) {
-    const seconds = ts._seconds ?? ts.seconds;
-    const nanoseconds = ts._nanoseconds ?? ts.nanoseconds ?? 0;
-    if (typeof seconds === 'number') {
-      return new Date(seconds * 1000 + nanoseconds / 1e6);
-    }
-  }
-  const d = new Date(ts);
-  return isNaN(d.getTime()) ? new Date() : d;
-}
 
 export interface NormalizedTimestamp {
   seconds: number;
@@ -86,25 +41,6 @@ export function createNormalizedTimestamp(date: Date): NormalizedTimestamp {
     toString: () => date.toISOString(),
     toLocaleString: (loc?: string, opt?: any) => date.toLocaleString(loc || 'id-ID', opt),
   };
-}
-
-export function resolveQueryField(table: string, field: string): { targetField?: string; ignore?: boolean } {
-  if (field === '__name__' || field === 'id') return { targetField: 'id' };
-  if (table === 'products' && (field === 'isActive' || field === 'is_active')) {
-    return { targetField: 'is_active' };
-  }
-  if (table === 'users' && (field === 'name' || field === 'displayName')) {
-    return { targetField: 'full_name' };
-  }
-  const normalized = CAMEL_TO_SNAKE[field] || field;
-  const cols = TABLE_COLUMNS[table];
-  if (cols && cols.has(normalized)) {
-    return { targetField: normalized };
-  }
-  if (TABLES_WITH_RAW_DATA.has(table)) {
-    return { targetField: `raw_data->>${field}` };
-  }
-  return { targetField: normalized };
 }
 
 export function normalizeRow(row: any): any {
@@ -138,65 +74,6 @@ export function normalizeRow(row: any): any {
 
 export function normalizeRows(rows: any[]): any[] {
   return (rows || []).map(normalizeRow);
-}
-
-export function extractTableColumns(table: string, data: any): Record<string, any> {
-  const cols: Record<string, any> = {};
-  if (!data || typeof data !== 'object') return cols;
-
-  if (table === 'products') {
-    if (data.stock !== undefined) cols.stock = Number(data.stock);
-    if (data.name !== undefined) cols.name = data.name;
-    else if (data.Nama !== undefined) cols.name = data.Nama;
-    if (data.price !== undefined) cols.price = Number(data.price);
-    else if (data.Ecer !== undefined) cols.price = Number(data.Ecer);
-    if (data.unit !== undefined) cols.unit = data.unit;
-    else if (data.Satuan !== undefined) cols.unit = data.Satuan;
-    if (data.category !== undefined) cols.category = data.category;
-    else if (data.Kategori !== undefined) cols.category = data.Kategori;
-    if (data.sku !== undefined) cols.sku = data.sku;
-    else if (data.Barcode !== undefined) cols.sku = data.Barcode;
-    if (data.barcode !== undefined) cols.barcode = data.barcode;
-    else if (data.Barcode !== undefined) cols.barcode = data.Barcode;
-    if (data.costPrice !== undefined) cols.cost_price = Number(data.costPrice);
-    else if (data.Modal !== undefined) cols.cost_price = Number(data.Modal);
-    if (data.imageUrl !== undefined) cols.image_url = data.imageUrl;
-    else if (data.Link_Foto !== undefined) cols.image_url = data.Link_Foto;
-    if (data.isActive !== undefined) cols.is_active = data.isActive;
-    else if (data.Status !== undefined) cols.is_active = data.Status === 1;
-  } else if (table === 'orders') {
-    if (data.status !== undefined) cols.status = data.status;
-    if (data.total !== undefined) cols.total = Number(data.total);
-    else if (data.totalAmount !== undefined) cols.total = Number(data.totalAmount);
-    if (data.orderId !== undefined) cols.order_id = data.orderId;
-    if (data.userId !== undefined) cols.user_id = data.userId;
-    if (data.customerName !== undefined) cols.customer_name = data.customerName;
-    else if (data.name !== undefined) cols.customer_name = data.name;
-    if (data.customerPhone !== undefined) cols.customer_phone = data.customerPhone;
-    else if (data.phone !== undefined) cols.customer_phone = data.phone;
-    if (data.items !== undefined) cols.items = data.items;
-  } else if (table === 'users') {
-    if (data.walletBalance !== undefined) cols.wallet_balance = Number(data.walletBalance);
-    if (data.name !== undefined) cols.full_name = data.name;
-    else if (data.displayName !== undefined) cols.full_name = data.displayName;
-  } else if (table === 'customers') {
-    if (data.name !== undefined) cols.name = data.name;
-    if (data.email !== undefined) cols.email = data.email;
-    if (data.phone !== undefined) cols.phone = data.phone;
-    if (data.address !== undefined) cols.address = data.address;
-  } else if (table === 'suppliers') {
-    if (data.name !== undefined) cols.name = data.name;
-    if (data.contact !== undefined) cols.contact = data.contact;
-    else if (data.contactPerson !== undefined) cols.contact = data.contactPerson;
-  } else if (table === 'purchases') {
-    if (data.total !== undefined) cols.total = Number(data.total);
-    if (data.status !== undefined) cols.status = data.status;
-  }
-  return cols;
-}
-
-export function generateId(table: string): string {
-  return `${table.slice(0, 4)}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 // --- Auth helpers (Supabase-native) ---
