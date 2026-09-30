@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import { Download, Users, Warehouse, Package, Activity, Clock, AlertTriangle, ShoppingCart, Database, DollarSign, Info, ArrowRight, ShieldCheck } from 'lucide-react';
@@ -8,30 +8,13 @@ import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import * as Sentry from '@sentry/nextjs';
 import * as XLSX from 'xlsx';
-import { supabase } from '@/lib/supabase';
-
-import { sbGetDocs } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, limit, query, where } from '@/lib/firebase';
-type OperationalMetric = {
-  id: string;
-  name: string;
-  category: string;
-  value: number | string;
-  unit: string;
-  status: 'good' | 'warning' | 'critical';
-  description: string;
-};
+import { getOperationsMetrics } from '@/lib/actions/operations-report.actions';
+import type { OperationalMetric } from '@/lib/operations-metrics';
 
 export default function OperationsReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [employeesData, setEmployeesData] = useState<any[]>([]);
-  const [usersData, setUsersData] = useState<any[]>([]);
-  const [warehousesData, setWarehousesData] = useState<any[]>([]);
-  const [productsData, setProductsData] = useState<any[]>([]);
-  const [ordersData, setOrdersData] = useState<any[]>([]);
-  const [inventoryData, setInventoryData] = useState<any[]>([]);
-  const [expensesData, setExpensesData] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<OperationalMetric[]>([]);
 
   const { authLoading } = useAdminAuth();
 
@@ -40,28 +23,12 @@ export default function OperationsReport() {
 
     const fetchData = async () => {
       try {
-        const empSnap = await sbGetDocs({ table: 'employees' });
-        setEmployeesData(empSnap.docs.map(d => d.data()));
-
-        const userSnap = await sbGetDocs({ table: 'users' });
-        setUsersData(userSnap.docs.map(d => d.data()));
-
-        const whSnap = await sbGetDocs({ table: 'warehouses' });
-        setWarehousesData(whSnap.docs.map(d => d.data()));
-
-        const prodSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true), limit(100)));
-        setProductsData(prodSnap.docs.map(d => d.data()));
-
-        const ordSnap = await sbGetDocs({ table: 'orders' });
-        setOrdersData(ordSnap.docs.map(d => d.data()));
-
-        const invSnap = await sbGetDocs({ table: 'inventory_transactions' });
-        setInventoryData(invSnap.docs.map(d => d.data()));
-
-        const expSnap = await sbGetDocs({ table: 'operational_expenses' });
-        setExpensesData(expSnap.docs.map(d => d.data()));
+        // Dihitung di server: klien tidak lagi mengunduh isi 7 tabel penuh
+        // hanya untuk memperoleh 8 angka.
+        setMetrics(await getOperationsMetrics());
       } catch (error) {
         console.error("Error fetching ops data", error);
+        Sentry.captureException(error);
       } finally {
         setLoading(false);
       }
@@ -69,36 +36,6 @@ export default function OperationsReport() {
 
     fetchData();
   }, [authLoading]);
-
-  const [activeUserCutoff, setActiveUserCutoff] = useState(0);
-
-  useEffect(() => {
-    setActiveUserCutoff(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  }, []);
-
-  const metrics = useMemo(() => {
-    if (loading || authLoading) return [];
-
-    const activeEmployees = employeesData.filter(e => String(e.status).toUpperCase() === 'AKTIF').length;
-    const totalPayroll = employeesData.filter(e => String(e.status).toUpperCase() === 'AKTIF').reduce((s, e) => s + Number(e.manualSalary || 0), 0);
-    const activeUsers = usersData.filter(u => u.lastActive && new Date(u.lastActive).getTime() > activeUserCutoff).length;
-    const fullWh = warehousesData.filter(wh => (wh.usedCapacity / wh.capacity) >= 0.9).length;
-    const outOfStock = productsData.filter(p => p.stock === 0).length;
-    const lowStock = productsData.filter(p => p.stock > 0 && p.stock <= 10).length;
-    const pendingOrders = ordersData.filter(o => o.status === 'MENUNGGU').length;
-
-    const m: OperationalMetric[] = [
-      { id: 'emp-1', name: 'Active Personnel', category: 'Karyawan', value: activeEmployees, unit: 'pax', status: activeEmployees > 0 ? 'good' : 'warning', description: 'Currently active workforce' },
-      { id: 'emp-2', name: 'Payroll Exposure', category: 'Karyawan', value: totalPayroll, unit: 'Rp', status: 'good', description: 'Monthly salary accumulation' },
-      { id: 'user-1', name: 'User Retention', category: 'Pengguna', value: activeUsers, unit: 'users', status: activeUsers > 0 ? 'good' : 'warning', description: 'Active in last 7 days' },
-      { id: 'wh-1', name: 'Capacity Alert', category: 'Gudang', value: fullWh, unit: 'units', status: fullWh > 0 ? 'critical' : 'good', description: 'Warehouses >90% full' },
-      { id: 'inv-1', name: 'Critical Stock', category: 'Inventory', value: outOfStock, unit: 'SKUs', status: outOfStock > 0 ? 'critical' : 'good', description: 'Out of stock products' },
-      { id: 'inv-2', name: 'Low Stock SKU', category: 'Inventory', value: lowStock, unit: 'SKUs', status: lowStock > 5 ? 'critical' : 'warning', description: 'Stock below 10 units' },
-      { id: 'ord-1', name: 'Pending Pipeline', category: 'Pesanan', value: pendingOrders, unit: 'orders', status: pendingOrders > 5 ? 'critical' : 'warning', description: 'Orders awaiting process' },
-      { id: 'exp-1', name: 'OpEx Total', category: 'Expenses', value: expensesData.reduce((s, e) => s + Number(e.amount || 0), 0), unit: 'Rp', status: 'good', description: 'Total operational cost' }
-    ];
-    return m;
-  }, [loading, employeesData, usersData, warehousesData, productsData, ordersData, inventoryData, expensesData]);
 
   const handleExport = () => {
     const ws = XLSX.utils.json_to_sheet(metrics.map(m => ({ Metric: m.name, Value: m.value, Unit: m.unit, Status: m.status })));

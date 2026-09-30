@@ -330,6 +330,36 @@ Nilai yang dipakai adalah gabungan yang **diverifikasi terhadap skema remote**:
 **Guard:** `src/lib/db-schema.test.ts` membaca kedua modul sebagai teks dan gagal
 bila konstanta tersebut dideklarasikan ulang di tempat lain.
 
+## 🔴 Tabel yang Dirujuk Kode tapi TIDAK ADA di Database
+
+Hasil audit 2026-10-01 — membandingkan semua nama tabel yang dirujuk kode dengan
+kondisi Supabase remote:
+
+> **55 tabel dirujuk · 41 ada · 14 tidak ada**
+
+| Tabel yang tidak ada (14) | Modul |
+|---|---|
+| `payroll_runs`, `payroll_settings`, `payroll_adjustments` | payroll |
+| `leave_requests`, `shift_templates`, `shift_assignments` | absensi & shift |
+| `employee_loans`, `employee_reimbursements`, `employee_petty_cash`, `employee_petty_cash_transactions` | kasbon & reimburse |
+| `kpi_scores`, `candidates` | penilaian & rekrutmen |
+| `messages` | chat |
+| `vouchers` | voucher |
+
+Sebagai pembanding, tabel berikut **memang ada**: `employees`, `payroll_slips`,
+`attendance_records`, `banners`, `chats`, `returns`, `notifications`, `audit_logs`.
+
+**Dampak:** hampir seluruh modul **`admin/employees`** (yang menyentuh 17 tabel) merujuk
+14 tabel yang tidak ada. Fitur HR/payroll, absensi, shift, kasbon, dan KPI **tidak bisa
+berfungsi** — query-nya gagal dan ditelan oleh `try/catch`, sehingga halaman tampak
+kosong tanpa pesan error.
+
+**Implikasi untuk migrasi:** memindahkan `admin/employees` ke Server Action **tidak ada
+gunanya** sampai tabel-tabelnya dibuat. Perlu keputusan produk dulu: modul ini akan
+dilanjutkan (buat tabelnya) atau dibuang.
+
+---
+
 ## Inventaris Akses Data dari Client
 
 Hasil pemindaian 2026-10-01: **69 client component** (`"use client"`) mengimpor bridge
@@ -373,6 +403,7 @@ Migrasi dilakukan **per file**, bukan borongan, dengan pola berikut:
 | File | Status | Tabel yang dibebaskan dari akses klien |
 |---|---|---|
 | `app/admin/inventory/sync-monitor/page.tsx` | ✅ **selesai** | `products`, `warehouses`, `warehouseStock` |
+| `app/admin/reports/operations/page.tsx` | ✅ **selesai** | `employees`, `users`, `warehouses`, `products`, `orders`, `operational_expenses` |
 
 Hasilnya bukan sekadar perpindahan: payload ke browser mengecil (hanya matriks hasil,
 bukan seluruh tabel mentah) dan logika perbandingannya kini punya 10 unit test
