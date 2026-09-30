@@ -1,5 +1,7 @@
 'use server';
 
+import { requireStaff } from '@/lib/actions/session';
+
 import { supabaseAdmin } from '@/lib/supabase';
 import { normalizeRow } from '@/lib/supabase-helpers';
 import { getProducts } from '@/lib/actions/product.actions';
@@ -23,6 +25,7 @@ import {
  * `actions/stock-sync.actions.ts`).
  */
 export async function getInventoryReport(): Promise<InventoryReportResult> {
+  await requireStaff();
   const products = await getProducts({ isActive: true, orderByField: 'name' });
 
   const [transactionsRes, warehousesRes] = await Promise.all([

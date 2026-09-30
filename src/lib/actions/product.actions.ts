@@ -1,5 +1,7 @@
 'use server'
 
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
+
 import { revalidatePath } from 'next/cache'
 
 export type ProductQueryOptions = {
@@ -118,6 +120,7 @@ export async function getProducts(options?: ProductQueryOptions) {
 }
 
 export async function getProductById(id: string) {
+  await requireStaff();
   try {
     const { data: p, error } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
     if (error || !p) return null;
@@ -151,6 +154,7 @@ export async function createProduct(data: {
   sellPrice: number
   unit: string
 }) {
+  await requireAdmin();
   try {
     const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
@@ -193,6 +197,7 @@ export async function createProduct(data: {
 }
 
 export async function getProductByIdForEdit(id: string) {
+  await requireAdmin();
   try {
     const { data: spRow, error } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
     if (error || !spRow) return null;
@@ -230,6 +235,7 @@ export async function saveEditedProduct(id: string, payload: {
   is_active: boolean
   raw_data: any
 }) {
+  await requireAdmin();
   try {
     const now = new Date().toISOString();
     const { error } = await supabaseAdmin.from('products').upsert({
@@ -288,6 +294,7 @@ export async function updateProduct(id: string, data: {
   sellPrice?: number
   unit?: string
 }) {
+  await requireAdmin();
   try {
     const now = new Date().toISOString();
     const { data: existing } = await supabaseAdmin.from('products').select('*').eq('id', id).single();
@@ -332,10 +339,12 @@ export async function updateProduct(id: string, data: {
 }
 
 export async function archiveProducts(ids: string[]) {
+  await requireAdmin();
   return updateProductStatus(ids, 1);
 }
 
 export async function deleteProductsBulk(ids: string[]) {
+  await requireAdmin();
   try {
     if (!ids || ids.length === 0) return { success: true, count: 0 };
     const { error } = await supabaseAdmin.from('products').delete().in('id', ids);
@@ -349,10 +358,12 @@ export async function deleteProductsBulk(ids: string[]) {
 }
 
 export async function deleteProduct(id: string) {
+  await requireAdmin();
   return deleteProductsBulk([id]);
 }
 
 export async function updateProductStatus(ids: string[], status: string | number) {
+  await requireAdmin();
   try {
     if (!ids || ids.length === 0) return { success: true };
     const now = new Date().toISOString();
@@ -457,6 +468,7 @@ export async function addProductFull(payload: {
   // Pricing strategy
   pricingStrategy?: Record<string, unknown>;
 }) {
+  await requireAdmin();
   try {
     const now = new Date().toISOString();
     const sku = payload.ID.trim();
@@ -581,6 +593,7 @@ export async function addProductFull(payload: {
 }
 
 export async function createCategory(data: { name: string; description?: string }) {
+  await requireAdmin();
   try {
     const id = `cat_${Date.now()}`;
     const now = new Date().toISOString();
@@ -601,6 +614,7 @@ export async function createCategory(data: { name: string; description?: string 
 }
 
 export async function attachBarcodeToProduct(productId: string, barcode: string, unitCode?: string) {
+  await requireAdmin();
   try {
     const { data: prod, error } = await supabaseAdmin
       .from('products')
@@ -655,6 +669,7 @@ export async function attachBarcodeToProduct(productId: string, barcode: string,
 }
 
 export async function duplicateProduct(id: string) {
+  await requireAdmin();
   try {
     const { data: src, error: fetchErr } = await supabaseAdmin
       .from('products')
@@ -718,6 +733,7 @@ export async function updateProductPrice(payload: {
   units?: Array<{ code: string; contains: number; price?: number; minQty?: number; label?: string }>;
   isHppLocked?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
   try {
     const { productId, newCost, newPrice, newGrosir, newMinGrosir, units, isHppLocked } = payload;
 
@@ -802,6 +818,7 @@ export async function toggleLockProductHpp(
   isLocked: boolean,
   adminEmail: string,
 ): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length) return { success: true, updated: 0 };
   try {
     const now = new Date().toISOString();
@@ -846,6 +863,7 @@ export async function toggleLockProductHpp(
 }
 
 export async function restockProductViaSupabase(productId: string, stokMasuk: number, hargaBaru: number, adminId?: string, warehouseId?: string) {
+  await requireAdmin();
   try {
     await addStock({
       productId,
@@ -871,6 +889,7 @@ export async function restockProductViaSupabase(productId: string, stokMasuk: nu
 export async function getAllProductsAvgHpp(): Promise<
   Record<string, { avgCost: number; totalQty: number; poCount: number }>
 > {
+  await requireAdmin();
   try {
     const { data: rows, error } = await supabaseAdmin
       .from('purchases')
@@ -939,6 +958,7 @@ export async function resetAvgHppForProducts(
     skipLockedHpp?: boolean;
   }
 ): Promise<{ success: boolean; updated: number; skipped: number; lockedSkipped: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length) return { success: true, updated: 0, skipped: 0, lockedSkipped: 0 };
 
   const skipLocked = options?.skipLockedHpp !== false;
@@ -1031,6 +1051,7 @@ export async function bulkUpdateTargetMargin(
   adminEmail: string,
   options?: BulkMarginOptions,
 ): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length) return { success: true, updated: 0 };
   
   const marginType = options?.marginType || 'PERCENT';
@@ -1165,6 +1186,7 @@ export async function syncAvgPoToActiveHpp(
   productIds: string[],
   adminEmail: string,
 ): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length) return { success: true, updated: 0 };
 
   try {
@@ -1311,6 +1333,7 @@ export async function bulkDivideHpp(
   divider: number,
   adminEmail: string,
 ): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length || divider <= 1) return { success: true, updated: 0 };
   
   try {
@@ -1436,6 +1459,7 @@ export async function resetAvgFromCurrentStock(
   productIds: string[],
   adminEmail: string,
 ): Promise<{ success: boolean; updated: number; skipped: number; error?: string }> {
+  await requireAdmin();
   if (!productIds.length) return { success: true, updated: 0, skipped: 0 };
 
   try {

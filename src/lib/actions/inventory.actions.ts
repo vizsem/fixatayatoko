@@ -1,8 +1,11 @@
 'use server'
+
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase';
 
 export async function getInventoryBatches(warehouseId?: string) {
+  await requireStaff();
   try {
     const { data: products } = await supabaseAdmin
       .from('products')
@@ -71,6 +74,7 @@ export async function getInventoryBatches(warehouseId?: string) {
 }
 
 export async function getLowStockProducts(threshold: number = 10) {
+  await requireStaff();
   try {
     const { data: products } = await supabaseAdmin
       .from('products')
@@ -110,6 +114,7 @@ export async function getLowStockProducts(threshold: number = 10) {
 }
 
 export async function getInventoryMovements(filters?: { productId?: string; warehouseId?: string; limit?: number }) {
+  await requireStaff();
   try {
     let query = supabaseAdmin.from('inventory_logs').select('*');
     if (filters?.productId) {
@@ -156,6 +161,7 @@ export async function adjustStock(data: {
   notes?: string
   createdById?: string
 }) {
+  await requireStaff();
   try {
     const { data: p, error: fetchErr } = await supabaseAdmin
       .from('products')
@@ -263,6 +269,7 @@ export async function adjustStock(data: {
 }
 
 export async function getWarehouses() {
+  await requireStaff();
   try {
     const { data: rows } = await supabaseAdmin.from('warehouses').select('*').order('name', { ascending: true });
     if (!rows) return [];
@@ -284,6 +291,7 @@ export async function getWarehouses() {
 }
 
 export async function createWarehouse(data: { name: string; address?: string }) {
+  await requireAdmin();
   try {
     const id = `wh_${Date.now()}`;
     const now = new Date().toISOString();
@@ -306,6 +314,7 @@ export async function createWarehouse(data: { name: string; address?: string }) 
 }
 
 export async function updateWarehouse(id: string, data: { name?: string; address?: string }) {
+  await requireAdmin();
   try {
     const now = new Date().toISOString();
     const { error } = await supabaseAdmin.from('warehouses').update({

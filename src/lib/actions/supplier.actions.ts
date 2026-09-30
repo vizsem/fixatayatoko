@@ -1,9 +1,12 @@
 'use server'
 
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
+
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function getSuppliers() {
+  await requireStaff();
   try {
     const { data: rows, error } = await supabaseAdmin
       .from('suppliers')
@@ -32,6 +35,7 @@ export async function getSuppliers() {
 }
 
 export async function getSupplierById(id: string) {
+  await requireStaff();
   try {
     const { data, error } = await supabaseAdmin.from('suppliers').select('*').eq('id', id).single();
     if (error || !data) return null;
@@ -57,6 +61,7 @@ export async function createSupplier(data: {
   email?: string
   address?: string
 }) {
+  await requireAdmin();
   try {
     const id = `sup_${Date.now()}`;
     const raw_data = {
@@ -97,6 +102,7 @@ export async function updateSupplier(id: string, data: {
   email?: string
   address?: string
 }) {
+  await requireAdmin();
   try {
     const { data: existing } = await supabaseAdmin.from('suppliers').select('*').eq('id', id).single();
     if (!existing) return { success: false, error: 'Supplier tidak ditemukan' };
@@ -125,6 +131,7 @@ export async function updateSupplier(id: string, data: {
 }
 
 export async function deleteSupplier(id: string) {
+  await requireAdmin();
   try {
     const { error } = await supabaseAdmin.from('suppliers').delete().eq('id', id);
     if (error) throw error;

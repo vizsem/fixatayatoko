@@ -1,5 +1,7 @@
 'use server'
 
+import { requireStaff } from '@/lib/actions/session';
+
 import { deductStockFEFO, addInventoryLog } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
@@ -13,6 +15,7 @@ type SalesItemInput = {
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 export async function getSalesOrders(filters?: { status?: string; customerId?: string; limit?: number }) {
+  await requireStaff();
   try {
     let query = supabase.from('orders').select('*');
     if (filters?.status && filters.status !== 'SEMUA') {
@@ -62,6 +65,7 @@ export async function getSalesOrders(filters?: { status?: string; customerId?: s
 }
 
 export async function getSalesOrderById(id: string) {
+  await requireStaff();
   try {
     const { data: o, error } = await supabase.from('orders').select('*').eq('id', id).single();
     if (error || !o) return null;
@@ -110,6 +114,7 @@ export async function createSalesOrder(data: {
   items: SalesItemInput[]
   warehouseId: string
 }) {
+  await requireStaff();
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const id = `so_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -177,6 +182,7 @@ export async function cancelSalesOrder(params: {
   reason?: string;
   adminId?: string;
 }) {
+  await requireStaff();
   try {
     const { orderId, restockStock = true, reason, adminId = 'system' } = params;
     const now = new Date().toISOString();
@@ -293,6 +299,7 @@ export async function updateSalesOrderStatus(
   status: string,
   options?: { restockStock?: boolean; reason?: string; adminId?: string }
 ) {
+  await requireStaff();
   if (status === 'CANCELLED' || status === 'DIBATALKAN') {
     return cancelSalesOrder({
       orderId: id,
@@ -330,6 +337,7 @@ export async function recordPayment(data: {
   paymentMethod: string
   reference?: string
 }) {
+  await requireStaff();
   try {
     const orderId = data.invoiceId.replace(/^inv_/, '');
     const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
@@ -360,6 +368,7 @@ export async function recordPayment(data: {
 }
 
 export async function getUnpaidInvoices() {
+  await requireStaff();
   try {
     const { data: rows, error } = await supabase
       .from('orders')
@@ -410,6 +419,7 @@ export async function createMarketplaceOrder(data: {
   warehouseName: string;
   adminId: string;
 }) {
+  await requireStaff();
   try {
     const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const now = new Date().toISOString();

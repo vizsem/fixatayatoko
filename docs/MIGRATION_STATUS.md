@@ -311,6 +311,103 @@ melewati RLS. Karena itu action baru pada poin/dompet **tidak** mengandalkan coo
 tersebut: klien mengirim token akses Supabase, lalu server memverifikasinya.
 Memperbaiki cookie itu sendiri menjadi prioritas berikutnya.
 
+## 🔴 Temuan Keamanan: Tidak Ada Gerbang Autentikasi (2026-10-01)
+
+Ditemukan saat menindaklanjuti rencana migrasi Server Action. Dibuktikan langsung
+dengan menjalankan build produksi secara lokal, bukan dari pembacaan kode.
+
+### Akar masalah 1 — middleware tidak pernah berjalan
+
+Proyek memiliki **dua** berkas middleware. Next.js memilih `src/middleware.ts`
+(entrypoint build: `server/src/middleware.js`), yang isinya hanya:
+
+```ts
+export async function middleware(req: NextRequest) {
+  // Pass-through to avoid redirect loops ...
+  return NextResponse.next();
+}
+```
+
+`middleware.ts` di root — yang berisi pemeriksaan auth sungguhan — **tidak pernah
+dieksekusi**. (Next.js 16 juga mengganti nama konvensi ini menjadi `proxy.ts`.)
+
+Akibatnya `GET /admin/points` tanpa cookie apa pun mengembalikan **HTTP 200**
+beserta HTML admin yang sesungguhnya.
+
+### Akar masalah 2 — Server Action adalah endpoint publik
+
+Dokumentasi Next.js yang terpasang
+(`node_modules/next/dist/docs/01-app/02-guides/data-security.md`) menyatakan:
+
+> "A page-level authentication check does not extend to the Server Actions defined
+> within it. Always re-verify inside the action."
+
+Karena itu komentar `// Otorisasi: mengandalkan middleware /admin/*` yang ada di
+berkas action **salah menurut dokumentasi Next.js sendiri**. Setiap action yang
+memakai `supabaseAdmin` — yang MELEWATI RLS — adalah pintu masuk tanpa penjaga.
+
+### Bukti eksploitasi
+
+Server produksi lokal, **tanpa login**, POST ke `/` (route yang tidak dilindungi
+middleware):
+
+| Uji | Sebelum perbaikan | Sesudah perbaikan |
+|---|---|---|
+| ID action palsu (kontrol) | HTTP 404 `Server action not found` | sama |
+| `getCapitalData()` | **HTTP 200, 26.668 byte data keuangan** | error, tanpa data |
+| `getSuppliers()` | **HTTP 200, 5.583 byte data pemasok** | error, tanpa data |
+| `getCustomers()` | `[]` — ditahan RLS (klien anon) | sama |
+
+`getCustomers` mengembalikan kosong karena memakai klien anon, jadi **RLS bekerja
+dengan baik**. Yang bocor hanyalah jalur service role.
+
+### Perbaikan yang sudah diterapkan
+
+| Berkas | Peran |
+|---|---|
+| `src/lib/auth-cookie.ts` | Kontrak cookie netral (klien menulis, server membaca) |
+| `src/components/AuthBootstrap.tsx` | Menyalin token akses Supabase ke cookie setiap sesi berubah |
+| `src/lib/actions/session.ts` | `requireAdmin()` / `requireStaff()` — verifikasi token + peran, gagal berarti menolak |
+| 62 action di 10 berkas | Disisipi pemeriksaan di awal badan fungsi |
+| `src/lib/actions/guard-coverage.test.ts` | Penjaga anti-regresi: gagal bila ada action baru tanpa pemeriksaan |
+
+Setelah perbaikan, permintaan yang sama menghasilkan
+`1:E{"digest":"..."}` — error tanpa muatan — dan log server mencatat
+`ActionAuthError: Sesi tidak ditemukan (UNAUTHENTICATED)`.
+
+Sisa **8 action** yang sengaja belum dijaga: `getProducts` dan `getCategories`
+keduanya hanya satu fungsi, dipakai halaman publik lewat `useProducts` dan
+`productService`. Menambahkan pemeriksaan peran akan merusak toko. Keduanya perlu
+penanganan tersendiri: memakai klien anon (RLS sudah mengizinkan `products` dibaca
+publik) sekaligus menyaring harga modal. Keduanya terdaftar sebagai pengecualian
+di `guard-coverage.test.ts` beserta alasannya.
+
+### ⚠️ Belum selesai
+
+`src/middleware.ts` masih pass-through, sehingga halaman `/admin/*` tetap
+ditampilkan tanpa login. Ini tidak lagi membocorkan data — datanya diambil lewat
+action yang kini sudah dijaga — tetapi UI admin seharusnya tidak terlihat sama
+sekali. Perbaikannya: jadikan `proxy.ts` (konvensi Next 16) dan verifikasi cookie
+`ataya-access-token` di sana.
+
+<details>
+<summary>Cara memverifikasi ulang sendiri</summary>
+
+```bash
+npm run build && npx next start -p 3112
+
+# ambil id action dari manifest
+node -e "const m=require('./.next/server/server-reference-manifest.json');
+for(const id of Object.keys(m.node)) if(m.node[id].exportedName==='getCapitalData') console.log(id)"
+
+# panggil tanpa login — harus TIDAK mengembalikan data
+curl -s -X POST http://localhost:3112/ \
+  -H "Next-Action: <id-di-atas>" -H "Origin: http://localhost:3112" \
+  -H "Content-Type: text/plain;charset=UTF-8" --data '[]'
+```
+
+</details>
+
 ## Rencana Migrasi Bertahap
 
 ### Fase 1 — Amankan batas client/server (prioritas tertinggi)

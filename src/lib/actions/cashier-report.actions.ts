@@ -1,5 +1,7 @@
 'use server';
 
+import { requireStaff } from '@/lib/actions/session';
+
 import { supabaseAdmin } from '@/lib/supabase';
 
 export type CashierPerformanceItem = {
@@ -40,6 +42,7 @@ export type CashierShiftLog = {
 };
 
 export async function getCashierPerformanceReport(startDateStr: string, endDateStr: string, filterCashierId?: string) {
+  await requireStaff();
   try {
     const startIso = new Date(startDateStr);
     startIso.setHours(0, 0, 0, 0);

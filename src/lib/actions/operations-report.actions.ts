@@ -1,5 +1,7 @@
 'use server';
 
+import { requireStaff } from '@/lib/actions/session';
+
 import { supabaseAdmin } from '@/lib/supabase';
 import { normalizeRow } from '@/lib/supabase-helpers';
 import {
@@ -22,6 +24,7 @@ import {
  * `actions/stock-sync.actions.ts`).
  */
 export async function getOperationsMetrics(): Promise<OperationalMetric[]> {
+  await requireStaff();
   const [employeesRes, usersRes, warehousesRes, productsRes, ordersRes, expensesRes] =
     await Promise.all([
       supabaseAdmin.from('employees').select('*'),

@@ -1,5 +1,7 @@
 'use server'
 
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
+
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -16,6 +18,7 @@ function parseDate(val: any): Date {
 }
 
 export async function getCapitalData() {
+  await requireStaff();
   try {
     const [txRes, loanRes, mpAccRes, mpTxRes, prodRes] = await Promise.all([
       supabaseAdmin.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(100),
@@ -139,6 +142,7 @@ export async function addCapitalTransaction(data: {
   description?: string
   recordedBy?: string
 }) {
+  await requireAdmin();
   try {
     const id = `cap_${Date.now()}`;
     const raw_data = {
@@ -171,6 +175,7 @@ export async function recordLoan(data: {
   loanType?: string
   interestRate?: number
 }) {
+  await requireAdmin();
   try {
     const id = `loan_${Date.now()}`;
     const raw_data = {
@@ -200,6 +205,7 @@ export async function recordLoan(data: {
 }
 
 export async function repayLoan(loanId: string, repayAmount: number, interestExpense?: number) {
+  await requireAdmin();
   try {
     const { data: existing } = await supabaseAdmin.from('loans').select('*').eq('id', loanId).single();
     if (!existing) throw new Error('Pinjaman tidak ditemukan');
@@ -240,6 +246,7 @@ export async function repayLoan(loanId: string, repayAmount: number, interestExp
 }
 
 export async function addMarketplaceAccount(name: string, storeName?: string) {
+  await requireAdmin();
   try {
     const id = `mp_${Date.now()}`;
     const raw_data = {
@@ -273,6 +280,7 @@ export async function updateMarketplaceBalance(data: {
   note?: string
   recordedBy?: string
 }) {
+  await requireAdmin();
   try {
     const { data: existing } = await supabaseAdmin.from('marketplace_accounts').select('*').eq('id', data.accountId).single();
     if (!existing) throw new Error('Akun marketplace tidak ditemukan');
@@ -322,6 +330,7 @@ export async function adjustTotalCapital(data: {
   reason?: string;
   recordedBy?: string;
 }) {
+  await requireAdmin();
   try {
     // 1. Fetch existing transactions to compute current capital
     const { data: rows } = await supabaseAdmin

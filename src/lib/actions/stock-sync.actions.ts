@@ -1,5 +1,7 @@
 'use server';
 
+import { requireStaff } from '@/lib/actions/session';
+
 import { supabaseAdmin } from '@/lib/supabase';
 import { normalizeRow } from '@/lib/supabase-helpers';
 import { buildSyncMatrix, type StockSyncRow } from '@/lib/stock-sync-matrix';
@@ -21,6 +23,7 @@ import { buildSyncMatrix, type StockSyncRow } from '@/lib/stock-sync-matrix';
  * (butuh klien Supabase yang sadar-cookie untuk membaca sesi di server).
  */
 export async function getStockSyncMatrix(): Promise<StockSyncRow[]> {
+  await requireStaff();
   const [productsRes, warehousesRes, stockRes] = await Promise.all([
     supabaseAdmin.from('products').select('*'),
     supabaseAdmin.from('warehouses').select('*'),

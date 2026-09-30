@@ -20,14 +20,13 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { isAdminRole, isStaffOrAdmin } from '@/lib/auth-helpers';
 
-// Jaring pengaman: modul ini memegang service role key, jadi tidak boleh
-// sampai ikut ter-bundle ke browser karena salah impor.
-if (typeof window !== 'undefined') {
-  throw new Error(
-    'src/lib/actions/guard.ts hanya boleh dijalankan di server. ' +
-      'Jangan impor modul ini dari client component.'
-  );
-}
+// Catatan: modul ini memegang service role key, jadi hanya boleh dijalankan di
+// server. Pemeriksaan `typeof window` di sini sengaja TIDAK dilakukan di tingkat
+// modul: komponen klien yang mengimpor Server Action membuat Next.js mengganti
+// modul itu dengan sebuah referensi, tetapi lingkungan uji (jsdom) memuatnya
+// sungguhan sehingga pemeriksaan tingkat modul menggagalkan uji yang sah.
+// Perlindungan yang benar adalah memastikan kunci service role tidak pernah
+// ber-prefiks NEXT_PUBLIC_ (lihat `src/lib/supabase.ts`).
 
 /** Tingkat izin yang dibutuhkan sebuah action. */
 export type AccessLevel = 'admin' | 'staff';

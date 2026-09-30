@@ -1,5 +1,7 @@
 'use server'
 
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
+
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import { addStock, deductStockFEFO } from '@/lib/inventory'
@@ -35,6 +37,7 @@ function parseDate(val: any): Date {
 }
 
 export async function getPurchaseOrders(filters?: { status?: string; supplierId?: string }) {
+  await requireStaff();
   try {
     const query = supabaseAdmin
       .from('purchases')
@@ -103,6 +106,7 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
 }
 
 export async function getPurchaseOrderById(id: string) {
+  await requireStaff();
   try {
     const { data: p, error } = await supabaseAdmin.from('purchases').select('*').eq('id', id).single();
     if (error || !p) return null;
@@ -158,6 +162,7 @@ export async function createPurchaseOrder(data: {
   paymentMethod?: string
   dueDate?: string
 }) {
+  await requireAdmin();
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const poNumber = `PO-${Date.now()}`;
@@ -274,6 +279,7 @@ export async function createPurchaseOrder(data: {
 }
 
 export async function receivePurchaseOrder(poId: string, warehouseId: string, batchNumber?: string, expiryDate?: string) {
+  await requireStaff();
   try {
     const { data: p, error: fetchErr } = await supabaseAdmin.from('purchases').select('*').eq('id', poId).single();
     if (fetchErr || !p) return { success: false, error: 'PO tidak ditemukan' };
@@ -329,6 +335,7 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
 }
 
 export async function updatePurchaseStatus(id: string, status: string) {
+  await requireStaff();
   try {
     const { data: p } = await supabaseAdmin.from('purchases').select('*').eq('id', id).single();
     if (!p) return { success: false, error: 'PO tidak ditemukan' };
@@ -349,6 +356,7 @@ export async function updatePurchaseStatus(id: string, status: string) {
 }
 
 export async function deletePurchaseOrder(id: string) {
+  await requireAdmin();
   try {
     const { error } = await supabaseAdmin.from('purchases').delete().eq('id', id);
     if (error) throw error;
@@ -371,6 +379,7 @@ export async function updatePurchaseOrder(
     expiryDate?: string
   }
 ) {
+  await requireAdmin();
   try {
     const { data: oldData, error: fetchErr } = await supabaseAdmin
       .from('purchases')
@@ -516,6 +525,7 @@ export async function updatePurchaseOrder(
 }
 
 export async function cancelPurchaseOrder(id: string) {
+  await requireAdmin();
   try {
     const { data: oldData, error: fetchErr } = await supabaseAdmin
       .from('purchases')
@@ -586,6 +596,7 @@ export type PurchaseSupplierHistory = {
 };
 
 export async function getPurchaseStatsByProductId(productId: string) {
+  await requireAdmin();
   try {
     const { data: rows, error } = await supabaseAdmin
       .from('purchases')
