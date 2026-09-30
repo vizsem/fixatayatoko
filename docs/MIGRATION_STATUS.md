@@ -404,6 +404,7 @@ Migrasi dilakukan **per file**, bukan borongan, dengan pola berikut:
 |---|---|---|
 | `app/admin/inventory/sync-monitor/page.tsx` | ✅ **selesai** | `products`, `warehouses`, `warehouseStock` |
 | `app/admin/reports/operations/page.tsx` | ✅ **selesai** | `employees`, `users`, `warehouses`, `products`, `orders`, `operational_expenses` |
+| `app/admin/reports/inventory/page.tsx` | ✅ **selesai** | `inventory_transactions`, `warehouses` |
 
 Hasilnya bukan sekadar perpindahan: payload ke browser mengecil (hanya matriks hasil,
 bukan seluruh tabel mentah) dan logika perbandingannya kini punya 10 unit test

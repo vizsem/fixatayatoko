@@ -3,34 +3,18 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
-import useProducts from '@/lib/hooks/useProducts';
-import type { NormalizedProduct } from '@/lib/normalize';
 import * as XLSX from 'xlsx';
 import { Package, Download, AlertTriangle, TrendingDown, TrendingUp, Search, Filter, ChevronLeft, ChevronRight, Info, Layers } from 'lucide-react';
 import notify from '@/lib/notify';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import * as Sentry from '@sentry/nextjs';
-import { supabase } from '@/lib/supabase';
-
-import { sbGetDocs } from '@/lib/supabase-helpers';
-type InventoryItem = {
-  id: string;
-  name: string;
-  category: string;
-  currentStock: number;
-  stockIn: number;
-  stockOut: number;
-  turnoverRate: number;
-  stockValue: number;
-  imageUrl?: string;
-  warehouseId?: string;
-};
+import { getInventoryReport } from '@/lib/actions/inventory-report.actions';
+import type { InventoryItem } from '@/lib/inventory-report';
 
 export default function InventoryReport() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   const [building, setBuilding] = useState(false);
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(20);
@@ -42,33 +26,16 @@ export default function InventoryReport() {
   const { authLoading } = useAdminAuth();
 
   useEffect(() => {
+    if (authLoading) return;
+
     const build = async () => {
       setBuilding(true);
       try {
-        const transSnap = await sbGetDocs({ table: 'inventory_transactions' });
-        const transactions = transSnap.docs.map(d => d.data());
-        
-        const whSnap = await sbGetDocs({ table: 'warehouses' });
-        setWarehouses(whSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.id })));
-
-        const inv: InventoryItem[] = products.map((p: NormalizedProduct) => {
-          const sIn = transactions.filter(t => t.productId === p.id && t.type === 'STOCK_IN').reduce((s, t) => s + Number(t.quantity || 0), 0);
-          const sOut = transactions.filter(t => t.productId === p.id && t.type === 'STOCK_OUT').reduce((s, t) => s + Number(t.quantity || 0), 0);
-          const cost = Number(p.Modal || p.purchasePrice || (p.priceEcer || 0) * 0.8);
-          return {
-            id: p.id,
-            name: p.name || '',
-            category: p.category || '',
-            currentStock: p.stock || 0,
-            stockIn: sIn,
-            stockOut: sOut,
-            turnoverRate: p.stock > 0 ? sOut / p.stock : 0,
-            stockValue: (p.stock || 0) * cost,
-            imageUrl: p.imageUrl,
-            warehouseId: p.warehouseId
-          };
-        });
-        setInventory(inv);
+        // Dihitung di server: klien tidak lagi membaca inventory_transactions
+        // maupun warehouses secara langsung.
+        const report = await getInventoryReport();
+        setInventory(report.inventory);
+        setWarehouses(report.warehouses);
       } catch (err) {
         Sentry.captureException(err);
       } finally {
@@ -76,14 +43,9 @@ export default function InventoryReport() {
         setLoading(false);
       }
     };
-    if (!productsLoading && !authLoading) {
-      if (products.length > 0) {
-        build();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [productsLoading, products, authLoading]);
+
+    build();
+  }, [authLoading]);
 
   const filtered = useMemo(() => {
     return inventory.filter(it => {
@@ -108,7 +70,7 @@ export default function InventoryReport() {
     XLSX.writeFile(wb, `Inventory_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
-  if (loading || productsLoading || building) return <div className="p-6"><TableSkeleton rows={15} /></div>;
+  if (loading || building) return <div className="p-6"><TableSkeleton rows={15} /></div>;
 
   return (
     <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
