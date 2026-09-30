@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabase, supabaseAdmin as _supabaseAdmin } from '@/lib/supabase';
 import { isAdminRole, isAuthorizedAdmin, isStaffOrAdmin } from '@/lib/auth-helpers';
 import { INCREMENT_MARKER } from '@/lib/firebase';
 import {
@@ -10,6 +10,30 @@ import {
   extractTableColumns,
   generateId,
 } from '@/lib/db-schema';
+
+/**
+ * Klien mana yang dipakai untuk membaca/menulis.
+ *
+ * MASALAH YANG DIPERBAIKI DI SINI:
+ * `supabaseAdmin` dibuat dengan `persistSession: false` dan `autoRefreshToken: false`,
+ * sehingga ia TIDAK PERNAH melampirkan token pengguna. Di browser, memakainya berarti
+ * setiap permintaan dikirim sebagai peran `anon`; RLS lalu menolak hampir semua tabel
+ * dan halaman admin tampak "kosong" tanpa pesan error apa pun — termasuk untuk admin
+ * yang sudah login. Itu sebabnya variasi yang bergantung pada opsi `useAdmin` (yang
+ * default-nya `true`) sangat menyesatkan.
+ *
+ * Di browser kita wajib memakai klien bersesi (`supabase`) supaya RLS melihat peran
+ * `authenticated` dan policy berbasis peran dapat bekerja.
+ *
+ * Di server perilakunya TIDAK berubah: `supabaseAdmin` tetap klien service role yang
+ * melewati RLS. Setiap jalur di server sudah memakai pemeriksaan izin eksplisit
+ * (`requireAdmin()`/`requireStaff()`), jadi bypass di server memang yang diinginkan.
+ *
+ * Catatan keamanan: kunci service role TIDAK ikut ke browser. `SUPABASE_SERVICE_ROLE_KEY`
+ * tidak berprefix `NEXT_PUBLIC_`, jadi di bundel klien nilainya `undefined`.
+ */
+const isBrowser = typeof window !== 'undefined';
+const supabaseAdmin = isBrowser ? supabase : _supabaseAdmin;
 
 // Sumber kebenaran tunggal ada di `@/lib/db-schema`.
 // Di-reekspor agar konsumen lama tetap bekerja.

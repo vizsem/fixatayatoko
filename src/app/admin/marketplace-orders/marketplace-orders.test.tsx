@@ -35,9 +35,22 @@ vi.mock('@/lib/supabase', () => {
     },
   ];
   const warehousesData = [{ id: 'gudang-utama', name: 'Gudang Utama' }];
+  // `getUserAndRole()` membaca baris `users` milik pengguna yang sedang login.
+  // Di produksi pembacaan ini lewat klien bersesi (peran `authenticated`) dan
+  // diizinkan RLS, jadi mock klien bersesi harus mengembalikannya juga.
+  // Sebelumnya mock ini hanya memberi peran admin lewat klien admin, karena
+  // dulu `supabase-helpers` memang salah memakai klien admin di browser.
+  const usersData = [{ id: 'admin-user', role: 'admin' }];
 
   const createQueryBuilder = (tableName: string) => {
-    const data = tableName === 'products' ? productsData : tableName === 'warehouses' ? warehousesData : [];
+    const data =
+      tableName === 'products'
+        ? productsData
+        : tableName === 'warehouses'
+          ? warehousesData
+          : tableName === 'users'
+            ? usersData
+            : [];
     const builder: any = {};
     builder.select = vi.fn().mockReturnValue(builder);
     builder.eq = vi.fn().mockReturnValue(builder);
