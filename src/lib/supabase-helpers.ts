@@ -116,15 +116,14 @@ export interface SupabaseUserAdapter {
 
 export function adaptSupabaseUser(user: any): SupabaseUserAdapter | null {
   if (!user) return null;
-  const email = (user.email || '').toLowerCase();
-  const metaRole = user.user_metadata?.role || user.app_metadata?.role;
-  const role = metaRole || (
-    email.startsWith('admin') || email.includes('hadzikoh')
-      ? 'superadmin'
-      : email.startsWith('kasir')
-        ? 'cashier'
-        : undefined
-  );
+
+  // PERINGATAN KEAMANAN: `user_metadata` dapat ditulis sendiri oleh pengguna
+  // (terbukti dengan `PUT /auth/v1/user`), dan email bisa didaftarkan dengan
+  // awalan apa pun. Menurunkan peran dari keduanya berarti siapa pun dapat
+  // menjadikan dirinya admin. Sumber peran yang sah hanya `public.users.role`
+  // dan `app_metadata` (hanya bisa ditulis service role).
+  const role = user.app_metadata?.role as string | undefined;
+
   return {
     ...user,
     id: user.id,
@@ -166,11 +165,13 @@ export async function getUserAndRole(): Promise<UserRoleCheck> {
     // ignore
   }
 
+  // `userDocData` berasal dari `public.users` dan merupakan satu-satunya sumber
+  // peran yang sah. `app_metadata` hanya bisa ditulis service role, jadi aman
+  // sebagai cadangan. `user_metadata` SENGAJA tidak dipakai karena dapat ditulis
+  // sendiri oleh pengguna (jalur naik-ke-admin).
   const candidateRoles = [
     userDocData?.role,
-    user.role,
     user.app_metadata?.role,
-    user.user_metadata?.role,
   ];
   const role = candidateRoles.find(Boolean);
 
@@ -185,15 +186,10 @@ export async function getUserAndRole(): Promise<UserRoleCheck> {
 
 export function getRoleFromUser(user: any, userDocData?: any): string | undefined {
   if (!user) return undefined;
-  const email = (user.email || '').toLowerCase();
-  if (email.startsWith('admin') || email.includes('hadzikoh')) return 'superadmin';
-  if (email.startsWith('kasir')) return 'cashier';
-  return (
-    userDocData?.role ||
-    user.role ||
-    user.app_metadata?.role ||
-    user.user_metadata?.role
-  );
+
+  // Hanya `public.users.role` dan `app_metadata`. Awalan email dan
+  // `user_metadata` tidak dipakai: keduanya dapat dikendalikan pengguna.
+  return userDocData?.role || user.app_metadata?.role;
 }
 
 // --- Build write payload helper ---

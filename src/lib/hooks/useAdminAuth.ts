@@ -42,9 +42,10 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
 
   const isRoleAllowed = (checkRole?: string | null, email?: string | null) => {
     if (!checkRole && !email) return false;
-    const lowerEmail = (email || '').toLowerCase();
-    if (lowerEmail.startsWith('admin') || lowerEmail.includes('hadzikoh')) return true;
-    
+
+    // Awalan email SENGAJA tidak dipakai sebagai bukti peran: email bisa
+    // didaftarkan dengan awalan apa pun, termasuk oleh pelanggan.
+
     if (allowedRoles.includes('admin') && isAdminRole(checkRole)) {
       return true;
     }
@@ -62,7 +63,15 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
           return;
         }
 
-        const userRole = (user.app_metadata?.role || user.user_metadata?.role || (user.email?.startsWith('admin') ? 'admin' : (user.email?.startsWith('kasir') ? 'cashier' : undefined))) as string | undefined;
+        // Peran dibaca dari `public.users.role`. `user_metadata` TIDAK sah
+        // dipakai: pengguna dapat menulisnya sendiri, jadi
+        // `user_metadata.role = 'admin'` cukup untuk lolos dari pemeriksaan ini.
+        const { data: row } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+        const userRole = (row?.role || user.app_metadata?.role || undefined) as string | undefined;
 
         if (!isRoleAllowed(userRole, user.email)) {
           notify.aksesDitolakAdmin();
@@ -90,14 +99,22 @@ export default function useAdminAuth(options?: UseAdminAuthOptions): AdminAuthSt
         router.push(redirectOnFail);
         return;
       }
-      const userRole = (session.user.app_metadata?.role || session.user.user_metadata?.role || (session.user.email?.startsWith('admin') ? 'admin' : (session.user.email?.startsWith('kasir') ? 'cashier' : undefined))) as string | undefined;
-      if (!isRoleAllowed(userRole, session.user.email)) {
-        notify.aksesDitolakAdmin();
-        router.push('/profil');
-        return;
-      }
-      setAdminId(session.user.id);
-      setRole(userRole || 'admin');
+      // Peran dibaca dari basis data, bukan dari metadata yang bisa ditulis pengguna.
+      void (async () => {
+        const { data: row } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        const userRole = (row?.role || session.user.app_metadata?.role || undefined) as string | undefined;
+        if (!isRoleAllowed(userRole, session.user.email)) {
+          notify.aksesDitolakAdmin();
+          router.push('/profil');
+          return;
+        }
+        setAdminId(session.user.id);
+        setRole(userRole || 'admin');
+      })();
     });
 
     return () => subscription.unsubscribe();

@@ -105,10 +105,14 @@ export async function authorize(
     return fail('INTERNAL', `Gagal membaca peran pengguna: ${roleError.message}`);
   }
 
+  // Sumber peran yang sah: `public.users.role` lebih dulu, lalu `app_metadata`
+  // yang hanya bisa ditulis lewat service role.
+  // `user_metadata.role` SENGAJA TIDAK dipakai: pengguna dapat menulisnya sendiri
+  // lewat `PUT /auth/v1/user`, sehingga `user_metadata.role = 'admin'` akan
+  // melewati `requireAdmin()` pada SEMUA Server Action.
   const role =
     (row?.role as string | undefined) ||
     (user.app_metadata?.role as string | undefined) ||
-    (user.user_metadata?.role as string | undefined) ||
     null;
 
   const allowed = level === 'admin' ? isAdminRole(role) : isStaffOrAdmin(role);

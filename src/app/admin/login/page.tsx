@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { signIn, syncSessionCookie } from '@/lib/supabaseAuth';
-import { isOperationalUser } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 import { useRouter, useSearchParams } from 'next/navigation';
 import notify from '@/lib/notify';
 import { Lock, Mail, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
@@ -24,7 +24,10 @@ function AdminLoginForm() {
     (async () => {
       const session = await syncSessionCookie();
       if (cancelled || !session) return;
-      if (!isOperationalUser(session.user)) return;
+      // Peran dibaca dari `public.users.role`, bukan dari metadata pengguna:
+      // metadata dapat ditulis sendiri, jadi tidak boleh dipercaya di sini.
+      const { isStaff } = await getUserAndRole();
+      if (cancelled || !isStaff) return;
       router.replace(callbackUrl);
     })();
     return () => {
@@ -51,8 +54,11 @@ function AdminLoginForm() {
         return;
       }
 
-      // Check role from app_metadata or user_metadata
-      if (!isOperationalUser(data?.user)) {
+      // Peran dibaca dari `public.users.role`, bukan dari metadata. Metadata
+      // pengguna dapat ditulis sendiri, sehingga mempercayainya sama dengan
+      // membiarkan siapa pun masuk ke portal admin.
+      const { isStaff } = await getUserAndRole();
+      if (!isStaff) {
         notify.error('Akses ditolak. Anda tidak memiliki izin operasional.', { id: toastId });
         setLoading(false);
         return;

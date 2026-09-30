@@ -621,9 +621,15 @@ export interface FirebaseUser {
 
 function adaptUser(user: any): FirebaseUser | null {
   if (!user) return null;
-  const email = (user.email || '').toLowerCase();
-  const metaRole = user.user_metadata?.role || user.app_metadata?.role;
-  const role = metaRole || (email.startsWith('admin') || email.includes('hadzikoh') ? 'superadmin' : (email.startsWith('kasir') ? 'cashier' : undefined));
+
+  // PERINGATAN KEAMANAN: peran TIDAK boleh diambil dari `user_metadata` maupun
+  // dari awalan email. Pengguna dapat menulis `user_metadata` sendiri lewat
+  // `PUT /auth/v1/user`, sehingga `user_metadata.role = 'admin'` cukup untuk
+  // melewati pemeriksaan izin. Email juga bisa didaftarkan dengan awalan apa pun.
+  // Sumber peran yang sah hanya `public.users.role` (dibaca terpisah lewat
+  // `getUserAndRole`) dan `app_metadata`, yang hanya bisa ditulis service role.
+  const role = user.app_metadata?.role as string | undefined;
+
   return {
     ...user,
     id: user.id,

@@ -29,16 +29,14 @@ export function isStaffOrAdmin(role?: string | null): boolean {
 export function isOperationalUser(user: any, profileRole?: string | null): boolean {
   if (!user && !profileRole) return false;
 
-  const email = (user?.email || '').toLowerCase();
-  if (email.startsWith('admin') || email.includes('hadzikoh') || email.startsWith('kasir')) {
-    return true;
-  }
-
+  // PERINGATAN KEAMANAN: awalan email dan `user_metadata` SENGAJA tidak dipakai.
+  // Pengguna dapat menulis `user_metadata.role` sendiri, dan email bisa
+  // didaftarkan dengan awalan apa pun. Keduanya pernah menjadi jalan masuk
+  // tanpa izin ke portal admin.
   const candidateRoles = [
     profileRole,
     user?.role,
     user?.app_metadata?.role,
-    user?.user_metadata?.role,
   ];
 
   return candidateRoles.some(r => isStaffOrAdmin(r));
@@ -47,18 +45,14 @@ export function isOperationalUser(user: any, profileRole?: string | null): boole
 export function isAuthorizedAdmin(user: any, userDocData?: any): boolean {
   if (!user) return false;
 
-  // Check email shortcut
-  const email = (user.email || '').toLowerCase();
-  if (email.startsWith('admin') || email.includes('hadzikoh')) {
-    return true;
-  }
-
-  // Check roles across all metadata and document sources
+  // Hanya `userDocData` (dari `public.users`), `app_metadata` (hanya bisa ditulis
+  // service role), dan `user.role` yang sudah dibersihkan oleh adaptor.
+  // `user_metadata` dan awalan email tidak dipakai karena dapat dikendalikan
+  // sepenuhnya oleh pengguna.
   const candidateRoles = [
-    user.role,
+    userDocData?.role,
     user.app_metadata?.role,
-    user.user_metadata?.role,
-    userDocData?.role
+    user.role,
   ];
 
   return candidateRoles.some(r => isAdminRole(r));
