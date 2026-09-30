@@ -31,13 +31,22 @@ Paket `firebase` **sudah tidak terpasang** — bridge murni menerjemahkan panggi
 
 | Metrik | Jumlah |
 |---|---|
-| File mengimpor `@/lib/firebase` (bridge) | **96** |
-| — sebagai client component (`"use client"`) | 76 |
-| — sebagai server module | 20 |
+| File mengimpor `@/lib/firebase` (bridge) | **90** |
+| — sebagai client component (`"use client"`) | 73 |
+| — sebagai server module | 17 |
 | File mengimpor `@supabase/*` langsung | 2 (`lib/supabase.ts`, `types/supabase.d.ts`) |
 | File mengimpor Prisma | 1 (`lib/prisma.ts`) |
 | Feature code yang memakai Supabase langsung | **0** |
 | Paket `firebase` di `package.json` | tidak ada |
+
+Dihitung dengan (berkas uji dikecualikan):
+
+```bash
+# total
+grep -rl "@/lib/firebase" src --include="*.ts" --include="*.tsx" | grep -v "\.test\." | wc -l
+# di antaranya client component
+grep -rl "@/lib/firebase" src --include="*.tsx" | grep -v "\.test\." | xargs grep -l "^'use client'" | wc -l
+```
 
 Artinya: **tidak ada satu pun fitur yang berbicara ke Supabase secara native.** Semuanya
 lewat bridge. Ini titik utama utang teknis migrasi.
@@ -190,12 +199,95 @@ tidak tersentuh, dan **0 tabel** tanpa RLS.
 > publik (`products`, `categories`, `promotions`, `settings`, `warehouses`) tidak
 > terpengaruh.
 
+## 🔴 Temuan: Sub-sistem Poin & Dompet Tidak Berfungsi (2026-10-01)
+
+Ditemukan saat memigrasikan `admin/points` dan `admin/wallet`. Diverifikasi langsung
+ke database remote, bukan dari asumsi.
+
+### Akar masalah
+
+1. **`public.users` tidak punya kolom `points` maupun `is_points_frozen`.**
+   Kolom yang sebenarnya ada hanya: `id, full_name, avatar_url, wallet_balance, role,
+   created_at, updated_at`. Akibatnya:
+   - `admin/points` mengurutkan pengguna dengan `order=points.desc` → **ERROR 42703** →
+     daftar pengguna **selalu kosong**.
+   - Tombol "Bekukan Poin" dan "Penyesuaian Manual" **tidak mengubah apa pun**, tetapi
+     tetap menampilkan notifikasi **sukses**. Kegagalan senyap: `extractTableColumns()`
+     untuk tabel `users` hanya memetakan `walletBalance` dan `name`, sehingga field
+     `points` dibuang sebelum `UPDATE` dijalankan.
+   - `cart`, `vouchers`, dan `profil` membaca `userData.points` → selalu `0` → poin
+     tidak pernah bisa ditukar.
+
+2. **`api/orders/create` menulis ke `users.raw_data` yang tidak ada.**
+   `users` tidak punya kolom `raw_data`, sehingga `UPDATE` gagal — dan galatnya tidak
+   pernah diperiksa. Efeknya: pemotongan poin/saldo saat checkout tidak pernah
+   tersimpan. Karena `points` selalu terbaca 0, jalur ini juga tidak pernah aktif,
+   sehingga tidak ada kebocoran yang benar-benar terjadi.
+
+3. **Kolom bertipe di tabel ledger semuanya NULL.** Seluruh isi `point_logs` dan
+   `wallet_logs` hanya ada di `raw_data` (sisa impor Firestore), sehingga tidak bisa
+   diindeks, difilter, atau dijumlahkan oleh SQL.
+
+4. **Drift tipe kolom.** `20240913_init.sql` mendeklarasikan `point_logs.id` dan
+   `wallet_logs.id` sebagai `UUID`, tetapi di remote keduanya `TEXT` (berisi id gaya
+   Firestore seperti `DQG7jFOtoOjLnNbMKhgw`).
+
+5. **Data yatim.** Semua baris ledger yang ada merujuk `raw_data.userId` =
+   `a1BAutHIUigczzWns0Ra5T3sL8D3` (UID Firebase). UID itu **tidak ada** di
+   `public.users` yang seluruh id-nya UUID, sehingga baris tersebut tidak bisa
+   dipetakan ke pengguna mana pun. Dibuktikan juga bahwa **tidak ada satu pun akun
+   pelanggan** — 8 akun yang ada semuanya staf.
+
+### Perbaikan
+
+| Berkas | Peran |
+|---|---|
+| `supabase/migrations/20261002_loyalty_wallet_hardening.sql` | Kolom `users.points` + `is_points_frozen`, kolom `type`/`order_id` pada ledger, backfill dari `raw_data` (aman terhadap nilai rusak), indeks, serta fungsi atomik `adjust_user_points`, `adjust_user_wallet`, dan agregat `ledger_totals` |
+| `supabase/tests/loyalty_wallet_hardening.sql` | Uji SQL yang dapat diulang: idempoten, backfill, penolakan data rusak, batas saldo, validasi masukan |
+| `src/lib/loyalty.ts` | Logika murni (validasi, normalisasi, ringkasan, format) — 33 unit test |
+| `src/lib/actions/guard.ts` | `authorize()`: verifikasi token akses Supabase + peran, pengganti cookie `admin-token` yang bisa dipalsukan |
+| `src/lib/actions/loyalty.actions.ts` | Server Action baca/tulis untuk kedua halaman |
+| `src/app/admin/points/page.tsx`, `src/app/admin/wallet/page.tsx` | Ditulis ulang memakai Server Action |
+
+### ⚠️ Perlu dijalankan manual
+
+Migrasi `20261002_loyalty_wallet_hardening.sql` **belum diterapkan**. Sebelum
+dijalankan, kedua halaman menampilkan spanduk peringatan dan menolak penulisan dengan
+pesan yang jelas — bukan gagal senyap. Setelah dijalankan, muat ulang halaman.
+
+```bash
+# Opsi A - Supabase Dashboard > SQL Editor > tempel isi file > Run
+# Opsi B - psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261002_loyalty_wallet_hardening.sql
+```
+
+Uji migrasinya di database sekali pakai sebelum menyentuh produksi:
+
+```bash
+createdb -h /tmp -p 55435 -U postgres loyalty_test
+psql -h /tmp -p 55435 -U postgres -d loyalty_test -v ON_ERROR_STOP=1 \
+     -f supabase/tests/loyalty_wallet_hardening.sql
+```
+
+### Catatan keamanan terkait
+
+Cookie `admin-token` **hanya berisi string `"true"`** yang di-set oleh JavaScript di
+browser (`src/app/profil/login/page.tsx`), sehingga mudah dipalsukan. Middleware
+`/admin/*` mempercayai cookie itu, sementara Server Action memakai service role yang
+melewati RLS. Karena itu action baru pada poin/dompet **tidak** mengandalkan cookie
+tersebut: klien mengirim token akses Supabase, lalu server memverifikasinya.
+Memperbaiki cookie itu sendiri menjadi prioritas berikutnya.
+
 ## Rencana Migrasi Bertahap
 
 ### Fase 1 — Amankan batas client/server (prioritas tertinggi)
 - [x] Pilih klien Supabase secara eksplisit berdasarkan lingkungan di `src/lib/firebase.ts`.
 - [x] Peringatan saat `SUPABASE_SERVICE_ROLE_KEY` tidak di-set di server.
 - [x] Resolver peran `current_app_role()` + Auth Hook — policy RLS kini benar-benar berlaku.
+- [x] Guard `authorize()` untuk Server Action (verifikasi token akses Supabase + peran),
+      diterapkan pada action poin & dompet. Lihat `src/lib/actions/guard.ts`.
+- [ ] Terapkan guard yang sama pada Server Action lain di `src/lib/actions/*`
+      (saat ini baru poin & dompet yang memeriksa peran di dalam action).
+- [ ] Ganti cookie `admin-token` yang bisa dipalsukan dengan sesi yang ditandatangani.
 - [ ] Audit **69** client component yang mengakses data langsung (lihat inventaris di bawah):
       pindahkan operasi data ke Server Action / Route Handler.
 - [ ] Pastikan `SUPABASE_SERVICE_ROLE_KEY` hanya hidup di jalur server.
@@ -405,13 +497,23 @@ Migrasi dilakukan **per file**, bukan borongan, dengan pola berikut:
 | `app/admin/inventory/sync-monitor/page.tsx` | ✅ **selesai** | `products`, `warehouses`, `warehouseStock` |
 | `app/admin/reports/operations/page.tsx` | ✅ **selesai** | `employees`, `users`, `warehouses`, `products`, `orders`, `operational_expenses` |
 | `app/admin/reports/inventory/page.tsx` | ✅ **selesai** | `inventory_transactions`, `warehouses` |
+| `app/admin/points/page.tsx` | ✅ **selesai** | `users`, `point_logs` |
+| `app/admin/wallet/page.tsx` | ✅ **selesai** | `users`, `wallet_logs` |
 
 Hasilnya bukan sekadar perpindahan: payload ke browser mengecil (hanya matriks hasil,
 bukan seluruh tabel mentah) dan logika perbandingannya kini punya 10 unit test
 (`src/lib/stock-sync-matrix.test.ts`).
 
-**Belum dimigrasikan: 68 file.** Dari pemindaian, **32 di antaranya read-only** (tier paling
-aman); sisanya mengandung operasi tulis.
+Dua migrasi terakhir (poin & dompet) sekaligus memperbaiki bug fungsional: lihat
+[Sub-sistem Poin & Dompet Tidak Berfungsi](#-temuan-sub-sistem-poin--dompet-tidak-berfungsi-2026-10-01).
+Seperti tiga migrasi sebelumnya, keduanya memindahkan logika ke modul murni yang diuji
+(`src/lib/loyalty.ts`, 33 unit test). Selain itu keduanya **memeriksa peran di dalam
+action**, sehingga menjadi dua Server Action pertama di proyek ini yang tidak lagi
+sepenuhnya bergantung pada middleware.
+
+**Belum dimigrasikan: 66 file.** Dari pemindaian, **32 di antaranya read-only** (tier paling
+aman); sisanya mengandung operasi tulis. Ingat: file yang hanya membaca tabel publik
+(`products`, `categories`) memberi manfaat keamanan hampir nol, jadi jangan diprioritaskan.
 
 #### Dua file yang sengaja DITUNDA (butuh keputusan, bukan sekadar refactor)
 
