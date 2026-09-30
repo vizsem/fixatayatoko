@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, FormEvent, Suspense } from 'react';
-import { signIn } from '@/lib/supabaseAuth';
+import { useState, useEffect, FormEvent, Suspense } from 'react';
+import { signIn, syncSessionCookie } from '@/lib/supabaseAuth';
 import { isOperationalUser } from '@/lib/auth-helpers';
 import { useRouter, useSearchParams } from 'next/navigation';
 import notify from '@/lib/notify';
@@ -15,6 +15,22 @@ function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/admin';
+
+  // Bila sesi sudah ada, jangan minta login ulang. Kasus ini muncul ketika
+  // pengguna membuka `/admin` sebelum cookie salinan terkirim: proxy
+  // mengalihkan ke sini, jadi halaman ini yang harus menuntaskan.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const session = await syncSessionCookie();
+      if (cancelled || !session) return;
+      if (!isOperationalUser(session.user)) return;
+      router.replace(callbackUrl);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, callbackUrl]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

@@ -69,7 +69,6 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                 <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5">
                    <select
                      value={unit}
-                     disabled={item.promoType === 'TEBUS_MURAH'}
                      onChange={(e) => onUpdateUnit(itemId, e.target.value)}
                      className="bg-transparent text-xs font-black text-slate-700 outline-none uppercase"
                    >

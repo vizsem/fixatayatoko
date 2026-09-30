@@ -7,7 +7,6 @@ type IncomingItem = {
   quantity: number;
   unit?: string;
   contains?: number;
-  promoType?: 'TEBUS_MURAH' | string;
 };
 type ChannelKey = 'OFFLINE' | 'WEBSITE' | 'SHOPEE' | 'TIKTOK';
 
@@ -58,8 +57,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Keranjang kosong' }, { status: 400 });
     }
 
-    items.sort((a: IncomingItem, b: IncomingItem) => Number(!!a.promoType) - Number(!!b.promoType));
-
     let calculatedSubtotal = 0;
     const validatedItems: { id: string; name: string; price: number; quantity: number; baseQuantity: number; contains: number; image?: string; unit: string; total: number }[] = [];
     const productUpdates: { id: string; newStock: number; newStockByWarehouse: Record<string, number>; name: string; currentStock: number; baseQuantity: number }[] = [];
@@ -102,8 +99,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Produk ${productData.name} tidak tersedia (diarsipkan).` }, { status: 400 });
       }
 
-      const contains = Math.max(1, Math.floor(Number(item.contains || 1)));
-      const baseQuantity = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
+      // Satuan yang dipilih beserta konfigurasinya diambil dari DATA PRODUK.
+      // `item.unit` dan `item.contains` datang dari klien dan tidak dipercaya.
+      const unit = String(item.unit || productData.unit || 'pcs');
+      const unitConfig = Array.isArray(productData.units)
+        ? productData.units.find((u) => String(u.code || '').toUpperCase() === unit.toUpperCase())
+        : undefined;
+
+      // `contains` menentukan berapa satuan dasar yang dipotong dari stok.
+      // Bila produk sudah menetapkan konfigurasi satuan, nilainya diambil dari
+      // sana dan nilai dari klien DIABAIKAN. Tanpa ini, klien dapat mengirim
+      // `contains` besar sehingga stok terpotong berkali-kali lipat sementara
+      // harga tetap, karena `unitPrice` memakai harga satuan (tidak dikalikan
+      // `contains`).
+      const contains = unitConfig && unitConfig.contains != null
+        ? Math.max(1, Math.floor(Number(unitConfig.contains)))
+        : Math.max(1, Math.floor(Number(item.contains || 1)));
+
+      const quantity = Math.max(1, Math.floor(Number(item.quantity || 0)));
+      const baseQuantity = quantity * contains;
 
       if (productData.stock < baseQuantity) {
         return NextResponse.json({ error: `Stok ${productData.name} tidak mencukupi (tersedia: ${productData.stock}, diminta: ${baseQuantity})` }, { status: 400 });
@@ -123,23 +137,35 @@ export async function POST(req: Request) {
       }
 
       if (wholesalePrice > 0 && baseQuantity >= minWholesale) baseUnitPrice = wholesalePrice;
-      if (item.promoType === 'TEBUS_MURAH' && calculatedSubtotal >= 50000 && baseQuantity === 1) baseUnitPrice = 10000;
 
-      const unit = String(item.unit || productData.unit || 'pcs');
-      let unitPrice = baseUnitPrice * contains;
-      const unitConfig = Array.isArray(productData.units) ? productData.units.find((u) => String(u.code || '').toUpperCase() === unit.toUpperCase()) : undefined;
-      if (unitConfig?.price != null) {
-        unitPrice = Number(unitConfig.price);
-      }
+      // CATATAN PENTING: diskon "TEBUS_MURAH" senilai Rp10.000 DIHAPUS.
+      //
+      // Sebelumnya harga promo diberikan HANYA berdasarkan `item.promoType`
+      // yang dikirim klien, sehingga barang apa pun bisa ditandai sebagai promo
+      // dan dibayar Rp10.000 — kerugian langsung, tanpa validasi apa pun.
+      //
+      // Fitur itu juga tidak pernah aktif: sisi klien mencari produk promo
+      // dengan `status == 'active'`, sedangkan seluruh nilai status di database
+      // adalah 'ARCHIVED' (verifikasi 2026-10-01: 0 dari 4.575 produk cocok),
+      // sehingga bannernya tidak pernah tampil. Karena itu penghapusan ini
+      // TIDAK mengubah harga yang dibayar pembeli saat ini.
+      //
+      // Bila promo tebus murah diinginkan, bentuknya harus dikonfigurasi di
+      // server (tabel `promotions`, atau satu baris `settings`) lalu
+      // diverifikasi di sini terhadap ID produk, periode, dan harga promonya.
 
-      const lineTotal = unitPrice * Math.max(1, Math.floor(Number(item.quantity || 0)));
+      const unitPrice = unitConfig?.price != null
+        ? Number(unitConfig.price)
+        : baseUnitPrice * contains;
+
+      const lineTotal = unitPrice * quantity;
       calculatedSubtotal += lineTotal;
 
       validatedItems.push({
         id: item.id,
         name: productData.name || 'Produk Tanpa Nama',
         price: unitPrice,
-        quantity: Math.max(1, Math.floor(Number(item.quantity || 0))),
+        quantity,
         baseQuantity,
         contains,
         image: productData.image || '',

@@ -11,7 +11,6 @@ import * as Sentry from '@sentry/nextjs';
 
 // Components
 import { CartItemCard } from '@/components/cart/CartItemCard';
-import { CartPromoBanner } from '@/components/cart/CartPromoBanner';
 import { CheckoutForms } from '@/components/cart/CheckoutForms';
 import { CheckoutSummary } from '@/components/cart/CheckoutSummary';
 import { supabase } from '@/lib/supabase';
@@ -62,7 +61,6 @@ export default function CartPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserProfile | null>(null);
-  const [promoProduct, setPromoProduct] = useState<CartItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Delivery & Shipping State
@@ -103,7 +101,7 @@ export default function CartPage() {
     const selected = available.find(u => u.code === unit);
     const price = (selected as any)?.price ?? (basePrice * contains);
 
-    return item.promoType === 'TEBUS_MURAH' ? 10000 : price * qty;
+    return price * qty;
   }, [getAvailableUnits]);
 
   const persistCart = useCallback((nextCart: CartItem[]) => {
@@ -152,10 +150,6 @@ export default function CartPage() {
           setCart(localCart);
         }
         setIsLoaded(true);
-
-        // Fetch Promo
-        const pSnap = await getDocs(query(collection(db, 'products'), where('stock', '>', 0), where('status', '==', 'active'), limit(1)));
-        if (!pSnap.empty) setPromoProduct({ id: pSnap.docs[0].id, ...pSnap.docs[0].data() } as CartItem);
       } catch (err) { Sentry.captureException(err); }
     };
     initialize();
@@ -213,7 +207,7 @@ export default function CartPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: cart.map(i => ({ id: getItemId(i), quantity: i.quantity, unit: i.unit, contains: i.unitContains, promoType: i.promoType })),
+          items: cart.map(i => ({ id: getItemId(i), quantity: i.quantity, unit: i.unit, contains: i.unitContains })),
           customer,
           delivery: {
             method: calculations.shippingMethodName,
@@ -253,15 +247,6 @@ export default function CartPage() {
 
       <main className="max-w-6xl mx-auto p-4 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-10">
-          <CartPromoBanner
-            product={promoProduct}
-            onTake={() => {
-              const baseUnit = getBaseUnit(promoProduct!);
-              persistCart([...cart, { ...promoProduct!, quantity: 1, promoType: 'TEBUS_MURAH', unit: baseUnit, unitContains: 1 } as CartItem]);
-              notify.success('Promo tebus murah diterapkan!');
-            }}
-          />
-
           <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 sm:p-8 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2.5">

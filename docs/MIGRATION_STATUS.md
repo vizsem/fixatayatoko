@@ -382,6 +382,72 @@ penanganan tersendiri: memakai klien anon (RLS sudah mengizinkan `products` diba
 publik) sekaligus menyaring harga modal. Keduanya terdaftar sebagai pengecualian
 di `guard-coverage.test.ts` beserta alasannya.
 
+### ✅ Gerbang halaman admin — SUDAH DIPERBAIKI (2026-10-01)
+
+`middleware.ts` (akar) dan `src/middleware.ts` **dihapus**, digantikan
+`src/proxy.ts` — nama konvensi Next.js 16. Next.js menolak build bila
+`middleware.ts` dan `proxy.ts` sama-sama ada, jadi keduanya harus hilang.
+
+`proxy.ts` memverifikasi cookie `ataya-access-token` ke Supabase lewat
+`authorize()`, lalu mengalihkan ke `/admin/login?callbackUrl=...`.
+`/admin/login` di-bypass agar tidak terjadi loop berputar.
+
+Agar tidak ada jeda, login dan logout menulis cookie itu **seketika**
+(`src/lib/supabaseAuth.ts`), dan `/admin/login` mengarahkan ulang sendiri bila
+sesi sudah ada — sehingga admin tidak diminta login dua kali.
+
+Hasil uji pada build produksi:
+
+| Permintaan | Sebelum | Sesudah |
+|---|---|---|
+| `GET /admin/points` | HTTP 200 (HTML admin) | **HTTP 307** → `/admin/login` |
+| `GET /admin/products` | HTTP 200 | **HTTP 307** |
+| `GET /cashier` | HTTP 200 | **HTTP 307** |
+| `GET /admin/points` + cookie `admin-token=true` palsu | HTTP 200 | **HTTP 307** |
+| `GET /admin/points` + cookie token ngawur | HTTP 200 | **HTTP 307** |
+| `GET /`, `/cart`, `/admin/login` | HTTP 200 | tetap **HTTP 200** |
+
+Perlu ditegaskan: `proxy.ts` menutup **tampilan halaman**, bukan menggantikan
+otorisasi di action. Dokumentasi Next.js tetap mewajibkan setiap Server Action
+memeriksa pemanggilnya sendiri.
+
+### 🔴 Celah pada checkout publik — SUDAH DIPERBAIKI (2026-10-01)
+
+Ditemukan saat audit lanjutan. Keduanya di `src/app/api/orders/create/route.ts`,
+endpoint publik tanpa autentikasi (memang begitu seharusnya).
+
+**1. Diskon `TEBUS_MURAH` Rp10.000 dipercaya dari klien.**
+Harga promo diberikan hanya berdasarkan `item.promoType` pada body permintaan,
+sehingga barang apa pun bisa ditandai sebagai promo dan dibayar Rp10.000 —
+tanpa validasi ke tabel `promotions`.
+
+Sekaligus terbukti fitur itu **tidak pernah aktif**: sisi klien mencari produk
+promo dengan `status == 'active'`, sedangkan seluruh 4.575 produk bernilai
+`status = 'ARCHIVED'` (0 yang cocok), sehingga bannernya tidak pernah tampil.
+Jadi penghapusan jalur ini tidak mengubah harga yang dibayar pembeli.
+
+Jalur promo dihapus dari kedua sisi (server, `lib/cart.ts`, `cart/page.tsx`,
+`CartItemCard.tsx`, dan komponen `CartPromoBanner` dihapus) supaya tidak ada
+harga yang ditampilkan klien tetapi tidak dihormati server. Bila promo ini
+diinginkan, bentuknya harus dikonfigurasi di server lalu diverifikasi
+terhadap ID produk, periode, dan harga promonya.
+
+**2. `contains` dari klien menentukan pemotongan stok.**
+`baseQuantity = quantity × contains`, sementara `unitPrice` memakai
+`unitConfig.price` yang **tidak** dikalikan `contains`. Data nyata:
+
+```
+CHOKI CHOKI   PCS contains=1 price=990   |  CTN contains=180 price=706500
+```
+
+Mengirim `unit: 'PCS', contains: 180` membuat stok terpotong **180 unit**
+sementara pembeli hanya membayar **Rp990** — padahal nilainya Rp178.200.
+
+Sekarang `contains` diambil dari `unitConfig.contains` milik produk (server),
+dan nilai dari klien hanya dipakai bila produk tidak punya konfigurasi satuan.
+Pada kasus terakhir itu harga ikut dikalikan `contains`, sehingga tidak ada
+ketidaksesuaian antara yang dibayar dan stok yang dipotong.
+
 ### ⚠️ Belum selesai
 
 `src/middleware.ts` masih pass-through, sehingga halaman `/admin/*` tetap

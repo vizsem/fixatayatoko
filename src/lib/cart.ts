@@ -51,9 +51,12 @@ export const removeItem = (id: string): void => {
 
 // ✅ Fungsi Cerdas: Menghitung total harga dengan logika Grosir
 // Jika jumlah barang >= Min_Grosir, gunakan harga Grosir, jika tidak gunakan harga Ecer
+//
+// Catatan: cabang diskon "TEBUS_MURAH" senilai Rp10.000 sudah DIHAPUS.
+// Diskon itu hanya mengandalkan `item.promoType` dari klien sehingga barang apa
+// pun bisa dibayar Rp10.000. Menampilkan harga yang tidak akan dihormati server
+// juga menyesatkan pembeli, jadi cabangnya dibuang dari kedua sisi.
 export const getItemPrice = (item: CartItem): number => {
-  if (item.promoType === 'TEBUS_MURAH') return 10000;
-
   const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
   const baseQty = Math.max(1, Math.floor(Number(item.quantity || 0))) * contains;
 
