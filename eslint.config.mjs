@@ -15,6 +15,13 @@ const eslintConfig = defineConfig([
     "public/**",
     "scripts/**",
     ".tmp/**",
+    // Agent/tooling worktrees (nested git worktrees must not be linted)
+    ".kilo/**",
+    ".claude/worktrees/**",
+    ".worktrees/**",
+    // Scratch / one-off codemod scripts at repo root
+    "m/**",
+    "fix_*.js",
   ]),
   {
     rules: {

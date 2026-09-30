@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:unit": "mkdir -p .tmp && TMPDIR=$(pwd)/.tmp vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "prepare": "husky && husky install",
     "migrate": "node scripts/migrate.js",
@@ -25,7 +26,9 @@
     "setup:firebase-admin": "node scripts/setup-firebase-admin.js",
     "import:users": "ts-node ./scripts/import-to-supabase.ts",
     "export:users": "ts-node ./scripts/export-firebase-users.ts",
-    "compare:firestore-supabase": "ts-node ./scripts/compare-firestore-supabase.ts"
+    "compare:firestore-supabase": "ts-node ./scripts/compare-firestore-supabase.ts",
+    "verify:schema": "node scripts/verify-supabase-schema.mjs",
+    "verify:schema:verbose": "node scripts/verify-supabase-schema.mjs --verbose"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

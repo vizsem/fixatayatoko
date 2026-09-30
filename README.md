@@ -25,25 +25,30 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
 ### Notification System
 - ✅ **Email Notifications** - Order confirmation, password reset, shipping updates
 - ✅ **SMS Notifications** - OTP, order updates, payment reminders
-- ✅ **Push Notifications (FCM)** - Real-time notifications di browser/mobile
-- ✅ **Multi-channel Delivery** - Kirim melalui email, SMS, atau push notification
+- 🚧 **Push Notifications (FCM)** - Belum aktif; masih stub di `src/lib/fcm.ts`
+- ✅ **Multi-channel Delivery** - Email (`emailService.ts`) & SMS (`smsService.ts`)
 
 ### Teknologi
-- **Framework**: Next.js 16.1.1 dengan App Router
-- **Database**: Firebase Firestore
-- **Authentication**: Firebase Auth
-- **Styling**: Tailwind CSS
+- **Framework**: Next.js 16.1.6 dengan App Router (React 19)
+- **Database**: Supabase Postgres (data layer utama)
+- **Authentication**: Supabase Auth
+- **ORM**: Prisma (skema ERP di `prisma/schema.prisma`)
+- **Styling**: Tailwind CSS 3.4
 - **Testing**: Vitest, Playwright
-- **Notifications**: React Hot Toast, Nodemailer, Twilio, FCM
+- **Notifications**: React Hot Toast, Nodemailer, Twilio
 - **PWA**: Next-PWA
 - **Error Tracking**: Sentry
 - **Code Quality**: ESLint, Prettier, Husky, Commitlint
+
+> ⚠️ **Status migrasi**: kode masih mengakses Supabase melalui *compatibility bridge*
+> Firestore di `src/lib/firebase.ts`. Paket `firebase` sudah tidak terpasang.
+> Lihat [docs/MIGRATION_STATUS.md](./docs/MIGRATION_STATUS.md) untuk detail dan rencana.
 
 ## 🛠️ Setup Development
 
 ### Prerequisites
 - Node.js 18+
-- Firebase Project
+- Supabase Project
 - Email Service (Gmail SMTP atau lainnya)
 - SMS Service (Twilio)
 - Environment Variables
@@ -70,57 +75,50 @@ Sistem manajemen marketplace lengkap dengan dashboard admin, manajemen produk, i
    
    Isi variabel environment di `.env.local`:
    ```env
-   # Firebase Configuration (Client-side)
-   NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-   
-   # Firebase Admin (untuk server-side operations)
-   # PILIH SALAH SATU METODE:
-   
-   # Metode 1: GCP Service Account JSON (Recommended)
-   GCP_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"..."}'
-   
-   # Metode 2: Individual Variables
-   # FIREBASE_PROJECT_ID=your_project_id
-   # FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your_project.iam.gserviceaccount.com
-   # FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-   
-   # Email Configuration (SMTP)
+   # Supabase (Data layer utama - WAJIB)
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxx
+
+   # Kunci rahasia untuk operasi server-side (bypass RLS). JANGAN beri prefix NEXT_PUBLIC_
+   SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxxxxxxxxxx
+
+   # Koneksi Postgres langsung (Prisma & tooling migrasi)
+   DATABASE_URL=postgresql://postgres:password@db.your-project-ref.supabase.co:5432/postgres
+
+   # Email Configuration (SMTP - prefix WAJIB SMTP_)
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_SECURE=false
    SMTP_USER=your-email@gmail.com
    SMTP_PASS=your-app-password
-   SMTP_FROM_EMAIL=noreply@atayatoko.com
-   
+   SMTP_FROM_EMAIL="ATAYATOKO <noreply@atayatoko.com>"
+
    # SMS Configuration (Twilio)
    TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    TWILIO_AUTH_TOKEN=your_auth_token
    TWILIO_PHONE_NUMBER=+1234567890
-   
+
    # Application URL
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
-
-   **🔥 Setup Firebase Admin Credentials:**
    
-   Untuk konfigurasi Firebase Admin yang lengkap, jalankan helper script:
+   Lihat `.env.example` untuk daftar lengkap beserta komentar.
+   
+   **🔥 Verifikasi koneksi Supabase:**
    ```bash
-   npm run setup:firebase-admin
+   npm run verify:schema
    ```
-   
-   Atau baca dokumentasi lengkap di [FIREBASE_ADMIN_SETUP.md](./FIREBASE_ADMIN_SETUP.md) dan file `.env.example`.
+   Perintah ini membandingkan tabel yang didefinisikan di `supabase/migrations/`
+   dengan yang benar-benar ada di project Supabase remote.
 
-4. **Setup Firebase**
-   - Buat project di [Firebase Console](https://console.firebase.google.com)
-   - Enable Authentication, Firestore Database, Storage, Cloud Messaging
-   - Tambahkan web app dan dapatkan config
-   - Download service account key untuk admin operations
-   - Generate Web Push Certificate untuk FCM
+4. **Setup Supabase**
+   - Buat project di [Supabase Dashboard](https://supabase.com/dashboard)
+   - Ambil URL + API keys di **Project Settings → API Keys**
+   - Apply migrasi yang ada di `supabase/migrations/`:
+     - **Opsi A (tercepat):** buka **SQL Editor**, tempel isi tiap file migrasi, klik **Run**
+     - **Opsi B (CLI):** `supabase link --project-ref <ref>` lalu `supabase db push`
+   - Enable Storage bucket untuk upload gambar produk
+   - Jalankan `npm run verify:schema` sampai semua tabel berstatus ada
 
 5. **Setup Email (Gmail Example)**
    - Enable 2-Factor Authentication di Google Account
@@ -170,10 +168,10 @@ src/
 │   ├── ErrorBoundary.tsx         # React error boundary
 │   └── LoadingFallback.tsx       # Loading states
 ├── lib/                   # Business Logic & Services
-│   ├── emailService.ts           # Email notifications
-│   ├── smsService.ts             # SMS notifications
-│   ├── pushNotificationService.ts # FCM push notifications
-│   ├── notificationService.ts    # Unified notification layer
+│   ├── emailService.ts           # Email notifications (butuh SMTP_* env)
+│   ├── smsService.ts             # SMS notifications (Twilio)
+│   ├── fcm.ts                    # FCM push - STUB, belum diimplementasikan
+│   ├── notify.ts                 # Toast/UI notification helpers (react-hot-toast)
 │   ├── inventory.ts              # Inventory management
 │   ├── ledger.ts                 # Accounting
 │   └── types.ts                  # TypeScript types
@@ -218,36 +216,60 @@ import { sendOTPSMS } from '@/lib/smsService';
 await sendOTPSMS('+6281234567890', '123456');
 ```
 
-### Push Notifications (FCM)
-- Real-time order updates
-- Chat message notifications
-- Promotional campaigns
+### Push Notifications (FCM) - 🚧 BELUM AKTIF
+Fitur ini **belum diimplementasikan**. `src/lib/fcm.ts` hanya berisi stub yang
+mengembalikan `null`, dan paket `firebase` tidak terpasang. `FCMManager` di
+`src/components/` saat ini tidak melakukan apa pun.
 
-**Usage:**
 ```typescript
-import { sendOrderConfirmationPush } from '@/lib/pushNotificationService';
-
-await sendOrderConfirmationPush(userId, order);
+// src/lib/fcm.ts - kondisi saat ini
+export const requestForToken = async (_force = false) => null;
+export const onMessageListener = () => new Promise(() => { /* no-op */ });
 ```
 
+Untuk mengaktifkan kembali, perlu: pasang paket `firebase`, isi `NEXT_PUBLIC_FIREBASE_*`,
+dan implementasikan `requestForToken` / `onMessageListener`.
+
 ### Unified Notification Service
-Kirim melalui multiple channels sekaligus:
+> Tidak ada satu service terpadu yang mengirim email + SMS sekaligus.
+> Panggil service yang sesuai secara langsung.
 
+**Email** - `src/lib/emailService.ts` (butuh env `SMTP_*`):
 ```typescript
-import notificationService from '@/lib/notificationService';
+import {
+  sendEmail,
+  sendOrderConfirmation,
+  sendPasswordReset,
+  sendShippingNotification,
+  sendOrderDelivered,
+  sendWelcomeEmail,
+} from '@/lib/emailService';
 
-const results = await notificationService.sendOrderConfirmationNotification({
-  id: 'ORDER123',
-  userId: 'user-uid',
-  customerEmail: 'customer@example.com',
-  customerPhone: '+6281234567890',
-  customerName: 'John Doe',
-  total: 150000,
-  items: [...],
-  paymentStatus: 'LUNAS'
-});
+await sendOrderConfirmation(order);
+await sendPasswordReset('user@example.com', resetToken);
+```
 
-// Results: { email: true, sms: true, push: true }
+**SMS** - `src/lib/smsService.ts` (butuh env `TWILIO_*`):
+```typescript
+import {
+  sendSMS,
+  sendOrderConfirmationSMS,
+  sendShippingSMS,
+  sendOTPSMS,
+  sendPaymentReminderSMS,
+  sendDeliveryConfirmationSMS,
+  sendPromotionalSMS,
+} from '@/lib/smsService';
+
+await sendOTPSMS('+6281234567890', '123456');
+```
+
+**Toast UI** - `src/lib/notify.ts` (react-hot-toast, bukan pengiriman notifikasi):
+```typescript
+import { notify } from '@/lib/notify';
+
+notify.success('Data berhasil disimpan!');
+notify.admin.error('Gagal menyimpan produk.');
 ```
 
 ## 💬 Chat System
@@ -361,14 +383,21 @@ npm start
 vercel --prod
 ```
 
-### Firebase Rules & Indexes
+### Supabase Migrations & Schema
 ```bash
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
+# Verifikasi tabel di Supabase remote vs file migrasi
+npm run verify:schema
+
+# Apply migrasi via CLI (butuh link ke project)
+supabase link --project-ref <project-ref>
+supabase db push
 ```
+Alternatif tanpa CLI: buka **Supabase Dashboard → SQL Editor**, tempel isi file
+di `supabase/migrations/`, lalu **Run**.
 
 ## 📚 Documentation
 
+- **[Migration Status](docs/MIGRATION_STATUS.md)** - Status & rencana migrasi Firebase → Supabase
 - **[Notification & Chat System](docs/NOTIFICATION_AND_CHAT_SYSTEM.md)** - Complete guide untuk notifikasi dan chat
 - **[Developer Tools](docs/DEVELOPER_TOOLS.md)** - Developer tools dan utilities
 - **[Backup Strategy](docs/BACKUP_STRATEGY.md)** - Backup dan recovery procedures

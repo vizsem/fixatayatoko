@@ -29,3 +29,14 @@ pnpm-debug.log*
 supabase/.temp/
 scratch/
 
+# Agent / tooling worktrees & scratch artifacts
+.kilo/
+.claude/worktrees/
+.worktrees/
+m/
+temp_file
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
