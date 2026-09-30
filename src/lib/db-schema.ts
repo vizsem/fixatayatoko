@@ -35,6 +35,31 @@ export const TABLES_WITH_RAW_DATA = new Set([
   // Bentuk historisnya hanya `id` + `raw_data`; migrasi 20260930 menambahkan
   // kolom asli di sampingnya (lihat TABLE_COLUMNS di bawah).
   'product_cost_logs',
+  // Modul HR/payroll (`admin/employees`). Seluruh tabel ini berbentuk
+  // `id`, `raw_data`, `created_at`, `updated_at` saja — datanya memang
+  // disimpan di `raw_data`, sehingga wajib terdaftar di sini agar
+  // `buildWritePayload` benar-benar menuliskan `raw_data`.
+  //
+  // Tanpa pendaftaran ini, penyimpanan karyawan menghasilkan baris berisi
+  // `id`/`created_at`/`updated_at` saja dan seluruh isinya hilang.
+  //
+  // `employees`, `attendance_records`, dan `payroll_slips` sudah ada di remote
+  // sejak awal; 12 sisanya dibuat oleh migrasi 20261003.
+  'employees',
+  'attendance_records',
+  'payroll_slips',
+  'payroll_settings',
+  'payroll_runs',
+  'payroll_adjustments',
+  'leave_requests',
+  'shift_templates',
+  'shift_assignments',
+  'employee_loans',
+  'employee_reimbursements',
+  'employee_petty_cash',
+  'employee_petty_cash_transactions',
+  'kpi_scores',
+  'candidates',
 ]);
 
 /**
