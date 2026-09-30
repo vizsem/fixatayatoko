@@ -83,14 +83,14 @@ kode, jadi **wajib diverifikasi manual** di Dashboard → Authentication → Hoo
 
 Tanpa hook tersebut, seluruh policy berbasis peran akan selalu gagal.
 
-> **Ini kini risiko aktif.** Sejak migrasi di-apply, RLS benar-benar menyala di 7 tabel
-> baru. Akibatnya: operasi lewat `supabaseAdmin` (service role) tetap jalan karena
-> mem-bypass RLS, tetapi operasi dari **client component** (kunci anon) hanya melihat
-> **0 baris** — tanpa pesan error apa pun. Untuk user yang login, klaim `role` berisi
-> `authenticated`, yang juga **tidak cocok** dengan daftar peran bisnis di policy.
+> **Risiko ini sudah dimitigasi** oleh
+> `supabase/migrations/20261001_auth_hook_and_rls_hardening.sql`, yang memindahkan
+> seluruh policy ke resolver `public.current_app_role()`. Lihat bagian
+> [Hardening RLS](#-hardening-rls--auth-hook-2026-10-01).
 >
-> Karena itu, verifikasi Auth Hook ini adalah prioritas berikutnya sebelum halaman
-> admin yang membaca tabel baru tersebut dipakai.
+> Catatan lama (tetap berlaku sebagai latar belakang): operasi lewat `supabaseAdmin`
+> (service role) tidak terpengaruh karena mem-bypass RLS, sedangkan operasi dari client
+> component bergantung pada klaim peran di JWT.
 
 ### 🔴 Temuan: RLS tidak aktif pada 7 tabel berisi data sensitif
 
@@ -117,10 +117,8 @@ Kemungkinan besar tabel ini dibuat di luar migrasi (mis. oleh skrip impor Firest
 Sisi baiknya: tabel lain seperti `users`, `capital_transactions`, `ledger_entries`,
 `inventory_logs`, `marketplace_*`, dan `product_cost_logs` **sudah ber-RLS** (anon = 0 baris).
 
-**Kenapa ini belum diperbaiki:** mengaktifkan RLS pada tabel-tabel itu akan memutus
-operasi dari client component yang saat ini mengandalkan akses `anon`. Perbaikannya harus
-berurutan: selesaikan dulu Auth Hook + pemindahan operasi data ke server (Fase 1),
-baru nyalakan RLS. Kalau dibalik, aplikasi akan langsung rusak.
+**Sudah diperbaiki** oleh `supabase/migrations/20261001_auth_hook_and_rls_hardening.sql`
+— lihat bagian [Hardening RLS](#-hardening-rls--auth-hook-2026-10-01) di bawah.
 
 ### Temuan: `product_cost_logs` RLS tidak aktif — ✅ SUDAH DIPERBAIKI
 
@@ -131,13 +129,75 @@ dijalankan.
 Sejak `20260930_missing_tables.sql` di-apply (2026-10-01), RLS menyala dan anon kini
 melihat **0 baris**. Service role tetap melihat 36 baris.
 
+## 🔐 Hardening RLS + Auth Hook (2026-10-01)
+
+`supabase/migrations/20261001_auth_hook_and_rls_hardening.sql`
+
+### Tiga akar masalah yang diperbaiki
+
+1. **Klaim `role` tidak pernah berisi peran bisnis.** Supabase memakai klaim `role` untuk
+   peran *Postgres* (`anon`/`authenticated`) supaya PostgREST bisa `SET ROLE`. Jadi
+   `auth.jwt()->>'role' IN ('admin','cashier',...)` tidak akan pernah cocok.
+2. **`= 'admin'` tidak cocok dengan siapa pun.** Peran yang benar-benar dipakai di
+   `public.users` adalah `superadmin` (4), `owner`, `cashier`, `staff`, `warehouse` —
+   tidak ada satu pun `admin`. Padahal `ADMIN_ROLES` di `src/lib/auth-helpers.ts` =
+   `['admin','superadmin','super_admin','owner','super-admin']`.
+3. **RLS mati pada 7 tabel sensitif** (lihat bagian di atas).
+
+### Cara kerja
+
+Policy tidak lagi membaca klaim JWT secara langsung, melainkan lewat resolver:
+
+```sql
+public.current_app_role()  -- klaim user_role bila ada, jika tidak baca public.users
+```
+
+Keuntungannya: **migration ini aman diterapkan sebelum Auth Hook didaftarkan**, tanpa
+jendela waktu di mana staf tiba-tiba tidak bisa melihat data.
+
+### Verifikasi (PostgreSQL 16, 2026-10-01)
+
+Seluruh migrasi lama + migrasi ini diterapkan pada database bersih, lalu diuji per peran:
+
+| Skenario | `orders` (3 baris) | Hasil |
+|---|---|---|
+| `anon` | 0 | ✅ lubang tertutup |
+| `anon` / `products` | 1 | ✅ katalog publik tetap terbuka |
+| Staf login **tanpa** klaim (fallback) | 3 | ✅ fallback bekerja |
+| Pelanggan (bukan staf) | 1 | ✅ hanya pesanannya sendiri |
+| Tanpa `sub` | 0 | ✅ |
+| `user_role` = superadmin / cashier / warehouse | 3 | ✅ |
+
+Idempotensi: dijalankan 3× berturut-turut → tanpa error.
+
+Hasil akhir: **0 policy** memakai `auth.jwt()->>'role'`, **86 policy** memakai
+`current_app_role()`, 11 policy berbasis `auth.uid()` dan 5 policy publik (`true`)
+tidak tersentuh, dan **0 tabel** tanpa RLS.
+
+### Cara apply
+
+1. Jalankan file migrasinya (SQL Editor atau `supabase db push`).
+2. *(Opsional, untuk performa)* Daftarkan hook di
+   **Authentication → Hooks → Customize Access Token (JWT) Claims** → pilih schema
+   `public`, function `custom_access_token_hook` → **Enable**.
+   Tanpa langkah ini pun aplikasi tetap berfungsi, hanya ada satu query tambahan
+   ke `public.users` per evaluasi policy.
+3. Setelah hook aktif, minta pengguna login ulang agar JWT-nya memuat klaim baru.
+4. Verifikasi dengan `npm run verify:schema` dan uji satu halaman admin dari browser.
+
+> **Catatan:** mengaktifkan RLS di 7 tabel tersebut menutup akses `anon`, sehingga
+> halaman yang membacanya **harus** diakses oleh pengguna yang sudah login. Halaman
+> publik (`products`, `categories`, `promotions`, `settings`, `warehouses`) tidak
+> terpengaruh.
+
 ## Rencana Migrasi Bertahap
 
 ### Fase 1 — Amankan batas client/server (prioritas tertinggi)
 - [x] Pilih klien Supabase secara eksplisit berdasarkan lingkungan di `src/lib/firebase.ts`.
 - [x] Peringatan saat `SUPABASE_SERVICE_ROLE_KEY` tidak di-set di server.
-- [ ] Verifikasi Auth Hook yang menyuntikkan `users.role` ke klaim `role` JWT.
-- [ ] Audit 76 client component: pindahkan operasi data ke Server Action / Route Handler.
+- [x] Resolver peran `current_app_role()` + Auth Hook — policy RLS kini benar-benar berlaku.
+- [ ] Audit **69** client component yang mengakses data langsung (lihat inventaris di bawah):
+      pindahkan operasi data ke Server Action / Route Handler.
 - [ ] Pastikan `SUPABASE_SERVICE_ROLE_KEY` hanya hidup di jalur server.
 
 ### Fase 2 — Standarkan akses data
@@ -269,6 +329,37 @@ Nilai yang dipakai adalah gabungan yang **diverifikasi terhadap skema remote**:
 
 **Guard:** `src/lib/db-schema.test.ts` membaca kedua modul sebagai teks dan gagal
 bila konstanta tersebut dideklarasikan ulang di tempat lain.
+
+## Inventaris Akses Data dari Client
+
+Hasil pemindaian 2026-10-01: **69 client component** (`"use client"`) mengimpor bridge
+dan mengakses sekitar 47 tabel langsung dari browser. Tabel yang paling sering diakses:
+
+| Tabel | File | Tabel | File |
+|---|---|---|---|
+| `products` | 24 | `chats` | 4 |
+| `users` | 13 | `categories` | 3 |
+| `orders` | 12 | `product_cost_logs` | 3 |
+| `settings` | 12 | `purchases` | 3 |
+| `warehouses` | 11 | `wallet_logs` | 3 |
+| `operational_expenses` | 6 | `customers` | 2 |
+| `inventory_logs` | 4 | `stock_logs` | 2 |
+| `capital_transactions` | 3 | `point_logs` | 2 |
+
+File dengan akses terbanyak — kandidat prioritas untuk dimigrasikan:
+
+| File | Tabel yang disentuh |
+|---|---|
+| `app/admin/employees/page.tsx` | 17 tabel (payroll, absensi, shift) |
+| `app/admin/settings/page.tsx` | 5 (settings, categories, employees, banners, warehouses) |
+| `app/admin/audit/page.tsx` | 7 (inventory_logs, orders, cashier_shifts, dst.) |
+| `app/page.tsx` | 8 (users, orders, products, notifications, dst.) |
+| `app/admin/reports/operations/page.tsx` | 7 |
+
+**Catatan penting:** setelah hardening RLS, komponen-komponen ini **tetap berfungsi** selama
+pengguna login (peran dibaca lewat `current_app_role()`). Migrasi ke Server Action tetap
+disarankan untuk mengurangi permukaan serangan dan agar akses `anon` tidak pernah
+diperlukan — tetapi sekarang bukan lagi prasyarat agar aplikasi jalan.
 
 ## Kualitas Kode
 
