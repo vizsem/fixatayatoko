@@ -15,11 +15,12 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import notify from '@/lib/notify';
-import { supabase } from '@/lib/supabase';
 
-import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth } from '@/lib/firebase';
-import { isAdminRole } from '@/lib/auth-helpers';
+// Seluruh akses data pelanggan kini lewat Server Action yang memeriksa peran
+// pemanggilnya (`requireStaff`). Sebelumnya halaman ini membaca dan menulis
+// `customers` langsung dari browser memakai kunci anon, sehingga RLS menolak
+// dan datanya selalu tampak tidak ditemukan.
+import { getCustomerForEdit, saveCustomer } from '@/lib/actions/customer.actions';
 export default function EditCustomer() {
   const router = useRouter();
   const { id } = useParams();
@@ -37,76 +38,69 @@ export default function EditCustomer() {
     notes: ''
   });
 
-  // 1. Proteksi Admin & Fetch Data Awal
+  // Halaman ini berada di bawah `/admin/*`, sehingga permintaannya sudah
+  // melewati `proxy.ts` dan Server Action di bawah juga memeriksa peran.
+  // Pemeriksaan peran di sisi klien karena itu tidak diperlukan lagi.
   useEffect(() => {
-    const checkAuth = async () => {
-      const { user, userDocData, isAdmin } = await getUserAndRole();
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
+    if (!id) {
+      setLoading(false);
+      return;
+    }
 
-      if (!isAdmin) {
-        router.push('/profil');
-        return;
-      }
+    let cancelled = false;
 
-      // Ambil data pelanggan yang akan diedit
-      if (id) {
-        try {
-          const customerDoc = await sbGetDoc('customers', id as string);
-          if (customerDoc.exists()) {
-            const data = customerDoc.data();
-            setFormData({
-              name: data.name || '',
-              phone: data.phone || '',
-              email: data.email || '',
-              address: data.address || '',
-              type: data.type || 'ecer',
-              creditLimit: data.creditLimit || 0,
-              notes: data.notes || ''
-            });
-          } else {
-            notify.admin.error("Data tidak ditemukan");
-            router.push('/admin/customers');
-          }
-        } catch (err) {
-          console.error(err);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-    checkAuth();
-
-    let __unsubscribe: (() => void) | undefined;
     (async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-        checkAuth();
-      });
-      __unsubscribe = () => subscription.unsubscribe();
+      try {
+        const data = await getCustomerForEdit(String(id));
+        if (cancelled) return;
+
+        if (!data) {
+          notify.admin.error('Data tidak ditemukan');
+          router.push('/admin/customers');
+          return;
+        }
+
+        setFormData({
+          name: data.name,
+          phone: data.phone,
+          email: data.email,
+          address: data.address,
+          type: data.type === 'grosir' ? 'grosir' : 'ecer',
+          creditLimit: data.creditLimit,
+          notes: data.notes,
+        });
+      } catch {
+        if (!cancelled) notify.admin.error('Gagal memuat data pelanggan');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
 
-    return () => { if (__unsubscribe) __unsubscribe(); };
+    return () => {
+      cancelled = true;
+    };
   }, [id, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await sbUpdateDoc('customers', id as string, {
-        ...formData,
-        updatedAt: new Date().toISOString()
-      });
+      const result = await saveCustomer(String(id), formData);
+
+      if (!result.success) {
+        notify.admin.error(result.error || 'Gagal memperbarui data');
+        setSaving(false);
+        return;
+      }
+
       setSuccess(true);
       setTimeout(() => {
         router.push('/admin/customers');
       }, 1500);
     } catch {
-      notify.admin.error("Gagal memperbarui data");
+      notify.admin.error('Gagal memperbarui data');
       setSaving(false);
     }
-
   };
 
   if (loading) return (
