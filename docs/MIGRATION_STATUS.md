@@ -85,19 +85,51 @@ Tanpa hook tersebut, seluruh policy berbasis peran akan selalu gagal.
 
 > **Ini kini risiko aktif.** Sejak migrasi di-apply, RLS benar-benar menyala di 7 tabel
 > baru. Akibatnya: operasi lewat `supabaseAdmin` (service role) tetap jalan karena
-> mem-bypass RLS, tetapi operasi dari **client component** (publishable key, berperan
-> `anon`) langsung ditolak HTTP 401. Untuk user yang login, klaim `role` berisi
-> `authenticated` — yang juga **tidak cocok** dengan daftar peran bisnis di policy.
+> mem-bypass RLS, tetapi operasi dari **client component** (kunci anon) hanya melihat
+> **0 baris** — tanpa pesan error apa pun. Untuk user yang login, klaim `role` berisi
+> `authenticated`, yang juga **tidak cocok** dengan daftar peran bisnis di policy.
 >
 > Karena itu, verifikasi Auth Hook ini adalah prioritas berikutnya sebelum halaman
 > admin yang membaca tabel baru tersebut dipakai.
 
-### Temuan: `product_cost_logs` RLS tidak aktif
+### 🔴 Temuan: RLS tidak aktif pada 7 tabel berisi data sensitif
 
-Diverifikasi lewat REST API: tabel ini **dapat dibaca memakai publishable key**, padahal
-policy-nya membatasi ke `admin`/`owner`/`superadmin`. Kesimpulannya tabel ini dibuat manual
-di luar migrasi dan **`ENABLE ROW LEVEL SECURITY` belum pernah dijalankan**. Perlu dicek di
-Dashboard → Table Editor → RLS.
+Hasil audit REST API dengan kunci `anon` (yang **dipublikasikan ke browser**), 2026-10-01:
+
+| Tabel | Terbaca oleh anon | Isi |
+|---|---|---|
+| `orders` | **154 baris** | seluruh pesanan pelanggan |
+| `purchases` | **179 baris** | data pembelian |
+| `stock_logs` | **45 baris** | pergerakan stok |
+| `suppliers` | **27 baris** | data pemasok |
+| `customers` | **5 baris** | data pelanggan |
+| `wallet_logs` | **4 baris** | mutasi saldo dompet |
+| `point_logs` | **2 baris** | mutasi poin |
+
+Policy di `20240913_init.sql` untuk tabel-tabel ini bersifat **membatasi**
+(`auth.jwt()->>'role' IN ('admin','cashier')`). Karena anon tetap bisa membaca seluruh
+baris, artinya **`ENABLE ROW LEVEL SECURITY` belum dijalankan** pada tabel-tabel tersebut.
+Kemungkinan besar tabel ini dibuat di luar migrasi (mis. oleh skrip impor Firestore).
+
+**Sebagai pembanding,** tabel berikut memang boleh dibaca publik dan itu sesuai desain
+(policy `USING (true)`): `products`, `categories`, `promotions`, `settings`, `warehouses`.
+
+Sisi baiknya: tabel lain seperti `users`, `capital_transactions`, `ledger_entries`,
+`inventory_logs`, `marketplace_*`, dan `product_cost_logs` **sudah ber-RLS** (anon = 0 baris).
+
+**Kenapa ini belum diperbaiki:** mengaktifkan RLS pada tabel-tabel itu akan memutus
+operasi dari client component yang saat ini mengandalkan akses `anon`. Perbaikannya harus
+berurutan: selesaikan dulu Auth Hook + pemindahan operasi data ke server (Fase 1),
+baru nyalakan RLS. Kalau dibalik, aplikasi akan langsung rusak.
+
+### Temuan: `product_cost_logs` RLS tidak aktif — ✅ SUDAH DIPERBAIKI
+
+Dulu tabel ini **dapat dibaca memakai kunci anon** (36 baris), padahal policy-nya membatasi
+ke `admin`/`owner`/`superadmin` — artinya `ENABLE ROW LEVEL SECURITY` belum pernah
+dijalankan.
+
+Sejak `20260930_missing_tables.sql` di-apply (2026-10-01), RLS menyala dan anon kini
+melihat **0 baris**. Service role tetap melihat 36 baris.
 
 ## Rencana Migrasi Bertahap
 
@@ -152,9 +184,11 @@ Kondisi remote saat verifikasi terakhir (**2026-10-01**): **32 ada, 0 belum — 
 - Backfill berhasil: **36 baris** `product_cost_logs` yang datanya sebelumnya terkubur
   di `raw_data` kini punya kolom `productId`, `oldCost`, `newCost`, `changeDate`,
   `adminEmail`, `notes` yang terisi ✅
-- **RLS aktif**: `anon` kini menerima **HTTP 401** untuk `product_cost_logs`,
-  `warehouseStock`, dan `activity_logs` — lubang keamanan sebelumnya (anon bisa
-  membaca `product_cost_logs`) sudah tertutup ✅
+- **RLS aktif**: `anon` kini menerima **200 dengan 0 baris** untuk `product_cost_logs`
+  (sebelumnya 36 baris terbaca) — lubang keamanan sebelumnya sudah tertutup ✅
+  > Catatan: bukan HTTP 401. RLS bekerja dengan *memfilter baris*, bukan menolak
+> permintaan, sehingga dari sisi klien hasilnya adalah data kosong — bukan error.
+> Ini penting untuk debugging: query yang ditolak RLS akan terlihat "tidak ada data".
 
 **Cara apply ulang (bila suatu saat diperlukan):**
 ```bash
