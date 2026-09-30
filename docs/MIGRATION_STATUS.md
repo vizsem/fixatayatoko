@@ -378,15 +378,25 @@ Hasilnya bukan sekadar perpindahan: payload ke browser mengecil (hanya matriks h
 bukan seluruh tabel mentah) dan logika perbandingannya kini punya 10 unit test
 (`src/lib/stock-sync-matrix.test.ts`).
 
-**Belum dimigrasikan: 68 file.** Kandidat berikutnya (read-only lebih dulu, karena
-paling aman):
+**Belum dimigrasikan: 68 file.** Dari pemindaian, **32 di antaranya read-only** (tier paling
+aman); sisanya mengandung operasi tulis.
 
-| File | Tabel |
+#### Dua file yang sengaja DITUNDA (butuh keputusan, bukan sekadar refactor)
+
+| File | Alasan ditunda |
 |---|---|
-| `app/admin/audit/page.tsx` | 7 (read-only) |
-| `app/admin/reports/operations/page.tsx` | 7 |
-| `app/admin/wallet/page.tsx` | 2 |
-| `app/admin/points/page.tsx` | 2 |
+| `app/admin/audit/page.tsx` | 8 tab dengan agregasi **pajak & laba** (PPN/PPh, HPP, diskon). Memindahkannya terburu-buru berisiko mengubah angka keuangan. Perlu migrasi tersendiri + uji perhitungan. |
+| `app/admin/audit-logs/page.tsx` | Bergantung pada `onSnapshot` (Realtime). Memindah ke Server Action berarti **menghilangkan pembaruan langsung** — itu keputusan produk, bukan sekadar pemindahan kode. |
+
+Urutan yang disarankan (dari aman ke berisiko):
+
+1. **Tier 1 — read-only, kecil** (32 file): `admin/audit-logs`, `semua-kategori`, `wishlist`,
+   `admin/reports/*`, `admin/operational-expenses/add`, `admin/products/print-label/*`.
+2. **Tier 2 — read-only, besar**: `admin/employees` (17 tabel), `admin/settings` (5 tabel).
+3. **Tier 3 — ada tulis**: `admin/points`, `admin/wallet`, `admin/purchases/*`.
+   Wajib hati-hati: bridge punya semantik `increment()` khusus yang harus dipertahankan.
+4. **Tier 4 — agregasi finansial**: `admin/audit`, `admin/reports/finance`.
+   Butuh uji perhitungan tersendiri sebelum diserahkan.
 
 > ⚠️ **Celah yang belum ditutup:** tidak ada satu pun Server Action di `src/lib/actions/*`
 > yang memeriksa peran di dalam action-nya. Saat ini mereka mengandalkan middleware
