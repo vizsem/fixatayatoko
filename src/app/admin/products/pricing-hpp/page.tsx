@@ -24,6 +24,7 @@ import {
   bulkUpdateTargetMargin,
   bulkDivideHpp,
   toggleLockProductHpp,
+  syncAvgPoToActiveHpp,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -101,8 +102,9 @@ export default function PricingHPPPage() {
   const [showMarginModal, setShowMarginModal] = useState(false);
   const [marginType, setMarginType] = useState<'PERCENT' | 'NOMINAL'>('PERCENT');
   const [targetMarginValue, setTargetMarginValue] = useState<number>(20);
-  const [marginUnitTarget, setMarginUnitTarget] = useState<'BASE_ONLY' | 'ALL_UNITS'>('BASE_ONLY');
+  const [marginUnitTarget, setMarginUnitTarget] = useState<string>('BASE_ONLY');
   const [showDivideModal, setShowDivideModal] = useState(false);
+  const [showSyncAvgModal, setShowSyncAvgModal] = useState(false);
   const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
@@ -370,6 +372,32 @@ export default function PricingHPPPage() {
     });
   }, [selectedIds, avgHppMap]);
 
+  // Produk yang memiliki selisih (drift) antara HPP aktif dan AVG PO
+  const selectedWithDrift = useMemo(() => {
+    return Array.from(selectedIds).filter(id => {
+      const p = products.find(prod => prod.id === id);
+      const avg = avgHppMap[id];
+      if (!p || !avg || avg.avgCost <= 0) return false;
+      return Math.abs(avg.avgCost - p.costPrice) > 100;
+    });
+  }, [selectedIds, products, avgHppMap]);
+
+  // Daftar seluruh satuan unik yang tersedia pada produk-produk yang saat ini dicentang
+  const availableUnitsInSelected = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (selectedIds.has(p.id)) {
+        if (p.units && Array.isArray(p.units)) {
+          p.units.forEach(u => {
+            if (u.code) set.add(u.code.toUpperCase());
+          });
+        }
+        if (p.unit) set.add(p.unit.toUpperCase());
+      }
+    });
+    return Array.from(set).sort();
+  }, [products, selectedIds]);
+
   // Reset AVG HPP Handler
   const handleResetAvgHpp = () => {
     if (selectedIds.size === 0) {
@@ -516,6 +544,38 @@ export default function PricingHPPPage() {
         await fetchData();
       } catch (err: any) {
         notify.error(err.message || 'Gagal mengubah status kunci HPP');
+      }
+    });
+  };
+
+  // Inisialisasi Saldo Awal Baseline AVG PO = HPP Aktif
+  const handleConfirmSyncAvgPo = (specificIds?: string[]) => {
+    const idsToSync = specificIds || Array.from(selectedIds);
+    if (idsToSync.length === 0) {
+      notify.error('Pilih minimal 1 produk terlebih dahulu');
+      return;
+    }
+
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+
+        const result = await syncAvgPoToActiveHpp(idsToSync, adminEmail);
+        setShowSyncAvgModal(false);
+
+        if (!result.success) throw new Error(result.error);
+
+        notify.success(`✅ Berhasil menginisialisasi AVG PO = HPP Aktif untuk ${result.updated} produk!`);
+
+        if (!specificIds) {
+          setSelectedIds(new Set());
+        }
+        await fetchData();
+        await fetchAvgHpp();
+      } catch (err: any) {
+        setShowSyncAvgModal(false);
+        notify.error(err.message || 'Gagal menyinkronkan AVG PO');
       }
     });
   };
@@ -864,6 +924,14 @@ export default function PricingHPPPage() {
                     Restart AVG ({selectedWithAvg.length})
                   </button>
                   <button
+                    onClick={() => setShowSyncAvgModal(true)}
+                    className="px-3.5 py-2 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-indigo-400"
+                    title="Jadikan HPP Aktif saat ini sebagai baseline saldo awal AVG PO untuk memulai perhitungan Moving Average yang bersih"
+                  >
+                    <Sparkles size={13} />
+                    Set AVG PO = HPP ({selectedCount})
+                  </button>
+                  <button
                     onClick={handleSetTargetMargin}
                     className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400"
                   >
@@ -1063,15 +1131,38 @@ export default function PricingHPPPage() {
                                     {avg.poCount} PO · {avg.totalQty.toLocaleString()} {p.unit}
                                   </p>
                                   {hasDrift && (
-                                    <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-black ${
-                                      avgDiff! > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
-                                    }`}>
-                                      {avgDiff! > 0 ? '+' : ''}{avgDiff!.toLocaleString('id-ID')}
-                                    </span>
+                                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                                        avgDiff! > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+                                      }`}>
+                                        {avgDiff! > 0 ? '+' : ''}{avgDiff!.toLocaleString('id-ID')}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleConfirmSyncAvgPo([p.id])}
+                                        className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                        title="Samakan AVG PO dengan HPP Aktif saat ini"
+                                      >
+                                        <Sparkles size={11} />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-slate-300 font-bold text-[11px]">Belum ada PO</span>
+                                <div className="space-y-1">
+                                  <span className="text-slate-300 font-bold text-[11px] block">Belum ada PO</span>
+                                  {p.costPrice > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmSyncAvgPo([p.id])}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                                      title="Set AVG PO = Nilai HPP aktif ini sebagai saldo awal baseline moving average"
+                                    >
+                                      <Sparkles size={9} />
+                                      Set Awal AVG
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
 
@@ -1148,6 +1239,14 @@ export default function PricingHPPPage() {
                       >
                         <RotateCcw size={13} />
                         Restart AVG HPP
+                      </button>
+                      <button
+                        onClick={() => setShowSyncAvgModal(true)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm"
+                        title="Inisialisasi Saldo Awal Baseline AVG PO = HPP Aktif"
+                      >
+                        <Sparkles size={13} />
+                        Set AVG PO = HPP
                       </button>
                       <button
                         onClick={handleSetTargetMargin}
@@ -1274,26 +1373,49 @@ export default function PricingHPPPage() {
             </div>
 
             {/* Show AVG in modal */}
-            {avgHppMap[editingProduct.id] && avgHppMap[editingProduct.id].avgCost > 0 && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
-                <Sparkles size={16} className="text-amber-600 shrink-0" />
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Sparkles size={16} className="text-indigo-600 shrink-0" />
                 <div>
-                  <p className="text-xs font-black text-amber-800">
-                    AVG HPP dari PO: <span className="text-amber-700">Rp {avgHppMap[editingProduct.id].avgCost.toLocaleString('id-ID')}</span>
+                  <p className="text-xs font-black text-slate-800">
+                    AVG HPP (PO):{' '}
+                    <span className={avgHppMap[editingProduct.id]?.avgCost > 0 ? "text-indigo-700" : "text-slate-400"}>
+                      {avgHppMap[editingProduct.id]?.avgCost > 0
+                        ? `Rp ${avgHppMap[editingProduct.id].avgCost.toLocaleString('id-ID')}`
+                        : 'Belum ada PO'}
+                    </span>
                   </p>
-                  <p className="text-[10px] text-amber-600 font-bold">
-                    Berdasarkan {avgHppMap[editingProduct.id].poCount} PO · {avgHppMap[editingProduct.id].totalQty.toLocaleString()} {editingProduct.unit}
+                  <p className="text-[10px] text-slate-500 font-bold">
+                    {avgHppMap[editingProduct.id]?.avgCost > 0
+                      ? `Berdasarkan ${avgHppMap[editingProduct.id].poCount} PO · ${avgHppMap[editingProduct.id].totalQty.toLocaleString()} ${editingProduct.unit}`
+                      : 'Mulai hitung Moving Average dari HPP aktif saat ini'}
                   </p>
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                {avgHppMap[editingProduct.id] && avgHppMap[editingProduct.id].avgCost > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEditModalCost(avgHppMap[editingProduct.id].avgCost)}
+                    className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-[10px] font-black transition-colors"
+                    title="Gunakan nilai AVG PO sebagai HPP saat ini"
+                  >
+                    Pakai AVG
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setEditModalCost(avgHppMap[editingProduct.id].avgCost)}
-                  className="ml-auto px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-xl text-[10px] font-black shrink-0 transition-colors"
+                  onClick={() => {
+                    handleConfirmSyncAvgPo([editingProduct.id]);
+                  }}
+                  className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-[10px] font-black transition-colors flex items-center gap-1"
+                  title="Jadikan HPP saat ini sebagai saldo awal baseline AVG PO"
                 >
-                  Pakai AVG
+                  <Sparkles size={11} />
+                  Set AVG PO = HPP
                 </button>
               </div>
-            )}
+            </div>
 
             {/* HPP & Proteksi Lock HPP */}
             <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
@@ -1821,7 +1943,7 @@ export default function PricingHPPPage() {
                     onClick={() => setMarginUnitTarget('BASE_ONLY')}
                     className={`p-2.5 rounded-2xl text-xs font-black border transition-all text-left ${
                       marginUnitTarget === 'BASE_ONLY'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
@@ -1833,7 +1955,7 @@ export default function PricingHPPPage() {
                     onClick={() => setMarginUnitTarget('ALL_UNITS')}
                     className={`p-2.5 rounded-2xl text-xs font-black border transition-all text-left ${
                       marginUnitTarget === 'ALL_UNITS'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
@@ -1841,16 +1963,56 @@ export default function PricingHPPPage() {
                     <div className="text-[10px] text-slate-400 font-bold mt-0.5">Proporsional per kemasan</div>
                   </button>
                 </div>
+
+                {/* Opsi Pemilihan Satuan Spesifik yang Tersedia */}
+                {availableUnitsInSelected.length > 0 && (
+                  <div className="mt-2.5 pt-2 border-t border-dashed border-slate-200">
+                    <div className="text-[11px] font-black uppercase text-slate-500 mb-1.5 flex items-center justify-between">
+                      <span>Atau Terapkan Khusus Satuan Ini:</span>
+                      <span className="text-[10px] lowercase font-semibold text-slate-400">{availableUnitsInSelected.length} satuan terdaftar</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                      {availableUnitsInSelected.map((uCode) => {
+                        const isSelected = marginUnitTarget === uCode;
+                        return (
+                          <button
+                            key={uCode}
+                            type="button"
+                            onClick={() => setMarginUnitTarget(uCode)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-200 scale-105'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                            }`}
+                          >
+                            <span>{uCode}</span>
+                            {isSelected && <span className="text-[9px] bg-emerald-700/60 px-1 py-0.5 rounded font-bold">Dipilih</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Simulasi Preview Ringkas */}
             <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-2">
               <Info size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-              <div className="text-[11px] text-emerald-800 font-bold space-y-0.5">
+              <div className="text-[11px] text-emerald-800 font-bold space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-600">Target Satuan:</span>
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-200/70 text-emerald-950 font-black text-[11px]">
+                    {marginUnitTarget === 'BASE_ONLY'
+                      ? 'Satuan Utama / Ecer Dasar'
+                      : marginUnitTarget === 'ALL_UNITS'
+                      ? 'Semua Satuan (Proporsional per Kemasan)'
+                      : `Khusus Satuan: ${marginUnitTarget}`}
+                  </span>
+                </div>
                 <p>Harga baru otomatis dibulatkan ke atas ke kelipatan Rp100 terdekat.</p>
                 <p className="text-[10px] text-emerald-600">
-                  Contoh modal Rp10.000 &rarr; Harga Baru:{' '}
+                  Contoh modal Rp10.000 &rarr; Estimasi Ecer Baru:{' '}
                   <span className="font-black text-emerald-900">
                     Rp{' '}
                     {(marginType === 'PERCENT'
@@ -1966,6 +2128,85 @@ export default function PricingHPPPage() {
                   <>
                     <Zap size={14} />
                     Bagi HPP ({selectedCount})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      {/* ===================== SYNC AVG PO = HPP CONFIRMATION MODAL ===================== */}
+      {showSyncAvgModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-indigo-100 rounded-2xl shrink-0">
+                <Sparkles size={22} className="text-indigo-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Inisialisasi Saldo Awal Baseline AVG PO</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">
+                  Menyamakan nilai AVG PO dengan nilai HPP aktif produk saat ini sebagai titik awal perhitungan Moving Average.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Total Produk Dipilih</span>
+                <span className="font-black text-slate-900">{selectedCount} produk</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Status Belum Ada PO</span>
+                <span className="font-black text-indigo-700">{selectedWithoutAvg.length} produk</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Produk Berselisih (Drift)</span>
+                <span className="font-black text-amber-700">{selectedWithDrift.length} produk</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200/80 space-y-2">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="text-indigo-600 shrink-0" />
+                <span className="text-xs font-black text-indigo-950">Logika Profesional Saldo Awal:</span>
+              </div>
+              <ul className="text-[11px] text-indigo-900 space-y-1 font-medium list-disc list-inside pl-0.5">
+                <li>
+                  <span className="font-bold">Mulai Bersih:</span> Produk tanpa riwayat PO akan dibuatkan dokumen faktur resmi Saldo Awal (<span className="font-mono text-[10px] font-bold">SALDO AWAL (BASELINE HPP)</span>).
+                </li>
+                <li>
+                  <span className="font-bold">Menghilangkan Selisih:</span> Nilai AVG PO riwayat disinkronkan dengan HPP aktif agar tidak terjadi selisih minus/plus merah.
+                </li>
+                <li>
+                  <span className="font-bold">Akurat Ke Depan:</span> Setiap PO baru yang diterima setelah ini akan langsung memperhitungkan Moving Average secara proporsional.
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowSyncAvgModal(false)}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmSyncAvgPo()}
+                disabled={isResetting || selectedCount === 0}
+                className="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm shadow-indigo-200 disabled:opacity-60"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Memproses Inisialisasi...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    Mulai Inisialisasi AVG ({selectedCount})
                   </>
                 )}
               </button>

@@ -1012,12 +1012,15 @@ export async function resetAvgHppForProducts(
 
 export interface BulkMarginOptions {
   marginType?: 'PERCENT' | 'NOMINAL';
-  targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS';
+  targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS' | string;
 }
 
 /**
  * Update harga jual berdasarkan target margin (% atau Nominal Rp) dari HPP.
- * Bisa memilih set untuk Satuan Utama saja atau Semua Satuan secara proporsional.
+ * Bisa memilih set untuk:
+ * - 'BASE_ONLY': Satuan Utama saja (harga ecer dasar)
+ * - 'ALL_UNITS': Semua Satuan secara proporsional
+ * - Satuan Spesifik Tertentu (misal 'DUS', 'PACK', 'RENCENG')
  */
 export async function bulkUpdateTargetMargin(
   productIds: string[],
@@ -1028,7 +1031,7 @@ export async function bulkUpdateTargetMargin(
   if (!productIds.length) return { success: true, updated: 0 };
   
   const marginType = options?.marginType || 'PERCENT';
-  const targetUnitMode = options?.targetUnitMode || 'BASE_ONLY';
+  const targetUnitMode = (options?.targetUnitMode || 'BASE_ONLY').toUpperCase();
 
   try {
     const now = new Date().toISOString();
@@ -1046,37 +1049,46 @@ export async function bulkUpdateTargetMargin(
       const cost = Number(prod.cost_price || 0);
       if (cost <= 0) continue; // skip if cost is 0
 
-      // 1. Hitung harga satuan utama
-      let newPrice = cost;
-      if (marginType === 'NOMINAL') {
-        newPrice = cost + marginValue;
-      } else {
-        // PERCENT
-        if (marginValue > 0 && marginValue < 100) {
-          newPrice = Math.ceil(cost / (1 - (marginValue / 100)));
-        } else if (marginValue >= 100) {
-          newPrice = Math.ceil(cost + (cost * (marginValue / 100)));
-        }
-      }
-
-      // Bulatkan ke ratusan terdekat untuk estetika ritel
-      newPrice = Math.ceil(newPrice / 100) * 100;
-
       const existingRaw = prod.raw_data || {};
       const baseUnit = (prod.unit || existingRaw.unit || existingRaw.Satuan || 'PCS').toUpperCase();
 
-      // 2. Jika targetUnitMode === 'ALL_UNITS', perbarui juga semua satuan yang ada
+      // Cek apakah harga ecer/satuan utama juga harus diubah
+      const shouldUpdateBasePrice = targetUnitMode === 'BASE_ONLY' || targetUnitMode === 'ALL_UNITS' || targetUnitMode === baseUnit;
+
+      let newBasePrice = Number(prod.price || existingRaw.price || cost);
+      if (shouldUpdateBasePrice) {
+        if (marginType === 'NOMINAL') {
+          newBasePrice = cost + marginValue;
+        } else {
+          // PERCENT
+          if (marginValue > 0 && marginValue < 100) {
+            newBasePrice = Math.ceil(cost / (1 - (marginValue / 100)));
+          } else if (marginValue >= 100) {
+            newBasePrice = Math.ceil(cost + (cost * (marginValue / 100)));
+          }
+        }
+        newBasePrice = Math.ceil(newBasePrice / 100) * 100;
+      }
+
+      // Perbarui satuan yang relevan di array units
       let updatedUnits = Array.isArray(existingRaw.units) ? [...existingRaw.units] : [];
+
       if (updatedUnits.length > 0) {
         updatedUnits = updatedUnits.map((u: any) => {
           const code = String(u.code || '').trim().toUpperCase();
           const contains = Number(u.contains || (code === baseUnit ? 1 : 1));
 
+          // Base unit sync jika base price berubah
           if (code === baseUnit || contains <= 1) {
-            return { ...u, code, contains: 1, price: newPrice };
+            if (shouldUpdateBasePrice) {
+              return { ...u, code, contains: 1, price: newBasePrice };
+            }
+            return u;
           }
 
-          if (targetUnitMode === 'ALL_UNITS') {
+          // Cek apakah satuan spesifik ini yang dipilih atau ALL_UNITS
+          const shouldUpdateThisUnit = targetUnitMode === 'ALL_UNITS' || targetUnitMode === code;
+          if (shouldUpdateThisUnit) {
             const unitCost = cost * contains;
             let uPrice = unitCost;
             if (marginType === 'NOMINAL') {
@@ -1098,23 +1110,31 @@ export async function bulkUpdateTargetMargin(
 
       const updatedRaw: Record<string, any> = {
         ...existingRaw,
-        Ecer: newPrice,
-        price: newPrice,
-        priceEcer: newPrice,
         updatedAt: now,
       };
+
+      if (shouldUpdateBasePrice) {
+        updatedRaw.Ecer = newBasePrice;
+        updatedRaw.price = newBasePrice;
+        updatedRaw.priceEcer = newBasePrice;
+      }
 
       if (updatedUnits.length > 0) {
         updatedRaw.units = updatedUnits;
       }
 
+      const updatePayload: Record<string, any> = {
+        raw_data: updatedRaw,
+        updated_at: now,
+      };
+
+      if (shouldUpdateBasePrice) {
+        updatePayload.price = newBasePrice;
+      }
+
       const { error: upErr } = await supabaseAdmin
         .from('products')
-        .update({
-          price: newPrice,
-          raw_data: updatedRaw,
-          updated_at: now,
-        })
+        .update(updatePayload)
         .eq('id', pid);
 
       if (!upErr) {
@@ -1128,6 +1148,151 @@ export async function bulkUpdateTargetMargin(
     return { success: true, updated };
   } catch (err: any) {
     console.error('bulkUpdateTargetMargin error:', err);
+    return { success: false, updated: 0, error: err.message };
+  }
+}
+
+/**
+ * Inisialisasi Baseline AVG PO = HPP Aktif untuk memulai perhitungan awal Moving Average yang profesional.
+ * - Jika produk sudah punya riwayat PO di purchases, semua harga beli di itemnya dinormalisasikan ke HPP aktif saat ini.
+ * - Jika produk belum pernah punya PO di purchases, dibuatkan record Saldo Awal (Baseline Purchase) resmi.
+ * Hasilnya: Nilai AVG PO terhitung sama persis dengan HPP aktif, selisih (drift) menjadi 0.
+ */
+export async function syncAvgPoToActiveHpp(
+  productIds: string[],
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0 };
+
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    // Ambil semua purchase orders yang ada
+    const { data: allPurchases } = await supabaseAdmin.from('purchases').select('*');
+    const purchases = allPurchases || [];
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('*')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+
+      const cost = Number(prod.cost_price || 0);
+      if (cost <= 0) continue; // skip jika HPP 0
+
+      let hasExistingPo = false;
+
+      // 1. Update di riwayat PO yang sudah ada jika ada
+      for (const po of purchases) {
+        const poRaw = po.raw_data || {};
+        const items = poRaw.items || [];
+        let poUpdated = false;
+
+        const newItems = items.map((it: any) => {
+          if (it.productId === pid || it.product_id === pid || it.id === pid) {
+            hasExistingPo = true;
+            poUpdated = true;
+            const qty = Number(it.quantity || it.qty || 1);
+            return {
+              ...it,
+              unitPrice: cost,
+              purchasePrice: cost,
+              totalPrice: qty * cost,
+            };
+          }
+          return it;
+        });
+
+        if (poUpdated) {
+          const newTotal = newItems.reduce((acc: number, it: any) => acc + Number(it.totalPrice || ((it.quantity || 1) * (it.unitPrice || 0))), 0);
+          await supabaseAdmin.from('purchases').update({
+            total: newTotal,
+            raw_data: {
+              ...poRaw,
+              total: newTotal,
+              subtotal: newTotal,
+              items: newItems,
+              updatedAt: now,
+            },
+            updated_at: now,
+          }).eq('id', po.id);
+        }
+      }
+
+      // 2. Jika belum pernah ada PO sama sekali untuk produk ini, buat PO Saldo Awal resmi (Baseline)
+      if (!hasExistingPo) {
+        const stockQty = Math.max(1, Number(prod.stock || 1));
+        const poNumber = `INIT-HPP-${Date.now().toString().slice(-6)}`;
+        const poId = `po_init_${pid}_${Date.now()}`;
+        const totalAmount = cost * stockQty;
+
+        const initPoRaw = {
+          poNumber,
+          supplierId: 'baseline_initial',
+          supplierName: 'SALDO AWAL (BASELINE HPP)',
+          createdById: adminEmail,
+          warehouseId: 'gudang-utama',
+          notes: 'Inisialisasi Saldo Awal HPP untuk perhitungan Moving Average',
+          status: 'RECEIVED',
+          paymentStatus: 'LUNAS',
+          paymentMethod: 'INITIAL_BALANCE',
+          total: totalAmount,
+          subtotal: totalAmount,
+          items: [
+            {
+              id: `item_init_${pid}`,
+              productId: pid,
+              name: prod.name,
+              unit: prod.unit || 'PCS',
+              quantity: stockQty,
+              unitPrice: cost,
+              purchasePrice: cost,
+              totalPrice: totalAmount,
+            }
+          ],
+          createdAt: now,
+          updatedAt: now,
+          receivedAt: now,
+        };
+
+        await supabaseAdmin.from('purchases').insert({
+          id: poId,
+          total: totalAmount,
+          raw_data: initPoRaw,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+
+      // 3. Catat audit log
+      try {
+        await supabaseAdmin.from('product_cost_logs').insert({
+          productId: pid,
+          productName: prod.name,
+          oldCost: cost,
+          newCost: cost,
+          adminEmail,
+          changeDate: now,
+          notes: `Inisialisasi Baseline AVG PO = HPP Aktif (Rp ${cost.toLocaleString('id-ID')})`,
+        });
+      } catch (e) {
+        console.warn('Audit log insert error:', e);
+      }
+
+      updated++;
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('syncAvgPoToActiveHpp error:', err);
     return { success: false, updated: 0, error: err.message };
   }
 }
