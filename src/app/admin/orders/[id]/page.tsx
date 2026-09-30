@@ -21,15 +21,19 @@ import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
 
 import { Timestamp } from '@/lib/firebase';
+import { getUserAndRole, getRoleFromUser } from '@/lib/supabase-helpers';
+// Seluruh akses data halaman ini kini lewat Server Action yang memeriksa peran
+// pemanggilnya. Sebelumnya halaman membaca dan menulis `orders`, `products`,
+// `users`, `settings`, `wallet_logs`, dan `returns` langsung dari browser.
 import {
-  sbGetDoc,
-  sbUpdateDoc,
-  sbInsertDoc,
-  getUserAndRole,
-  getRoleFromUser,
-} from '@/lib/supabase-helpers';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { isAdminRole, isAuthorizedAdmin } from '@/lib/auth-helpers';
+  createReturnRequest,
+  creditWalletRefund,
+  getOrderDetail,
+  getProductForOrder,
+  updateOrder,
+  updateProductForOrder,
+} from '@/lib/actions/order-admin.actions';
+import { supabase } from '@/lib/supabase';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 type DeliveryLocation = { lat: number; lng: number };
@@ -148,19 +152,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!authChecked || !id) return;
     const fetchAll = async () => {
       try {
-        const [docSnap, settingsSnap] = await Promise.all([
-          sbGetDoc('orders', id),
-          sbGetDoc('settings', 'system'),
-        ]);
-        if (!docSnap.exists()) {
+        const detail = await getOrderDetail(String(id));
+        if (!detail.ok) {
+          setError(detail.error);
+          return;
+        }
+        const data = detail.data;
+        if (!data.order) {
           setError('Pesanan tidak ditemukan.');
           return;
         }
-        const data = { id: docSnap.id, ...docSnap.data() } as Order;
-        setOrder(data);
-        if (data.items && Array.isArray(data.items)) {
+        setOrder(data.order as unknown as Order);
+        const orderItems = (data.order.items ?? []) as Order['items'];
+        if (Array.isArray(orderItems)) {
           setEditableItems(
-            data.items.map((item) => ({
+            orderItems.map((item) => ({
               ...item,
               originalQuantity: item.originalQuantity || item.quantity,
               quantity: item.status === 'unfulfilled' ? 0 : item.quantity,
@@ -169,8 +175,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             }))
           );
         }
-        if (settingsSnap.exists()) {
-          const s = settingsSnap.data() as any;
+        if (data.settings) {
+          const s = data.settings as { store?: Record<string, unknown> };
           setStoreSettings(prev => ({ ...prev, ...(s.store || {}) }));
         }
       } catch {
@@ -204,10 +210,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order || isUpdating) return;
     setIsUpdating(true);
     try {
-      await sbUpdateDoc('orders', order.id, {
+      const updated = await updateOrder(order.id, {
         status: newStatus,
         updatedAt: new Date().toISOString(),
       });
+      if (!updated.ok) {
+        notify.admin.error(updated.error);
+        return;
+      }
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       notify.admin.success(`Status: ${newStatus}`, { icon: '🚀' });
     } catch {
@@ -270,11 +280,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order || confirmedItems.length === 0 || isConfirmingItems) return;
     setIsConfirmingItems(true);
     try {
-      const orderSnap = await sbGetDoc('orders', order.id);
-      if (!orderSnap.exists()) {
+      const freshOrder = await getOrderDetail(order.id);
+      if (!freshOrder.ok || !freshOrder.data.order) {
         throw new Error('Pesanan tidak ditemukan saat konfirmasi');
       }
-      const current = orderSnap.data() as Order;
+      const current = freshOrder.data.order as unknown as Order;
       const logsToAdd: InventoryLogData[] = [];
 
       // --- SYNC STOCK LOGIC ---
@@ -287,16 +297,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         const diff = newQty - oldQty;
 
         if (diff !== 0) {
-          const pSnap = await sbGetDoc('products', newItem.productId);
+          const productResult = await getProductForOrder(newItem.productId);
+          const pData = productResult.ok ? productResult.data : null;
 
-          if (pSnap.exists()) {
-            const pData = pSnap.data();
+          if (pData) {
               const currentStock = Number(pData.stock || pData.Stok || 0);
-              const stockByWarehouse = pData.stockByWarehouse || {};
+              const stockByWarehouse = (pData.stockByWarehouse ?? {}) as Record<string, number>;
               const newStockByWarehouse: Record<string, number> = { ...stockByWarehouse };
               
               // Tentukan Gudang Target (Prioritas: warehouseId -> gudang-utama)
-              const targetWarehouseId = pData.warehouseId || 'gudang-utama';
+              const targetWarehouseId = String(pData.warehouseId || 'gudang-utama');
               const currentWarehouseStock = stockByWarehouse[targetWarehouseId] || 0;
               
               // Update Stok Gudang
@@ -333,18 +343,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 cogsDelta += remaining * fallbackCost;
               }
               if (cogsDelta !== 0) {
-                await sbUpdateDoc('orders', order.id, {
+                await updateOrder(order.id, {
                   cogsTotal: ((current as any).cogsTotal || 0) + Math.round(cogsDelta),
                 });
               }
               if (nextLayers.length !== layers.length || cogsDelta !== 0) {
-                await sbUpdateDoc('products', newItem.productId, {
+                await updateProductForOrder(newItem.productId, {
                   inventoryLayers: nextLayers,
                 });
               }
             }
 
-            await sbUpdateDoc('products', newItem.productId, {
+            await updateProductForOrder(newItem.productId, {
               stock: currentStock + stockChange,
               stockByWarehouse: newStockByWarehouse,
             });
@@ -389,7 +399,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const calculatedNewTotal =
         calculatedRefund > 0 ? Math.max(0, currentTotal - calculatedRefund) : currentTotal;
 
-      await sbUpdateDoc('orders', order.id, {
+      const orderUpdate = await updateOrder(order.id, {
         items: editableItems.map((item) => ({
           name: item.name || 'Produk Tanpa Nama',
           price: Number(item.price) || 0,
@@ -406,6 +416,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         updatedAt: new Date().toISOString(),
       });
 
+      if (!orderUpdate.ok) {
+        throw new Error(orderUpdate.error);
+      }
+
       const isRefundablePayment = !['CASH', 'TEMPO', 'COD'].includes((current.paymentMethod || '').toUpperCase());
 
       if (
@@ -415,32 +429,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         current.userId !== 'guest' &&
         isRefundablePayment
       ) {
-        const userSnap = await sbGetDoc('users', current.userId);
-        const currentWallet = Number(userSnap.data()?.walletBalance || userSnap.data()?.wallet_balance || 0);
-        await sbUpdateDoc('users', current.userId, {
-          walletBalance: currentWallet + calculatedRefund,
-        });
+        // Pengembalian dana dimasukkan ke dompet secara ATOMIK oleh fungsi SQL
+        // `adjust_user_wallet`, yang sekaligus menuliskan baris ledger-nya.
+        // Cara lama (baca saldo di browser -> jumlahkan -> tulis nilai absolut)
+        // kehilangan pembaruan bila dua admin bekerja bersamaan, dan karena
+        // pembacaannya ditolak RLS, saldo bisa tertimpa menjadi nilai refund saja.
+        const refund = await creditWalletRefund(current.userId, calculatedRefund, order.id);
+        if (!refund.ok) throw new Error(refund.error);
       }
+
+      // Ledger pengembalian dana sudah dituliskan oleh `creditWalletRefund`;
+      // penulisan `wallet_logs` terpisah yang lama dihapus — selain membuat dua
+      // sumber kebenaran, penulisan itu memang selalu gagal karena tabel
+      // `wallet_logs` tidak punya kolom `updated_at` yang selalu ditulis
+      // `buildWritePayload`.
 
       // Execute logs
       if (logsToAdd && logsToAdd.length > 0) {
         await Promise.all(logsToAdd.map((log: any) => addInventoryLog(log)));
-      }
-
-      if (
-        refundAmount > 0 &&
-        order.userId &&
-        order.userId !== 'guest' &&
-        !['CASH', 'TEMPO', 'COD'].includes((order.paymentMethod || '').toUpperCase())
-      ) {
-        await sbInsertDoc('wallet_logs', {
-          userId: order.userId,
-          orderId: order.id,
-          amountChanged: refundAmount,
-          type: 'REFUND_STOCK',
-          description: 'Pengembalian dana karena stok tidak sesuai',
-          createdAt: new Date().toISOString(),
-        });
       }
 
       setOrder((prev) =>
@@ -481,7 +487,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmittingReturn(true);
     try {
       const totalValue = itemsToReturn.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      await sbInsertDoc('returns', {
+      const created = await createReturnRequest({
         type: 'SALES_RETURN',
         refId: order?.id,
         customerOrSupplierName: order?.customerName,
@@ -492,6 +498,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      if (!created.ok) throw new Error(created.error);
 
       notify.admin.success("Request retur berhasil dibuat");
       setIsReturnModalOpen(false);
