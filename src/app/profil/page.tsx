@@ -169,8 +169,7 @@ export default function ProfilePage() {
   // --- HANDLERS ---
   const handleLogout = async () => {
     await signOut(auth);
-    // Hapus token admin jika ada
-    document.cookie = "admin-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
     router.push('/profil/login');
   };
 

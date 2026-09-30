@@ -34,15 +34,9 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result?.user;
       if (!user) return;
-      const userRef = doc(db, 'users', user.uid);
       const userSnap = await sbGetDoc('users', result.user.uid);
       if (!userSnap.exists()) {
         await sbUpsertDoc('users', result.user.uid, { uid: user.uid, name: user.displayName, email: user.email, role: 'customer', points: 0, createdAt: new Date().toISOString() });
-      } else {
-        const userData = userSnap.data();
-        if (userData.role === 'admin' || userData.role === 'cashier') {
-          document.cookie = `admin-token=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-        }
       }
       await requestForToken();
       router.push('/profil');
@@ -60,14 +54,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      const userRef = doc(db, 'users', result.user.uid);
-      const userSnap = await sbGetDoc('users', result.user.uid);
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.role === 'admin' || userData.role === 'cashier') {
-          document.cookie = `admin-token=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-        }
-      }
+      await sbGetDoc('users', result.user.uid);
       await requestForToken();
       router.push('/profil');
     } catch (error: unknown) {
