@@ -225,12 +225,27 @@ let unsub: (() => void) | undefined;
             const price = Number(it.price || 0), qty = Number(it.quantity || 1), pid = it.id || it.productId;
             const prod = productsMap.get(pid || '');
             const raw = prod?.raw_data || {};
+            
+            let conv = 1;
+            const itemUnit = (it.unit || '').toUpperCase();
+            if (itemUnit && itemUnit !== 'PCS') {
+              const uObj = (raw.units || []).find((x: any) => (x.code || '').toUpperCase() === itemUnit || (x.name || '').toUpperCase() === itemUnit);
+              if (uObj && uObj.contains) {
+                conv = Number(uObj.contains);
+              } else if (['CTN', 'KARTON', 'DUS', 'BOX'].includes(itemUnit)) {
+                const ctn = (raw.units || []).find((x: any) => ['CTN', 'KARTON', 'DUS', 'BOX'].includes((x.code || '').toUpperCase()));
+                if (ctn && ctn.contains) conv = Number(ctn.contains);
+              }
+            }
+            
             // Prioritas: cost_price (kolom Supabase) > raw.costPrice > raw.Modal > raw.purchasePrice > latestCostMap (dari purchase) > fallback 85%
             const costFromProd = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
             const fallback = latestCostMap.get(pid || '')?.costPerPcs || 0;
             const cost = costFromProd > 0 ? costFromProd : (fallback > 0 ? fallback : price * 0.85);
             const hppSource: FinancialRecord['hppSource'] = costFromProd > 0 ? 'FIFO' : (fallback > 0 ? 'Fallback' : 'Estimate (85%)');
-            goodsRev += price * qty; totalCost += cost * qty;
+            
+            goodsRev += price * qty; 
+            totalCost += cost * (qty * conv);
           });
           const pm = (order.payment?.method || order.paymentMethod || orderRaw.paymentMethod || 'CASH').toUpperCase();
           const ch = (order.channel || orderRaw.channel || orderRaw.transactionType || 'OFFLINE').toUpperCase();
@@ -351,8 +366,22 @@ let unsub: (() => void) | undefined;
             const prod = productsMap.get(it.productId || '');
             const raw = prod?.raw_data || {};
             const modal = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
+            
+            let conv = 1;
+            const itemUnit = (it.unit || '').toUpperCase();
+            if (itemUnit && itemUnit !== 'PCS') {
+              const uObj = (raw.units || []).find((x: any) => (x.code || '').toUpperCase() === itemUnit || (x.name || '').toUpperCase() === itemUnit);
+              if (uObj && uObj.contains) {
+                conv = Number(uObj.contains);
+              } else if (['CTN', 'KARTON', 'DUS', 'BOX'].includes(itemUnit)) {
+                const ctn = (raw.units || []).find((x: any) => ['CTN', 'KARTON', 'DUS', 'BOX'].includes((x.code || '').toUpperCase()));
+                if (ctn && ctn.contains) conv = Number(ctn.contains);
+              }
+            }
+            
             retRev += Number(it.price || 0) * Number(it.quantity || 0);
-            retCost += (modal > 0 ? modal : Number(it.price || 0) * 0.85) * Number(it.quantity || 0);
+            const costPerPcs = (modal > 0 ? modal : Number(it.price || 0) * 0.85);
+            retCost += costPerPcs * (Number(it.quantity || 0) * conv);
           });
           financeRecords.push({
             id: `RET-${rd.id}`,
