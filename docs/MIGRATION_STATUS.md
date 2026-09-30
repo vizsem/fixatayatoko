@@ -51,22 +51,51 @@ import { supabase, supabaseAdmin } from '@/lib/supabase';
 const db_client = supabaseAdmin;
 ```
 
-Masalahnya, file ini diimpor oleh **76 client component** dan **tidak punya guard `server-only`**:
+Masalahnya, file ini diimpor oleh **76 client component**.
 
 1. Modul bridge ikut ter-bundle ke JavaScript browser.
 2. Di browser, `SUPABASE_SERVICE_ROLE_KEY` tidak tersedia (tanpa prefix `NEXT_PUBLIC_`),
-   sehingga `supabaseAdmin` diam-diam *fallback* ke publishable key.
+   sehingga klien admin tidak mungkin terbentuk.
 3. Query dari client berjalan sebagai `anon` → **RLS aktif** → berpotensi ditolak
    atau mengembalikan data kosong tanpa pesan error yang jelas.
 
-Policy RLS di migrasi memakai `auth.jwt()->>'role' IN ('admin', ...)`, sehingga perilaku
-ini bergantung penuh pada bagaimana JWT diisi. Perlu ditinjau sebelum menambah policy baru.
+**Sudah diperbaiki sebagian (2026-10-01):** `src/lib/firebase.ts` sekarang memilih klien
+secara eksplisit — `supabaseAdmin` di server, `supabase` di browser — dan
+`src/lib/supabase.ts` memperingatkan bila `SUPABASE_SERVICE_ROLE_KEY` tidak di-set di server.
+Perilaku runtime tidak berubah (sebelumnya pun fallback ke publishable key), tetapi sekarang
+niatnya jelas dan salah konfigurasi tidak lagi senyap.
+
+**Belum diperbaiki:** 76 client component masih mengimpor bridge untuk operasi data.
+Sampai dipindahkan ke Server Action / Route Handler, RLS adalah satu-satunya pengaman.
+
+## ⚠️ Konvensi RLS & Temuan
+
+Seluruh migrasi memakai pola yang sama:
+
+```sql
+USING (auth.jwt()->>'role' IN ('admin', 'cashier'))
+```
+
+**Penting:** klaim `role` pada JWT bawaan Supabase bernilai `anon` atau `authenticated` —
+bukan peran bisnis. Agar policy di atas berfungsi, harus ada **Auth Hook kustom** di
+Supabase Dashboard yang menyuntikkan `users.role` ke dalam JWT. Ini tidak terlihat dari
+kode, jadi **wajib diverifikasi manual** di Dashboard → Authentication → Hooks.
+
+Tanpa hook tersebut, seluruh policy berbasis peran akan selalu gagal.
+
+### Temuan: `product_cost_logs` RLS tidak aktif
+
+Diverifikasi lewat REST API: tabel ini **dapat dibaca memakai publishable key**, padahal
+policy-nya membatasi ke `admin`/`owner`/`superadmin`. Kesimpulannya tabel ini dibuat manual
+di luar migrasi dan **`ENABLE ROW LEVEL SECURITY` belum pernah dijalankan**. Perlu dicek di
+Dashboard → Table Editor → RLS.
 
 ## Rencana Migrasi Bertahap
 
 ### Fase 1 — Amankan batas client/server (prioritas tertinggi)
-- [ ] Tambahkan `import 'server-only'` ke `src/lib/firebase.ts`, atau pecah menjadi
-      `firebase.server.ts` (service role) dan `firebase.client.ts` (publishable key).
+- [x] Pilih klien Supabase secara eksplisit berdasarkan lingkungan di `src/lib/firebase.ts`.
+- [x] Peringatan saat `SUPABASE_SERVICE_ROLE_KEY` tidak di-set di server.
+- [ ] Verifikasi Auth Hook yang menyuntikkan `users.role` ke klaim `role` JWT.
 - [ ] Audit 76 client component: pindahkan operasi data ke Server Action / Route Handler.
 - [ ] Pastikan `SUPABASE_SERVICE_ROLE_KEY` hanya hidup di jalur server.
 
@@ -116,6 +145,10 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
+> File `20260930_missing_tables.sql` kini **idempoten** (`CREATE TABLE/INDEX IF NOT EXISTS`
+> dan `DROP POLICY IF EXISTS` sebelum tiap `CREATE POLICY`), sehingga aman dijalankan ulang
+> bila eksekusi pertama terputus di tengah jalan.
+
 **Cara verifikasi:**
 ```bash
 npm run verify:schema          # ringkas
@@ -125,3 +158,33 @@ npm run verify:schema:verbose  # tampilkan jumlah baris per tabel
 > Catatan: verifikasi di atas memakai REST API. Agar akurat, gunakan
 > `SUPABASE_SERVICE_ROLE_KEY` di `.env.local`. Dengan publishable key, tabel yang
 > dilindungi RLS akan tampak kosong.
+
+## Kualitas Kode
+
+### React Compiler tidak aktif
+`next.config.ts` tidak menyetel `reactCompiler`, paket `babel-plugin-react-compiler`
+tidak terpasang, dan tidak ada directive `"use memo"`. Karena itu aturan
+`react-hooks/purity`, `react-hooks/static-components`, dan
+`react-hooks/preserve-manual-memoization` bersifat **advisory** — tidak memengaruhi build.
+
+Meski demikian, per 2026-10-01 seluruh pelanggarannya sudah diperbaiki (bukan di-*disable*):
+
+| Perbaikan | File |
+|---|---|
+| Fungsi impure dipindah ke module scope (`msUntilExpiry`) | `admin/inventory/page.tsx` |
+| `ProfitBadge` dipindah keluar dari render | `admin/products/edit/[id]/page.tsx` |
+| `isoDateInDays()` untuk `priceValidUntil` JSON-LD | `produk/[id]/page.tsx` |
+| `validateCart()` diekstrak agar memo bisa dipertahankan | `cart/page.tsx` |
+| Generator ID terpusat di `src/lib/ids.ts` | `cashier`, `vouchers`, `admin/marketplace-orders` |
+
+`src/lib/ids.ts` sengaja dibuat agar `Date.now()` / `Math.random()` tidak lagi dipanggil
+di dalam render — mencegah hydration mismatch dan membuat format ID konsisten.
+
+### Status lint
+| | Sebelum | Sesudah |
+|---|---|---|
+| Error | 117 | **0** |
+| Warning | 1223 | 602 |
+
+Turunnya angka ini sebagian besar karena `.kilo/` (nested git worktree berisi salinan
+repo) sudah dikeluarkan dari proses lint.

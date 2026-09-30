@@ -24,6 +24,38 @@ import {
 import { sbGetDoc } from '@/lib/supabase-helpers';
 import { auth, collection, db, getDocs, limit, query, where } from '@/lib/firebase';
 
+type CartValidationResult = { ok: boolean; msg: string };
+
+/**
+ * Validasi keranjang sebelum checkout.
+ *
+ * Diletakkan di module scope agar body `useMemo` di komponen tetap ringkas
+ * dan murni, sehingga memoization-nya dapat dipertahankan oleh React Compiler.
+ */
+function validateCart(
+  cart: CartItem[],
+  customer: { name: string; phone: string; address: string },
+  deliveryMethod: 'pickup' | 'delivery'
+): CartValidationResult {
+  if (cart.length === 0) return { ok: false, msg: 'Keranjang belanja masih kosong' };
+  if (!customer.name.trim()) return { ok: false, msg: 'Nama penerima wajib diisi' };
+  if (!customer.phone.trim()) return { ok: false, msg: 'Nomor WhatsApp wajib diisi' };
+  if (deliveryMethod === 'delivery' && !customer.address.trim()) {
+    return { ok: false, msg: 'Alamat lengkap pengiriman wajib diisi' };
+  }
+
+  // Batas minimal / maksimal pembelian per item
+  for (const item of cart) {
+    const min = Number(item.minPurchase || 1);
+    const max = Number(item.maxPurchase || 0);
+    const qty = Number(item.quantity || 1);
+    if (qty < min) return { ok: false, msg: `Minimal pembelian ${item.name} adalah ${min}` };
+    if (max > 0 && qty > max) return { ok: false, msg: `Maksimal pembelian ${item.name} adalah ${max}` };
+  }
+
+  return { ok: true, msg: '' };
+}
+
 export default function CartPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -168,23 +200,10 @@ export default function CartPage() {
     };
   }, [cart, getLineTotal, activeDeliveryMethod, deliveryMethod, usePoints, useWallet, userData, appliedVoucher]);
 
-  const validation = useMemo(() => {
-    if (cart.length === 0) return { ok: false, msg: "Keranjang belanja masih kosong" };
-    if (!customer.name.trim()) return { ok: false, msg: "Nama penerima wajib diisi" };
-    if (!customer.phone.trim()) return { ok: false, msg: "Nomor WhatsApp wajib diisi" };
-    if (deliveryMethod === 'delivery' && !customer.address.trim()) return { ok: false, msg: "Alamat lengkap pengiriman wajib diisi" };
-
-    // Check purchase limits
-    for (const item of cart) {
-      const min = Number(item.minPurchase || 1);
-      const max = Number(item.maxPurchase || 0);
-      const qty = Number(item.quantity || 1);
-      if (qty < min) return { ok: false, msg: `Minimal pembelian ${item.name} adalah ${min}` };
-      if (max > 0 && qty > max) return { ok: false, msg: `Maksimal pembelian ${item.name} adalah ${max}` };
-    }
-
-    return { ok: true, msg: "" };
-  }, [cart, customer, deliveryMethod]);
+  const validation = useMemo(
+    () => validateCart(cart, customer, deliveryMethod),
+    [cart, customer, deliveryMethod]
+  );
 
   const handleCheckout = async () => {
     if (!validation.ok) return notify.user.error(validation.msg);

@@ -23,6 +23,17 @@ function stockInUnits(stock: number, units?: { code: string; contains?: number }
     .filter(u => u.qty > 0);
 }
 
+/** Ambang batas "hampir kedaluwarsa": 30 hari dalam milidetik. */
+const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Selisih waktu (ms) dari sekarang menuju tanggal kedaluwarsa.
+ * Diletakkan di module scope agar `Date.now()` tidak dipanggil saat render.
+ */
+function msUntilExpiry(expiryDate: string): number {
+  return new Date(expiryDate).getTime() - Date.now();
+}
+
 /** Compact unit-breakdown badges */
 function StockUnitDisplay({ stock, units }: { stock: number; units?: { code: string; contains?: number }[] }) {
   const conversions = stockInUnits(stock, units);
@@ -163,8 +174,8 @@ export default function AdminInventory() {
   const totalNilaiStok = batches.reduce((sum, b) => sum + (b.quantity * (b.incomingPrice || b.product?.costPrice || 0)), 0);
   const expiringSoon = batches.filter(b => {
     if (!b.expiryDate) return false;
-    const diff = new Date(b.expiryDate).getTime() - Date.now();
-    return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000; // 30 hari
+    const diff = msUntilExpiry(b.expiryDate);
+    return diff > 0 && diff < EXPIRY_SOON_MS; // 30 hari
   }).length;
 
   const tabs: { key: Tab; label: string; count: number }[] = [
@@ -330,7 +341,7 @@ export default function AdminInventory() {
                         {filteredBatches.length === 0 ? (
                           <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Tidak ada data batch</td></tr>
                         ) : filteredBatches.map(b => {
-                          const isExpiringSoon = b.expiryDate && new Date(b.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+                          const isExpiringSoon = b.expiryDate && msUntilExpiry(b.expiryDate) < EXPIRY_SOON_MS;
                           const isExpired = b.expiryDate && new Date(b.expiryDate) < new Date();
                           const isActive = b.product?.isActive !== false;
                           return (

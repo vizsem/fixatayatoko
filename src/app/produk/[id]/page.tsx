@@ -9,6 +9,14 @@ type PageProps = {
 
 const BASE_URL = 'https://atayatoko.aty0.com';
 
+/**
+ * Tanggal dalam format YYYY-MM-DD, N hari dari sekarang.
+ * Diletakkan di module scope agar `Date.now()` tidak dipanggil saat render.
+ */
+function isoDateInDays(daysAhead: number): string {
+  return new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
+
 // 1. Generate Metadata for SEO & Social Media
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -183,7 +191,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
           url: `${BASE_URL}/produk/${product.id}`,
           priceCurrency: 'IDR',
           price: product.price,
-          priceValidUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          priceValidUntil: isoDateInDays(60),
           itemCondition: 'https://schema.org/NewCondition',
           availability:
             product.stock > 0

@@ -166,39 +166,49 @@ ALTER TABLE public."stockValidationLogs"         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_cost_logs             ENABLE ROW LEVEL SECURITY;
 
 -- marketplace_orders
+DROP POLICY IF EXISTS "staff_manage_marketplace_orders" ON public.marketplace_orders;
 CREATE POLICY "staff_manage_marketplace_orders" ON public.marketplace_orders
   FOR ALL USING (auth.jwt()->>'role' IN ('admin', 'cashier', 'owner', 'staff', 'superadmin'));
 
 -- bri_webhook_logs
+DROP POLICY IF EXISTS "admin_read_bri_logs" ON public.bri_webhook_logs;
 CREATE POLICY "admin_read_bri_logs" ON public.bri_webhook_logs
   FOR ALL USING (auth.jwt()->>'role' IN ('admin', 'owner', 'superadmin'));
 
 -- warehouseStock
+DROP POLICY IF EXISTS "staff_manage_warehouse_stock" ON public."warehouseStock";
 CREATE POLICY "staff_manage_warehouse_stock" ON public."warehouseStock"
   FOR ALL USING (auth.jwt()->>'role' IN ('admin', 'cashier', 'owner', 'staff', 'warehouse', 'superadmin'));
 
 -- activity_logs
+DROP POLICY IF EXISTS "admin_read_activity_logs" ON public.activity_logs;
 CREATE POLICY "admin_read_activity_logs" ON public.activity_logs
   FOR SELECT USING (auth.jwt()->>'role' IN ('admin', 'owner', 'superadmin'));
 
+DROP POLICY IF EXISTS "system_insert_activity_logs" ON public.activity_logs;
 CREATE POLICY "system_insert_activity_logs" ON public.activity_logs
   FOR INSERT WITH CHECK (true);
 
 -- operational_expenses_proofs
+DROP POLICY IF EXISTS "staff_manage_expense_proofs" ON public.operational_expenses_proofs;
 CREATE POLICY "staff_manage_expense_proofs" ON public.operational_expenses_proofs
   FOR ALL USING (auth.jwt()->>'role' IN ('admin', 'cashier', 'owner', 'staff', 'superadmin'));
 
 -- stockValidationLogs
+DROP POLICY IF EXISTS "staff_read_stock_validation_logs" ON public."stockValidationLogs";
 CREATE POLICY "staff_read_stock_validation_logs" ON public."stockValidationLogs"
   FOR SELECT USING (auth.jwt()->>'role' IN ('admin', 'cashier', 'owner', 'staff', 'warehouse', 'superadmin'));
 
+DROP POLICY IF EXISTS "system_insert_stock_validation_logs" ON public."stockValidationLogs";
 CREATE POLICY "system_insert_stock_validation_logs" ON public."stockValidationLogs"
   FOR INSERT WITH CHECK (true);
 
 -- product_cost_logs
+DROP POLICY IF EXISTS "admin_read_product_cost_logs" ON public.product_cost_logs;
 CREATE POLICY "admin_read_product_cost_logs" ON public.product_cost_logs
   FOR SELECT USING (auth.jwt()->>'role' IN ('admin', 'owner', 'superadmin'));
 
+DROP POLICY IF EXISTS "system_insert_product_cost_logs" ON public.product_cost_logs;
 CREATE POLICY "system_insert_product_cost_logs" ON public.product_cost_logs
   FOR INSERT WITH CHECK (true);
 

@@ -1,13 +1,24 @@
 /**
  * Supabase-backed Firebase / Firestore Compatibility Bridge
- * Seamlessly routes all Firestore, Auth, and Storage calls directly to Supabase Postgres.
- * Uses supabaseAdmin (service role) for all data operations to bypass RLS.
+ *
+ * Menerjemahkan panggilan bergaya Firestore (collection/doc/getDocs/...)
+ * langsung ke Supabase Postgres.
+ *
+ * ⚠️ Pemilihan klien bergantung pada lingkungan:
+ *   - Server  -> `supabaseAdmin` (service role, bypass RLS) bila key tersedia.
+ *   - Browser -> `supabase` (publishable key, RLS berlaku).
+ *
+ * Service role key tidak pernah tersedia di browser, sehingga pemanggilan
+ * bridge dari client component selalu berjalan sebagai `anon` dan tunduk RLS.
+ * Lihat docs/MIGRATION_STATUS.md untuk rencana perbaikan.
  */
 
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-// Use admin client for all data operations (bypasses RLS)
-const db_client = supabaseAdmin;
+const isServer = typeof window === 'undefined';
+
+// Server: bypass RLS. Browser: tunduk RLS memakai publishable key.
+const db_client = isServer ? supabaseAdmin : supabase;
 
 // --- Interfaces & Types ---
 export interface DocRef {

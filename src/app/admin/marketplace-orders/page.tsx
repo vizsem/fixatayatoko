@@ -25,6 +25,7 @@ import * as Sentry from '@sentry/nextjs';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { millisId, timestampId } from '@/lib/ids';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
 interface CartItem {
@@ -253,8 +254,8 @@ export default function MarketplaceOrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const adminId = user?.id || 'system';
       const now = new Date().toISOString();
-      const orderId = `MKT-${Date.now()}`;
-      const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const orderId = millisId('MKT');
+      const dbOrderId = timestampId('mkt', 4);
 
       const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
 

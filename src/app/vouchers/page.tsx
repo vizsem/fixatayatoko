@@ -14,6 +14,7 @@ import { SkeletonList, EmptyState } from '@/components/UIState';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { randomCode } from '@/lib/ids';
 import { auth, db, doc, increment, onAuthStateChanged, updateDoc, FirebaseUser } from '@/lib/firebase';
 interface UserData extends UserProfile {
   _addresses?: unknown[]; // internal extended field
@@ -116,7 +117,7 @@ export default function VoucherExchangePage() {
 
 
       // Generate Kode Unik
-      const voucherCode = `ATY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const voucherCode = randomCode('ATY');
 
       // 1. Jalankan Transaksi ke Firestore
       await sbUpdateDoc('users', user.uid, { points: increment(-voucher.cost) });

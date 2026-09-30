@@ -1,5 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
+/**
+ * Klien Supabase.
+ *
+ * Ada dua klien dengan peran berbeda:
+ *
+ * 1. `supabase`      - memakai publishable/anon key. Aman dipakai di browser dan
+ *                      tunduk pada RLS. Gunakan di client component.
+ * 2. `supabaseAdmin` - memakai service role/secret key dan MELEWATI RLS.
+ *                      HANYA untuk server (Server Action / Route Handler).
+ *                      Jangan pernah memberi prefix NEXT_PUBLIC_ pada key ini.
+ */
+
+const isServer = typeof window === 'undefined';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const supabaseAnonKey = 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
@@ -19,9 +33,20 @@ if (!supabaseUrl || !supabaseKey) {
     '[Supabase] KONFIGURASI TIDAK LENGKAP!\n' +
     'Pastikan variabel berikut sudah di-set di Vercel Environment Variables:\n' +
     '  - NEXT_PUBLIC_SUPABASE_URL\n' +
-    '  - NEXT_PUBLIC_SUPABASE_ANON_KEY\n' +
+    '  - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (atau NEXT_PUBLIC_SUPABASE_ANON_KEY)\n' +
     'URL:', supabaseUrl ? '✓ ada' : '✗ KOSONG',
     '| Key:', supabaseKey ? '✓ ada' : '✗ KOSONG'
+  );
+}
+
+// Peringatan khusus server: tanpa service key, supabaseAdmin tidak akan
+// mem-bypass RLS sehingga operasi backend bisa gagal tanpa pesan yang jelas.
+if (isServer && !supabaseServiceKey) {
+  console.warn(
+    '[Supabase] SUPABASE_SERVICE_ROLE_KEY belum di-set di server. ' +
+    'supabaseAdmin akan memakai publishable key, sehingga RLS TETAP BERLAKU ' +
+    'dan query yang seharusnya bypass RLS akan gagal atau mengembalikan data kosong. ' +
+    'Set di .env.local (lokal) dan Vercel Environment Variables (produksi).'
   );
 }
 

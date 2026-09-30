@@ -23,6 +23,7 @@ import { isStaffOrAdmin, isAdminRole } from '@/lib/auth-helpers';
 
 import { uploadToSupabase } from '@/lib/supabase';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { timestampId, uniqueFileName } from '@/lib/ids';
 import { collection, db, onSnapshot, query, where } from '@/lib/firebase';
 // Types
 type UnitOption = {
@@ -1193,7 +1194,7 @@ export default function CashierPOS() {
       if (paymentProof && !isOffline) {
         // PROSES KOMPRESI SEBELUM UPLOAD KE SUPABASE
         const compressedFile = await compressImage(paymentProof);
-        const fileName = `payment-proofs/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+        const fileName = uniqueFileName('payment-proofs', 'jpg');
         const { success: upSuccess, url: upUrl, error: upErr } = await uploadToSupabase(
           'products',
           fileName,
@@ -1212,7 +1213,7 @@ export default function CashierPOS() {
       // Hitung dulu sebelum membuat orderData
       const finalPayAmount = paymentMethod === 'CASH' ? (parseFloat(cashGiven) || total) : total;
       const finalChange = paymentMethod === 'CASH' ? change : 0;
-      const orderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const orderId = timestampId('ord');
       const now = new Date().toISOString();
       const selectedWhObj = warehouses.find(w => w.id === selectedWarehouse);
       const warehouseName = selectedWhObj ? selectedWhObj.name : (selectedWarehouse === 'auto' ? 'Otomatis' : selectedWarehouse);
@@ -1336,7 +1337,7 @@ export default function CashierPOS() {
           .eq('id', selectedCustomer.id);
 
         await supabase.from('wallet_logs').insert({
-          id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          id: timestampId('wal'),
           user_id: selectedCustomer.id,
           amount: -total,
           description: `Pembayaran pesanan #${orderId}`,
