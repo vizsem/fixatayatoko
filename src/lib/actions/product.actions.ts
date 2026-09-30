@@ -896,13 +896,16 @@ export async function getAllProductsAvgHpp(): Promise<
 
         const qty = Number(item.quantity ?? item.qty ?? 1);
         const price = Number(item.unitPrice ?? item.purchasePrice ?? 0);
+        const conversion = Number(item.conversion ?? 1);
+
         if (qty <= 0 || price <= 0) continue;
 
         if (!accumulator[pid]) {
           accumulator[pid] = { totalCost: 0, totalQty: 0, poCount: 0 };
         }
+        const baseQty = qty * conversion;
         accumulator[pid].totalCost += qty * price;
-        accumulator[pid].totalQty += qty;
+        accumulator[pid].totalQty += baseQty;
         accumulator[pid].poCount += 1;
       }
     }
