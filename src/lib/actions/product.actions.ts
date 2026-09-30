@@ -715,14 +715,16 @@ export async function updateProductPrice(payload: {
   newPrice: number;
   newGrosir: number;
   newMinGrosir: number;
+  units?: Array<{ code: string; contains: number; price?: number; minQty?: number; label?: string }>;
+  isHppLocked?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { productId, newCost, newPrice, newGrosir, newMinGrosir } = payload;
+    const { productId, newCost, newPrice, newGrosir, newMinGrosir, units, isHppLocked } = payload;
 
     // Ambil raw_data saat ini untuk di-merge (jangan overwrite field lain)
     const { data: currentProd, error: fetchErr } = await supabaseAdmin
       .from('products')
-      .select('raw_data')
+      .select('raw_data, cost_price, unit, price')
       .eq('id', productId)
       .single();
 
@@ -730,11 +732,29 @@ export async function updateProductPrice(payload: {
 
     const existingRaw = currentProd?.raw_data || {};
     const now = new Date().toISOString();
+    const baseUnit = (currentProd?.unit || existingRaw.unit || existingRaw.Satuan || 'PCS').toUpperCase();
+
+    // Pastikan jika ada units, base unit tersinkron dengan newPrice
+    let cleanedUnits = units ? [...units] : (Array.isArray(existingRaw.units) ? [...existingRaw.units] : []);
+    if (cleanedUnits.length > 0) {
+      cleanedUnits = cleanedUnits.map(u => {
+        const code = String(u.code || '').trim().toUpperCase();
+        if (code === baseUnit) {
+          return { ...u, code, contains: 1, price: newPrice };
+        }
+        return { ...u, code, contains: Number(u.contains || 1), price: Number(u.price || 0) };
+      });
+    }
+
+    // Tentukan flag lock HPP: jika eksplisit diberikan gunakan itu, jika tidak tapi cost berubah maka kunci
+    const costChanged = Number(currentProd?.cost_price || 0) !== newCost;
+    const shouldLock = isHppLocked !== undefined ? isHppLocked : (costChanged ? true : Boolean(existingRaw.isHppLocked));
 
     const updatedRaw = {
       ...existingRaw,
       Modal: newCost,
       purchasePrice: newCost,
+      costPrice: newCost,
       Ecer: newPrice,
       price: newPrice,
       priceEcer: newPrice,
@@ -742,8 +762,15 @@ export async function updateProductPrice(payload: {
       wholesalePrice: newGrosir,
       priceGrosir: newGrosir,
       Min_Grosir: newMinGrosir,
+      isHppLocked: shouldLock,
+      customHpp: shouldLock ? newCost : existingRaw.customHpp,
+      customHppUpdatedAt: shouldLock ? now : existingRaw.customHppUpdatedAt,
       updatedAt: now,
     };
+
+    if (cleanedUnits.length > 0) {
+      updatedRaw.units = cleanedUnits;
+    }
 
     const { error: updateErr } = await supabaseAdmin
       .from('products')
@@ -764,6 +791,57 @@ export async function updateProductPrice(payload: {
   } catch (err: any) {
     console.error('updateProductPrice error:', err);
     return { success: false, error: err.message || 'Gagal memperbarui harga produk' };
+  }
+}
+
+/**
+ * Toggle Kunci HPP (Proteksi agar tidak tertimpa saat restart AVG)
+ */
+export async function toggleLockProductHpp(
+  productIds: string[],
+  isLocked: boolean,
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0 };
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data, cost_price')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+
+      const existingRaw = prod.raw_data || {};
+      const updatedRaw = {
+        ...existingRaw,
+        isHppLocked: isLocked,
+        customHpp: isLocked ? Number(prod.cost_price || 0) : existingRaw.customHpp,
+        customHppUpdatedAt: now,
+        lockedBy: adminEmail,
+      };
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (!upErr) updated++;
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('toggleLockProductHpp error:', err);
+    return { success: false, updated: 0, error: err.message };
   }
 }
 
@@ -848,18 +926,25 @@ export async function getAllProductsAvgHpp(): Promise<
 /**
  * Reset HPP (cost_price) produk terpilih ke nilai AVG berdasarkan riwayat PO.
  * Memperbarui cost_price + raw_data.Modal + raw_data.purchasePrice di Supabase.
+ * Opsi skipLockedHpp (default true) menjamin produk yang sudah diset manual TIDAK HILANG / TIDAK TERTIMPA!
  */
 export async function resetAvgHppForProducts(
   productIds: string[],
   avgMap: Record<string, { avgCost: number; totalQty: number; poCount: number }>,
   adminEmail: string,
-): Promise<{ success: boolean; updated: number; skipped: number; error?: string }> {
-  if (!productIds.length) return { success: true, updated: 0, skipped: 0 };
+  options?: {
+    skipLockedHpp?: boolean;
+  }
+): Promise<{ success: boolean; updated: number; skipped: number; lockedSkipped: number; error?: string }> {
+  if (!productIds.length) return { success: true, updated: 0, skipped: 0, lockedSkipped: 0 };
+
+  const skipLocked = options?.skipLockedHpp !== false;
 
   try {
     const now = new Date().toISOString();
     let updated = 0;
     let skipped = 0;
+    let lockedSkipped = 0;
 
     for (const pid of productIds) {
       const stats = avgMap[pid];
@@ -868,7 +953,7 @@ export async function resetAvgHppForProducts(
         continue;
       }
 
-      // Fetch raw_data to merge
+      // Fetch raw_data to check lock and merge
       const { data: prod } = await supabaseAdmin
         .from('products')
         .select('raw_data, cost_price')
@@ -878,10 +963,19 @@ export async function resetAvgHppForProducts(
       if (!prod) { skipped++; continue; }
 
       const existingRaw = prod.raw_data || {};
+
+      // Jika user memilih untuk lewati produk yang terkunci/sudah diset manual
+      if (skipLocked && existingRaw.isHppLocked) {
+        lockedSkipped++;
+        continue;
+      }
+
       const updatedRaw = {
         ...existingRaw,
         Modal: stats.avgCost,
         purchasePrice: stats.avgCost,
+        costPrice: stats.avgCost,
+        isHppLocked: false, // reset lock jika admin sengaja menimpa dengan AVG
         avgHppResetAt: now,
         avgHppResetBy: adminEmail,
         avgHppPOCount: stats.poCount,
@@ -909,23 +1003,33 @@ export async function resetAvgHppForProducts(
     revalidatePath('/admin/products');
     revalidatePath('/admin/inventory');
 
-    return { success: true, updated, skipped };
+    return { success: true, updated, skipped, lockedSkipped };
   } catch (err: any) {
     console.error('resetAvgHppForProducts error:', err);
-    return { success: false, updated: 0, skipped: productIds.length, error: err.message };
+    return { success: false, updated: 0, skipped: productIds.length, lockedSkipped: 0, error: err.message };
   }
 }
 
+export interface BulkMarginOptions {
+  marginType?: 'PERCENT' | 'NOMINAL';
+  targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS';
+}
+
 /**
- * Update harga jual ecer berdasarkan target margin (%) dari HPP.
+ * Update harga jual berdasarkan target margin (% atau Nominal Rp) dari HPP.
+ * Bisa memilih set untuk Satuan Utama saja atau Semua Satuan secara proporsional.
  */
 export async function bulkUpdateTargetMargin(
   productIds: string[],
-  targetMarginPct: number,
+  marginValue: number,
   adminEmail: string,
+  options?: BulkMarginOptions,
 ): Promise<{ success: boolean; updated: number; error?: string }> {
   if (!productIds.length) return { success: true, updated: 0 };
   
+  const marginType = options?.marginType || 'PERCENT';
+  const targetUnitMode = options?.targetUnitMode || 'BASE_ONLY';
+
   try {
     const now = new Date().toISOString();
     let updated = 0;
@@ -933,7 +1037,7 @@ export async function bulkUpdateTargetMargin(
     for (const pid of productIds) {
       const { data: prod } = await supabaseAdmin
         .from('products')
-        .select('raw_data, cost_price, name, price')
+        .select('raw_data, cost_price, name, price, unit')
         .eq('id', pid)
         .single();
 
@@ -942,27 +1046,67 @@ export async function bulkUpdateTargetMargin(
       const cost = Number(prod.cost_price || 0);
       if (cost <= 0) continue; // skip if cost is 0
 
-      // Calculate new price based on margin formula: Price = Cost / (1 - Margin%)
-      // Using Math.ceil to round up to the nearest integer
+      // 1. Hitung harga satuan utama
       let newPrice = cost;
-      if (targetMarginPct > 0 && targetMarginPct < 100) {
-        newPrice = Math.ceil(cost / (1 - (targetMarginPct / 100)));
-      } else if (targetMarginPct >= 100) {
-        // Fallback to markup if margin is >= 100%
-        newPrice = Math.ceil(cost + (cost * (targetMarginPct / 100)));
+      if (marginType === 'NOMINAL') {
+        newPrice = cost + marginValue;
+      } else {
+        // PERCENT
+        if (marginValue > 0 && marginValue < 100) {
+          newPrice = Math.ceil(cost / (1 - (marginValue / 100)));
+        } else if (marginValue >= 100) {
+          newPrice = Math.ceil(cost + (cost * (marginValue / 100)));
+        }
       }
 
-      // Bulatkan ke ratusan terdekat untuk harga yang lebih rapi (opsional tapi disarankan)
+      // Bulatkan ke ratusan terdekat untuk estetika ritel
       newPrice = Math.ceil(newPrice / 100) * 100;
 
       const existingRaw = prod.raw_data || {};
-      const updatedRaw = {
+      const baseUnit = (prod.unit || existingRaw.unit || existingRaw.Satuan || 'PCS').toUpperCase();
+
+      // 2. Jika targetUnitMode === 'ALL_UNITS', perbarui juga semua satuan yang ada
+      let updatedUnits = Array.isArray(existingRaw.units) ? [...existingRaw.units] : [];
+      if (updatedUnits.length > 0) {
+        updatedUnits = updatedUnits.map((u: any) => {
+          const code = String(u.code || '').trim().toUpperCase();
+          const contains = Number(u.contains || (code === baseUnit ? 1 : 1));
+
+          if (code === baseUnit || contains <= 1) {
+            return { ...u, code, contains: 1, price: newPrice };
+          }
+
+          if (targetUnitMode === 'ALL_UNITS') {
+            const unitCost = cost * contains;
+            let uPrice = unitCost;
+            if (marginType === 'NOMINAL') {
+              uPrice = unitCost + (marginValue * contains);
+            } else {
+              if (marginValue > 0 && marginValue < 100) {
+                uPrice = Math.ceil(unitCost / (1 - (marginValue / 100)));
+              } else if (marginValue >= 100) {
+                uPrice = Math.ceil(unitCost + (unitCost * (marginValue / 100)));
+              }
+            }
+            uPrice = Math.ceil(uPrice / 100) * 100;
+            return { ...u, code, contains, price: uPrice };
+          }
+
+          return u;
+        });
+      }
+
+      const updatedRaw: Record<string, any> = {
         ...existingRaw,
         Ecer: newPrice,
         price: newPrice,
         priceEcer: newPrice,
         updatedAt: now,
       };
+
+      if (updatedUnits.length > 0) {
+        updatedRaw.units = updatedUnits;
+      }
 
       const { error: upErr } = await supabaseAdmin
         .from('products')
@@ -990,7 +1134,9 @@ export async function bulkUpdateTargetMargin(
 
 /**
  * Bagi HPP produk secara bulk (Konversi CTN -> PCS dsb).
- * Ini akan membagi `cost_price` dan field modal lainnya dengan angka pembagi (divider).
+ * Ini akan membagi `cost_price` dan field modal lainnya dengan angka pembagi (divider),
+ * mengunci HPP produk agar tidak tertimpa saat restart AVG,
+ * dan mengoreksi riwayat PO.
  */
 export async function bulkDivideHpp(
   productIds: string[],
@@ -1028,6 +1174,9 @@ export async function bulkDivideHpp(
         Modal: newCost,
         purchasePrice: newCost,
         costPrice: newCost,
+        isHppLocked: true, // KUNCI HPP agar aman saat restart AVG!
+        customHpp: newCost,
+        customHppUpdatedAt: now,
         updatedAt: now,
       };
 
@@ -1051,7 +1200,7 @@ export async function bulkDivideHpp(
             newCost,
             adminEmail,
             changeDate: now,
-            notes: `Konversi HPP (Dibagi ${divider}) & Koreksi Histori PO`,
+            notes: `Konversi HPP (Dibagi ${divider}) & Koreksi Histori PO [HPP Dikunci]`,
           });
         } catch (e) {
           console.warn('Failed to log cost change:', e);
