@@ -2170,6 +2170,7 @@ export default function PricingHPPPage() {
             </div>
           </div>
         </div>
+      )}
       {/* ===================== SYNC AVG PO = HPP CONFIRMATION MODAL ===================== */}
       {showSyncAvgModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
