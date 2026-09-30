@@ -52,7 +52,7 @@ as $$
            ''
          )
   from public.users u
-  where u.id = auth.uid()::text
+  where u.id = auth.uid()
   limit 1;
 $$;
 
@@ -95,37 +95,41 @@ grant execute on function public.ataya_is_staff() to anon, authenticated, servic
 
 
 -- ============================================================================
--- BAGIAN 1 — Catat lalu hapus SEMUA policy lama pada `public.users`
+-- BAGIAN 1 — Hapus policy lama pada `public.users`
 --
--- Policy lama itu yang membiarkan pelanggan menulis `role` miliknya sendiri.
--- Nama policy-nya dicatat lewat NOTICE supaya ada jejak sebelum dihapus.
+-- Nama-namanya diambil dari riwayat migration di repo (`20240913_init.sql`),
+-- BUKAN ditebak. Ada lima, dan dua di antaranya yang bermasalah:
+--
+--   "users can list (authenticated users only)"
+--       USING (auth.uid() IS NOT NULL)
+--       -> setiap pengguna yang login boleh membaca SELURUH baris `users`.
+--          Inilah sebabnya akun pelanggan bisa melihat role, wallet_balance,
+--          dan points milik orang lain.
+--
+--   "users can update own or staff"
+--       USING/WITH CHECK (auth.uid() = id OR auth.jwt()->>'role' IN ('admin','cashier'))
+--       -> RLS membatasi BARIS, bukan KOLOM. Pemilik baris karena itu boleh
+--          menulis kolom apa pun, termasuk `role`. Inilah jalur naik-ke-admin.
+--
+-- CATATAN PENTING soal `auth.jwt()->>'role'`:
+-- di Supabase klaim itu berisi peran POSTGRES (`anon`, `authenticated`,
+-- `service_role`), BUKAN peran aplikasi. Jadi setiap perbandingan
+-- `= 'admin'` atau `IN ('admin','cashier')` selalu bernilai SALAH. Akibatnya
+-- semua policy berlabel "staff" di `20240913_init.sql` tidak pernah memberi
+-- akses sama sekali — itu juga sebabnya 53 tabel tampak kosong pada audit.
+--
+-- Policy lama dihapus satu per satu (bukan disapu borongan) supaya tidak ada
+-- policy tak dikenal yang ikut hilang diam-diam. Definisi aslinya dicatat di
+-- BAGIAN 5 agar bisa dipulihkan.
 -- ============================================================================
 
-do $$
-declare
-  pol record;
-  jumlah int := 0;
-begin
-  for pol in
-    select policyname, cmd, roles, qual, with_check
-    from pg_policies
-    where schemaname = 'public' and tablename = 'users'
-    order by policyname
-  loop
-    jumlah := jumlah + 1;
-    raise notice 'Policy lama pada users: % | cmd=% | roles=% | using=% | check=%',
-      pol.policyname, pol.cmd, pol.roles, pol.qual, pol.with_check;
-  end loop;
+alter table public.users enable row level security;
 
-  raise notice 'Total policy lama pada users: %', jumlah;
-
-  for pol in
-    select policyname from pg_policies
-    where schemaname = 'public' and tablename = 'users'
-  loop
-    execute format('drop policy %I on public.users', pol.policyname);
-  end loop;
-end $$;
+drop policy if exists "users can read own or admin" on public.users;
+drop policy if exists "users can list (authenticated users only)" on public.users;
+drop policy if exists "users can create own profile" on public.users;
+drop policy if exists "users can update own or staff" on public.users;
+drop policy if exists "only admin can delete users" on public.users;
 
 
 -- ============================================================================
@@ -138,23 +142,28 @@ end $$;
 --   DELETE : tidak ada policy  -> hanya service role lewat Server Action
 -- ============================================================================
 
+-- CATATAN TIPE KOLOM: `public.users.id` bertipe `uuid` (berbeda dari tabel
+-- lain yang memakai `text`). Karena itu perbandingannya adalah `id = auth.uid()`
+-- TANPA cast. Menuliskan `auth.uid()::text` akan gagal dengan
+-- "operator does not exist: uuid = text".
+
 alter table public.users enable row level security;
 
 drop policy if exists users_select_self_or_staff on public.users;
 create policy users_select_self_or_staff on public.users
   as permissive for select to authenticated
-  using (public.ataya_is_staff() or id = auth.uid()::text);
+  using (public.ataya_is_staff() or id = auth.uid());
 
 drop policy if exists users_update_self_or_staff on public.users;
 create policy users_update_self_or_staff on public.users
   as permissive for update to authenticated
-  using (public.ataya_is_staff() or id = auth.uid()::text)
-  with check (public.ataya_is_staff() or id = auth.uid()::text);
+  using (public.ataya_is_staff() or id = auth.uid())
+  with check (public.ataya_is_staff() or id = auth.uid());
 
 drop policy if exists users_insert_self on public.users;
 create policy users_insert_self on public.users
   as permissive for insert to authenticated
-  with check (id = auth.uid()::text);
+  with check (id = auth.uid());
 
 
 -- ============================================================================
@@ -223,13 +232,26 @@ order by column_name, privilege_type;
 -- ============================================================================
 -- BAGIAN 5 — ROLLBACK
 --
--- Peringatan: policy lama yang dihapus di Bagian 1 TIDAK dapat dipulihkan oleh
--- blok ini, karena isinya tidak diketahui. NOTICE di Bagian 1 mencetak definisinya
--- — simpan keluaran itu bila Anda mungkin perlu kembali ke keadaan sebelumnya.
+-- Policy lama dihapus dengan nama yang pasti, jadi bisa dipulihkan persis.
+-- Definisi aslinya dari `20240913_init.sql` disertakan di bawah.
 -- ============================================================================
 
--- revoke insert, update on table public.users from authenticated;
--- grant select, insert, update, delete on table public.users to authenticated;
 -- drop policy if exists users_select_self_or_staff on public.users;
 -- drop policy if exists users_update_self_or_staff on public.users;
 -- drop policy if exists users_insert_self on public.users;
+-- revoke insert, update on table public.users from authenticated, anon;
+-- grant select, insert, update, delete on table public.users to authenticated;
+--
+-- -- Mengembalikan policy lama (PERINGATAN: ini membuka kembali dua celah
+-- -- keamanan yang baru saja ditutup, jangan dijalankan tanpa alasan jelas):
+-- create policy "users can read own or admin" on public.users
+--   for select using (auth.uid() = id or auth.jwt()->>'role' = 'admin');
+-- create policy "users can list (authenticated users only)" on public.users
+--   for select using (auth.uid() is not null);
+-- create policy "users can create own profile" on public.users
+--   for insert with check (auth.uid() = id);
+-- create policy "users can update own or staff" on public.users
+--   for update using (auth.uid() = id or auth.jwt()->>'role' in ('admin','cashier'))
+--   with check (auth.uid() = id or auth.jwt()->>'role' in ('admin','cashier'));
+-- create policy "only admin can delete users" on public.users
+--   for delete using (auth.jwt()->>'role' = 'admin');

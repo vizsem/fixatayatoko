@@ -67,19 +67,32 @@ async function main() {
 
   console.log(`=== SKEMA NYATA (${names.length} tabel) ===`);
   console.log('Diambil dari spesifikasi PostgREST, jadi ini kolom yang benar-benar ada.');
+  console.log('TIPE IKUT DICETAK: jangan pernah mengasumsikan tipe kolom. `users.id`');
+  console.log('ternyata uuid, sedangkan tabel lain memakai text — perbedaan itu pernah');
+  console.log('membuat migration gagal dengan "operator does not exist: uuid = text".');
   console.log('');
 
   const out = [];
+  const uuidColumns = [];
   for (const name of names) {
     const props = schemas[name].properties || {};
-    const required = schemas[name].required || [];
-    const cols = Object.keys(props);
-    out.push(`${name} (${cols.length} kolom): ${cols.join(', ')}`);
-    if (required.length && required.length !== cols.length) {
-      // Diamkan: hanya informatif.
-    }
+    const cols = Object.entries(props).map(([col, def]) => {
+      const type = def?.format ? `${def.type ?? 'string'}:${def.format}` : String(def?.type ?? '?');
+      if (type.includes('uuid')) uuidColumns.push(`${name}.${col}`);
+      return `${col}:${type}`;
+    });
+    out.push(`${name} (${cols.length} kolom):`);
+    out.push(`    ${cols.join(', ')}`);
   }
   out.forEach((l) => console.log(l));
+
+  console.log('');
+  console.log('=== KOLOM BERTIPE uuid (harus dibandingkan dengan auth.uid() TANPA ::text) ===');
+  if (uuidColumns.length === 0) {
+    console.log('(tidak ada)');
+  } else {
+    uuidColumns.forEach((c) => console.log(`  ${c}`));
+  }
 
   // --- Pemeriksaan kebocoran `settings` lewat anon -------------------------
   console.log('');

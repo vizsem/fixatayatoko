@@ -57,7 +57,7 @@ as $$
            ''
          )
   from public.users u
-  where u.id = auth.uid()::text
+  where u.id = auth.uid()
   limit 1;
 $$;
 
