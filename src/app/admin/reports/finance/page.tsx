@@ -487,7 +487,7 @@ let unsub: (() => void) | undefined;
     const ongkir = filteredRecords.filter(r => r.type === 'income' && r.category === 'Ongkir').reduce((s, r) => s + r.amount, 0);
     const returns = filteredRecords.filter(r => r.type === 'profit' && r.amount < 0).reduce((s, r) => s + Math.abs(r.amount), 0);
     const netRevenue = salesRev + ongkir - returns;
-    const cogs = filteredRecords.filter(r => r.type === 'profit').reduce((s, r) => s + Math.abs(r.cost || 0), 0);
+    const cogs = filteredRecords.filter(r => r.type === 'profit').reduce((s, r) => s + (r.cost || 0), 0);
     const grossProfit = netRevenue - cogs;
     const opex = filteredRecords.filter(r => r.type === 'expense' && r.category.startsWith('Operasional')).reduce((s, r) => s + r.amount, 0);
     const stockPurchases = filteredRecords.filter(r => r.type === 'expense' && r.category === 'Pembelian Stok').reduce((s, r) => s + r.amount, 0);
