@@ -249,24 +249,58 @@ ke database remote, bukan dari asumsi.
 | `src/lib/actions/loyalty.actions.ts` | Server Action baca/tulis untuk kedua halaman |
 | `src/app/admin/points/page.tsx`, `src/app/admin/wallet/page.tsx` | Ditulis ulang memakai Server Action |
 
-### ⚠️ Perlu dijalankan manual
+### ✅ Sudah diterapkan & terverifikasi (2026-10-01)
 
-Migrasi `20261002_loyalty_wallet_hardening.sql` **belum diterapkan**. Sebelum
-dijalankan, kedua halaman menampilkan spanduk peringatan dan menolak penulisan dengan
-pesan yang jelas — bukan gagal senyap. Setelah dijalankan, muat ulang halaman.
+Migrasi `20261002` **sudah dijalankan** pada proyek `cnxuzqlcmosymcwcraoa`.
+Verifikasi ulang kapan saja dengan:
 
 ```bash
-# Opsi A - Supabase Dashboard > SQL Editor > tempel isi file > Run
-# Opsi B - psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261002_loyalty_wallet_hardening.sql
+npm run verify:loyalty
 ```
 
-Uji migrasinya di database sekali pakai sebelum menyentuh produksi:
+Hasil pemeriksaan: kolom `users.points` + `users.is_points_frozen` ada;
+`point_logs.type`, `wallet_logs.type`, dan `wallet_logs.order_id` ada;
+fungsi `adjust_user_points()`, `adjust_user_wallet()`, dan `ledger_totals()` aktif.
+Backfill berhasil — `point_logs.points` dan `wallet_logs.amount` tidak ada lagi
+yang kosong.
+
+Sisa **2 baris `point_logs.user_id` yang masih NULL** adalah data warisan era
+Firebase yang UID-nya tidak ada di `public.users`, jadi memang tidak bisa
+dipetakan (lihat bagian data yatim di atas). Ini wajar, bukan kegagalan migrasi.
+
+#### Jaring pengaman diuji di database sungguhan
+
+Ketiga probe di bawah sengaja dirancang **tidak** menulis apa pun. Data sebelum
+dan sesudah sama persis:
+
+| Probe | Hasil |
+|---|---|
+| Penarikan melebihi saldo | ditolak `23514 Saldo tidak mencukupi`; saldo tidak berubah |
+| Penalti melebihi saldo poin | sukses; saldo tetap 0 dan **tidak** ada baris ledger palsu |
+| UUID tidak valid | ditolak `22P02` sebelum menyentuh data |
+
+Sebelum migrasi dijalankan pun kedua halaman tidak rusak: spanduk kuning muncul
+dan penulisan ditolak dengan pesan yang menjelaskan penyebabnya — bukan gagal senyap.
+
+<details>
+<summary>Cara menjalankan ulang bila diperlukan</summary>
+
+Pastikan yang di-paste adalah **isi** berkasnya, bukan nama berkasnya:
+
+```bash
+pbcopy < supabase/migrations/20261002_loyalty_wallet_hardening.sql
+# lalu Cmd+V di Supabase SQL Editor dan klik Run
+```
+
+Uji di database sekali pakai sebelum menyentuh produksi:
 
 ```bash
 createdb -h /tmp -p 55435 -U postgres loyalty_test
 psql -h /tmp -p 55435 -U postgres -d loyalty_test -v ON_ERROR_STOP=1 \
      -f supabase/tests/loyalty_wallet_hardening.sql
 ```
+
+</details>
 
 ### Catatan keamanan terkait
 
