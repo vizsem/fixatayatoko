@@ -1,7 +1,18 @@
 -- ==============================================================================
 -- Migrasi: Tabel-Tabel yang Belum Ada di Supabase
--- Tanggal: 2026-09-30
--- Deskripsi: Menambahkan 7 tabel yang dipakai kode tapi belum terdefinisi
+-- Tanggal: 2026-09-30 (direvisi 2026-10-01)
+-- Deskripsi: Menambahkan 7 tabel yang dipakai kode tapi belum terdefinisi.
+--
+-- SIFAT: IDEMPOTEN & SELF-HEALING — aman dijalankan berulang kali.
+--   - CREATE TABLE / CREATE INDEX memakai IF NOT EXISTS
+--   - Tiap tabel diikuti ADD COLUMN IF NOT EXISTS, sehingga tabel yang sudah
+--     terlanjur ada dengan skema parsial tetap dilengkapi.
+--     (Kasus nyata: product_cost_logs hanya punya `id` + `raw_data`, sehingga
+--      CREATE INDEX ... ("productId") gagal dengan error 42703.)
+--   - CREATE POLICY didahului DROP POLICY IF EXISTS
+--
+-- Diverifikasi terhadap PostgreSQL 16 (2026-10-01):
+--   skenario tabel kosong OK | lanjut-setelah-gagal OK | dijalankan 3x berturut OK
 -- ==============================================================================
 
 -- ============================================================
@@ -25,6 +36,24 @@ CREATE TABLE IF NOT EXISTS public.marketplace_orders (
   updated_at       TIMESTAMPTZ DEFAULT now()
 );
 
+-- Pastikan kolom ada bila tabel sudah terlanjur dibuat dengan skema parsial.
+-- `CREATE TABLE IF NOT EXISTS` akan DILEWATI untuk tabel yang sudah ada,
+-- sehingga kolom di bawah ini tidak akan terbentuk tanpa pernyataan berikut.
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS source          TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS product_id      TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS product_name    TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS qty             INTEGER DEFAULT 1;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS price           NUMERIC DEFAULT 0;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS total           NUMERIC DEFAULT 0;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS status          TEXT DEFAULT 'PENDING';
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS customer_name   TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS customer_phone  TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS notes           TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS raw_data        JSONB;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS recorded_by     TEXT;
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.marketplace_orders ADD COLUMN IF NOT EXISTS updated_at      TIMESTAMPTZ DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_mp_orders_source     ON public.marketplace_orders (source, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mp_orders_product    ON public.marketplace_orders (product_id);
 CREATE INDEX IF NOT EXISTS idx_mp_orders_status     ON public.marketplace_orders (status);
@@ -47,6 +76,17 @@ CREATE TABLE IF NOT EXISTS public.bri_webhook_logs (
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS type            TEXT DEFAULT 'QRIS';
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS status          TEXT DEFAULT 'RECEIVED';
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS order_id        TEXT;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS partner_ref     TEXT;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS original_ref    TEXT;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS external_id     TEXT;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS amount          NUMERIC DEFAULT 0;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS verified        BOOLEAN DEFAULT false;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS raw_data        JSONB;
+ALTER TABLE public.bri_webhook_logs ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_bri_logs_created     ON public.bri_webhook_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bri_logs_order       ON public.bri_webhook_logs (order_id);
 CREATE INDEX IF NOT EXISTS idx_bri_logs_partner_ref ON public.bri_webhook_logs (partner_ref);
@@ -68,6 +108,32 @@ CREATE TABLE IF NOT EXISTS public."warehouseStock" (
   CONSTRAINT uq_warehouse_product UNIQUE ("productId", "warehouseId")
 );
 
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS "productId"     TEXT;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS "productName"   TEXT;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS "warehouseId"   TEXT;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS "warehouseName" TEXT;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS quantity        INTEGER DEFAULT 0;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS reserved        INTEGER DEFAULT 0;
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS last_updated    TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public."warehouseStock" ADD COLUMN IF NOT EXISTS updated_at      TIMESTAMPTZ DEFAULT now();
+
+-- Unique constraint tidak punya bentuk "IF NOT EXISTS", jadi dibungkus DO block.
+-- Kegagalan (mis. ada baris duplikat) tidak menghentikan migrasi.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_warehouse_product'
+  ) THEN
+    BEGIN
+      ALTER TABLE public."warehouseStock"
+        ADD CONSTRAINT uq_warehouse_product UNIQUE ("productId", "warehouseId");
+    EXCEPTION WHEN unique_violation OR duplicate_object OR duplicate_table THEN
+      RAISE NOTICE 'Lewati uq_warehouse_product: %', SQLERRM;
+    END;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_wh_stock_product   ON public."warehouseStock" ("productId");
 CREATE INDEX IF NOT EXISTS idx_wh_stock_warehouse ON public."warehouseStock" ("warehouseId");
 
@@ -88,6 +154,17 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS type          TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS admin_id      TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS admin_name    TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS target_id     TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS target_name   TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS description   TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS metadata      JSONB;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS ip_address    TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS user_agent    TEXT;
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS created_at    TIMESTAMPTZ DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_activity_logs_admin   ON public.activity_logs (admin_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_type    ON public.activity_logs (type);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON public.activity_logs (created_at DESC);
@@ -107,6 +184,15 @@ CREATE TABLE IF NOT EXISTS public.operational_expenses_proofs (
   uploaded_by      TEXT,
   created_at       TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS expense_id   TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS file_name    TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS file_path    TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS file_url     TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS file_type    TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS file_size    INTEGER;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS uploaded_by  TEXT;
+ALTER TABLE public.operational_expenses_proofs ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_expense_proofs_expense ON public.operational_expenses_proofs (expense_id);
 CREATE INDEX IF NOT EXISTS idx_expense_proofs_created ON public.operational_expenses_proofs (created_at DESC);
@@ -129,6 +215,18 @@ CREATE TABLE IF NOT EXISTS public."stockValidationLogs" (
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS "productId"      TEXT;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS "warehouseId"    TEXT;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS "systemStock"    INTEGER DEFAULT 0;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS "physicalStock"  INTEGER DEFAULT 0;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS difference       INTEGER DEFAULT 0;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS status           TEXT DEFAULT 'VALID';
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS type             TEXT DEFAULT 'STOCK_VALIDATION';
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS error            TEXT;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS "executionTime"  NUMERIC;
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS timestamp        TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public."stockValidationLogs" ADD COLUMN IF NOT EXISTS created_at       TIMESTAMPTZ DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_svl_product   ON public."stockValidationLogs" ("productId", timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_svl_warehouse ON public."stockValidationLogs" ("warehouseId");
 CREATE INDEX IF NOT EXISTS idx_svl_status    ON public."stockValidationLogs" (status);
@@ -149,6 +247,49 @@ CREATE TABLE IF NOT EXISTS public.product_cost_logs (
   raw_data         JSONB,
   created_at       TIMESTAMPTZ DEFAULT now()
 );
+
+-- PENTING: tabel ini sudah ada di project remote dengan bentuk minimal
+-- (hanya `id` + `raw_data`), sehingga CREATE TABLE IF NOT EXISTS di atas DILEWATI.
+-- Kolom berikut wajib ditambahkan eksplisit, karena kode aplikasi menulis
+-- `insert({ productId, productName, oldCost, newCost, adminEmail, changeDate, notes })`.
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "productId"    TEXT;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "productName"  TEXT;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "oldCost"      NUMERIC DEFAULT 0;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "newCost"      NUMERIC DEFAULT 0;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "adminEmail"   TEXT;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS "changeDate"   TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS notes          TEXT;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS source         TEXT DEFAULT 'MANUAL';
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS raw_data       JSONB;
+ALTER TABLE public.product_cost_logs ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ DEFAULT now();
+
+-- Pulihkan baris lama yang datanya masih terkubur di dalam `raw_data`
+-- (format ekspor Firestore). Baris legacy dikenali dari `"productId" IS NULL`,
+-- sehingga UPDATE ini aman dijalankan berulang kali.
+--
+-- Catatan: kolom numerik/tanggal ditimpa langsung (bukan COALESCE) karena
+-- `ADD COLUMN ... DEFAULT` sudah mengisinya dengan nilai default, sehingga
+-- COALESCE akan mempertahankan nilai default alih-alih nilai asli.
+-- Setiap cast dijaga regex + exception handler agar tak pernah menggagalkan migrasi.
+DO $$
+BEGIN
+  UPDATE public.product_cost_logs SET
+    "productId"   = COALESCE("productId", raw_data->>'productId'),
+    "productName" = COALESCE("productName", raw_data->>'productName'),
+    "adminEmail"  = COALESCE("adminEmail", raw_data->>'adminId'),
+    notes         = COALESCE(notes, raw_data->>'reason'),
+    "oldCost"     = CASE WHEN raw_data->>'oldCost' ~ '^-?[0-9]+(\.[0-9]+)?$'
+                         THEN (raw_data->>'oldCost')::numeric ELSE "oldCost" END,
+    "newCost"     = CASE WHEN raw_data->>'newCost' ~ '^-?[0-9]+(\.[0-9]+)?$'
+                         THEN (raw_data->>'newCost')::numeric ELSE "newCost" END,
+    "changeDate"  = CASE WHEN raw_data->'changeDate'->>'_seconds' ~ '^[0-9]+$'
+                         THEN to_timestamp((raw_data->'changeDate'->>'_seconds')::bigint)
+                         ELSE "changeDate" END
+  WHERE raw_data IS NOT NULL
+    AND "productId" IS NULL;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Lewati backfill product_cost_logs: %', SQLERRM;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_pcl_product     ON public.product_cost_logs ("productId", "changeDate" DESC);
 CREATE INDEX IF NOT EXISTS idx_pcl_change_date ON public.product_cost_logs ("changeDate" DESC);

@@ -159,6 +159,52 @@ npm run verify:schema:verbose  # tampilkan jumlah baris per tabel
 > `SUPABASE_SERVICE_ROLE_KEY` di `.env.local`. Dengan publishable key, tabel yang
 > dilindungi RLS akan tampak kosong.
 
+### Kasus `product_cost_logs` (bentuk ganda)
+
+Tabel ini **sudah ada** di remote dengan bentuk minimal — hanya `id` + `raw_data`
+(JSONB), sisa ekspor Firestore. Karena `CREATE TABLE IF NOT EXISTS` dilewati untuk
+tabel yang sudah ada, perintah `CREATE INDEX ... ("productId", "changeDate")`
+berikutnya gagal dengan:
+
+```
+ERROR: 42703: column "productId" does not exist
+```
+
+Akibatnya seluruh migrasi batal. Penyebab ini sudah direproduksi dan diperbaiki pada
+2026-10-01 — migrasi kini menambahkan kolom yang hilang via `ADD COLUMN IF NOT EXISTS`,
+lalu **memulihkan data lama dari `raw_data`**.
+
+Saat ini ada **dua jalur penulisan** ke tabel yang sama, dan keduanya harus jalan:
+
+| Jalur | Bentuk data | Contoh |
+|---|---|---|
+| Bridge `addDoc()` | `{ id, raw_data: {...}, created_at }` | `pricing-hpp/page.tsx` |
+| `supabaseAdmin.from(...).insert()` | kolom asli camelCase | `product.actions.ts` (3 tempat) |
+
+Migrasi menyatukan keduanya: kolom asli dibuat, dan baris lama di-*backfill* dari
+`raw_data`. Backfill hanya menyentuh baris legacy (`"productId" IS NULL`) sehingga
+aman diulang.
+
+### ⚠️ Divergensi `TABLES_WITH_RAW_DATA`
+
+Konstanta ini **diduplikasi** di dua modul dan isinya sudah berbeda:
+
+| Modul | Entri | Selisih |
+|---|---|---|
+| `src/lib/firebase.ts` | 17 | — |
+| `src/lib/supabase-helpers.ts` | 19 | + `inventory_transactions`, + `product_cost_logs` |
+
+Konsekuensinya, `product_cost_logs` diperlakukan berbeda oleh dua jalur query:
+`firebase.ts` memetakan `changeDate` ke **kolom asli**, sedangkan
+`supabase-helpers.ts` memetakannya ke **`raw_data->>changeDate`**.
+
+Karena migrasi ini kini membuat kolom asli `"changeDate"`, entri `product_cost_logs`
+di `supabase-helpers.ts` sebaiknya dihapus agar kedua modul konsisten. Belum diubah
+karena mengubah semantik query — perlu ditinjau dulu.
+
+**Rekomendasi jangka panjang:** jadikan satu sumber kebenaran (mis. `src/lib/db-schema.ts`)
+dan impor dari kedua modul, agar tidak bisa drift lagi.
+
 ## Kualitas Kode
 
 ### React Compiler tidak aktif
