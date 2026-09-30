@@ -9,8 +9,21 @@ export function isAdminRole(role?: string | null): boolean {
 export function isStaffOrAdmin(role?: string | null): boolean {
   if (!role) return false;
   if (isAdminRole(role)) return true;
-  const normalized = role.trim().toLowerCase();
-  return ['cashier', 'kasir', 'employee', 'staff', 'sales', 'warehouse', 'driver'].includes(normalized);
+  const normalized = role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return [
+    'cashier',
+    'kasir',
+    'employee',
+    'staff',
+    'sales',
+    'warehouse',
+    'driver',
+    // Peran yang sudah dimodelkan aplikasi (lihat `UserRole` di
+    // admin/employees): HR mengelola kepegawaian, supervisor mengawasi
+    // operasional. Keduanya butuh akses data internal, bukan akses publik.
+    'hr',
+    'supervisor',
+  ].includes(normalized);
 }
 
 export function isOperationalUser(user: any, profileRole?: string | null): boolean {

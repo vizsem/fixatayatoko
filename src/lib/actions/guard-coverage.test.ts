@@ -44,6 +44,10 @@ const GUARD_PATTERNS = [
   /await\s+requireIdentity\s*\(/,
   /await\s+authorize\s*\(/,
   /const\s+\w+\s*=\s*await\s+authorize\s*\(/,
+  // Pemeriksaan yang diangkat ke fungsi tersendiri agar tidak diulang di
+  // setiap action. `assertHrAccess` memverifikasi token + peran sekaligus
+  // membatasi nama tabelnya (lihat `src/lib/actions/hr-data.actions.ts`).
+  /await\s+assert\w*Access\s*\(/,
 ];
 
 function actionFiles(): string[] {

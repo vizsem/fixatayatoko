@@ -16,8 +16,12 @@ import { useRouter } from 'next/navigation';
 import jsPDF from 'jspdf';
 import { supabase } from '@/lib/supabase';
 
-import { sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { arrayUnion, collection, db, doc, getDocs, increment, orderBy, query, ref, runTransaction, setDoc, where } from '@/lib/firebase';
+import { sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/hr-client';
+// Modul HR selalu diakses lewat Server Action (`src/lib/hr-client.ts`).
+// Sebelumnya halaman ini memakai '@/lib/supabase-helpers' dan '@/lib/firebase'
+// langsung dari browser; di sana `supabaseAdmin` jatuh ke kunci anon tanpa sesi
+// pengguna sehingga RLS menolak semuanya dan halaman tampak kosong.
+import { arrayUnion, collection, db, doc, getDocs, increment, orderBy, query, runTransaction, setDoc, where } from '@/lib/hr-client';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Employee = {
   id: string;

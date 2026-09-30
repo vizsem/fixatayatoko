@@ -7,7 +7,10 @@ import EmployeesPage from './page';
 const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
 const mockRunTransaction = vi.fn();
-vi.mock('@/lib/firebase', () => {
+// Halaman ini sekarang mengakses data lewat `@/lib/hr-client`, yang meneruskan
+// setiap panggilan ke Server Action. Yang di-mock karena itu adalah modul
+// tersebut, bukan `@/lib/firebase` seperti sebelumnya.
+vi.mock('@/lib/hr-client', () => {
   const M = Symbol('supabase_increment');
   return ({
   auth: {},

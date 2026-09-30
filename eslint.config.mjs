@@ -31,6 +31,17 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/immutability": "off",
       "react/no-unescaped-entities": "off",
+      // Argumen yang diawali garis bawah menandakan "sengaja tidak dipakai".
+      // Dipakai pada penyesuai API (`src/lib/hr-client.ts`) yang harus tetap
+      // menerima parameter lama agar pemanggilnya tidak perlu diubah.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);
