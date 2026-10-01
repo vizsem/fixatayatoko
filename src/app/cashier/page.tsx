@@ -12,9 +12,7 @@ import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library K
 import toast from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
-import { addInventoryLog, deductStockFEFO } from '@/lib/inventory';
-import { supabaseAdmin } from '@/lib/supabase';
-import { postJournal } from '@/lib/ledger';
+import { simpanTransaksiKasir } from '@/lib/actions/cashier.actions';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 import { supabase } from '@/lib/supabase';
@@ -1230,10 +1228,6 @@ export default function CashierPOS() {
         shiftId: currentShift.id,
       };
 
-      // FIX: Fetch auth user once outside the loop
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const currentUserId = currentUser?.id || 'cashier';
-
       // 1. Validasi kecukupan stok sebelum proses eksekusi
       for (const item of cart) {
         const contains = Number(item.contains || 1);
@@ -1245,151 +1239,19 @@ export default function CashierPOS() {
         }
       }
 
-      // 2. Potong stok via Supabase deductStockFEFO (dengan fallback offline)
-      const deductionResults: Array<{
-        productId: string;
-        newStock: number;
-        newStockByWarehouse: Record<string, number>;
-      }> = [];
-
-      if (!isOffline) {
-        for (const item of cart) {
-          const contains = Number(item.contains || 1);
-          const pcsToDeduct = item.quantity * contains;
-
-          const res = await deductStockFEFO({
-            productId: item.id,
-            amount: pcsToDeduct,
-            warehouseId: selectedWarehouse,
-            reference: orderId,
-            notes: `Transaksi Kasir (${paymentMethod}) - ${item.quantity} ${item.unit} [Gudang: ${warehouseName}]`,
-            source: 'CASHIER',
-            adminId: currentUserId,
-          });
-
-          if (!res.success) {
-            throw new Error(`Gagal memotong stok ${item.name}: ${res.error}`);
-          }
-
-          // Fetch state terkini untuk sync ke state lokal
-          const { data: updatedProd } = await supabaseAdmin
-            .from('products')
-            .select('stock, raw_data')
-            .eq('id', item.id)
-            .single();
-
-          const nStock = Number(updatedProd?.stock ?? Math.max(0, (products.find(p => p.id === item.id)?.stock || 0) - pcsToDeduct));
-          const nWh = (updatedProd?.raw_data?.stockByWarehouse || {}) as Record<string, number>;
-
-          deductionResults.push({
-            productId: item.id,
-            newStock: nStock,
-            newStockByWarehouse: nWh,
-          });
-
-        }
-      } else {
-        // Mode OFFLINE
-        for (const item of cart) {
-          const localProduct = products.find(p => p.id === item.id);
-          const currentStock = localProduct?.stock || 0;
-          const contains = Number(item.contains || 1);
-          const pcsToDeduct = item.quantity * contains;
-          const newStock = Math.max(0, currentStock - pcsToDeduct);
-          const stockByWarehouse = localProduct?.stockByWarehouse || {};
-          const newStockByWarehouse = { ...stockByWarehouse };
-
-          deductionResults.push({
-            productId: item.id,
-            newStock,
-            newStockByWarehouse,
-          });
-
-          await addInventoryLog({
-            productId: item.id,
-            productName: item.name,
-            type: 'KELUAR',
-            amount: pcsToDeduct,
-            adminId: currentUserId,
-            source: 'CASHIER',
-            referenceId: orderId,
-            orderId: orderId,
-            note: `Transaksi Kasir Offline (${paymentMethod})`,
-            fromWarehouseId: selectedWarehouse === 'auto' ? 'gudang-utama' : selectedWarehouse,
-            prevStock: currentStock,
-            nextStock: newStock,
-          });
-        }
-      }
-
-      // --- LOGIKA UNTUK DOMPET VIA SUPABASE ---
-      if (paymentMethod === 'DOMPET' && selectedCustomer) {
-        const newBalance = selectedCustomer.walletBalance - total;
-        await supabase
-          .from('customers')
-          .update({
-            wallet_balance: newBalance,
-          })
-          .eq('id', selectedCustomer.id);
-
-        await supabase.from('wallet_logs').insert({
-          id: timestampId('wal'),
-          user_id: selectedCustomer.id,
-          amount: -total,
-          description: `Pembayaran pesanan #${orderId}`,
-          created_at: now,
-          raw_data: {
-            type: 'payment',
-            userId: selectedCustomer.id,
-            amount: -total,
-            orderId: orderId,
-            createdAt: now,
-          }
-        });
-      }
-      // --- AKHIR LOGIKA DOMPET ---
-
-      // --- DOUBLE-ENTRY ACCOUNTING KE SUPABASE ---
-      let debitAcc: any = 'Cash';
-      if (paymentMethod === 'TEMPO') debitAcc = 'AccountsReceivable';
-      else if (paymentMethod === 'DOMPET') debitAcc = 'CustomerWallet';
-
-      await postJournal({
-        debitAccount: debitAcc,
-        creditAccount: 'Sales',
-        amount: total,
-        memo: `Penjualan Kasir #${orderId}`,
-        refType: 'ORDER',
-        refId: orderId
-      });
-
-      let totalCogs = 0;
-      for (const item of cart) {
-        const itemCost = item.cost || 0;
-        const contains = Number(item.contains || 1);
-        totalCogs += (itemCost * item.quantity * contains);
-      }
-      
-      if (totalCogs > 0) {
-        await postJournal({
-          debitAccount: 'COGS',
-          creditAccount: 'Inventory',
-          amount: totalCogs,
-          memo: `HPP Penjualan #${orderId}`,
-          refType: 'ORDER',
-          refId: orderId
-        });
-      }
-      // --- AKHIR DOUBLE-ENTRY ---
-  
-      // Simpan ke tabel orders Supabase secara native
-      const { error: insertErr } = await supabaseAdmin.from('orders').insert({
-        id: orderId,
-        order_id: orderId,
-        user_id: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
-        customer_name: orderData.customerName,
-        status: orderData.status,
-        total,
+      // 2. Simpan SEMUA di server (stok, order, dompet, jurnal).
+      //
+      // Sebelumnya halaman ini menulis sendiri memakai `supabaseAdmin` DARI
+      // PERAMBAN. Klien itu di browser berjalan sebagai `anon` (tanpa sesi),
+      // sehingga RLS menolak: pemotongan stok gagal dan baris `orders` tidak
+      // pernah masuk (terbukti 0 order ber-source CASHIER di database, dan
+      // order offline terakhir masih dari era Firestore).
+      //
+      // Server Action ini memakai service role + pemeriksaan peran, menghitung
+      // ulang MODAL per pcs dari master produk (snapshot HPP), dan mengembalikan
+      // stok yang sudah terpotong bila ada langkah yang gagal.
+      const simpan = await simpanTransaksiKasir({
+        orderId,
         items: cart.map(item => ({
           id: item.id,
           name: item.name,
@@ -1397,23 +1259,48 @@ export default function CashierPOS() {
           quantity: item.quantity,
           unit: item.unit,
           contains: item.contains || 1,
-          cost: item.cost,
         })),
-        raw_data: {
-          ...orderData,
-          warehouseId: selectedWarehouse,
-          warehouseName,
-          source: 'CASHIER',
-        },
-        created_at: now,
-        updated_at: now,
+        subtotal,
+        shippingCost,
+        total,
+        paymentMethod,
+        paymentProofUrl: proofUrl,
+        transactionType,
+        deliveryMethod,
+        status: orderData.status,
+        dueDate: orderData.dueDate,
+        customerName: orderData.customerName,
+        customerPhone: orderData.customerPhone,
+        userId: orderData.userId,
+        payAmount: finalPayAmount,
+        changeAmount: finalChange,
+        shiftId: currentShift.id,
+        warehouseId: selectedWarehouse,
+        warehouseName,
       });
 
-      if (insertErr) {
-        console.warn('Gagal insert order ke Supabase:', insertErr);
+      if (!simpan.success || !simpan.data) {
+        return toast.error(
+          isOffline
+            ? 'Mode offline: transaksi TIDAK tersimpan (butuh koneksi). Sambungkan internet lalu ulangi.'
+            : (simpan.error || 'Gagal menyimpan transaksi')
+        );
       }
 
-      toast.success('Transaksi Berhasil! Stok diperbarui.');
+      const deductionResults = simpan.data.items;
+
+      if (simpan.data.itemTanpaModal > 0) {
+        toast(
+          `${simpan.data.itemTanpaModal} item belum punya Modal — HPP transaksi ini masih estimasi.`
+        );
+      }
+
+      toast.success('Transaksi tersimpan & stok diperbarui.');
+
+      // 3. Pencatatan dompet, jurnal double-entry, dan baris `orders` sudah
+      //    dilakukan di dalam `simpanTransaksiKasir()` — jangan ditulis lagi
+      //    di sini supaya tidak terhitung dua kali.
+
 
       // 4. Update stok di state produk kasir secara realtime
       if (deductionResults.length > 0) {
