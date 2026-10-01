@@ -69,7 +69,7 @@ function EditPurchaseFormContent() {
     const fetchDuplicateData = async () => {
       setIsDuplicating(true);
       try {
-        const docSnap = await sbGetDoc('purchases', id);
+        const docSnap = await sbGetDoc('purchases', id, false);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOldPurchaseData(data);

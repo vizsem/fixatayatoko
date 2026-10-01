@@ -64,7 +64,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
           threadId = snapshot.docs[0].id;
         } else {
           // Create new chat thread
-          const userDoc = await sbGetDoc('users', user.uid);
+          const userDoc = await sbGetDoc('users', user.uid, false);
           const userData = userDoc.data();
 
           const newThread = await sbInsertDoc('chats', {
@@ -79,7 +79,7 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
             isReadByAdmin: false,
             unreadCount: 0,
             createdAt: new Date().toISOString(),
-          });
+          }, false);
 
           threadId = newThread.id;
         }
@@ -145,8 +145,8 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
         lastMessage: text,
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,
-        unreadCount: (await sbGetDoc('chats', chatId)).data()?.unreadCount || 0 + 1
-      });
+        unreadCount: (await sbGetDoc('chats', chatId, false)).data()?.unreadCount || 0 + 1
+      }, false);
 
       // Request notification permission if not granted
       if ('Notification' in window && Notification.permission === 'default') {

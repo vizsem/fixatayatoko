@@ -92,7 +92,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
     const fetchOrder = async () => {
       try {
         const docRef = doc(db, 'orders', id);
-        const docSnap = await sbGetDoc('orders', id);
+        const docSnap = await sbGetDoc('orders', id, false);
 
         if (!docSnap.exists()) {
           setError('Pesanan tidak ditemukan.');

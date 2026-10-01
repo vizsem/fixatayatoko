@@ -64,7 +64,7 @@ export default function VoucherExchangePage() {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        const userSnap = await sbGetDoc('users', currentUser.uid);
+        const userSnap = await sbGetDoc('users', currentUser.uid, false);
         if (userSnap.exists()) setUserData(userSnap.data() as UserData);
 
       } else {

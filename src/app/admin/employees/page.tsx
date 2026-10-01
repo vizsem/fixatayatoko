@@ -586,7 +586,7 @@ export default function EmployeesPage() {
 
   const fetchPayrollSettings = async () => {
     try {
-      const snap = await sbGetDoc('payroll_settings', 'default');
+      const snap = await sbGetDoc('payroll_settings', 'default', false);
       if (!snap.exists()) return;
       const data = snap.data() as any;
       setPayrollSettings((prev) => ({
@@ -610,7 +610,7 @@ export default function EmployeesPage() {
 
   const fetchPayrollRun = async (month: string) => {
     try {
-      const snap = await sbGetDoc('payroll_runs', month);
+      const snap = await sbGetDoc('payroll_runs', month, false);
       if (!snap.exists()) {
         setPayrollRun({ id: month, month, status: 'DRAFT', includeTHR: false });
         setIncludeTHR(false);
@@ -1320,7 +1320,7 @@ export default function EmployeesPage() {
 
   const downloadSlipPdf = async (slipId: string) => {
     try {
-      const snap = await sbGetDoc('payroll_slips', slipId);
+      const snap = await sbGetDoc('payroll_slips', slipId, false);
       if (!snap.exists()) {
         notify.admin.error('Slip belum dibuat');
         return;

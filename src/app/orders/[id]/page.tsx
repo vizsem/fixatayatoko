@@ -55,7 +55,7 @@ export default function PublicOrderDetailPage() {
     if (!id) return;
     const fetchOrder = async () => {
       try {
-        const docSnap = await sbGetDoc('orders', id);
+        const docSnap = await sbGetDoc('orders', id, false);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setOrder({

@@ -39,7 +39,7 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
         return;
       }
       try {
-        const userDoc = await sbGetDoc('users', user.uid);
+        const userDoc = await sbGetDoc('users', user.uid, false);
         const role = userDoc.data()?.role;
         setUserRole(role);
       } catch (error) {
@@ -122,7 +122,7 @@ let unsub: (() => void) | undefined;
       sbUpdateDoc('chats', selectedThread.id, {
         isReadByAdmin: true,
         unreadCount: 0
-      });
+      }, false);
     }
 
     const q = query(
@@ -170,7 +170,7 @@ let unsub: (() => void) | undefined;
         lastMessage: text,
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: true // Admin just replied, so it's read by admin
-      });
+      }, false);
 
     } catch (error) {
       console.error('Error sending message:', error);

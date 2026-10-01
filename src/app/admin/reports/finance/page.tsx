@@ -118,7 +118,7 @@ export default function FinanceReport() {
   const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
   
       if (!user) { router.push('/profil/login'); return; }
-      const ud = await sbGetDoc('users', user.uid);
+      const ud = await sbGetDoc('users', user.uid, false);
       if (!isAuthorizedAdmin(user, ud.exists() ? ud.data() : null)) {
         notify.aksesDitolakAdmin(); router.push('/profil'); return;
       }

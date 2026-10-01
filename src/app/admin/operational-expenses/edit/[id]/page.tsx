@@ -33,7 +33,7 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
     const fetchExpense = async () => {
       try {
         const docRef = doc(db, 'operational_expenses', id);
-        const docSnap = await sbGetDoc('operational_expenses', id);
+        const docSnap = await sbGetDoc('operational_expenses', id, false);
         
         if (docSnap.exists()) {
           const data = docSnap.data();

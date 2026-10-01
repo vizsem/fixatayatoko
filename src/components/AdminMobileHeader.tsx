@@ -96,7 +96,7 @@ export default function AdminMobileHeader() {
     const fetchUserProfile = async () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (user) {
-        const userDoc = await sbGetDoc('users', user.id);
+        const userDoc = await sbGetDoc('users', user.id, false);
         if (userDoc.exists()) {
           setUserProfile(userDoc.data());
         }

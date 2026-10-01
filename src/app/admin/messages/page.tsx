@@ -56,7 +56,7 @@ export default function AdminMessages() {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await sbUpdateDoc('messages', id, { status: 'read' });
+      await sbUpdateDoc('messages', id, { status: 'read' }, false);
       notify.success('Pesan ditandai sudah dibaca');
     } catch (error) {
       console.error(error);

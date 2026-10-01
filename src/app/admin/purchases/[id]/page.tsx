@@ -165,7 +165,7 @@ export default function PurchaseDetail() {
         }
 
         // 2. Fetch data via sbGetDoc
-        const snap = await sbGetDoc('purchases', id as string);
+        const snap = await sbGetDoc('purchases', id as string, false);
         if (snap.exists()) {
           setPurchase({ id: snap.id, ...snap.data() } as PurchaseData);
         } else {

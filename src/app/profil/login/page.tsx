@@ -34,7 +34,7 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result?.user;
       if (!user) return;
-      const userSnap = await sbGetDoc('users', result.user.uid);
+      const userSnap = await sbGetDoc('users', result.user.uid, false);
       if (!userSnap.exists()) {
         await sbUpsertDoc('users', result.user.uid, { uid: user.uid, name: user.displayName, email: user.email, role: 'customer', points: 0, createdAt: new Date().toISOString() });
       }

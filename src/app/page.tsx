@@ -132,7 +132,7 @@ export default function Home() {
       }
       setCurrentUserPhotoUrl(user.photoURL || null);
       try {
-        const userSnap = await sbGetDoc('users', user.uid);
+        const userSnap = await sbGetDoc('users', user.uid, false);
         setCurrentUserName(userSnap.exists() ? userSnap.data()?.name : user.displayName || 'Pengguna');
         
         const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5));

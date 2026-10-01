@@ -25,7 +25,7 @@ export default function CustomerChatWidget() {
       if (currentUser) {
         // Check role to hide widget for admins/cashiers
         try {
-          const userDoc = await sbGetDoc('users', currentUser.uid);
+          const userDoc = await sbGetDoc('users', currentUser.uid, false);
           const role = userDoc.data()?.role;
           if (role === 'admin' || role === 'cashier') {
             setUser(null); // Hide widget
@@ -100,7 +100,7 @@ export default function CustomerChatWidget() {
 
       // 1. Ensure Chat Thread Exists
       const chatRef = doc(db, 'chats', user.uid);
-      const chatSnap = await sbGetDoc('chats', user.uid);
+      const chatSnap = await sbGetDoc('chats', user.uid, false);
 
       if (!chatSnap.exists()) {
         await sbUpsertDoc('chats', user.uid, {
@@ -114,7 +114,7 @@ export default function CustomerChatWidget() {
           createdAt: new Date().toISOString(),
           unreadCount: 0,
           isReadByAdmin: false
-        });
+        }, false);
       }
 
       // 2. Add Message
@@ -132,7 +132,7 @@ export default function CustomerChatWidget() {
         lastMessageTime: new Date().toISOString(),
         isReadByAdmin: false,
         unreadCount: (chatSnap.data()?.unreadCount || 0) + 1
-      });
+      }, false);
 
     } catch (error) {
       console.error('Error sending message:', error);

@@ -71,7 +71,7 @@ import { isAdminRole } from '@/lib/auth-helpers';
  
    const fetchSupplier = useCallback(async () => {
      try {
-       const snap = await sbGetDoc('suppliers', id);
+       const snap = await sbGetDoc('suppliers', id, false);
        if (!snap.exists()) {
          notify.admin.error('Supplier tidak ditemukan');
          router.push('/admin/suppliers');
