@@ -18,6 +18,7 @@ import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { Timestamp, auth, collection, db, getDocs, limit, orderBy, query, ref, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
+import { hitungItemOrder } from '@/lib/hpp';
 
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital' | 'tax';
 
@@ -43,7 +44,17 @@ function AuditPageContent() {
   const [costLogs, setCostLogs] = useState<any[]>([]);
   const [capitalLogs, setCapitalLogs] = useState<any[]>([]);
   const [taxLogs, setTaxLogs] = useState<any[]>([]);
-  const [profitSummary, setProfitSummary] = useState({ sales: 0, cost: 0, profit: 0, discount: 0, expenses: 0, netProfit: 0 });
+  const [profitSummary, setProfitSummary] = useState({
+    sales: 0,
+    cost: 0,
+    profit: 0,
+    discount: 0,
+    expenses: 0,
+    netProfit: 0,
+    /** Laba dari item yang produknya belum punya Modal (estimasi, bukan angka nyata). */
+    labaEstimasi: 0,
+    itemEstimasi: 0,
+  });
   const [taxSummary, setTaxSummary] = useState({ totalSales: 0, dpp: 0, taxAmount: 0 });
 
   useEffect(() => {
@@ -93,20 +104,56 @@ function AuditPageContent() {
         const qExp = query(collection(db, 'operational_expenses'), where('date', '>=', startT), where('date', '<=', endT));
         const [oSnap, eSnap] = await Promise.all([getDocs(qOrders), getDocs(qExp)]);
         
-        let tS = 0, tC = 0, tD = 0, tE = 0;
+        let tS = 0, tC = 0, tD = 0, tE = 0, tEstimasi = 0, nEstimasi = 0;
         eSnap.docs.forEach(d => tE += (d.data().amount || 0));
+
+        // HPP memakai RUMUS YANG SAMA dengan Dashboard & Laporan Keuangan
+        // (`src/lib/hpp.ts`). Sebelumnya halaman ini membaca `i.cost`/`i.modal`
+        // yang TIDAK ADA di order marketplace, sehingga HPP dianggap Rp0 dan
+        // laba tampil 100% dari penjualan.
+        const produkSnap = await sbGetDocs({ table: 'products' });
+        const produkMap = new Map<string, any>();
+        produkSnap.docs.forEach(ps => produkMap.set(ps.id, ps.data()));
+
         const logs = oSnap.docs.map(d => {
            const data = d.data();
-           let oC = 0, oD = 0;
-           (data.items || []).forEach((i: any) => {
-              oC += (i.cost || i.modal || 0) * (i.quantity || 1);
-              oD += Math.max(0, ((i.originalPrice || i.price) - i.price) * i.quantity);
+           const items = data.items || [];
+
+           const { ringkasan } = hitungItemOrder({
+              items,
+              produkDari: (pid) => produkMap.get(pid),
            });
-           tS += (data.total || 0); tC += oC; tD += oD;
-           return { id: d.id, date: data.createdAt, sales: data.total, cost: oC, profit: (data.total - oC) };
+
+           // Order tanpa baris item (data lama) jatuh ke total order.
+           const pendapatan = ringkasan.itemTotal > 0 ? ringkasan.pendapatan : Number(data.total || 0);
+           const oC = ringkasan.hppDipercaya + ringkasan.hppEstimasi;
+           const oD = items.reduce((s: number, i: any) => s + Math.max(0, ((i.originalPrice || i.price) - i.price) * (i.quantity || 1)), 0);
+
+           tS += pendapatan; tC += oC; tD += oD;
+           tEstimasi += ringkasan.labaEstimasi;
+           nEstimasi += ringkasan.itemEstimasi;
+
+           return {
+              id: d.id,
+              date: data.createdAt,
+              sales: pendapatan,
+              cost: oC,
+              profit: pendapatan - oC,
+              labaEstimasi: ringkasan.labaEstimasi,
+              itemEstimasi: ringkasan.itemEstimasi,
+           };
         });
         setProfitLogs(logs);
-        setProfitSummary({ sales: tS, cost: tC, profit: (tS - tC), discount: tD, expenses: tE, netProfit: (tS - tC - tE) });
+        setProfitSummary({
+           sales: tS,
+           cost: tC,
+           profit: (tS - tC),
+           discount: tD,
+           expenses: tE,
+           netProfit: (tS - tC - tE),
+           labaEstimasi: tEstimasi,
+           itemEstimasi: nEstimasi,
+        });
         setLoading(false);
       } else if (activeTab === 'cost') {
         const q = query(collection(db, 'product_cost_logs'), where('changeDate', '>=', startT), where('changeDate', '<=', endT), orderBy('changeDate', 'desc'), limit(limitCount));
@@ -260,6 +307,13 @@ function AuditPageContent() {
            <div className={`p-6 rounded-[2rem] border ${profitSummary.netProfit >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'} shadow-xl`}>
               <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-2">Laba Bersih</p>
               <p className="text-2xl font-black">Rp {profitSummary.netProfit.toLocaleString()}</p>
+              {profitSummary.itemEstimasi > 0 && (
+                <p className="text-[10px] font-bold opacity-80 mt-2 leading-tight">
+                  {profitSummary.itemEstimasi} item tanpa Modal · perkiraan Rp{' '}
+                  {Math.round(profitSummary.labaEstimasi).toLocaleString('id-ID')} ikut terhitung —
+                  angka ini belum akurat.
+                </p>
+              )}
            </div>
         </div>
       )}

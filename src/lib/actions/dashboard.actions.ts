@@ -2,6 +2,7 @@
 
 import { requireStaff } from '@/lib/actions/session';
 import { supabaseAdmin } from '@/lib/supabase';
+import { hitungItemOrder } from '@/lib/hpp';
 
 export async function getDashboardStats() {
   // Action ini memakai klien service role (melewati RLS), jadi identitas WAJIB
@@ -60,11 +61,14 @@ export async function getDashboardStats() {
       return stock <= 10;
     }).length;
 
-    // Create a map of product id to cost_price for profit calculation
-    const productCostMap = new Map<string, number>();
+    // Peta produk (Modal + daftar satuan) untuk perhitungan HPP.
+    // Dulu peta ini hanya menyimpan harga modal, lalu halaman ini memakai
+    // asumsi "laba 20%" bila Modal kosong — BERBEDA dari halaman Laporan
+    // Keuangan yang memakai asumsi 15%. Sekarang keduanya memakai rumus yang
+    // sama dari `src/lib/hpp.ts`.
+    const productCostMap = new Map<string, any>();
     for (const p of allProducts) {
-      const costPrice = Number(p.cost_price ?? p.raw_data?.costPrice ?? p.raw_data?.Modal ?? 0);
-      productCostMap.set(p.id, costPrice);
+      productCostMap.set(p.id, { cost_price: p.cost_price, raw_data: p.raw_data });
     }
 
     // Filter berdasarkan tanggal & status
@@ -80,6 +84,8 @@ export async function getDashboardStats() {
     let weeklySales = 0;
     let monthlySales = 0;
     let monthlyProfit = 0;
+    let monthlyProfitEstimasi = 0;
+    let monthlyItemsEstimasi = 0;
 
     const dailyMap = new Map<string, number>();
     for (let i = 6; i >= 0; i--) {
@@ -110,23 +116,19 @@ export async function getDashboardStats() {
       if (date >= startOfMonth) {
         monthlySales += amount;
         
-        // Calculate profit for this order
+        // Hitung laba dengan RUMUS YANG SAMA dengan Laporan Keuangan & Audit.
         const raw = o.raw_data || {};
         const items = Array.isArray(raw.items) ? raw.items : [];
-        for (const it of items) {
-          const pid = it.id || it.productId || '';
-          const qty = Number(it.quantity || it.qty || 1);
-          const conversion = Number(it.containsPerUnit || it.contains || it.conversion || 1);
-          const baseQty = Number(it.baseQuantity || (qty * conversion));
-          const price = Number(it.price || 0);
-          const costPrice = pid ? (productCostMap.get(pid) || 0) : 0;
-          if (costPrice > 0) {
-             monthlyProfit += (price * qty) - (costPrice * baseQty);
-          } else {
-             // Fallback estimate if cost price is unknown (e.g., 20% margin)
-             monthlyProfit += (price * 0.2) * qty;
-          }
-        }
+        const { ringkasan } = hitungItemOrder({
+          items,
+          produkDari: (pid) => productCostMap.get(pid),
+        });
+
+        // Hanya laba dari baris yang modalnya NYATA yang masuk angka utama.
+        // Baris tanpa Modal dipisah supaya tidak mencemari "Laba Bersih".
+        monthlyProfit += ringkasan.labaDipercaya;
+        monthlyProfitEstimasi += ringkasan.labaEstimasi;
+        monthlyItemsEstimasi += ringkasan.itemEstimasi;
       }
 
       const dateKey = date.toISOString().split('T')[0];
@@ -221,6 +223,10 @@ export async function getDashboardStats() {
         weeklySales,
         monthlySales,
         monthlyProfit,
+        // Laba dari baris yang produknya BELUM punya Modal (HPP estimasi).
+        // Ditampilkan terpisah, tidak dicampur ke "Laba Bersih".
+        monthlyProfitEstimasi,
+        monthlyItemsEstimasi,
         monthlyNetProfit: monthlyProfit - monthlyExpenses,
         totalInventoryValue,
         totalProducts,
@@ -238,7 +244,7 @@ export async function getDashboardStats() {
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error);
     return {
-      stats: { dailySales: 0, weeklySales: 0, monthlySales: 0, monthlyProfit: 0, monthlyNetProfit: 0, totalInventoryValue: 0, totalProducts: 0, lowStock: 0, deadStock: 0, warehouses: 0, users: 0, cancelledOrders: 0 },
+      stats: { dailySales: 0, weeklySales: 0, monthlySales: 0, monthlyProfit: 0, monthlyProfitEstimasi: 0, monthlyItemsEstimasi: 0, monthlyNetProfit: 0, totalInventoryValue: 0, totalProducts: 0, lowStock: 0, deadStock: 0, warehouses: 0, users: 0, cancelledOrders: 0 },
       recentOrders: [],
       topProducts: [],
       topCustomers: [],

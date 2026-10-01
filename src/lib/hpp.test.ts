@@ -4,8 +4,11 @@ import {
   ambilHppPerPcs,
   cariContainsSatuan,
   hitungHppItem,
+  hitungItemOrder,
   hitungPcsItem,
   hitungPetaModalPembelian,
+  nilaiSnapshotHpp,
+  ringkasLabaItem,
 } from '@/lib/hpp';
 
 /**
@@ -86,7 +89,17 @@ describe('hitungPcsItem', () => {
 });
 
 describe('ambilHppPerPcs', () => {
-  it('master produk menang', () => {
+  it('snapshot saat transaksi menang atas Modal terkini', () => {
+    // Modal produk sudah diubah jadi 30.000, tetapi transaksinya terjadi saat
+    // modalnya masih 20.333 — laba order lama TIDAK boleh ikut berubah.
+    const hasil = ambilHppPerPcs({
+      item: { hppPerPcs: 20333 },
+      produk: { cost_price: 30000, raw_data: {} },
+    });
+    expect(hasil).toEqual({ costPerPcs: 20333, sumber: 'SNAPSHOT' });
+  });
+
+  it('master produk menang bila tidak ada snapshot', () => {
     const hasil = ambilHppPerPcs({ item: {}, produk: PRODUK_BANTAL });
     expect(hasil).toEqual({ costPerPcs: 20333, sumber: 'MASTER' });
   });
@@ -200,5 +213,63 @@ describe('hitungPetaModalPembelian', () => {
     ]);
 
     expect(peta.size).toBe(0);
+  });
+});
+
+describe('ringkasLabaItem — laba nyata dipisah dari laba estimasi', () => {
+  it('memisahkan baris bermodal nyata dari baris tanpa Modal', () => {
+    const { ringkasan } = hitungItemOrder({
+      items: [
+        { id: 'p1', price: 10000, quantity: 2, unit: 'PCS' }, // modal ada
+        { id: 'p2', price: 20000, quantity: 1, unit: 'PCS' }, // modal kosong
+      ],
+      produkDari: (pid) =>
+        pid === 'p1' ? { cost_price: 6000, raw_data: {} } : { cost_price: 0, raw_data: {} },
+    });
+
+    expect(ringkasan.itemTotal).toBe(2);
+    expect(ringkasan.itemEstimasi).toBe(1);
+    expect(ringkasan.pendapatan).toBe(40000);
+    // Baris bermodal: 20.000 - 12.000 = 8.000 (ini angka yang boleh dipakai)
+    expect(ringkasan.labaDipercaya).toBe(8000);
+    // Baris tanpa modal: 20.000 - 17.000 = 3.000 (hanya perkiraan)
+    expect(ringkasan.labaEstimasi).toBe(3000);
+  });
+
+  it('ringkasan kosong tetap berbentuk angka nol', () => {
+    expect(ringkasLabaItem([])).toEqual({
+      pendapatan: 0,
+      hppDipercaya: 0,
+      hppEstimasi: 0,
+      labaDipercaya: 0,
+      labaEstimasi: 0,
+      itemTotal: 0,
+      itemEstimasi: 0,
+    });
+  });
+});
+
+describe('nilaiSnapshotHpp — apa yang direkam saat order dibuat', () => {
+  it('merekam modal per pcs bila sumbernya nyata', () => {
+    const hasil = nilaiSnapshotHpp({
+      item: { price: 250000, quantity: 15, unit: 'CTN', baseQuantity: 180 },
+      produk: PRODUK_BANTAL,
+    });
+
+    expect(hasil.sumber).toBe('MASTER');
+    expect(hasil.hppPerPcs).toBe(20333);
+    expect(hasil.hppTotal).toBe(3659940);
+    expect(hasil.pcs).toBe(180);
+  });
+
+  it('TIDAK merekam angka estimasi (jangan membekukan angka karangan)', () => {
+    const hasil = nilaiSnapshotHpp({
+      item: { price: 10000, quantity: 1, unit: 'PCS' },
+      produk: { cost_price: 0, raw_data: {} },
+    });
+
+    expect(hasil.sumber).toBe('ESTIMASI');
+    expect(hasil.hppPerPcs).toBeUndefined();
+    expect(hasil.hppTotal).toBe(0);
   });
 });

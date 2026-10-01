@@ -42,6 +42,13 @@ type FinancialRecord = {
   channel?: string;
   /** Dari mana HPP baris ini diambil — lihat `src/lib/hpp.ts`. */
   hppSource?: SumberHpp;
+  /**
+   * Laba yang berasal dari baris item yang Modal produknya belum diisi
+   * (HPP estimasi 85%). Angka ini DIPISAH dari laba yang bisa dipercaya.
+   */
+  labaEstimasi?: number;
+  /** Berapa baris item pada transaksi ini yang HPP-nya masih estimasi. */
+  itemEstimasi?: number;
 };
 
 type CashFlowItem = {
@@ -90,8 +97,6 @@ export default function FinanceReport() {
   const [cashflowItems, setCashflowItems] = useState<CashFlowItem[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [totalInventoryValue, setTotalInventoryValue] = useState(0);
-  // Baris item yang labanya TIDAK bisa dipercaya karena Modal produk kosong.
-  const [hppEstimasiItems, setHppEstimasiItems] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   // Overview Filters State
@@ -210,11 +215,6 @@ let unsub: (() => void) | undefined;
         const financeRecords: FinancialRecord[] = [];
         const cashItems: CashFlowItem[] = [...allCapItems];
 
-        // Berapa baris item yang HPP-nya hanya ESTIMASI (85% harga jual) karena
-        // Modal produk belum diisi. Angka laba dari baris itu BUKAN laba nyata,
-        // jadi pengguna harus diberi tahu, bukan disuguhi angka yang terlihat wajar.
-        let hppEstimasiItem = 0;
-
         for (const od of salesSnap.docs) {
           const order = od.data() as any;
           const orderRaw = order.raw_data || {};
@@ -228,14 +228,15 @@ let unsub: (() => void) | undefined;
           // items bisa di kolom langsung atau di raw_data
           const orderItems = order.items || orderRaw.items || [];
 
-          let goodsRev = 0, totalCost = 0;
+          let goodsRev = 0, totalCost = 0, labaEstimasiOrder = 0, itemEstimasiOrder = 0;
           orderItems.forEach((it: any) => {
             const pid = it.id || it.productId;
             const prod = productsMap.get(pid || '');
 
             // Rumus HPP dipusatkan di `src/lib/hpp.ts` supaya konversi satuan
             // (CTN -> pcs) TIDAK bisa hilang lagi, dan agar sumber modalnya
-            // jelas (master produk / baris order / pembelian / estimasi).
+            // jelas (snapshot transaksi / master produk / baris order /
+            // pembelian / estimasi).
             const hitung = hitungHppItem({
               item: it,
               produk: prod,
@@ -244,7 +245,11 @@ let unsub: (() => void) | undefined;
 
             goodsRev += hitung.pendapatan;
             totalCost += hitung.hpp;
-            if (hitung.sumber === 'ESTIMASI') hppEstimasiItem += 1;
+            if (hitung.sumber === 'ESTIMASI') {
+              // Laba dari baris ini BUKAN laba nyata -> catat terpisah.
+              itemEstimasiOrder += 1;
+              labaEstimasiOrder += hitung.pendapatan - hitung.hpp;
+            }
           });
           const pm = (order.payment?.method || order.paymentMethod || orderRaw.paymentMethod || 'CASH').toUpperCase();
           const ch = (order.channel || orderRaw.channel || orderRaw.transactionType || 'OFFLINE').toUpperCase();
@@ -258,7 +263,9 @@ let unsub: (() => void) | undefined;
             cost: totalCost,
             profit: goodsRev - totalCost,
             paymentMethod: pm,
-            channel: ch
+            channel: ch,
+            labaEstimasi: labaEstimasiOrder,
+            itemEstimasi: itemEstimasiOrder,
           });
 
           if (['CASH', 'TRANSFER', 'QRIS'].includes(pm)) {
@@ -359,7 +366,7 @@ let unsub: (() => void) | undefined;
           const created = parseDateAny(r.createdAt);
           if (!(created >= startDate && created <= endDate)) return;
           if (r.status !== 'APPROVED' || r.type !== 'SALES_RETURN') return;
-          let retRev = 0, retCost = 0;
+          let retRev = 0, retCost = 0, retLabaEstimasi = 0, retItemEstimasi = 0;
           (r.items || []).forEach((it: any) => {
             const prod = productsMap.get(it.productId || it.id || '');
 
@@ -372,7 +379,10 @@ let unsub: (() => void) | undefined;
 
             retRev += hitung.pendapatan;
             retCost += hitung.hpp;
-            if (hitung.sumber === 'ESTIMASI') hppEstimasiItem += 1;
+            if (hitung.sumber === 'ESTIMASI') {
+              retItemEstimasi += 1;
+              retLabaEstimasi += hitung.pendapatan - hitung.hpp;
+            }
           });
           financeRecords.push({
             id: `RET-${rd.id}`,
@@ -384,7 +394,9 @@ let unsub: (() => void) | undefined;
             cost: -Math.abs(retCost),
             profit: -(Math.abs(retRev) - Math.abs(retCost)),
             paymentMethod: 'REFUND',
-            channel: 'OFFLINE'
+            channel: 'OFFLINE',
+            labaEstimasi: -Math.abs(retLabaEstimasi),
+            itemEstimasi: retItemEstimasi,
           });
         });
 
@@ -392,7 +404,6 @@ let unsub: (() => void) | undefined;
         cashItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setRecords(financeRecords);
         setCashflowItems(cashItems);
-        setHppEstimasiItems(hppEstimasiItem);
       } catch (err) {
         console.error('Finance fetch error:', err);
       } finally {
@@ -513,8 +524,16 @@ let unsub: (() => void) | undefined;
     const opex = filteredRecords.filter(r => r.type === 'expense' && r.category.startsWith('Operasional')).reduce((s, r) => s + r.amount, 0);
     const stockPurchases = filteredRecords.filter(r => r.type === 'expense' && r.category === 'Pembelian Stok').reduce((s, r) => s + r.amount, 0);
     const netIncome = grossProfit - opex;
+
+    // Laba yang TIDAK bisa dipercaya: berasal dari baris item yang Modal
+    // produknya belum diisi (HPP-nya hanya estimasi 85% harga jual). Angka ini
+    // dipisah supaya pemilik tahu berapa yang benar-benar bisa dipegang.
+    const labaEstimasi = filteredRecords.reduce((s, r) => s + (r.labaEstimasi || 0), 0);
+    const itemEstimasi = filteredRecords.reduce((s, r) => s + (r.itemEstimasi || 0), 0);
+
     return {
       salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, stockPurchases, netIncome,
+      labaEstimasi, itemEstimasi, netIncomeDipercaya: netIncome - labaEstimasi,
       grossMargin: netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0,
       netMargin: netRevenue > 0 ? (netIncome / netRevenue) * 100 : 0
     };
@@ -815,7 +834,7 @@ let unsub: (() => void) | undefined;
                 { label: 'HPP', value: IS.cogs, icon: Package, note: 'Modal Terjual', cl: 'text-rose-600', bg: 'bg-rose-50' },
                 { label: 'Laba Kotor', value: IS.grossProfit, icon: TrendingUp, note: `GPM ${IS.grossMargin.toFixed(1)}%`, cl: 'text-blue-600', bg: 'bg-blue-50' },
                 { label: 'Pengeluaran', value: IS.opex + IS.stockPurchases, icon: CreditCard, note: 'Operasional & Stok', cl: 'text-orange-600', bg: 'bg-orange-50' },
-                { label: 'Laba Bersih', value: IS.netIncome, icon: IS.netIncome >= 0 ? TrendingUp : TrendingDown, note: `NPM ${IS.netMargin.toFixed(1)}%`, highlight: true },
+                { label: 'Laba Bersih', value: IS.netIncome, icon: IS.netIncome >= 0 ? TrendingUp : TrendingDown, note: IS.itemEstimasi > 0 ? `bisa dipercaya ${idr(IS.netIncomeDipercaya)}` : `NPM ${IS.netMargin.toFixed(1)}%`, highlight: true },
               ].map(card => {
                 const Icon = card.icon;
                 if (card.highlight) return (
@@ -1146,15 +1165,21 @@ let unsub: (() => void) | undefined;
               </div>
 
               {/* Peringatan HPP estimasi — laba tidak bisa dipercaya bila Modal produk kosong */}
-              {hppEstimasiItems > 0 && (
+              {IS.itemEstimasi > 0 && (
                 <div className="mx-5 mt-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <Lightbulb size={16} className="mt-0.5 flex-shrink-0 text-amber-600" />
                   <div className="text-xs text-amber-900">
-                    <p className="font-black uppercase tracking-widest">Laba belum akurat</p>
+                    <p className="font-black uppercase tracking-widest">Sebagian laba belum akurat</p>
                     <p className="mt-1 leading-relaxed">
-                      <strong>{hppEstimasiItems} baris item</strong> tidak punya data Modal, sehingga HPP-nya
-                      hanya <strong>estimasi 85% dari harga jual</strong> (laba terlihat selalu ~15%). Isi
-                      &ldquo;Modal&rdquo; produk di halaman Produk agar laba bersihnya nyata.{' '}
+                      <strong>{IS.itemEstimasi} baris item</strong> produknya belum punya Modal, sehingga
+                      HPP-nya hanya <strong>estimasi 85% dari harga jual</strong>. Nilai laba dari baris itu{' '}
+                      <strong>{idr(IS.labaEstimasi)}</strong> — <em>bukan laba nyata</em>.
+                    </p>
+                    <p className="mt-1 leading-relaxed">
+                      Laba bersih yang bisa dipercaya:{' '}
+                      <strong>{idr(IS.netIncomeDipercaya)}</strong>{' '}
+                      <span className="text-amber-700">(sudah dikurangi {idr(IS.labaEstimasi)} di atas)</span>.{' '}
+                      Isi &ldquo;Modal&rdquo; produk di halaman Produk agar angkanya nyata.{' '}
                       <Link href="/admin/products" className="font-bold underline">
                         Buka Produk
                       </Link>
@@ -1204,7 +1229,17 @@ let unsub: (() => void) | undefined;
                         </td>
                         <td className="px-5 py-3.5 text-right">
                           {r.cost !== undefined ? (
-                            <span className="text-xs font-bold text-slate-500">{idr(r.cost)}</span>
+                            <span className="text-xs font-bold text-slate-500">
+                              {idr(r.cost)}
+                              {r.itemEstimasi ? (
+                                <span
+                                  className="ml-1 inline-block rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-700"
+                                  title={`${r.itemEstimasi} item di transaksi ini belum punya Modal, jadi HPP-nya estimasi`}
+                                >
+                                  estimasi
+                                </span>
+                              ) : null}
+                            </span>
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
                           )}

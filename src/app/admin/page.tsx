@@ -87,6 +87,9 @@ export default function AdminDashboard() {
     monthlySales: 0,
     monthlyProfit: 0,
     monthlyNetProfit: 0,
+    /** Laba dari item yang produknya belum punya Modal — ditampilkan terpisah. */
+    monthlyProfitEstimasi: 0,
+    monthlyItemsEstimasi: 0,
     totalInventoryValue: 0,
     totalProducts: 0,
     lowStock: 0,
@@ -120,6 +123,8 @@ export default function AdminDashboard() {
         monthlySales: data.stats.monthlySales,
         monthlyProfit: data.stats.monthlyProfit || 0,
         monthlyNetProfit: data.stats.monthlyNetProfit || 0,
+        monthlyProfitEstimasi: data.stats.monthlyProfitEstimasi || 0,
+        monthlyItemsEstimasi: data.stats.monthlyItemsEstimasi || 0,
         totalInventoryValue: data.stats.totalInventoryValue || 0,
         totalProducts: data.stats.totalProducts,
         lowStock: data.stats.lowStock,
@@ -252,6 +257,21 @@ export default function AdminDashboard() {
           bg="bg-red-50"
         />
       </div>
+
+      {/* Laba di atas HANYA menghitung item yang Modal produknya sudah diisi.
+          Sisanya ditampilkan terpisah supaya angka utamanya bisa dipercaya. */}
+      {stats.monthlyItemsEstimasi > 0 && (
+        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-600 mt-0.5" />
+          <p className="text-xs text-amber-900 leading-relaxed">
+            <strong>{stats.monthlyItemsEstimasi} item</strong> bulan ini produknya belum punya{' '}
+            <strong>Modal</strong>, jadi labanya tidak bisa dihitung. Perkiraannya{' '}
+            <strong>Rp{Math.round(stats.monthlyProfitEstimasi).toLocaleString('id-ID')}</strong> dan{' '}
+            <strong>tidak</strong> dimasukkan ke &ldquo;Keuntungan Kotor&rdquo; / &ldquo;Laba Bersih&rdquo; di
+            atas. Isi Modal produk agar angkanya ikut terhitung.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Main Content Column */}

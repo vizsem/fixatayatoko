@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { addInventoryLog } from '@/lib/inventory';
+import { lengkapiSnapshotHpp } from '@/lib/hpp-server';
 
 type IncomingItem = {
   id: string;
@@ -322,12 +323,15 @@ export async function POST(req: Request) {
     const shippingCost = Number(delivery?.cost || 0);
     const total = Math.max(0, calculatedSubtotal + shippingCost - pointsUsed - voucherDiscount - walletUsed);
 
+    // Rekam Modal per pcs pada saat transaksi supaya laba order ini stabil.
+    const itemsDenganHpp = await lengkapiSnapshotHpp(validatedItems);
+
     const orderData = {
       orderId,
       name: customer.name || 'Pelanggan Umum',
       phone: customer.phone || '-',
       userId: userId || 'guest',
-      items: validatedItems,
+      items: itemsDenganHpp,
       subtotal: calculatedSubtotal,
       shippingCost,
       pointsUsed,
@@ -354,7 +358,7 @@ export async function POST(req: Request) {
       customer_phone: customer.phone || '-',
       status: 'PENDING',
       total,
-      items: validatedItems,
+      items: itemsDenganHpp,
       delivery,
       payment,
       raw_data: orderData,

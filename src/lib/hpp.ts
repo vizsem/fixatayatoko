@@ -16,6 +16,9 @@
  *    `item.id` (id baris pembelian) padahal dicari dengan id produk.
  *
  * URUTAN SUMBER HPP (dari yang paling dipercaya)
+ *   0. `SNAPSHOT` — modal per pcs yang DICATAT SAAT TRANSAKSI (`item.hppPerPcs`).
+ *                   Nilai ini tidak pernah berubah, sehingga laba historis stabil
+ *                   walau Modal produk diubah belakangan.
  *   1. `MASTER`   — `cost_price` produk (Modal terkini yang dipelihara toko).
  *   2. `ITEM`     — modal yang tersimpan di baris order itu sendiri. Order lama
  *                   hasil impor menyimpan `Modal`/`purchasePrice`, dan nilainya
@@ -25,7 +28,7 @@
  *                   laba nyata; pemanggil wajib menghitung dan menandainya.
  */
 
-export type SumberHpp = 'MASTER' | 'ITEM' | 'PEMBELIAN' | 'ESTIMASI';
+export type SumberHpp = 'SNAPSHOT' | 'MASTER' | 'ITEM' | 'PEMBELIAN' | 'ESTIMASI';
 
 export type ItemPenjualan = {
   id?: string;
@@ -41,6 +44,11 @@ export type ItemPenjualan = {
   /** Modal yang terekam di baris order (order lama). */
   purchasePrice?: number | string;
   Modal?: number | string;
+  /**
+   * Modal per pcs yang direkam SAAT TRANSAKSI (`createMarketplaceOrder` dkk).
+   * Ini yang membuat laba historis tidak berubah saat Modal produk diubah.
+   */
+  hppPerPcs?: number | string;
 };
 
 export type ProdukUntukHpp = {
@@ -112,6 +120,12 @@ export function ambilHppPerPcs(params: {
   const { item, produk, costPembelianPerPcs } = params;
   const raw = (produk?.raw_data || {}) as Record<string, any>;
 
+  // 0. Snapshot saat transaksi — paling dipercaya dan tidak pernah berubah.
+  const dariSnapshot = Number(item?.hppPerPcs ?? 0);
+  if (Number.isFinite(dariSnapshot) && dariSnapshot > 0) {
+    return { costPerPcs: dariSnapshot, sumber: 'SNAPSHOT' };
+  }
+
   // 1. Modal terkini dari master produk.
   const dariMaster = Number(
     produk?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0
@@ -171,6 +185,106 @@ export function hitungHppItem(params: {
     hpp: sumber === 'ESTIMASI' ? price * 0.85 * pcs : costPerPcs * pcs,
     pcs,
     costPerPcs,
+    sumber,
+  };
+}
+
+export type RingkasanLaba = {
+  /** Nilai penjualan seluruh baris (harga jual × jumlah satuan jual). */
+  pendapatan: number;
+  /** HPP baris yang modalnya NYATA. */
+  hppDipercaya: number;
+  /** HPP baris yang modalnya hanya perkiraan — bukan angka akuntansi. */
+  hppEstimasi: number;
+  /** Laba dari baris yang modalnya nyata. INI angka yang boleh dipakai. */
+  labaDipercaya: number;
+  /** Laba dari baris yang modalnya perkiraan. Ditampilkan terpisah. */
+  labaEstimasi: number;
+  itemTotal: number;
+  itemEstimasi: number;
+};
+
+/**
+ * Gabungkan hasil per item menjadi satu ringkasan laba.
+ *
+ * WAJIB dipakai semua halaman (Dashboard, Laporan Keuangan, Audit) supaya
+ * ketiganya menampilkan angka yang sama persis. Laba dari baris tanpa Modal
+ * DIPISAH — tidak dicampur ke angka utama, karena itu bukan laba nyata.
+ */
+export function ringkasLabaItem(hasil: HasilHppItem[]): RingkasanLaba {
+  const ringkas: RingkasanLaba = {
+    pendapatan: 0,
+    hppDipercaya: 0,
+    hppEstimasi: 0,
+    labaDipercaya: 0,
+    labaEstimasi: 0,
+    itemTotal: 0,
+    itemEstimasi: 0,
+  };
+
+  for (const h of hasil || []) {
+    ringkas.pendapatan += h.pendapatan;
+    ringkas.itemTotal += 1;
+
+    if (h.sumber === 'ESTIMASI') {
+      ringkas.itemEstimasi += 1;
+      ringkas.hppEstimasi += h.hpp;
+      ringkas.labaEstimasi += h.pendapatan - h.hpp;
+    } else {
+      ringkas.hppDipercaya += h.hpp;
+      ringkas.labaDipercaya += h.pendapatan - h.hpp;
+    }
+  }
+
+  return ringkas;
+}
+
+/** Hitung seluruh baris satu order dengan sumber modal yang diberikan pemanggil. */
+export function hitungItemOrder(params: {
+  items: ItemPenjualan[];
+  produkDari: (productId: string) => ProdukUntukHpp;
+  costPembelianDari?: (productId: string) => number | undefined;
+}): { hasil: HasilHppItem[]; ringkasan: RingkasanLaba } {
+  const hasil: HasilHppItem[] = [];
+
+  for (const item of params.items || []) {
+    const productId = String((item as any)?.id || (item as any)?.productId || '');
+    hasil.push(
+      hitungHppItem({
+        item,
+        produk: productId ? params.produkDari(productId) : undefined,
+        costPembelianPerPcs: productId ? params.costPembelianDari?.(productId) : undefined,
+      })
+    );
+  }
+
+  return { hasil, ringkasan: ringkasLabaItem(hasil) };
+}
+
+/**
+ * Nilai snapshot modal yang HARUS direkam saat order dibuat.
+ *
+ * Mengembalikan `hppPerPcs` hanya bila sumbernya nyata (bukan estimasi):
+ * merekam angka estimasi berarti membekukan angka karangan selamanya. Bila
+ * modal belum ada, biarkan kosong supaya baris itu tetap ditandai "estimasi"
+ * dan otomatis membaik begitu Modal produk diisi.
+ */
+export function nilaiSnapshotHpp(params: {
+  item: ItemPenjualan;
+  produk?: ProdukUntukHpp;
+  costPembelianPerPcs?: number;
+}): { hppPerPcs?: number; hppTotal: number; pcs: number; sumber: SumberHpp } {
+  const { costPerPcs, sumber } = ambilHppPerPcs(params);
+  const pcs = hitungPcsItem(params.item, (params.produk?.raw_data as any)?.units);
+
+  if (sumber === 'ESTIMASI') {
+    return { hppTotal: 0, pcs, sumber };
+  }
+
+  return {
+    hppPerPcs: costPerPcs,
+    hppTotal: costPerPcs * pcs,
+    pcs,
     sumber,
   };
 }

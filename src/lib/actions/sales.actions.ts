@@ -13,6 +13,7 @@ type SalesItemInput = {
 }
 
 import { supabaseAdmin } from '@/lib/supabase';
+import { lengkapiSnapshotHpp } from '@/lib/hpp-server';
 
 export async function getSalesOrders(filters?: { status?: string; customerId?: string; limit?: number }) {
   await requireStaff();
@@ -121,6 +122,10 @@ export async function createSalesOrder(data: {
     const soNumber = `SO-${Date.now()}`;
     const now = new Date().toISOString();
 
+    // Rekam Modal per pcs pada saat transaksi supaya laba order ini tidak
+    // berubah kalau Modal produk diubah belakangan — lihat `src/lib/hpp.ts`.
+    const itemsDenganHpp = await lengkapiSnapshotHpp(data.items);
+
     // Deduct stock using FEFO
     for (const item of data.items) {
       const result = await deductStockFEFO({
@@ -146,7 +151,7 @@ export async function createSalesOrder(data: {
       customerPhone: custPhone,
       createdById: data.createdById,
       notes: data.notes || '',
-      items: data.items,
+      items: itemsDenganHpp,
       total: totalAmount,
       status: 'CONFIRMED',
       createdAt: now,
@@ -160,7 +165,7 @@ export async function createSalesOrder(data: {
       customer_phone: custPhone,
       status: 'CONFIRMED',
       total: totalAmount,
-      items: data.items,
+      items: itemsDenganHpp,
       raw_data: orderData,
       created_at: now,
       updated_at: now,
@@ -424,6 +429,10 @@ export async function createMarketplaceOrder(data: {
     const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const now = new Date().toISOString();
 
+    // Rekam Modal per pcs pada saat transaksi. Tanpa ini laba historis ikut
+    // berubah setiap kali "Modal" produk diperbaiki di halaman Produk.
+    const itemsDenganHpp = await lengkapiSnapshotHpp(data.items);
+
     // Catat stok yang sudah terpotong supaya bisa dikembalikan bila order gagal
     // disimpan. Tanpa ini, kegagalan menyimpan order meninggalkan stok yang
     // sudah terpotong tanpa order — kerugian yang tidak terlihat.
@@ -467,7 +476,7 @@ export async function createMarketplaceOrder(data: {
       orderId: data.orderId,
       externalOrderId: data.externalOrderId,
       customerName: data.customerName,
-      items: data.items,
+      items: itemsDenganHpp,
       subtotal: data.subtotal,
       shippingCost: data.shippingCost,
       total: data.total,
@@ -487,7 +496,7 @@ export async function createMarketplaceOrder(data: {
       customer_name: data.customerName,
       status: 'SELESAI',
       total: data.total,
-      items: data.items,
+      items: itemsDenganHpp,
       raw_data: orderData,
       created_at: now,
       updated_at: now,
