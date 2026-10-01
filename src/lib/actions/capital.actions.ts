@@ -4,6 +4,7 @@ import { requireAdmin, requireStaff } from '@/lib/actions/session';
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
+import { hitungSaldoModal } from '@/lib/capital-ledger'
 import { mergeRowWithRawData } from '@/lib/db-schema'
 
 function parseDate(val: any): Date {
@@ -46,46 +47,14 @@ async function fetchAllCapitalRows(): Promise<Record<string, any>[]> {
 }
 
 /**
- * SATU-SATUNYA perhitungan saldo modal di seluruh aplikasi.
+ * Perhitungan saldo modal ada di `@/lib/capital-ledger`
+ * (`hitungSaldoModal`) — SATU rumus untuk halaman Modal, validasi halaman PO,
+ * dan `adjustTotalCapital`.
  *
- * Sebelumnya rumus yang sama ditulis ulang di empat tempat dan hasilnya berbeda:
- *
- *   `/admin/capital`            : hanya 100 baris pertama (`.limit(100)`), jadi
- *                                 "Modal Total Saat Ini" lebih kecil dari yang
- *                                 seharusnya pada 171 baris yang ada.
- *   `/admin/purchases/add` dan  : membaca kolom `type`/`amount` yang masih berisi
- *   `/admin/purchases/edit/[id]`  nilai DEFAULT importer (NULL dan 0), sehingga
- *                                 saldo terbaca Rp0 dan setiap pembelian tunai
- *                                 ditolak "Saldo Modal Tidak Cukup" — padahal
- *                                 halaman Modal menunjukkan saldo besar. Inilah
- *                                 sebab dua halaman itu saling bertentangan.
- *   `adjustTotalCapital`        : sumbernya benar, tetapi terpotong 1000 baris.
- *
- * `mergeRowWithRawData` dipakai supaya sumber angkanya persis sama dengan seluruh
- * aplikasi: kolom yang dikelola bridge menang, kolom sisa importer tidak menimpa
- * `raw_data`.
+ * Diletakkan di sana, bukan di sini, karena berkas Server Action hanya boleh
+ * mengekspor fungsi `async`. Mengekspor fungsi murni dari berkas ini membuat
+ * build produksi gagal dengan "Server Actions must be async functions".
  */
-export function hitungSaldoModal(rows: Record<string, any>[]) {
-  let injection = 0;
-  let withdrawal = 0;
-
-  for (const row of rows) {
-    const data = mergeRowWithRawData(row, 'capital_transactions');
-    const type = String(data.type ?? '').toUpperCase();
-    const amount = Number(data.amount ?? 0);
-
-    if (!Number.isFinite(amount)) continue;
-    if (type === 'INJECTION') injection += amount;
-    else if (type === 'WITHDRAWAL') withdrawal += amount;
-  }
-
-  return {
-    injection,
-    withdrawal,
-    balance: injection - withdrawal,
-    count: rows.length,
-  };
-}
 
 /**
  * Saldo modal untuk validasi di luar halaman Modal.

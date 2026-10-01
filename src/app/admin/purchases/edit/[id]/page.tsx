@@ -17,9 +17,8 @@ import { updatePurchaseOrder } from '@/lib/actions/purchase.actions';
 import { getCapitalBalance } from '@/lib/actions/capital.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
-import { sbGetDoc } from '@/lib/supabase-helpers';
+import { sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { supabase } from '@/lib/supabase';
-import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 import { useParams } from 'next/navigation';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
@@ -162,24 +161,20 @@ function EditPurchaseFormContent() {
 
   const handleScan = async (code: string) => {
     try {
-      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
-      const s1 = await getDocs(q1);
-      let p: any | null = null;
-      if (!s1.empty) {
-        const d = s1.docs[0];
-        p = { id: d.id, ...d.data() };
-      } else {
-        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
-        const s2 = await getDocs(q2);
-        if (!s2.empty) {
-          const d2 = s2.docs[0];
-          p = { id: d2.id, ...d2.data() };
-        }
-      }
-      if (!p) {
+      // Sama seperti halaman tambah PO: baca langsung dari Supabase.
+      // `Barcode` dan `barcode` dipetakan ke kolom `barcode` yang sama, jadi
+      // satu kueri cukup.
+      const snap = await sbGetDocs({
+        table: 'products',
+        where: [{ field: 'barcode', op: '==', val: code }],
+        limit: 1,
+      });
+      const found = snap.docs[0];
+      if (!found) {
         notify.admin.error('Barcode tidak ditemukan');
         return;
       }
+      const p = { id: found.id, ...found.data() } as any;
       const normalized: NormalizedProduct = normalizeProduct(p.id, p);
       playScanBeep();
       addToCart(normalized);
@@ -240,14 +235,21 @@ function EditPurchaseFormContent() {
         }
       }
 
-      const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
-      const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
-
       // 1. Simpan ke Supabase (Primary Database) & update stok
+      //
+      // Mutasi modal (mengembalikan nilai PO lama lalu menarik nilai PO baru)
+      // dihitung di dalam Server Action ini — idempoten, memakai perbandingan
+      // posisi modal per PO. Dulu hal itu dilakukan blok `writeBatch` di sini
+      // yang SELALU gagal dengan senyap (hanya `console.warn`), sehingga
+      // mengubah PO tunai tidak pernah menyesuaikan saldo modal.
       const purchaseRes = await updatePurchaseOrder(id, {
         supplierId: selectedSupplier,
         warehouseId: selectedWarehouse,
         notes: notes || undefined,
+        // WAJIB dikirim: tanpa dua field ini perubahan cara bayar tidak
+        // tersimpan, dan mutasi modal tidak ikut disesuaikan.
+        paymentStatus,
+        paymentMethod,
         items: cart.map(item => ({
           productId: item.id,
           quantity: item.quantity,          // qty asli (misal 1 Dus) — backend yang konversi
@@ -260,64 +262,14 @@ function EditPurchaseFormContent() {
         throw new Error(purchaseRes.error || 'Gagal mengubah Purchase Order ke database');
       }
 
-      // 2. Safe sync ke Firestore untuk kompatibilitas riwayat/modal
-      try {
-        const batch = writeBatch(db);
-        const purchaseRef = doc(db, 'purchases', id);
-
-        batch.update(purchaseRef, {
-          supplierId: selectedSupplier,
-          supplierName,
-          warehouseId: selectedWarehouse,
-          warehouseName,
-          items: cart,
-          subtotal,
-          shippingCost,
-          total,
-          paymentStatus,
-          paymentMethod,
-          notes,
-          updatedAt: new Date().toISOString(),
-        });
-
-        const oldIsPaid = oldPurchaseData?.paymentStatus === 'LUNAS' && (oldPurchaseData?.paymentMethod === 'CASH' || oldPurchaseData?.paymentMethod === 'TRANSFER');
-        const oldTotal = oldPurchaseData?.total || 0;
-        
-        const newIsPaid = paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER');
-        const newTotal = total;
-
-        // Refund the old transaction if it existed
-        if (oldIsPaid) {
-          const refundRef = doc(collection(db, 'capital_transactions'));
-          batch.set(refundRef, {
-            date: new Date().toISOString(),
-            type: 'INJECTION',
-            amount: oldTotal,
-            description: `Refund Edit PO Lama: ${id}`,
-            recordedBy: 'system',
-            referenceId: purchaseRef.id
-          });
-        }
-        
-        // Apply the new transaction if it exists
-        if (newIsPaid) {
-           const capitalRef = doc(collection(db, 'capital_transactions'));
-           batch.set(capitalRef, {
-             date: new Date().toISOString(),
-             type: 'WITHDRAWAL',
-             amount: newTotal,
-             description: `Edit PO (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
-             recordedBy: 'system',
-             referenceId: purchaseRef.id
-           });
-        }
-
-        await batch.commit();
-      } catch (fsErr) {
-        console.warn('Firestore sync skipped or failed:', fsErr);
+      // Mutasi modal gagal dicatat -> beri tahu, tapi jangan bilang gagal: PO dan
+      // stoknya sudah tersimpan.
+      const warningModal = (purchaseRes as { warning?: string }).warning;
+      if (warningModal) {
+        notify.admin.warning(warningModal);
+      } else {
+        notify.admin.success("Purchase Order berhasil diubah!");
       }
-
-      notify.admin.success("Purchase Order berhasil diubah!");
       router.push('/admin/purchases');
     } catch (err: any) {
       console.error(err);

@@ -19,7 +19,7 @@ import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { buildDuplicateCart } from '@/lib/purchase-duplicate';
 import { supabase } from '@/lib/supabase';
-import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
 interface CartItem { 
@@ -213,24 +213,21 @@ function AddPurchaseFormContent() {
 
   const handleScan = async (code: string) => {
     try {
-      const q1 = query(collection(db, 'products'), where('Barcode', '==', code));
-      const s1 = await getDocs(q1);
-      let p: any | null = null;
-      if (!s1.empty) {
-        const d = s1.docs[0];
-        p = { id: d.id, ...d.data() };
-      } else {
-        const q2 = query(collection(db, 'products'), where('barcode', '==', code));
-        const s2 = await getDocs(q2);
-        if (!s2.empty) {
-          const d2 = s2.docs[0];
-          p = { id: d2.id, ...d2.data() };
-        }
-      }
-      if (!p) {
+      // Dibaca langsung dari Supabase, bukan lewat API bergaya Firestore.
+      // `resolveQueryField` memetakan `Barcode`/`barcode` ke kolom `barcode`
+      // yang SAMA, jadi satu kueri sudah cukup — kode lama menembak dua kueri
+      // ke kolom yang sama.
+      const snap = await sbGetDocs({
+        table: 'products',
+        where: [{ field: 'barcode', op: '==', val: code }],
+        limit: 1,
+      });
+      const found = snap.docs[0];
+      if (!found) {
         notify.admin.error('Barcode tidak ditemukan');
         return;
       }
+      const p = { id: found.id, ...found.data() } as any;
       const normalized: NormalizedProduct = normalizeProduct(p.id, p);
       playScanBeep();
       addToCart(normalized);
@@ -289,10 +286,14 @@ function AddPurchaseFormContent() {
         }
       }
 
-      const supplierName = suppliers.find(s => s.id === selectedSupplier)?.name;
-      const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
-
       // 1. Simpan ke Supabase (Primary Database) & langsung tambahkan stok ke Gudang & Inventory Log
+      //
+      // Seluruh penulisan data (baris PO, stok, log inventory, DAN mutasi modal)
+      // terjadi di dalam Server Action ini. Dulu ada blok `writeBatch` di sini
+      // yang mencoba menyalin PO + menarik modal dari peramban; blok itu menulis
+      // baris `purchases` KEDUA (duplikat) dan SELALU gagal dengan senyap
+      // (try/catch hanya `console.warn`), sehingga pembelian tunai tidak pernah
+      // mengurangi saldo modal. Sudah dihapus — jangan dikembalikan.
       const purchaseRes = await createPurchaseOrder({
         supplierId: selectedSupplier,
         createdById: 'admin',
@@ -321,44 +322,6 @@ function AddPurchaseFormContent() {
       // dihapus admin lain). Itu dilaporkan lewat `warning`, bukan `success: false`,
       // supaya pengguna tahu harus klik "Terima" di daftar PO.
       const warningStok = (purchaseRes as { warning?: string }).warning;
-
-      // 2. Safe sync ke Firestore untuk kompatibilitas riwayat/modal
-      try {
-        const batch = writeBatch(db);
-        const purchaseRef = doc(collection(db, 'purchases'));
-
-        batch.set(purchaseRef, {
-          supplierId: selectedSupplier,
-          supplierName,
-          warehouseId: selectedWarehouse,
-          warehouseName,
-          items: cart,
-          subtotal,
-          shippingCost,
-          total,
-          paymentStatus,
-          paymentMethod,
-          notes,
-          status: 'DITERIMA',
-          createdAt: new Date().toISOString(),
-        });
-
-        if (paymentStatus === 'LUNAS' && (paymentMethod === 'CASH' || paymentMethod === 'TRANSFER')) {
-           const capitalRef = doc(collection(db, 'capital_transactions'));
-           batch.set(capitalRef, {
-             date: new Date().toISOString(),
-             type: 'WITHDRAWAL',
-             amount: total,
-             description: `Pembelian Stok (${paymentMethod}): ${supplierName || 'Supplier'} (${cart.length} items)`,
-             recordedBy: 'system',
-             referenceId: purchaseRef.id
-           });
-        }
-
-        await batch.commit();
-      } catch (fsErr) {
-        console.warn('Firestore sync skipped or failed:', fsErr);
-      }
 
       if (warningStok) {
         notify.admin.warning(warningStok);

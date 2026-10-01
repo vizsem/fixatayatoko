@@ -7,7 +7,6 @@ import toast, { Toaster } from 'react-hot-toast';
 
 import { getPurchaseOrderById, receivePurchaseOrder } from '@/lib/actions/purchase.actions';
 import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { Timestamp, db, doc, getDoc } from '@/lib/firebase';
 import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
@@ -16,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface PurchaseItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
-interface PurchaseData { id: string; supplierName: string; warehouseName: string; items: PurchaseItem[]; subtotal: number; shippingCost: number; total: number; status: string; paymentStatus: string; paymentMethod: string; notes?: string; dueDate?: string; createdAt?: Timestamp | { toDate: () => Date } | null; }
+interface PurchaseData { id: string; supplierName: string; warehouseName: string; items: PurchaseItem[]; subtotal: number; shippingCost: number; total: number; status: string; paymentStatus: string; paymentMethod: string; notes?: string; dueDate?: string; createdAt?: string | Date | { seconds: number } | { toDate: () => Date } | null; }
 
 export default function PurchaseDetail() {
   const { id } = useParams();
@@ -81,8 +80,10 @@ export default function PurchaseDetail() {
         })),
         paymentMethod: editForm.paymentMethod,
         paymentStatus: paymentStatus, // Explicitly update status
-        // Convert to Firestore Timestamp correctly
-        createdAt: editDate ? Timestamp.fromDate(new Date(editDate)) : purchase.createdAt,
+        // Tanggal dikirim sebagai ISO string: kolom `created_at` di Supabase
+        // bertipe `timestamptz`, sehingga objek Timestamp gaya Firestore
+        // (`{ seconds, nanoseconds }`) tidak bisa disimpan ke sana.
+        createdAt: editDate ? new Date(editDate).toISOString() : purchase.createdAt,
         subtotal: newSubtotal,
         total: newTotal
       };
@@ -184,9 +185,12 @@ export default function PurchaseDetail() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-xs">Loading Order Details...</div>;
   if (!purchase) return null;
 
-  const dateFormatted = purchase.createdAt?.toDate
-    ? purchase.createdAt.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-    : (purchase.createdAt ? new Date(purchase.createdAt as any).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A');
+  // `createdAt` bisa berbentuk normalisasi timestamp (`toDate()`), ISO string,
+  // atau Date — tergantung asal datanya (Server Action atau `sbGetDoc`).
+  const tanggalPO: any = purchase.createdAt;
+  const dateFormatted = tanggalPO?.toDate
+    ? tanggalPO.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    : (tanggalPO ? new Date(tanggalPO).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A');
 
   const isReceived = purchase.status === 'DITERIMA' || purchase.status === 'RECEIVED';
 

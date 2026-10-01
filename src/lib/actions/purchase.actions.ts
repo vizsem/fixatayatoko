@@ -5,6 +5,7 @@ import { requireAdmin, requireStaff } from '@/lib/actions/session';
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import { addStock, deductStockFEFO } from '@/lib/inventory'
+import { catatMutasiModalPO } from '@/lib/capital-ledger'
 
 type PurchaseItemInput = {
   productId: string
@@ -49,6 +50,11 @@ function parseDate(val: any): Date {
   }
   const d = new Date(val);
   return isNaN(d.getTime()) ? new Date() : d;
+}
+
+/** Gabungkan beberapa pesan peringatan opsional menjadi satu kalimat. */
+function gabungPeringatan(...pesan: Array<string | null | undefined>): string {
+  return pesan.filter((p): p is string => Boolean(p)).join(' ');
 }
 
 export async function getPurchaseOrders(filters?: { status?: string; supplierId?: string }) {
@@ -264,6 +270,22 @@ export async function createPurchaseOrder(data: {
       return { success: false, error: error.message };
     }
 
+    // Catat uang yang keluar dari modal bila dibayar tunai/transfer.
+    //
+    // Diletakkan SEBELUM stok ditambahkan karena pembayaran terjadi saat PO
+    // dibuat, bukan saat barang diterima. Fungsi ini idempoten (dibandingkan
+    // dengan posisi modal PO yang sudah tercatat), jadi aman dipanggil ulang.
+    // Kegagalannya dikembalikan sebagai `warning`, bukan `success: false`:
+    // baris PO-nya sudah tersimpan dan stok tetap harus diproses.
+    const peringatanModal = await catatMutasiModalPO({
+      poId: id,
+      total: totalAmount,
+      paymentStatus,
+      paymentMethod,
+      label: supplierName,
+      itemCount: enrichedItems.length,
+    });
+
     // Jika autoReceive diaktifkan, langsung proses penambahan stok ke produk dan inventory_logs.
     //
     // Catatan perbaikan: dulu loop ini TANPA try/catch. Kalau addStock gagal untuk
@@ -309,10 +331,14 @@ export async function createPurchaseOrder(data: {
         revalidatePath('/admin/purchases');
         revalidatePath('/admin/inventory');
         revalidatePath('/admin/products');
+        revalidatePath('/admin/capital');
 
         return {
           success: true,
-          warning: `PO tersimpan, tetapi stok gagal ditambahkan untuk ${gagal.length} item: ${gagal.join('; ')}. Status PO dikembalikan ke "Disetujui" — klik "Terima" untuk mencoba lagi.`,
+          warning: gabungPeringatan(
+            `PO tersimpan, tetapi stok gagal ditambahkan untuk ${gagal.length} item: ${gagal.join('; ')}. Status PO dikembalikan ke "Disetujui" — klik "Terima" untuk mencoba lagi.`,
+            peringatanModal
+          ),
           data: { id, ...raw_data },
         };
       }
@@ -321,6 +347,11 @@ export async function createPurchaseOrder(data: {
     revalidatePath('/admin/purchases');
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
+    revalidatePath('/admin/capital');
+
+    if (peringatanModal) {
+      return { success: true, warning: peringatanModal, data: { id, ...raw_data } };
+    }
     return { success: true, data: { id, ...raw_data } };
   } catch (error: any) {
     console.error('Failed to create purchase order:', error);
@@ -475,6 +506,8 @@ export async function updatePurchaseOrder(
     autoReceive?: boolean
     batchNumber?: string
     expiryDate?: string
+    paymentStatus?: string
+    paymentMethod?: string
   }
 ) {
   await requireAdmin();
@@ -598,6 +631,11 @@ export async function updatePurchaseOrder(
       supplierName,
       warehouseId: data.warehouseId,
       notes: data.notes || raw.notes || '',
+      // Dua kolom ini WAJIB disimpan di sini. Sebelumnya hanya ditulis oleh blok
+      // peramban yang selalu gagal, sehingga mengubah pembayaran HUTANG -> LUNAS
+      // (atau sebaliknya) tidak pernah tersimpan ke database.
+      paymentStatus: data.paymentStatus || raw.paymentStatus || 'LUNAS',
+      paymentMethod: data.paymentMethod || raw.paymentMethod || 'CASH',
       total: totalAmount,
       subtotal: totalAmount,
       items: enrichedItems,
@@ -612,9 +650,26 @@ export async function updatePurchaseOrder(
 
     if (updateErr) throw updateErr;
 
+    // Selaraskan modal dengan cara bayar yang BARU. Bila PO yang tadinya tunai
+    // diubah menjadi HUTANG, uangnya otomatis dikembalikan ke modal (INJECTION);
+    // bila sebaliknya atau nominalnya berubah, selisihnya dicatat. Idempoten.
+    const peringatanModal = await catatMutasiModalPO({
+      poId: id,
+      total: totalAmount,
+      paymentStatus: updatedRaw.paymentStatus,
+      paymentMethod: updatedRaw.paymentMethod,
+      label: supplierName,
+      itemCount: enrichedItems.length,
+    });
+
     revalidatePath('/admin/purchases');
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
+    revalidatePath('/admin/capital');
+
+    if (peringatanModal) {
+      return { success: true, warning: peringatanModal, data: { id, ...updatedRaw } };
+    }
     return { success: true, data: { id, ...updatedRaw } };
   } catch (error: any) {
     console.error('Failed to update PO:', error);
@@ -674,9 +729,27 @@ export async function cancelPurchaseOrder(id: string) {
 
     if (updateErr) throw updateErr;
 
+    // Kembalikan uang ke modal bila PO ini pernah mengurangi modal (tunai /
+    // transfer). PO tempo tidak punya catatan keluar, jadi tidak ada yang
+    // dikembalikan. Idempoten: membatalkan ulang tidak menggandakan refund.
+    const peringatanModal = await catatMutasiModalPO({
+      poId: id,
+      total: Number(oldData.total ?? raw.total ?? 0),
+      paymentStatus: raw.paymentStatus,
+      paymentMethod: raw.paymentMethod,
+      label: raw.supplierName || 'Supplier',
+      itemCount: (raw.items || []).length,
+      dibatalkan: true,
+    });
+
     revalidatePath('/admin/purchases');
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
+    revalidatePath('/admin/capital');
+
+    if (peringatanModal) {
+      return { success: true, warning: peringatanModal };
+    }
     return { success: true };
   } catch (error: any) {
     console.error('Failed to cancel PO:', error);

@@ -129,6 +129,9 @@ beforeEach(() => {
 const lastPurchaseUpdate = () =>
   [...state.updateCalls].reverse().find((c) => c.table === 'purchases');
 
+/** Insert yang ditujukan ke satu tabel (kini setiap PO juga menyentuh modal). */
+const insertKe = (table: string) => state.insertCalls.filter((c) => c.table === table);
+
 describe('receivePurchaseOrder', () => {
   it('menambahkan stok dengan konversi satuan, lalu menandai PO diterima', async () => {
     state.purchaseRow = {
@@ -234,9 +237,30 @@ describe('createPurchaseOrder', () => {
 
     expect(hasil.success).toBe(true);
     expect(hasil.warning).toBeUndefined();
-    expect(state.insertCalls).toHaveLength(1);
-    expect(state.insertCalls[0].payload.raw_data.status).toBe('DITERIMA');
+    expect(insertKe('purchases')).toHaveLength(1);
+    expect(insertKe('purchases')[0].payload.raw_data.status).toBe('DITERIMA');
     expect(mocks.addStock).toHaveBeenCalledTimes(1);
+  });
+
+  it('PO tunai (default LUNAS + CASH) mencatat WITHDRAWAL modal', async () => {
+    // `orderBaru` tidak mengirim paymentStatus/paymentMethod -> default
+    // LUNAS + CASH, jadi uangnya HARUS tercatat keluar dari modal.
+    await createPurchaseOrder(orderBaru);
+
+    const mutasi = insertKe('capital_transactions');
+    expect(mutasi).toHaveLength(1);
+    expect(mutasi[0].payload.raw_data).toMatchObject({
+      type: 'WITHDRAWAL',
+      amount: 3000, // 3 x Rp1.000
+      recordedBy: 'system',
+    });
+    expect(mutasi[0].payload.raw_data.referenceId).toMatch(/^po_/);
+  });
+
+  it('PO tempo (HUTANG) tidak menyentuh modal', async () => {
+    await createPurchaseOrder({ ...orderBaru, paymentStatus: 'HUTANG', paymentMethod: 'HUTANG' });
+
+    expect(insertKe('capital_transactions')).toHaveLength(0);
   });
 
   it('melaporkan warning (bukan gagal) bila stok tidak bisa ditambahkan', async () => {
@@ -247,7 +271,7 @@ describe('createPurchaseOrder', () => {
     // PO sudah tersimpan, jadi ini BUKAN kegagalan total.
     expect(hasil.success).toBe(true);
     expect(hasil.warning).toContain('stok gagal ditambahkan');
-    expect(state.insertCalls).toHaveLength(1);
+    expect(insertKe('purchases')).toHaveLength(1);
     // Status dikembalikan ke APPROVED supaya tombol "Terima" muncul lagi.
     expect(lastPurchaseUpdate()?.payload.raw_data.status).toBe('APPROVED');
     expect(lastPurchaseUpdate()?.payload.raw_data.receivedAt).toBeUndefined();
@@ -279,6 +303,6 @@ describe('createPurchaseOrder', () => {
     expect(hasil.success).toBe(true);
     expect(hasil.warning).toBeUndefined();
     expect(mocks.addStock).not.toHaveBeenCalled();
-    expect(state.insertCalls[0].payload.raw_data.status).toBe('APPROVED');
+    expect(insertKe('purchases')[0].payload.raw_data.status).toBe('APPROVED');
   });
 });

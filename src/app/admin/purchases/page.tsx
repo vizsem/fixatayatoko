@@ -241,7 +241,15 @@ export default function AdminPurchases() {
     setSaving(true);
     const result = await cancelPurchaseOrder(poId);
     if (result.success) {
-      notify.success(`PO ${poNumber} berhasil dibatalkan`);
+      // `warning` = PO sudah dibatalkan & stok dikembalikan, tetapi pencatatan
+      // mutasi modalnya gagal. Jangan tampilkan sukses biasa supaya pengguna
+      // memeriksa halaman Modal.
+      const warning = (result as { warning?: string }).warning;
+      if (warning) {
+        notify.admin.warning(warning);
+      } else {
+        notify.success(`PO ${poNumber} berhasil dibatalkan`);
+      }
       setDetailModal(null);
       await load();
     } else {
