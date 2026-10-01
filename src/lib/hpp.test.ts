@@ -7,7 +7,9 @@ import {
   hitungItemOrder,
   hitungPcsItem,
   hitungPetaModalPembelian,
+  keBentukProdukHpp,
   nilaiSnapshotHpp,
+  PRODUK_RINGKAS,
   ringkasLabaItem,
 } from '@/lib/hpp';
 
@@ -186,6 +188,46 @@ describe('hitungHppItem — dua order nyata 1 Okt', () => {
     });
     expect(hasil.sumber).toBe('ESTIMASI');
     expect(hasil.hpp).toBe(17000); // 2 x (85% x Rp10.000)
+  });
+});
+
+describe('PRODUK_RINGKAS + keBentukProdukHpp (hemat 9,5x, hasil harus sama)', () => {
+  it('menyusun ulang raw_data sehingga konversi satuan tetap jalan', () => {
+    // Baris seperti yang dikembalikan proyeksi ringkas PostgREST.
+    const barisRingkas = {
+      id: 'sqfNNBIbJuvv0I6kMSuW',
+      stock: 500,
+      cost_price: 20333,
+      rawcostprice: null,
+      rawmodal: '20333',
+      rawpurchaseprice: '20333',
+      rawstok: '500',
+      units: [{ code: 'PCS', contains: 1 }, { code: 'CTN', contains: 12 }],
+    };
+
+    const produk = keBentukProdukHpp(barisRingkas);
+
+    const hasil = hitungHppItem({
+      item: { id: 'sqfNNBIbJuvv0I6kMSuW', price: 250000, quantity: 15, unit: 'CTN' },
+      produk,
+    });
+
+    // Tanpa penyusunan ulang, `units` hilang -> conv 1 -> HPP Rp304.995 (salah).
+    expect(hasil.pcs).toBe(180);
+    expect(hasil.hpp).toBe(3659940);
+    expect(hasil.sumber).toBe('MASTER');
+  });
+
+  it('proyeksi memang meminta kolom yang dibutuhkan', () => {
+    expect(PRODUK_RINGKAS).toContain('cost_price');
+    expect(PRODUK_RINGKAS).toContain('units:raw_data->units');
+    expect(PRODUK_RINGKAS).toContain('rawmodal:raw_data->>Modal');
+  });
+
+  it('produk tanpa units tetap aman (tidak melempar)', () => {
+    const produk = keBentukProdukHpp({ id: 'x', cost_price: 500, units: null });
+    expect(produk.raw_data.units).toEqual([]);
+    expect(hitungPcsItem({ quantity: 3, unit: 'PCS' }, produk.raw_data.units)).toBe(3);
   });
 });
 

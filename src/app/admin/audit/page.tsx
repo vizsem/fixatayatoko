@@ -5,8 +5,6 @@ import {
   History, ArrowLeftRight, Wallet, Search, Download, AlertCircle, CheckCircle, Clock, User, Package, ArrowUpCircle, ArrowDownCircle, Landmark, ChevronRight, BarChart3, TrendingUp, Info, Receipt
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -18,7 +16,7 @@ import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { Timestamp, auth, collection, db, getDocs, limit, orderBy, query, ref, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
-import { hitungItemOrder } from '@/lib/hpp';
+import { hitungItemOrder, keBentukProdukHpp, PRODUK_RINGKAS } from '@/lib/hpp';
 
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital' | 'tax';
 
@@ -69,7 +67,11 @@ function AuditPageContent() {
     __checkAuthunsubAuth();
     let unsubAuth: (() => void) | undefined;
     (async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsubAuth());
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        // HANYA saat sesi hilang; INITIAL_SESSION dipancarkan segera setelah
+        // subscribe dan membuat seluruh data dimuat dua kali tiap halaman dibuka.
+        if (event === 'SIGNED_OUT') __checkAuthunsubAuth();
+      });
       unsubAuth = () => subscription.unsubscribe();
     })();
     return () => { if (unsubAuth) unsubAuth(); };
@@ -111,9 +113,11 @@ function AuditPageContent() {
         // (`src/lib/hpp.ts`). Sebelumnya halaman ini membaca `i.cost`/`i.modal`
         // yang TIDAK ADA di order marketplace, sehingga HPP dianggap Rp0 dan
         // laba tampil 100% dari penjualan.
-        const produkSnap = await sbGetDocs({ table: 'products' });
+        // Hanya kolom yang dipakai: `products` utuh = ±5 MB (raw_data +
+        // image_url ikut terunduh), proyeksi ini ±570 KB untuk seluruh katalog.
+        const produkSnap = await sbGetDocs({ table: 'products', columns: PRODUK_RINGKAS });
         const produkMap = new Map<string, any>();
-        produkSnap.docs.forEach(ps => produkMap.set(ps.id, ps.data()));
+        produkSnap.docs.forEach(ps => produkMap.set(ps.id, keBentukProdukHpp(ps.data())));
 
         const logs = oSnap.docs.map(d => {
            const data = d.data();
@@ -236,12 +240,14 @@ function AuditPageContent() {
     fetchData();
   }, [fetchData]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let data: any[] = [];
     if (activeTab === 'stock') data = stockLogs.map(l => ({ Tanggal: format(l.date.toDate(), 'Pp'), Produk: l.productName, Tipe: l.type, Qty: l.amount, Sisa: l.nextStock, Admin: l.adminId }));
     else if (activeTab === 'transaction') data = transactions.map(t => ({ Tanggal: format(t.createdAt.toDate(), 'Pp'), ID: t.id, Customer: t.customerName, Total: t.total, Status: t.status }));
     else if (activeTab === 'tax') data = taxLogs.map(t => ({ Tanggal: format(t.date, 'Pp'), Nota: t.orderId, Customer: t.customer, Produk: t.product, Kategori: t.category, Omzet: t.sales, DPP: t.dpp, Pajak: t.taxAmount, Status: t.taxLabel }));
 
+    // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ekspor ditekan.
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, activeTab);

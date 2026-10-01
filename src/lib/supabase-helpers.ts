@@ -301,10 +301,26 @@ export async function sbGetDocs(params: {
   orderBy?: Array<{ field: string; direction?: 'asc' | 'desc' }>;
   limit?: number;
   useAdmin?: boolean;
+  /**
+   * Proyeksi kolom PostgREST, mis. `'id,name'` atau
+   * `'id,cost_price,units:raw_data->units'`. Default `'*'`.
+   *
+   * Dipakai halaman yang hanya butuh beberapa kolom: mengambil seluruh kolom
+   * `products` berarti ikut mengunduh `raw_data` dan `image_url` sehingga satu
+   * tabel bisa berukuran MEGABYTE padahal angkanya hanya butuh ~10% dari itu.
+   */
+  columns?: string;
 }): Promise<SbQuerySnapshot> {
-  const { table, where: wheres, orderBy: orderBys, limit: lim, useAdmin = true } = params;
+  const {
+    table,
+    where: wheres,
+    orderBy: orderBys,
+    limit: lim,
+    useAdmin = true,
+    columns,
+  } = params;
   const client = useAdmin ? supabaseAdmin : supabase;
-  let builder: any = client.from(table).select('*');
+  let builder: any = client.from(table).select(columns || '*');
 
   for (const w of wheres || []) {
     const resolved = resolveQueryField(table, w.field);

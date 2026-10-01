@@ -4,7 +4,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
 import {
   CreditCard, Download, TrendingUp, TrendingDown, Package,
   ChevronLeft, ChevronRight, LayoutDashboard, Printer,
@@ -19,6 +18,8 @@ import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import {
   hitungHppItem,
   hitungPetaModalPembelian,
+  keBentukProdukHpp,
+  PRODUK_RINGKAS,
   type SumberHpp,
 } from '@/lib/hpp';
 import { supabase } from '@/lib/supabase';
@@ -140,7 +141,12 @@ export default function FinanceReport() {
 __checkAuthunsub();
 let unsub: (() => void) | undefined;
 (async () => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsub());
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    // HANYA saat sesi hilang. Supabase memancarkan INITIAL_SESSION tepat setelah
+    // subscribe; memanggil ulang pemeriksaan di sini membuat SELURUH laporan
+    // (hanya termasuk ±5 MB data produk) dimuat DUA KALI tiap halaman dibuka.
+    if (event === 'SIGNED_OUT') __checkAuthunsub();
+  });
   unsub = () => subscription.unsubscribe();
 })();
     return () => { if (unsub) unsub(); };
@@ -166,9 +172,26 @@ let unsub: (() => void) | undefined;
         const startDate = new Date(dateRange.startDate);
         const endDate = new Date(dateRange.endDate); endDate.setHours(23, 59, 59, 999);
 
+        // SATU gelombang permintaan paralel untuk semua tabel yang dibutuhkan.
+        //
+        // Sebelumnya lima tabel diambil BERURUTAN (await satu per satu) dan
+        // `products` diambil utuh: 1.190 KB per 1.000 baris × ±4.600 produk =
+        // ±5 MB hanya untuk membaca modal & satuan. Proyeksi ringkas di bawah
+        // hanya mengambil kolom yang dipakai (±125 KB per 1.000 baris) —
+        // terukur pada data produksi.
+        const [capSnap, salesSnap, prodSnap, purchaseSnap, expenseSnap, returnSnap] =
+          await Promise.all([
+            sbGetDocs({ table: 'capital_transactions' }),
+            sbGetDocs({ table: 'orders' }),
+            sbGetDocs({ table: 'products', columns: PRODUK_RINGKAS }),
+            sbGetDocs({ table: 'purchases' }),
+            sbGetDocs({ table: 'operational_expenses' }),
+            sbGetDocs({ table: 'returns' }),
+          ]);
+
         let openBal = 0;
         const allCapItems: CashFlowItem[] = [];
-        (await sbGetDocs({ table: 'capital_transactions' })).docs.forEach(d => {
+        capSnap.docs.forEach(d => {
           const data = d.data() as any;
           const created = parseDateAny(data.date || data.createdAt);
           const amount = Number(data.amount || 0);
@@ -189,13 +212,10 @@ let unsub: (() => void) | undefined;
         });
         setOpeningBalance(openBal);
 
-        const salesSnap = await sbGetDocs({ table: 'orders' });
         const pidsSet = new Set<string>();
         salesSnap.docs.forEach(od => (od.data() as any).items?.forEach((it: any) => { const pid = it.id || it.productId; if (pid) pidsSet.add(pid); }));
-        const pids = Array.from(pidsSet);
         const productsMap = new Map<string, any>();
-        const allProdSnap = await sbGetDocs({ table: 'products' });
-        allProdSnap.docs.forEach(ds => productsMap.set(ds.id, ds.data()));
+        prodSnap.docs.forEach(ds => productsMap.set(ds.id, keBentukProdukHpp(ds.data())));
         let calculatedInv = 0;
         productsMap.forEach((p: any) => {
           const raw = p.raw_data || {};
@@ -208,9 +228,7 @@ let unsub: (() => void) | undefined;
         // Peta modal per pcs dari PO terakhir. Kuncinya WAJIB id PRODUK
         // (`item.productId`), sebelumnya dipakai `item.id` (id baris pembelian)
         // sehingga pencariannya selalu gagal — lihat `hitungPetaModalPembelian`.
-        const latestCostMap = hitungPetaModalPembelian(
-          (await sbGetDocs({ table: 'purchases' })).docs
-        );
+        const latestCostMap = hitungPetaModalPembelian(purchaseSnap.docs);
 
         const financeRecords: FinancialRecord[] = [];
         const cashItems: CashFlowItem[] = [...allCapItems];
@@ -315,7 +333,7 @@ let unsub: (() => void) | undefined;
           }
         }
 
-        (await sbGetDocs({ table: 'operational_expenses' })).docs.forEach(d => {
+        expenseSnap.docs.forEach(d => {
           const data = d.data() as any;
           let created: Date;
           if (data.date instanceof Timestamp) created = data.date.toDate();
@@ -349,7 +367,7 @@ let unsub: (() => void) | undefined;
           });
         });
 
-        (await sbGetDocs({ table: 'purchases' })).docs.forEach(d => {
+        purchaseSnap.docs.forEach(d => {
           const data = d.data() as any;
           const created = parseDateAny(data.createdAt);
           if (!(created >= startDate && created <= endDate)) return;
@@ -380,7 +398,7 @@ let unsub: (() => void) | undefined;
           });
         });
 
-        (await sbGetDocs({ table: 'returns' })).docs.forEach(rd => {
+        returnSnap.docs.forEach(rd => {
           const r = rd.data() as any;
           const created = parseDateAny(r.createdAt);
           if (!(created >= startDate && created <= endDate)) return;
@@ -676,7 +694,10 @@ let unsub: (() => void) | undefined;
   const paginatedCfItems = useMemo(() => filteredCashflowItems.slice((cfPage - 1) * cfItemsPerPage, cfPage * cfItemsPerPage), [filteredCashflowItems, cfPage]);
   const totalCfPages = Math.ceil(filteredCashflowItems.length / cfItemsPerPage);
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ekspor ditekan.
+    // Impor statis membuat halaman ini mengunduhnya sebelum bisa tampil.
+    const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
     const period = `${dateRange.startDate} sd ${dateRange.endDate}`;
     if (activeTab === 'overview') {

@@ -299,6 +299,49 @@ export function nilaiSnapshotHpp(params: {
 }
 
 /**
+ * Proyeksi kolom `products` khusus untuk perhitungan HPP.
+ *
+ * Mengambil `products` utuh ikut mengunduh `raw_data` dan `image_url`: terukur
+ * ±1.190 KB per 1.000 baris (±5 MB untuk seluruh katalog 4.577 produk).
+ * Proyeksi ini hanya mengambil kunci yang benar-benar dibaca sehingga
+ * ±125 KB per 1.000 baris — SAMA hasilnya, 9,5x lebih ringan.
+ *
+ * Dipakai halaman Laporan Keuangan dan Audit bersama `keBentukProdukHpp()`.
+ */
+export const PRODUK_RINGKAS =
+  'id,stock,cost_price,' +
+  'rawcostprice:raw_data->>costPrice,rawmodal:raw_data->>Modal,' +
+  'rawpurchaseprice:raw_data->>purchasePrice,rawstok:raw_data->>Stok,' +
+  'units:raw_data->units';
+
+/**
+ * Susun kembali bentuk `{ cost_price, raw_data: {...} }` dari baris ringkas.
+ *
+ * WAJIB dipakai bersama `PRODUK_RINGKAS`: tanpa ini `raw_data.units` hilang,
+ * konversi satuan (CTN -> pcs) tidak jalan, dan HPP kembali salah seperti bug
+ * 2026-10-01.
+ */
+export function keBentukProdukHpp(baris: any): {
+  id?: string;
+  stock?: number;
+  cost_price?: number | string | null;
+  raw_data: Record<string, any>;
+} {
+  return {
+    id: baris?.id,
+    stock: baris?.stock,
+    cost_price: baris?.cost_price,
+    raw_data: {
+      units: baris?.units || [],
+      costPrice: baris?.rawcostprice ?? undefined,
+      Modal: baris?.rawmodal ?? undefined,
+      purchasePrice: baris?.rawpurchaseprice ?? undefined,
+      Stok: baris?.rawstok ?? undefined,
+    },
+  };
+}
+
+/**
  * Peta "modal per pcs dari pembelian terakhir" untuk sekumpulan Purchase Order.
  *
  * PERBAIKAN PENTING: kuncinya adalah **id produk** (`item.productId`), bukan

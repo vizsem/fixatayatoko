@@ -25,8 +25,10 @@ import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import { playScanBeep } from '@/lib/sound';
 
 
-// ✅ SheetJS untuk Export/Import Excel
-import * as XLSX from 'xlsx';
+// CATATAN: SheetJS (xlsx, ±400 KB) TIDAK diimpor di sini. Library itu hanya
+// dipakai saat Export/Import Excel ditekan, jadi dimuat dengan
+// `await import('xlsx')` di dalam handler masing-masing — kalau diimpor statis,
+// halaman produk mengunduhnya sebelum bisa tampil.
 import { supabase } from '@/lib/supabase';
 
 
@@ -491,7 +493,7 @@ export default function AdminProducts() {
   const currentItems = filteredAndSorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Handlers
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filteredAndSorted.length === 0) return notify.admin.error("Tidak ada data untuk diexport!");
     const t = notify.admin.loading("Mengunduh Excel...");
     try {
@@ -517,6 +519,9 @@ export default function AdminProducts() {
       tgl_masuk: p.tgl_masuk || '',
       expired_date: p.expired_date || ''
     }));
+      // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ini ditekan.
+      // Impor statis membuat halaman produk mengunduhnya sebelum bisa tampil.
+      const XLSX = await import('xlsx');
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Produk");
@@ -526,7 +531,8 @@ export default function AdminProducts() {
 
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx');
     const template = [{ ID: "P001", Barcode: "123", Nama: "CONTOH", Kategori: "Umum", Satuan: "Pcs", Stok: 0, Min_Stok: 5, Modal: 0, Ecer: 0, Min_Grosir: 0, Harga_Grosir: 0, Lokasi: "A1", Deskripsi: "-", URL_Produk: "", Status: 1, warehouseId: warehouses[0]?.id || "", tgl_masuk: "2024-01-01", expired_date: "" }];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
@@ -542,6 +548,7 @@ export default function AdminProducts() {
       const t = notify.admin.loading("Mengimport...");
       try {
         const bstr = evt.target?.result as string;
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(bstr, { type: 'binary' });
         const data = (XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) as Record<string, any>[]);
 
