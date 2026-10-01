@@ -49,6 +49,13 @@ export type ItemPenjualan = {
    * Ini yang membuat laba historis tidak berubah saat Modal produk diubah.
    */
   hppPerPcs?: number | string;
+  /**
+   * Modal per pcs versi order KASIR (field `cost`). Sama-sama direkam saat
+   * transaksi, hanya namanya berbeda — jangan sampai terbaca sebagai estimasi.
+   */
+  cost?: number | string;
+  /** Isi satu satuan jual dalam pcs, versi order kasir. */
+  contains?: number | string;
 };
 
 export type ProdukUntukHpp = {
@@ -90,8 +97,9 @@ export function cariContainsSatuan(unit: unknown, units: any[] | undefined): num
 /**
  * Banyaknya pcs yang benar-benar keluar untuk satu baris item.
  *
- * Prioritas: `baseQuantity` (snapshot saat transaksi) > `containsPerUnit`
- * (snapshot saat transaksi) > daftar satuan produk master.
+ * Prioritas: `baseQuantity` > `containsPerUnit` / `contains` (ketiganya snapshot
+ * SAAT TRANSAKSI, jadi tidak berubah kalau isi satuan produk diubah) > daftar
+ * satuan produk master.
  */
 export function hitungPcsItem(item: ItemPenjualan, unitsProduk?: any[]): number {
   const base = Number(item?.baseQuantity ?? 0);
@@ -100,7 +108,7 @@ export function hitungPcsItem(item: ItemPenjualan, unitsProduk?: any[]): number 
   const qty = Number(item?.quantity ?? 1);
   const jumlah = Number.isFinite(qty) && qty > 0 ? qty : 1;
 
-  const containsItem = Number(item?.containsPerUnit ?? 0);
+  const containsItem = Number(item?.containsPerUnit ?? item?.contains ?? 0);
   if (Number.isFinite(containsItem) && containsItem > 0) return jumlah * containsItem;
 
   return jumlah * cariContainsSatuan(item?.unit, unitsProduk);
@@ -121,7 +129,8 @@ export function ambilHppPerPcs(params: {
   const raw = (produk?.raw_data || {}) as Record<string, any>;
 
   // 0. Snapshot saat transaksi — paling dipercaya dan tidak pernah berubah.
-  const dariSnapshot = Number(item?.hppPerPcs ?? 0);
+  //    `hppPerPcs` dipakai order marketplace/website, `cost` dipakai order kasir.
+  const dariSnapshot = Number(item?.hppPerPcs ?? item?.cost ?? 0);
   if (Number.isFinite(dariSnapshot) && dariSnapshot > 0) {
     return { costPerPcs: dariSnapshot, sumber: 'SNAPSHOT' };
   }

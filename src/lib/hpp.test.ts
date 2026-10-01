@@ -78,6 +78,10 @@ describe('hitungPcsItem', () => {
     expect(hitungPcsItem({ quantity: 7, unit: 'CTN', containsPerUnit: 40 })).toBe(280);
   });
 
+  it('memakai `contains` (order kasir) bila field snapshot lain tidak ada', () => {
+    expect(hitungPcsItem({ quantity: 15, unit: 'CTN', contains: 12 })).toBe(180);
+  });
+
   it('memakai daftar satuan produk sebagai cadangan', () => {
     expect(hitungPcsItem({ quantity: 15, unit: 'CTN' }, PRODUK_BANTAL.raw_data.units)).toBe(180);
   });
@@ -102,6 +106,14 @@ describe('ambilHppPerPcs', () => {
   it('master produk menang bila tidak ada snapshot', () => {
     const hasil = ambilHppPerPcs({ item: {}, produk: PRODUK_BANTAL });
     expect(hasil).toEqual({ costPerPcs: 20333, sumber: 'MASTER' });
+  });
+
+  it('modal dari order KASIR (field `cost`) dianggap snapshot, bukan estimasi', () => {
+    const hasil = ambilHppPerPcs({
+      item: { cost: 81000, contains: 1 },
+      produk: { cost_price: 0, raw_data: {} },
+    });
+    expect(hasil).toEqual({ costPerPcs: 81000, sumber: 'SNAPSHOT' });
   });
 
   it('Modal di baris order dipakai bila master kosong (order lama)', () => {
