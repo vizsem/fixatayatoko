@@ -32,6 +32,12 @@ export const TABLES_WITH_RAW_DATA = new Set([
   'operational_expenses',
   // Terverifikasi punya kolom raw_data di Supabase remote (2026-10-01):
   'inventory_transactions',
+  // Dibuat oleh migrasi 20261007. `messages` menampung pesan chat (dulu
+  // subcollection Firestore `chats/{id}/messages`), `carts` menampung keranjang
+  // per pengguna. Keduanya ditulis lewat bridge, jadi harus terdaftar di sini
+  // agar `buildWritePayload` benar-benar menuliskan `raw_data`.
+  'messages',
+  'carts',
   // Bentuk historisnya hanya `id` + `raw_data`; migrasi 20260930 menambahkan
   // kolom asli di sampingnya (lihat TABLE_COLUMNS di bawah).
   'product_cost_logs',
@@ -86,6 +92,14 @@ export const TABLE_COLUMNS: Record<string, Set<string>> = {
   wallet_logs: new Set(['id', 'user_id', 'amount', 'description', 'created_at', 'raw_data']),
   notifications: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
   settings: new Set(['id', 'key', 'value', 'created_at', 'updated_at', 'raw_data']),
+  // Dibuat oleh migrasi 20261007.
+  // `carts`: id dan user_id dibuat sama oleh pemanggil supaya dua jalur tulis
+  // (CartContext lewat onConflict user_id, dan sbUpsertDoc lewat id) mengarah
+  // ke baris yang sama.
+  carts: new Set(['id', 'user_id', 'items', 'raw_data', 'created_at', 'updated_at']),
+  // `messages`: chat_id adalah penaut ke percakapan induk. Bridge mengisinya
+  // dari path subcollection Firestore `chats/{chatId}/messages`.
+  messages: new Set(['id', 'chat_id', 'text', 'sender_id', 'type', 'image_url', 'is_read', 'raw_data', 'created_at', 'updated_at']),
   operational_expenses: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
   // Kolom camelCase (dibuat oleh migrasi 20260930). Sengaja dipertahankan
   // camelCase karena `product.actions.ts` menulis `insert({ productId, ... })`.
@@ -98,6 +112,9 @@ export const CAMEL_TO_SNAKE: Record<string, string> = {
   updatedAt: 'updated_at',
   orderId: 'order_id',
   userId: 'user_id',
+  chatId: 'chat_id',
+  senderId: 'sender_id',
+  isRead: 'is_read',
   customerId: 'customer_id',
   customerName: 'customer_name',
   customerPhone: 'customer_phone',
@@ -227,6 +244,16 @@ export function extractTableColumns(table: string, data: any): Record<string, an
   } else if (table === 'purchases') {
     if (data.total !== undefined) cols.total = Number(data.total);
     if (data.status !== undefined) cols.status = data.status;
+  } else if (table === 'carts') {
+    if (data.userId !== undefined) cols.user_id = data.userId;
+    if (data.items !== undefined) cols.items = data.items;
+  } else if (table === 'messages') {
+    if (data.chatId !== undefined) cols.chat_id = data.chatId;
+    if (data.text !== undefined) cols.text = data.text;
+    if (data.senderId !== undefined) cols.sender_id = data.senderId;
+    if (data.type !== undefined) cols.type = data.type;
+    if (data.imageUrl !== undefined) cols.image_url = data.imageUrl;
+    if (data.isRead !== undefined) cols.is_read = data.isRead;
   } else if (table === 'product_cost_logs') {
     // Kolom camelCase — lihat catatan di TABLE_COLUMNS.
     if (data.productId !== undefined) cols.productId = data.productId;

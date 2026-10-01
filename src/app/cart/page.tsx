@@ -133,8 +133,11 @@ export default function CartPage() {
         if (user) {
           setUserId(user.id);
           const [uSnap, cSnap] = await Promise.all([
-            sbGetDoc('users', user.id),
-            sbGetDoc('carts', user.id)
+            // `false` = pakai klien ber-sesi (anon key + sesi login). Di browser,
+            // `sbGetDoc` default memakai klien service-role yang TIDAK membawa
+            // sesi, sehingga RLS menolak dan hasilnya selalu kosong.
+            sbGetDoc('users', user.id, false),
+            sbGetDoc('carts', user.id, false)
           ]);
           if (uSnap.exists()) {
             const uData = uSnap.data() as UserProfile;

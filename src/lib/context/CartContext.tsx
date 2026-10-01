@@ -32,7 +32,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (uid) {
       try {
+        // `id` sengaja disamakan dengan `user_id`: jalur lain (sbUpsertDoc)
+        // meng-upsert berdasarkan `id`, sedangkan jalur ini berdasarkan
+        // `user_id`. Kalau `id` dibiarkan acak, keduanya bisa membuat baris
+        // berbeda untuk pengguna yang sama dan menabrak UNIQUE(user_id).
         await supabase.from('carts').upsert({
+          id: uid,
           user_id: uid,
           items: newCart,
           updated_at: new Date().toISOString(),

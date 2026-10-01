@@ -162,12 +162,14 @@ export default function ProductDetailClient({
     if (userId) {
       try {
         const cartRef = doc(db, 'carts', userId);
-        const cartSnap = await sbGetDoc('carts', userId);
+        // `false` = klien ber-sesi; klien service-role di browser tidak punya
+        // sesi sehingga RLS menolak dan keranjang cloud selalu tampak kosong.
+        const cartSnap = await sbGetDoc('carts', userId, false);
         const cloudItems = (cartSnap.exists() ? (cartSnap.data().items as CartItem[]) : []) ?? [];
         const existingIndex = cloudItems.findIndex(item => item.productId === idToMatch && item.unit === unitCode);
         if (existingIndex > -1) { cloudItems[existingIndex].quantity += q; cloudItems[existingIndex].price = finalPrice; }
         else { cloudItems.push({ productId: idToMatch, id: idToMatch, name: p.name, price: finalPrice, image: p.image, unit: unitCode, quantity: q, addedAt: new Date().toISOString() }); }
-        await sbUpsertDoc('carts', userId, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true });
+        await sbUpsertDoc('carts', userId, { userId, items: cloudItems, updatedAt: new Date().toISOString() }, { merge: true, useAdmin: false });
       } catch (err) { console.error(err); }
     }
     setIsAdding(false);

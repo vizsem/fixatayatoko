@@ -37,6 +37,12 @@ export interface DocRef {
 export interface CollectionRef {
   type: 'collection';
   table: string;
+  /**
+   * ID dokumen induk untuk subcollection.
+   * `collection(db, 'chats', chatId, 'messages')` -> `messages` + `chatId`.
+   * Dipakai untuk mengisi/menyaring kolom penaut (lihat PARENT_FOREIGN_KEY).
+   */
+  parentId?: string;
   constraints?: QueryConstraint[];
 }
 
@@ -48,6 +54,7 @@ export type QueryConstraint =
 export interface QueryRef {
   type: 'query';
   table: string;
+  parentId?: string;
   constraints: QueryConstraint[];
 }
 
@@ -74,12 +81,34 @@ export const db: any = {
   supabase: db_client,
 };
 
+/**
+ * Subcollection Firestore -> kolom penaut di tabel datar.
+ *
+ * Di Firestore, pesan disimpan sebagai subcollection `chats/{chatId}/messages`,
+ * sehingga induknya implisit. Di Postgres semuanya tabel datar, jadi penautnya
+ * harus eksplisit: `messages.chat_id`. Tanpa pemetaan ini, pesan dari semua
+ * percakapan akan tercampur dalam satu daftar.
+ */
+const PARENT_FOREIGN_KEY: Record<string, string> = {
+  messages: 'chat_id',
+};
+
+/** Kolom penaut untuk sebuah koleksi, bila ada. */
+function parentField(table: string, parentId?: string): { column: string; value: string } | null {
+  const column = PARENT_FOREIGN_KEY[table];
+  if (!column || !parentId) return null;
+  return { column, value: parentId };
+}
+
 export function collection(_database: any, path: string, ...subPaths: string[]): CollectionRef {
-  const fullPath = [path, ...subPaths].filter(Boolean).join('/');
   const table = subPaths.length > 0 ? subPaths[subPaths.length - 1] : path;
+  // `collection(db, 'chats', chatId, 'messages')` -> subPaths = [chatId, 'messages']
+  // sehingga id induk ada satu posisi sebelum nama koleksi terakhir.
+  const parentId = subPaths.length > 1 ? subPaths[subPaths.length - 2] : undefined;
   return {
     type: 'collection',
     table,
+    parentId,
     constraints: [],
   };
 }
@@ -131,6 +160,9 @@ export function query(target: CollectionRef | QueryRef, ...constraints: QueryCon
   return {
     type: 'query',
     table: target.table,
+    // Teruskan id induk: tanpa ini, `query(collection(db,'chats',id,'messages'), ...)`
+    // kehilangan penautnya dan pesan semua percakapan tercampur.
+    parentId: (target as any).parentId,
     constraints: [...existingConstraints, ...constraints],
   };
 }
@@ -219,6 +251,10 @@ export async function getDocs<T = any>(target: CollectionRef | QueryRef): Promis
   try {
     let builder: any = db_client.from(target.table).select('*');
     const constraints = (target as any).constraints || [];
+
+    // Subcollection: batasi ke dokumen induknya.
+    const parent = parentField(target.table, (target as any).parentId);
+    if (parent) builder = builder.eq(parent.column, parent.value);
 
     for (const c of constraints) {
       if (c.type === 'where') {
@@ -320,9 +356,18 @@ export async function addDoc(colRef: CollectionRef, data: any): Promise<{ id: st
       ...extractTableColumns(colRef.table, data),
     };
 
+    // Subcollection: isikan kolom penaut ke dokumen induk.
+    const parent = parentField(colRef.table, colRef.parentId);
+    if (parent) payload[parent.column] = parent.value;
+
     // Only add raw_data for tables that have the column
     if (TABLES_WITH_RAW_DATA.has(colRef.table)) {
-      payload.raw_data = { ...data, createdAt: data.createdAt || now, updatedAt: now };
+      payload.raw_data = {
+        ...data,
+        ...(parent ? { [parent.column]: parent.value } : {}),
+        createdAt: data.createdAt || now,
+        updatedAt: now,
+      };
     }
 
     const { error } = await db_client
