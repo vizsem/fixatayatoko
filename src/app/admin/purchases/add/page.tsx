@@ -407,7 +407,10 @@ function AddPurchaseFormContent() {
           </div>
 
           {/* 2. Product Search & Table */}
-          <div className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+          {/* Sengaja TANPA `overflow-hidden`: dropdown hasil pencarian di bawah ini
+              memakai `position: absolute`, dan `overflow-hidden` akan memotongnya
+              begitu kartu lebih pendek dari daftar hasil (mis. saat keranjang kosong). */}
+          <div className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="p-4 sm:p-8 border-b border-gray-50">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -644,7 +647,7 @@ function AddPurchaseFormContent() {
 
         {/* RIGHT: SUMMARY & ACTIONS */}
         <div className="space-y-6">
-          <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl space-y-6">
+          <div className="bg-black text-white p-5 sm:p-8 rounded-3xl sm:rounded-[2.5rem] shadow-xl space-y-6">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
               <Calculator size={14} /> Order Summary
             </h3>
@@ -716,7 +719,7 @@ function AddPurchaseFormContent() {
             </button>
           </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
+          <div className="bg-white p-5 sm:p-8 rounded-3xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
               <Info size={14} /> Additional Notes
             </h3>

@@ -420,10 +420,10 @@ export default function AdminPurchases() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 my-4">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 my-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-black text-gray-900">Buat Purchase Order</h2>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+              <button onClick={() => setModalOpen(false)} className="p-2.5 -m-1 rounded-lg hover:bg-gray-100" aria-label="Tutup"><X size={18} /></button>
             </div>
 
             <div className="space-y-4">
@@ -657,10 +657,10 @@ export default function AdminPurchases() {
       {receiveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setReceiveModal(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-black text-gray-900">Terima Barang</h2>
-              <button onClick={() => setReceiveModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+              <button onClick={() => setReceiveModal(null)} className="p-2.5 -m-1 rounded-lg hover:bg-gray-100" aria-label="Tutup"><X size={18} /></button>
             </div>
             <p className="text-xs text-gray-500 mb-4">PO: <strong>{receiveModal.poNumber}</strong> — {receiveModal.supplier.name}</p>
 
@@ -716,13 +716,13 @@ export default function AdminPurchases() {
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDetailModal(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-lg font-black text-gray-900">Detail PO</h2>
                 <p className="text-xs text-gray-500 mt-0.5 font-mono">{detailModal.poNumber}</p>
               </div>
-              <button onClick={() => setDetailModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+              <button onClick={() => setDetailModal(null)} className="p-2.5 -m-1 rounded-lg hover:bg-gray-100" aria-label="Tutup"><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
               <div className="bg-gray-50 rounded-xl p-3">
@@ -748,28 +748,30 @@ export default function AdminPurchases() {
                 <p className="font-bold text-gray-800 text-xs uppercase">{detailModal.paymentMethod || 'CASH'}</p>
               </div>
             </div>
-            <table className="w-full text-sm mb-4">
-              <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                <th className="text-left p-2 rounded-tl-lg">Produk</th>
-                <th className="text-center p-2">Qty</th>
-                <th className="text-right p-2 rounded-tr-lg">Subtotal</th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {detailModal.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="p-2 text-gray-800 font-medium">{item.product.name}</td>
-                    <td className="p-2 text-center text-gray-600">{item.quantity} {item.product.unit}</td>
-                    <td className="p-2 text-right font-bold text-gray-900">Rp{item.totalPrice.toLocaleString('id-ID')}</td>
+            <div className="overflow-x-auto -mx-2 px-2 mb-4">
+              <table className="w-full text-sm min-w-[320px]">
+                <thead><tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                  <th className="text-left p-2 rounded-tl-lg">Produk</th>
+                  <th className="text-center p-2">Qty</th>
+                  <th className="text-right p-2 rounded-tr-lg">Subtotal</th>
+                </tr></thead>
+                <tbody className="divide-y divide-gray-50">
+                  {detailModal.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="p-2 text-gray-800 font-medium">{item.product.name}</td>
+                      <td className="p-2 text-center text-gray-600">{item.quantity} {item.product.unit}</td>
+                      <td className="p-2 text-right font-bold text-gray-900">Rp{item.totalPrice.toLocaleString('id-ID')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-gray-200">
+                    <td colSpan={2} className="p-2 font-bold text-gray-800 text-right">Total:</td>
+                    <td className="p-2 text-right font-black text-emerald-700 text-lg">Rp{detailModal.totalAmount.toLocaleString('id-ID')}</td>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-gray-200">
-                  <td colSpan={2} className="p-2 font-bold text-gray-800 text-right">Total:</td>
-                  <td className="p-2 text-right font-black text-emerald-700 text-lg">Rp{detailModal.totalAmount.toLocaleString('id-ID')}</td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
 
             <div className="flex flex-wrap gap-2 mt-6">
               {detailModal.status !== 'CANCELLED' && (
