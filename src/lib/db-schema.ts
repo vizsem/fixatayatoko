@@ -211,10 +211,22 @@ export function mergeRowWithRawData(
   const raw =
     row.raw_data && typeof row.raw_data === 'object' ? (row.raw_data as Record<string, any>) : {};
   const managed = table ? TABLE_COLUMNS[table] : undefined;
+  // Isi `raw_data` diratakan ke permukaan supaya `data.units`, `data.Modal`,
+  // `data.channelPricing`, dst. bisa dibaca langsung.
   const merged: Record<string, any> = { ...raw };
 
+  // TAPI properti `raw_data` itu sendiri HARUS TETAP ADA.
+  //
+  // Banyak pembaca memakai bentuk `const raw = data.raw_data || {}` (laporan
+  // keuangan, perhitungan satuan/konversi, HPP). Kalau properti ini hilang,
+  // `raw` menjadi objek kosong dan pembacaannya DIAM-DIAM salah — bukan error.
+  // Contoh nyata (regresi 2026-10-01): HPP FORTUNE BANTAL 1L terbaca
+  // Rp304.995 (15 CTN dihitung 15 pcs) padahal seharusnya Rp3.659.940
+  // (15 × 12 pcs × Rp20.333), sehingga "laba bersih" melonjak jadi Rp3.445.005.
+  merged.raw_data = raw;
+
   for (const [key, value] of Object.entries(row)) {
-    // Kolom `raw_data` sendiri tidak ikut diratakan ke permukaan.
+    // `raw_data` sudah ditangani di atas (isinya diratakan, propertinya disimpan).
     if (key === 'raw_data') continue;
     // NULL/undefined tidak membawa informasi: jangan menghapus isi raw_data.
     if (value === null || value === undefined) continue;

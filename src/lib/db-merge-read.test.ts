@@ -164,3 +164,130 @@ describe('pembacaan lewat bridge dan sbGetDocs', () => {
     expect(data.type).toBe('WITHDRAWAL');
   });
 });
+
+/**
+ * REGRESI 2026-10-01 — "laba bersih salah hitung".
+ *
+ * `mergeRowWithRawData` meratakan ISI `raw_data` ke permukaan (supaya `data.units`
+ * bisa dibaca), tetapi awalnya LUPA mempertahankan properti `raw_data` itu
+ * sendiri. Padahal banyak pembaca memakai bentuk `const raw = data.raw_data || {}`
+ * — tanpa properti itu `raw` menjadi objek kosong dan hasilnya DIAM-DIAM salah:
+ * konversi satuan (CTN -> pcs) hilang sehingga HPP dihitung per satuan jual,
+ * bukan per pcs.
+ *
+ * Dua contoh NYATA dari 1 Okt (data produksi, harga & satuan apa adanya):
+ *   - mkt_1790864796550_m745 : FORTUNE BANTAL 1L, 15 CTN @Rp250.000
+ *     HPP benar 3.659.940 (15 × 12 pcs × Rp20.333) -> laba Rp90.060
+ *     HPP salah   304.995 (15 pcs saja)             -> "laba" Rp3.445.005
+ *   - mkt_1790846344433_bv2g : TOP COFFEE TOP MINI 6G, 1 CTN @Rp155.000
+ *     HPP benar   133.000 (200 pcs × Rp665)         -> laba Rp22.000
+ *     HPP salah       665 (1 pcs saja)              -> "laba" Rp154.335
+ */
+
+/** Produk apa adanya dari tabel `products` (hanya kolom yang dipakai laporan). */
+const PRODUK_BANTAL = {
+  id: 'sqfNNBIbJuvv0I6kMSuW',
+  name: 'FORTUNE BANTAL 1L',
+  price: 23000,
+  unit: 'PCS',
+  cost_price: 20333,
+  raw_data: {
+    Modal: 20333,
+    units: [
+      { code: 'PCS', contains: 1, price: 23000 },
+      { code: 'CTN', contains: 12, price: 280400 },
+    ],
+  },
+};
+
+const PRODUK_KOPI = {
+  id: 'prod_1790689091832_k783v',
+  name: 'TOP COFFEE TOP MINI 6G',
+  price: 800,
+  unit: 'PCS',
+  cost_price: 665,
+  raw_data: {
+    Modal: 665,
+    units: [
+      { code: 'PCS', contains: 1, price: 800 },
+      { code: 'RTG', contains: 10, price: 8000 },
+      { code: 'CTN', contains: 200, price: 733000 },
+    ],
+  },
+};
+
+/**
+ * Rumus HPP yang dipakai tabel mutasi di `src/app/admin/reports/finance/page.tsx`
+ * (diringkas ke bagian yang relevan). Kalau halaman itu berubah, test ini wajib
+ * ikut disesuaikan.
+ */
+function hppDanLaba(
+  produk: any,
+  item: { price: number; quantity: number; unit?: string }
+) {
+  const raw = produk?.raw_data || {};
+
+  let conv = 1;
+  const itemUnit = (item.unit || '').toUpperCase();
+  if (itemUnit && itemUnit !== 'PCS') {
+    const uObj = (raw.units || []).find(
+      (x: any) => (x.code || '').toUpperCase() === itemUnit
+    );
+    if (uObj?.contains) conv = Number(uObj.contains);
+  }
+
+  const cost = Number(produk?.cost_price ?? raw.Modal ?? 0);
+  const pendapatan = item.price * item.quantity;
+  const hpp = cost * (item.quantity * conv);
+  return { pendapatan, hpp, laba: pendapatan - hpp };
+}
+
+describe('raw_data tetap ada setelah perataan (regresi HPP / laba bersih)', () => {
+  it('properti raw_data tidak hilang', () => {
+    const merged = mergeRowWithRawData(PRODUK_BANTAL, 'products');
+    expect(merged.raw_data).toEqual(PRODUK_BANTAL.raw_data);
+    // Isinya juga tetap diratakan ke permukaan.
+    expect(merged.units).toHaveLength(2);
+  });
+
+  it('getDocs: FORTUNE BANTAL 15 CTN dihitung 180 pcs, bukan 15', async () => {
+    state.rows = [PRODUK_BANTAL];
+    const snap = await getDocs(collection({}, 'products'));
+    const produk = snap.docs[0].data() as any;
+
+    const { pendapatan, hpp, laba } = hppDanLaba(produk, {
+      price: 250000,
+      quantity: 15,
+      unit: 'CTN',
+    });
+
+    expect(pendapatan).toBe(3750000);
+    expect(hpp).toBe(20333 * 15 * 12);
+    expect(hpp).toBe(3659940);
+    expect(laba).toBe(90060);
+  });
+
+  it('normalizeRow: TOP COFFEE 1 CTN dihitung 200 pcs, bukan 1', () => {
+    const produk = normalizeRow(PRODUK_KOPI, 'products');
+
+    const { pendapatan, hpp, laba } = hppDanLaba(produk, {
+      price: 155000,
+      quantity: 1,
+      unit: 'CTN',
+    });
+
+    expect(pendapatan).toBe(155000);
+    expect(hpp).toBe(665 * 200);
+    expect(hpp).toBe(133000);
+    expect(laba).toBe(22000);
+  });
+
+  it('sbGetDocs: satuan PCS tetap dihitung apa adanya', async () => {
+    state.rows = [PRODUK_KOPI];
+    const snap = await sbGetDocs({ table: 'products' });
+    const produk = snap.docs[0].data() as any;
+
+    const { hpp } = hppDanLaba(produk, { price: 800, quantity: 10, unit: 'PCS' });
+    expect(hpp).toBe(6650);
+  });
+});
