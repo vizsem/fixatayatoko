@@ -293,8 +293,9 @@ export const addStock = async (params: {
   reference?: string
   notes?: string
   incomingPrice?: number // Harga beli masuk untuk menghitung AVG Modal
+  source?: InventorySource // Asal mutasi; default 'PURCHASE' (perilaku lama)
 }) => {
-  const { productId, amount, batchNumber, reference, notes, incomingPrice } = params;
+  const { productId, amount, batchNumber, reference, notes, incomingPrice, source } = params;
   const warehouseId = params.warehouseId || 'gudang-utama';
 
   if (amount <= 0) throw new Error('Amount must be > 0');
@@ -370,7 +371,7 @@ export const addStock = async (params: {
       note: notes || 'Penambahan stok',
       toWarehouseId: warehouseId,
       warehouseId,
-      source: 'PURCHASE',
+      source: source || 'PURCHASE',
       batchNumber,
     });
 

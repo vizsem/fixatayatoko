@@ -2,7 +2,7 @@
 
 import { requireStaff } from '@/lib/actions/session';
 
-import { deductStockFEFO, addInventoryLog } from '../inventory'
+import { deductStockFEFO, addStock, addInventoryLog } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
 import { limit } from '@/lib/firebase';
@@ -12,12 +12,12 @@ type SalesItemInput = {
   unitPrice: number
 }
 
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function getSalesOrders(filters?: { status?: string; customerId?: string; limit?: number }) {
   await requireStaff();
   try {
-    let query = supabase.from('orders').select('*');
+    let query = supabaseAdmin.from('orders').select('*');
     if (filters?.status && filters.status !== 'SEMUA') {
       query = query.eq('status', filters.status);
     }
@@ -67,7 +67,7 @@ export async function getSalesOrders(filters?: { status?: string; customerId?: s
 export async function getSalesOrderById(id: string) {
   await requireStaff();
   try {
-    const { data: o, error } = await supabase.from('orders').select('*').eq('id', id).single();
+    const { data: o, error } = await supabaseAdmin.from('orders').select('*').eq('id', id).single();
     if (error || !o) return null;
     const raw = o.raw_data || {};
     const items = Array.isArray(o.items) ? o.items : (raw.items || []);
@@ -135,7 +135,7 @@ export async function createSalesOrder(data: {
     }
 
     // Fetch customer info if available
-    const { data: cust } = await supabase.from('customers').select('*').eq('id', data.customerId).single();
+    const { data: cust } = await supabaseAdmin.from('customers').select('*').eq('id', data.customerId).single();
     const custName = cust?.name || cust?.raw_data?.name || 'Pelanggan';
     const custPhone = cust?.phone || cust?.raw_data?.phone || null;
 
@@ -152,7 +152,7 @@ export async function createSalesOrder(data: {
       createdAt: now,
     };
 
-    const { error } = await supabase.from('orders').insert({
+    const { error } = await supabaseAdmin.from('orders').insert({
       id,
       order_id: soNumber,
       user_id: data.customerId,
@@ -340,7 +340,7 @@ export async function recordPayment(data: {
   await requireStaff();
   try {
     const orderId = data.invoiceId.replace(/^inv_/, '');
-    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    const { data: order } = await supabaseAdmin.from('orders').select('*').eq('id', orderId).single();
     if (!order) return { success: false, error: 'Order tidak ditemukan' };
 
     const raw = order.raw_data || {};
@@ -353,7 +353,7 @@ export async function recordPayment(data: {
     raw.paymentStatus = isPaid ? 'PAID' : 'PARTIAL';
     raw.status = status;
 
-    await supabase.from('orders').update({
+    await supabaseAdmin.from('orders').update({
       status,
       raw_data: raw,
       updated_at: new Date().toISOString(),
@@ -370,7 +370,7 @@ export async function recordPayment(data: {
 export async function getUnpaidInvoices() {
   await requireStaff();
   try {
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await supabaseAdmin
       .from('orders')
       .select('*')
       .neq('status', 'SELESAI')
@@ -424,6 +424,27 @@ export async function createMarketplaceOrder(data: {
     const dbOrderId = `mkt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const now = new Date().toISOString();
 
+    // Catat stok yang sudah terpotong supaya bisa dikembalikan bila order gagal
+    // disimpan. Tanpa ini, kegagalan menyimpan order meninggalkan stok yang
+    // sudah terpotong tanpa order — kerugian yang tidak terlihat.
+    const sudahDipotong: { id: string; baseQuantity: number }[] = [];
+    const kembalikanStok = async () => {
+      for (const item of sudahDipotong) {
+        try {
+          await addStock({
+            productId: item.id,
+            amount: item.baseQuantity,
+            warehouseId: data.warehouseId,
+            reference: data.orderId,
+            notes: `Pengembalian otomatis — order ${data.externalOrderId} gagal disimpan`,
+            source: 'MARKETPLACE',
+          });
+        } catch (err) {
+          console.error(`Gagal mengembalikan stok ${item.id} setelah order gagal:`, err);
+        }
+      }
+    };
+
     // Deduct stock using FEFO
     for (const item of data.items) {
       const result = await deductStockFEFO({
@@ -436,8 +457,10 @@ export async function createMarketplaceOrder(data: {
         notes: `${data.channel} Order #${data.externalOrderId} | Gudang: ${data.warehouseName}`,
       });
       if (!result.success) {
+        await kembalikanStok();
         return { success: false, error: result.error || `Stok tidak cukup untuk produk ID: ${item.id}` };
       }
+      sudahDipotong.push({ id: item.id, baseQuantity: item.baseQuantity });
     }
 
     const orderData = {
@@ -457,7 +480,7 @@ export async function createMarketplaceOrder(data: {
       createdAt: now,
     };
 
-    const { error: orderError } = await supabase.from('orders').insert({
+    const { error: orderError } = await supabaseAdmin.from('orders').insert({
       id: dbOrderId,
       order_id: data.orderId,
       user_id: null,
@@ -470,7 +493,10 @@ export async function createMarketplaceOrder(data: {
       updated_at: now,
     });
 
-    if (orderError) throw orderError;
+    if (orderError) {
+      await kembalikanStok();
+      throw orderError;
+    }
 
     revalidatePath('/admin/products');
     revalidatePath('/admin/orders');
