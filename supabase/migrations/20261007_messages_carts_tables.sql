@@ -29,13 +29,26 @@
 --   ditambahkan sebagai penaut, dan bridge (src/lib/firebase.ts) diubah untuk
 --   ikut menyertakan/menyaring kolom ini.
 --
--- BENTUK `carts` — mendukung DUA jalur tulis yang sudah ada
---   1. `CartContext`  : upsert { user_id, items, updated_at } dengan
---                       onConflict 'user_id'  -> butuh `id` punya DEFAULT.
---   2. `sbUpsertDoc`  : upsert dengan `id = userId` -> butuh `user_id` ikut
---                       terisi (lihat `extractTableColumns` di db-schema.ts).
---   Agar keduanya menghasilkan baris yang sama, `id` dan `user_id` sengaja
---   dibuat sama oleh pemanggil, dan `user_id` diberi UNIQUE sebagai penjaga.
+-- BENTUK `carts` — tabelnya SUDAH ADA, tetapi berbeda dan KOSONG
+--   Bentuk yang ditemukan di remote (OpenAPI PostgREST, 2026-10-01):
+--     user_id uuid, product_id uuid, qty integer, created_at, raw_data
+--   Yaitu "satu baris per produk". Bentuk itu TIDAK punya kolom `id` maupun
+--   `items`, padahal:
+--     * `CartContext` meng-upsert { user_id, items } -> gagal (kolom tidak ada)
+--     * `sbGetDoc('carts', uid)` mencari kolom `id` -> HTTP 400
+--   Jadi tabel lama tidak cocok dengan satu pun jalur kode yang dipakai.
+--
+--   Isinya 0 baris (terverifikasi: `content-range: */0`), sehingga dibuang lalu
+--   dibuat ulang sesuai bentuk yang benar-benar dipakai aplikasi:
+--     satu baris per pengguna, `items` jsonb, `id` (dipakai sbGetDoc).
+--
+--   Drop-nya DIJAGA: hanya berjalan bila tabel benar-benar kosong DAN belum
+--   punya kolom `items`. Bila ada baris, tabel dibiarkan dan hanya diberi
+--   peringatan supaya diperiksa manual — jadi tidak mungkin menghapus data.
+--
+--   Dua jalur tulis yang harus didukung (keduanya menulis `id = user_id`):
+--     1. `CartContext`  -> upsert onConflict 'user_id'
+--     2. `sbUpsertDoc`  -> upsert berdasarkan `id`
 --
 -- CATATAN
 --   - Idempoten: aman dijalankan berulang.
@@ -50,20 +63,49 @@
 -- 1. TABEL
 -- ============================================================================
 
+-- Buang tabel `carts` lama HANYA bila kosong dan belum berbentuk benar.
+DO $$
+DECLARE
+  jumlah bigint;
+  punya_items boolean;
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'carts'
+  ) THEN
+    SELECT count(*) INTO jumlah FROM public.carts;
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'carts' AND column_name = 'items'
+    ) INTO punya_items;
+
+    IF punya_items THEN
+      RAISE NOTICE 'Tabel carts sudah berbentuk benar, dibiarkan.';
+    ELSIF jumlah = 0 THEN
+      DROP TABLE public.carts;
+      RAISE NOTICE 'Tabel carts lama (kosong, bentuk tidak sesuai) dibuang.';
+    ELSE
+      RAISE NOTICE 'Tabel carts berisi % baris — TIDAK dibuang, periksa manual.', jumlah;
+    END IF;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.carts (
+  -- `sbGetDoc('carts', uid)` mencari kolom `id`.
   id         text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id    text NOT NULL,
+  -- uuid (bukan text): `auth.uid()` bertipe uuid, jadi policy bisa
+  -- membandingkan tanpa cast.
+  user_id    uuid NOT NULL,
   items      jsonb NOT NULL DEFAULT '[]'::jsonb,
   -- Bridge (buildWritePayload) menulis payload asli ke raw_data untuk tabel
   -- yang terdaftar di TABLES_WITH_RAW_DATA. Kolom ini disediakan agar jalur
   -- `sbUpsertDoc('carts', ...)` tidak kehilangan data.
   raw_data   jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- Satu keranjang per pengguna; ini juga target `onConflict: 'user_id'`.
+  CONSTRAINT carts_user_id_key UNIQUE (user_id)
 );
-
--- Satu keranjang per pengguna. Ini juga target `onConflict: 'user_id'`.
-CREATE UNIQUE INDEX IF NOT EXISTS carts_user_id_key ON public.carts (user_id);
 
 CREATE TABLE IF NOT EXISTS public.messages (
   id         text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -120,8 +162,8 @@ BEGIN
     WHERE schemaname = 'public' AND tablename = 'carts' AND policyname = 'cart_owner_manage'
   ) THEN
     CREATE POLICY cart_owner_manage ON public.carts FOR ALL
-      USING (user_id = auth.uid()::text)
-      WITH CHECK (user_id = auth.uid()::text);
+      USING (user_id = auth.uid())
+      WITH CHECK (user_id = auth.uid());
   END IF;
 
   IF NOT EXISTS (
