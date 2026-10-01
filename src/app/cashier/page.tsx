@@ -19,7 +19,7 @@ import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
-import { isStaffOrAdmin, isAdminRole } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 
 import { uploadToSupabase } from '@/lib/supabase';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
@@ -506,19 +506,15 @@ export default function CashierPOS() {
 
       if (navigator.onLine) {
         try {
-          // Ambil role dari Supabase
-          const userRole = supaUser?.app_metadata?.role
-            || supaUser?.user_metadata?.role
-            || (supaUser?.email?.startsWith('admin') ? 'admin' : undefined)
-            || (supaUser?.email?.startsWith('kasir') ? 'cashier' : undefined)
-            || (supaUser?.email?.includes('hadzikoh') ? 'superadmin' : undefined);
-
-          // Izinkan: cashier, admin, superadmin, super_admin, owner
-          if (!isStaffOrAdmin(userRole) && !isAdminRole(userRole)) {
-            if (userRole !== 'cashier' && userRole !== 'kasir') {
-              router.push('/profil');
-              return;
-            }
+          // Peran dibaca dari `public.users.role` lewat getUserAndRole().
+          // Metadata pengguna dan awalan email TIDAK lagi dipakai: metadata bisa
+          // ditulis sendiri oleh pengguna, dan versi lama blok ini menolak admin
+          // asli karena perannya hanya tersimpan di `users.role` — akibatnya
+          // superadmin pun tidak bisa masuk ke halaman kasir.
+          const { isStaff: bolehMasukKasir } = await getUserAndRole();
+          if (!bolehMasukKasir) {
+            router.push('/profil');
+            return;
           }
 
           // --- SHIFT CACHE: Cek sessionStorage dulu untuk menghindari modal berulang ---

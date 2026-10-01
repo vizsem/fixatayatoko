@@ -11,7 +11,7 @@ import notify from '@/lib/notify';
 import * as Sentry from '@sentry/nextjs';
 import { Product } from '@/lib/types';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 export default function StockOutPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,9 +26,13 @@ export default function StockOutPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Peran dibaca dari `public.users.role` lewat getUserAndRole().
+      // Sebelumnya halaman ini memanggil isAuthorizedAdmin(user) TANPA data
+      // `users`, sehingga admin asli — yang perannya hanya tersimpan di tabel
+      // itu — selalu ditolak dan dialihkan ke /profil.
+      const { user, isAdmin } = await getUserAndRole();
       if (!user) { router.push('/admin/login'); return; }
-      if (!isAuthorizedAdmin(user)) {
+      if (!isAdmin) {
         notify.aksesDitolakAdmin();
         router.push('/profil');
         return;

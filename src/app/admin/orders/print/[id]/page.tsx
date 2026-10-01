@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { isAdminRole, isStaffOrAdmin } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 
 type OrderItem = {
   productId?: string;
@@ -62,13 +62,10 @@ export default function PrintOrderPage({ params }: { params: Promise<{ id: strin
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/admin/login'); return; }
       
-      const userRole = user.app_metadata?.role
-        || user.user_metadata?.role
-        || (user.email?.startsWith('admin') ? 'admin' : undefined)
-        || (user.email?.includes('hadzikoh') ? 'superadmin' : undefined)
-        || (user.email?.startsWith('kasir') ? 'cashier' : undefined);
-
-      if (!isAdminRole(userRole) && !isStaffOrAdmin(userRole)) {
+      // Peran dibaca dari `public.users.role`, bukan dari metadata pengguna
+      // yang bisa ditulis sendiri. Metadata membuat admin asli ditolak.
+      const { isStaff } = await getUserAndRole();
+      if (!isStaff) {
         router.push('/profil'); return;
       }
       setAuthChecked(true);

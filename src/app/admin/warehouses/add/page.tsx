@@ -7,7 +7,7 @@ import { Package } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-import { isAdminRole } from '@/lib/auth-helpers';
+import { getUserAndRole } from '@/lib/supabase-helpers';
 type Warehouse = {
   name: string;
   location: string;
@@ -36,10 +36,10 @@ function WarehouseFormContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/admin/login'); return; }
 
-      const userRole = user.app_metadata?.role || user.user_metadata?.role
-        || (user.email?.startsWith('admin') ? 'admin' : undefined)
-        || (user.email?.includes('hadzikoh') ? 'superadmin' : undefined);
-      if (!isAdminRole(userRole)) {
+      // Peran dibaca dari `public.users.role`, bukan dari metadata pengguna
+      // yang bisa ditulis sendiri. Metadata membuat admin asli ditolak.
+      const { isAdmin } = await getUserAndRole();
+      if (!isAdmin) {
         notify.admin.error('Akses ditolak! Anda bukan admin.');
         router.push('/profil');
         return;
