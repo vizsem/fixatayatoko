@@ -10,6 +10,7 @@ import {
   extractTableColumns,
   generateId,
   mergeRowWithRawData,
+  toFilterValue,
 } from '@/lib/db-schema';
 
 /**
@@ -325,14 +326,17 @@ export async function sbGetDocs(params: {
   for (const w of wheres || []) {
     const resolved = resolveQueryField(table, w.field);
     const field = resolved.targetField || w.field;
-    if (w.op === '==' || w.op === '===') builder = builder.eq(field, w.val);
-    else if (w.op === '!=') builder = builder.neq(field, w.val);
-    else if (w.op === '>') builder = builder.gt(field, w.val);
-    else if (w.op === '>=') builder = builder.gte(field, w.val);
-    else if (w.op === '<') builder = builder.lt(field, w.val);
-    else if (w.op === '<=') builder = builder.lte(field, w.val);
-    else if (w.op === 'in') builder = builder.in(field, Array.isArray(w.val) ? w.val : [w.val]);
-    else if (w.op === 'array-contains') builder = builder.contains(field, [w.val]);
+    // Nilai tanggal WAJIB diubah ke ISO: PostgREST membalas 400 untuk bentuk
+    // `Fri Oct 02 2026 ...` hasil `String(new Date())`.
+    const val = toFilterValue(w.val);
+    if (w.op === '==' || w.op === '===') builder = builder.eq(field, val);
+    else if (w.op === '!=') builder = builder.neq(field, val);
+    else if (w.op === '>') builder = builder.gt(field, val);
+    else if (w.op === '>=') builder = builder.gte(field, val);
+    else if (w.op === '<') builder = builder.lt(field, val);
+    else if (w.op === '<=') builder = builder.lte(field, val);
+    else if (w.op === 'in') builder = builder.in(field, Array.isArray(val) ? val : [val]);
+    else if (w.op === 'array-contains') builder = builder.contains(field, [val]);
   }
   for (const ob of orderBys || []) {
     const resolved = resolveQueryField(table, ob.field);

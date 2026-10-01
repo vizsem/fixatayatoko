@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { requireAdmin, requireStaff } from '@/lib/actions/session';
-import { describeDatabaseError } from '@/lib/actions/guard';
+import { ActionAuthError, requireAdmin, requireStaff } from '@/lib/actions/session';
+import { describeDatabaseError, type ActionErrorCode } from '@/lib/actions/guard';
+import { toPlainRow, toPlainRows } from '@/lib/db-schema';
 import {
   sbDeleteDoc,
   sbGetDoc,
@@ -34,7 +35,55 @@ import {
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: ActionErrorCode };
+
+/** Kegagalan verifikasi izin, sudah berbentuk hasil (bukan lemparan). */
+type IzinGagal = { ok: false; error: string; code: ActionErrorCode };
+
+/**
+ * Periksa izin TANPA melempar.
+ *
+ * MENGAPA TIDAK MELEMPAR (pelajaran `/admin/settings`, 2026-10-02)
+ * -----------------------------------------------------------------
+ * Server Action yang melempar tidak mengirim pesannya ke peramban di produksi:
+ * yang sampai hanya "An error occurred in the Server Components render..."
+ * (React #441) tanpa penjelasan. Halaman lalu tampak rusak/"tidak bisa dibuka"
+ * dan tidak ada cara bagi pengguna untuk tahu bahwa sesinya sudah kedaluwarsa.
+ *
+ * Sifat FAIL-CLOSED tetap: verifikasi dijalankan lebih dulu, dan bila gagal
+ * fungsi ini mengembalikan kegagalan sehingga tidak ada satu baris pun dibaca
+ * atau ditulis.
+ */
+function kegagalanIzin(error: unknown): IzinGagal {
+  if (error instanceof ActionAuthError) {
+    return { ok: false, error: error.message, code: error.code };
+  }
+  return {
+    ok: false,
+    error: error instanceof Error ? error.message : 'Verifikasi izin gagal.',
+    code: 'INTERNAL',
+  };
+}
+
+/** `null` = diizinkan. Selain itu = kegagalan siap dikembalikan ke klien. */
+async function cekAksesStaf(): Promise<IzinGagal | null> {
+  try {
+    await requireStaff();
+    return null;
+  } catch (error) {
+    return kegagalanIzin(error);
+  }
+}
+
+/** `null` = diizinkan. Selain itu = kegagalan siap dikembalikan ke klien. */
+async function cekAksesAdmin(): Promise<IzinGagal | null> {
+  try {
+    await requireAdmin();
+    return null;
+  } catch (error) {
+    return kegagalanIzin(error);
+  }
+}
 
 /** Tabel yang boleh disentuh operasi harian halaman pengaturan. */
 const SETTINGS_TABLES = new Set([
@@ -86,24 +135,28 @@ function assertSettingsDocId(id: string): void {
 export async function getSettingsDoc(
   id: string
 ): Promise<ActionResult<Record<string, unknown> | null>> {
-  await requireStaff();
+  const tolak = await cekAksesStaf();
+  if (tolak) return tolak;
   try {
     assertSettingsDocId(id);
     const doc = await sbGetDoc('settings', id);
-    return { ok: true, data: doc.exists() ? doc.data() : null };
+    // `toPlainRow` wajib: baris memuat `createdAt` bergaya Firestore yang berisi
+    // FUNGSI, dan serializer Server Action menolaknya (React #441).
+    return { ok: true, data: doc.exists() ? toPlainRow(doc.data()) : null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Gagal memuat pengaturan' };
   }
 }
 
 export async function listTable(table: string): Promise<ActionResult<Record<string, unknown>[]>> {
-  await requireStaff();
+  const tolak = await cekAksesStaf();
+  if (tolak) return tolak;
   try {
     assertSettingsTable(table);
     const snapshot = await sbGetDocs({ table });
     // `id` disertakan supaya bentuknya sama seperti `docs.map(d => ({id, ...d.data()}))`
     // yang dipakai halaman sebelumnya.
-    return { ok: true, data: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+    return { ok: true, data: toPlainRows(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Gagal memuat data' };
   }
@@ -134,7 +187,8 @@ export type SettingsPageData = {
  * daripada peramban -> server -> Supabase).
  */
 export async function getSettingsPageData(): Promise<ActionResult<SettingsPageData>> {
-  await requireStaff();
+  const tolak = await cekAksesStaf();
+  if (tolak) return tolak;
   try {
     const [system, points, categories, employees, banners, warehouses] = await Promise.all([
       sbGetDoc('settings', 'system'),
@@ -151,12 +205,12 @@ export async function getSettingsPageData(): Promise<ActionResult<SettingsPageDa
     return {
       ok: true,
       data: {
-        system: system.exists() ? (system.data() as Record<string, unknown>) : null,
-        points: points.exists() ? (points.data() as Record<string, unknown>) : null,
-        categories: baris(categories),
-        employees: baris(employees),
-        banners: baris(banners),
-        warehouses: baris(warehouses),
+        system: system.exists() ? toPlainRow(system.data()) : null,
+        points: points.exists() ? toPlainRow(points.data()) : null,
+        categories: toPlainRows(baris(categories)),
+        employees: toPlainRows(baris(employees)),
+        banners: toPlainRows(baris(banners)),
+        warehouses: toPlainRows(baris(warehouses)),
       },
     };
   } catch (error) {
@@ -175,7 +229,8 @@ export async function saveSettingsDoc(
   id: string,
   data: Record<string, unknown>
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
   try {
     assertSettingsDocId(id);
     await sbUpsertDoc('settings', id, { ...data, updatedAt: new Date().toISOString() });
@@ -190,7 +245,8 @@ export async function createInTable(
   table: string,
   data: Record<string, unknown>
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
   try {
     assertSettingsTable(table);
     const result = await sbInsertDoc(table, data);
@@ -206,7 +262,8 @@ export async function updateInTable(
   id: string,
   patch: Record<string, unknown>
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
   try {
     assertSettingsTable(table);
     await sbUpdateDoc(table, id, patch);
@@ -218,7 +275,8 @@ export async function updateInTable(
 }
 
 export async function deleteFromTable(table: string, id: string): Promise<ActionResult> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
   try {
     assertSettingsTable(table);
     await sbDeleteDoc(table, id);
@@ -235,7 +293,8 @@ export async function deleteFromTable(table: string, id: string): Promise<Action
 
 /** Nama tabel yang boleh diekspor/diimpor, agar UI dan server sepakat. */
 export async function getBackupTableNames(): Promise<ActionResult<string[]>> {
-  await requireStaff();
+  const tolak = await cekAksesStaf();
+  if (tolak) return tolak;
   return { ok: true, data: [...BACKUP_TABLES] };
 }
 
@@ -250,7 +309,8 @@ export async function getBackupTableNames(): Promise<ActionResult<string[]>> {
 export async function getBackupData(): Promise<
   ActionResult<Record<string, Record<string, unknown>[]>>
 > {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
 
   const result: Record<string, Record<string, unknown>[]> = {};
   for (const table of BACKUP_TABLES) {
@@ -260,12 +320,12 @@ export async function getBackupData(): Promise<
         const doc = await sbGetDoc('settings', id);
         if (doc.exists()) rows.push({ id, ...doc.data() });
       }
-      result[table] = rows;
+      result[table] = toPlainRows(rows);
       continue;
     }
 
     const snapshot = await sbGetDocs({ table });
-    result[table] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    result[table] = toPlainRows(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   }
 
   return { ok: true, data: result };
@@ -287,7 +347,8 @@ export async function replaceTableContents(
   rows: Record<string, unknown>[],
   mode: 'replace' | 'merge' = 'replace'
 ): Promise<ActionResult<{ written: number }>> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
 
   try {
     assertBackupTable(table);
@@ -323,7 +384,8 @@ export async function replaceTableContents(
 
 /** Hapus satu tabel backup (dipakai impor untuk tabel yang isinya diganti). */
 export async function clearTable(table: string): Promise<ActionResult> {
-  await requireAdmin();
+  const tolak = await cekAksesAdmin();
+  if (tolak) return tolak;
   try {
     assertBackupTable(table);
     const existing = await sbGetDocs({ table, limit: 100000 });
@@ -338,7 +400,8 @@ export async function clearTable(table: string): Promise<ActionResult> {
 
 /** Dipakai halaman untuk memastikan koneksi service role hidup. */
 export async function pingSettingsBackend(): Promise<boolean> {
-  await requireStaff();
+  const tolak = await cekAksesStaf();
+  if (tolak) return false;
   const { error } = await supabaseAdmin.from('settings').select('id').limit(1);
   return !error;
 }

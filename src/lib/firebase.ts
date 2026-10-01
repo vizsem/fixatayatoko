@@ -21,6 +21,7 @@ import {
   extractTableColumns,
   generateId,
   mergeRowWithRawData,
+  toFilterValue,
 } from '@/lib/db-schema';
 
 const isServer = typeof window === 'undefined';
@@ -265,23 +266,26 @@ export async function getDocs<T = any>(target: CollectionRef | QueryRef): Promis
         const resolved = resolveQueryField(target.table, c.field);
         if (resolved.ignore) continue;
         const field = resolved.targetField || c.field;
+        // Nilai tanggal WAJIB diubah ke ISO: PostgREST membalas 400 untuk
+        // bentuk `Fri Oct 02 2026 ...` hasil `String(new Date())`.
+        const val = toFilterValue(c.val);
 
         if (c.op === '==' || c.op === '===') {
-          builder = builder.eq(field, c.val);
+          builder = builder.eq(field, val);
         } else if (c.op === '!=') {
-          builder = builder.neq(field, c.val);
+          builder = builder.neq(field, val);
         } else if (c.op === '>') {
-          builder = builder.gt(field, c.val);
+          builder = builder.gt(field, val);
         } else if (c.op === '>=') {
-          builder = builder.gte(field, c.val);
+          builder = builder.gte(field, val);
         } else if (c.op === '<') {
-          builder = builder.lt(field, c.val);
+          builder = builder.lt(field, val);
         } else if (c.op === '<=') {
-          builder = builder.lte(field, c.val);
+          builder = builder.lte(field, val);
         } else if (c.op === 'in') {
-          builder = builder.in(field, Array.isArray(c.val) ? c.val : [c.val]);
+          builder = builder.in(field, Array.isArray(val) ? val : [val]);
         } else if (c.op === 'array-contains') {
-          builder = builder.contains(field, [c.val]);
+          builder = builder.contains(field, [val]);
         }
       } else if (c.type === 'orderBy') {
         const resolved = resolveQueryField(target.table, c.field);

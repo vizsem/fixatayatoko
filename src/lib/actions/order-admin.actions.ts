@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireStaff } from '@/lib/actions/session';
 import { describeDatabaseError } from '@/lib/actions/guard';
+import { toPlainRow } from '@/lib/db-schema';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 
 /**
@@ -43,8 +44,10 @@ export async function getOrderDetail(id: string): Promise<
     return {
       ok: true,
       data: {
-        order: orderDoc.exists() ? { id: orderDoc.id, ...orderDoc.data() } : null,
-        settings: settingsDoc.exists() ? settingsDoc.data() : null,
+        // `toPlainRow` wajib: baris memuat `createdAt` bergaya Firestore yang
+        // berisi FUNGSI, dan serializer Server Action menolaknya (React #441).
+        order: orderDoc.exists() ? toPlainRow({ id: orderDoc.id, ...orderDoc.data() }) : null,
+        settings: settingsDoc.exists() ? toPlainRow(settingsDoc.data()) : null,
       },
     };
   } catch (error) {
@@ -59,7 +62,7 @@ export async function getProductForOrder(
   await requireStaff();
   try {
     const doc = await sbGetDoc('products', id);
-    return { ok: true, data: doc.exists() ? { id: doc.id, ...doc.data() } : null };
+    return { ok: true, data: doc.exists() ? toPlainRow({ id: doc.id, ...doc.data() }) : null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Gagal memuat produk' };
   }

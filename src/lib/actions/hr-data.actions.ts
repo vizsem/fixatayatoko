@@ -1,6 +1,7 @@
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabase';
+import { toPlainRow } from '@/lib/db-schema';
 import { sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
 import { authorize } from '@/lib/actions/guard';
 import { resolveAccessToken } from '@/lib/actions/session';
@@ -119,7 +120,9 @@ export async function hrFetchDocs<T = Record<string, unknown>>(
   const docs = snapshot.docs.map((doc) => ({
     id: doc.id,
     exists: doc.exists(),
-    data: doc.data() as T,
+    // `toPlainRow` wajib: baris memuat `createdAt` bergaya Firestore yang
+    // berisi FUNGSI, dan serializer Server Action menolaknya (React #441).
+    data: toPlainRow(doc.data()) as T,
   }));
 
   return { docs, empty: docs.length === 0, size: docs.length };
@@ -133,7 +136,7 @@ export async function hrFetchDoc<T = Record<string, unknown>>(
   await assertHrAccess(table);
 
   const doc = await sbGetDoc(table, id);
-  return { id: doc.id, exists: doc.exists(), data: doc.data() as T };
+  return { id: doc.id, exists: doc.exists(), data: toPlainRow(doc.data()) as T };
 }
 
 /**

@@ -134,12 +134,25 @@ export default function AdminSettings() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { user, isAdmin } = await getUserAndRole();
-      if (!user) { router.push('/profil/login'); return; }
-      if (!isAdmin) { router.push('/'); return; }
+      try {
+        const { user, isAdmin } = await getUserAndRole();
+        if (!user) { router.push('/profil/login'); return; }
+        if (!isAdmin) { router.push('/'); return; }
 
-      await loadAll();
-      setLoading(false);
+        await loadAll();
+      } catch (error) {
+        // JANGAN biarkan halaman menggantung.
+        //
+        // Sebelumnya `setLoading(false)` berada setelah `await loadAll()` di
+        // dalam blok try, sehingga kegagalan apa pun (jaringan, Server Action,
+        // serialisasi respons) membuat spinner berputar SELAMANYA dan halaman
+        // tampak "tidak bisa dibuka" tanpa petunjuk. Pengguna hanya melihat
+        // `Uncaught (in promise) Error: Minified React error #441` di konsol.
+        console.error('Gagal memuat halaman pengaturan:', error);
+        notify.admin.error('Gagal memuat data pengaturan. Muat ulang halaman.');
+      } finally {
+        setLoading(false);
+      }
     };
     checkAuth();
 
@@ -172,6 +185,13 @@ export default function AdminSettings() {
   const loadAll = async () => {
     const result = await getSettingsPageData();
     if (!result.ok) {
+      // Sesi kedaluwarsa bukan kesalahan pengguna: arahkan ke halaman masuk
+      // dengan pesan yang jelas, bukan halaman kosong.
+      if (result.code === 'UNAUTHENTICATED') {
+        notify.admin.error(result.error);
+        router.push('/profil/login');
+        return;
+      }
       notify.admin.error(result.error);
       return;
     }

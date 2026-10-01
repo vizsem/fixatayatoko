@@ -239,6 +239,115 @@ export function mergeRowWithRawData(
 }
 
 /**
+ * Ubah nilai apa pun menjadi bentuk yang bisa menyeberangi batas Server Action.
+ *
+ * MASALAH YANG DIPERBAIKI DI SINI
+ * -------------------------------
+ * `normalizeRow` (lihat `supabase-helpers.ts`) menempelkan `createdAt` sebagai
+ * objek bergaya Firestore yang berisi FUNGSI: `{ seconds, nanoseconds,
+ * toDate(), toISOString(), toString(), toLocaleString() }`. Bentuk itu dipakai
+ * luas oleh pembaca di sisi klien, jadi tidak boleh diubah.
+ *
+ * Tetapi Server Action mengembalikan nilainya lewat serialisasi React Server
+ * Components, dan serializer itu MENOLAK fungsi. Server melempar, respons berisi
+ * error, dan peramban hanya melihat pesan tanpa isi:
+ *
+ *   "An error occurred in the Server Components render..." (React #441)
+ *
+ * Akibatnya halaman tampak "tidak bisa dibuka" tanpa petunjuk apa pun — persis
+ * yang terjadi pada `/admin/settings` (2026-10-02). Karena itu SETIAP action
+ * yang mengembalikan baris database WAJIB melewatkannya ke fungsi ini.
+ *
+ * Aturan:
+ *   - Date / objek ber-`toISOString()` (termasuk Timestamp) -> string ISO.
+ *   - Fungsi & Symbol dibuang (tidak bisa dikirim; bukan data).
+ *   - BigInt -> string (tidak didukung serializer).
+ *   - Array & objek biasa ditelusuri rekursif.
+ *   - Nilai primitif lain diteruskan apa adanya.
+ */
+export function toPlainData(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+
+  const tipe = typeof value;
+  if (tipe === 'string' || tipe === 'number' || tipe === 'boolean') return value;
+  // Fungsi/Symbol tidak punya representasi JSON: dibuang, bukan membuat error.
+  if (tipe === 'function' || tipe === 'symbol') return undefined;
+  if (tipe === 'bigint') return (value as bigint).toString();
+
+  if (value instanceof Date) {
+    const d = value as Date;
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  if (Array.isArray(value)) return value.map((item) => toPlainData(item));
+
+  if (tipe === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Timestamp (Firestore maupun `createNormalizedTimestamp`) -> string ISO.
+    if (typeof obj.toISOString === 'function') {
+      try {
+        const iso = (obj.toISOString as () => unknown).call(obj);
+        if (typeof iso === 'string') return iso;
+      } catch {
+        // `toISOString()` melempar pada Date tidak valid -> lanjut ke salinan.
+      }
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(obj)) {
+      const plain = toPlainData(item);
+      if (plain !== undefined) out[key] = plain;
+    }
+    return out;
+  }
+
+  return undefined;
+}
+
+/** Versi `toPlainData` untuk sebuah baris tabel. */
+export function toPlainRow<T>(row: T): Record<string, unknown> {
+  const plain = toPlainData(row);
+  return (plain && typeof plain === 'object' ? plain : {}) as Record<string, unknown>;
+}
+
+/** Versi `toPlainData` untuk daftar baris tabel. */
+export function toPlainRows<T>(rows: T[]): Array<Record<string, unknown>> {
+  return (rows || []).map((row) => toPlainRow(row));
+}
+
+/**
+ * Ubah nilai filter menjadi bentuk yang dimengerti PostgREST.
+ *
+ * `query(collection(db, 'orders'), where('createdAt', '>=', new Date()))`
+ * mengirim objek `Date` mentah. Supabase-js menyerialisasinya lewat
+ * `String(nilai)`, sehingga permintaannya menjadi:
+ *
+ *   /rest/v1/orders?created_at=gte.Fri Oct 02 2026 00:00:00 GMT+0700 (Waktu Indonesia Barat)
+ *
+ * PostgREST hanya menerima ISO 8601 dan membalas **HTTP 400** — sehingga
+ * "Penjualan Hari Ini" di header admin SELALU nol tanpa pesan yang jelas.
+ * Nilai tanggal karena itu wajib diubah ke ISO di satu tempat ini.
+ */
+export function toFilterValue(value: unknown): unknown {
+  if (value instanceof Date) {
+    const d = value as Date;
+    return isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  if (Array.isArray(value)) return value.map((item) => toFilterValue(item));
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.toISOString === 'function') {
+      try {
+        const iso = (obj.toISOString as () => unknown).call(obj);
+        if (typeof iso === 'string') return iso;
+      } catch {
+        // Date tidak valid: biarkan apa adanya agar kesalahannya terlihat.
+      }
+    }
+  }
+  return value;
+}
+
+/**
  * Konversi timestamp Firestore (objek `{ _seconds, _nanoseconds }`) atau
  * ISO string / epoch ms menjadi `Date`.
  */

@@ -48,6 +48,12 @@ const GUARD_PATTERNS = [
   // setiap action. `assertHrAccess` memverifikasi token + peran sekaligus
   // membatasi nama tabelnya (lihat `src/lib/actions/hr-data.actions.ts`).
   /await\s+assert\w*Access\s*\(/,
+  // Sama, tetapi kegagalannya DIKEMBALIKAN sebagai hasil alih-alih dilempar.
+  // Server Action yang melempar tidak mengirim pesannya ke peramban di
+  // produksi (hanya React #441 tanpa penjelasan), sehingga halaman tampak
+  // rusak tanpa sebab. Lihat `cekAksesStaf`/`cekAksesAdmin` di
+  // `src/lib/actions/settings.actions.ts`.
+  /await\s+cekAkses\w*\s*\(/,
 ];
 
 function actionFiles(): string[] {

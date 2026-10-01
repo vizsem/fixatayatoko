@@ -53,11 +53,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
 
       if (uid) {
+        // `maybeSingle()` — bukan `single()`.
+        //
+        // `single()` meminta satu objek JSON lewat header Accept khusus;
+        // PostgREST menjawab 406 bila barisnya belum ada (pengguna baru /
+        // keranjang kosong). Kegagalannya tidak berbahaya tetapi memenuhi
+        // konsol dengan galat merah dan menutupi masalah lain.
         const { data } = await supabase
           .from('carts')
           .select('items')
           .eq('user_id', uid)
-          .single();
+          .maybeSingle();
 
         const cloudCart = data?.items || [];
         setCart(cloudCart.length > 0 ? cloudCart : localCart);

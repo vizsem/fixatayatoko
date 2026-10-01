@@ -57,6 +57,20 @@ export const supabase = createClient(
 
 /**
  * Admin client with Service Role Key for server actions and backend mutations (bypasses RLS)
+ *
+ * Di BROWSER kunci service role tidak tersedia (tidak ber-prefiks NEXT_PUBLIC_),
+ * jadi klien ini jatuh ke kunci anon — lihat peringatan di `supabase-helpers.ts`.
+ *
+ * `storageKey` sengaja DIBERI NILAI BERBEDA di browser.
+ *
+ * Supabase memperingatkan "Multiple GoTrueClient instances detected in the same
+ * browser context ... may produce undefined behavior when used concurrently
+ * under the same storage key". Di browser, klien kedua ini memang tidak
+ * menyimpan sesi (`persistSession: false`), tetapi tanpa `storageKey` terpisah
+ * ia tetap membaca kunci penyimpanan yang sama dengan `supabase`, sehingga dua
+ * klien dapat memperbarui token secara bersamaan. Kalau yang menang adalah
+ * token lama, cookie `ataya-access-token` ikut basi dan SELURUH Server Action
+ * menolak dengan "Sesi tidak valid" — halaman admin tampak rusak tanpa sebab.
  */
 export const supabaseAdmin = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
@@ -65,6 +79,7 @@ export const supabaseAdmin = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+      ...(isServer ? {} : { storageKey: 'ataya-browser-service-client' }),
     }
   }
 );
