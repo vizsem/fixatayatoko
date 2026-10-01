@@ -14,6 +14,7 @@ type SalesItemInput = {
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { lengkapiSnapshotHpp } from '@/lib/hpp-server';
+import { TARIF_DEFAULT, hitungBiayaAdmin, type TarifMarketplace } from '@/lib/marketplace-fee';
 
 export async function getSalesOrders(filters?: { status?: string; customerId?: string; limit?: number }) {
   await requireStaff();
@@ -423,6 +424,11 @@ export async function createMarketplaceOrder(data: {
   warehouseId: string;
   warehouseName: string;
   adminId: string;
+  /**
+   * Cara mengisi harga: `AUTO` = yang diisi harga jual (biaya admin dipotong
+   * sistem), `MANUAL` = yang diisi uang bersih hasil potongan marketplace.
+   */
+  hargaMode?: string;
 }) {
   await requireStaff();
   try {
@@ -472,6 +478,14 @@ export async function createMarketplaceOrder(data: {
       sudahDipotong.push({ id: item.id, baseQuantity: item.baseQuantity });
     }
 
+    // Biaya admin marketplace dihitung di server dari tarif Settings.
+    const biayaAdmin = hitungBiayaAdmin({
+      mode: data.hargaMode,
+      jumlahDiisi: Number(data.subtotal || 0),
+      channel: data.channel,
+      tarif: await ambilTarifMarketplace(),
+    });
+
     const orderData = {
       orderId: data.orderId,
       externalOrderId: data.externalOrderId,
@@ -487,6 +501,14 @@ export async function createMarketplaceOrder(data: {
       status: 'SELESAI',
       adminId: data.adminId,
       createdAt: now,
+      // Biaya admin marketplace dihitung di SERVER memakai tarif dari Settings,
+      // bukan dari kiriman klien. `AUTO` = angka yang diisi bruto (biaya
+      // dipotong sistem), `MANUAL` = angka yang diisi sudah bersih.
+      hargaMode: biayaAdmin.mode,
+      tarifAdmin: biayaAdmin.tarif,
+      biayaAdmin: biayaAdmin.biaya,
+      brutoBarang: Number(data.subtotal || 0),
+      nettoBarang: biayaAdmin.bersih,
     };
 
     const { error: orderError } = await supabaseAdmin.from('orders').insert({
@@ -509,9 +531,38 @@ export async function createMarketplaceOrder(data: {
 
     revalidatePath('/admin/products');
     revalidatePath('/admin/orders');
+    revalidatePath('/admin/reports/finance');
+    revalidatePath('/admin/audit');
     return { success: true, data: { id: dbOrderId, ...orderData } };
   } catch (error: any) {
     console.error('Failed to create marketplace order:', error);
     return { success: false, error: error.message || 'Gagal membuat marketplace order' };
+  }
+}
+
+/**
+ * Tarif biaya admin per marketplace dari Settings (baris `id = 'system'`).
+ *
+ * Dibaca di server supaya tarif tidak bisa dipalsukan klien, dan supaya
+ * perubahan di halaman Settings langsung berlaku pada order berikutnya.
+ */
+async function ambilTarifMarketplace(): Promise<TarifMarketplace> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('settings')
+      .select('raw_data')
+      .eq('id', 'system')
+      .maybeSingle();
+
+    const fees = (data?.raw_data as any)?.marketplaceFees || {};
+    return {
+      shopee: Number(fees.shopee ?? TARIF_DEFAULT.shopee),
+      tiktok: Number(fees.tiktok ?? TARIF_DEFAULT.tiktok),
+      tokopedia: Number(fees.tokopedia ?? TARIF_DEFAULT.tokopedia),
+      lazada: Number(fees.lazada ?? TARIF_DEFAULT.lazada),
+    };
+  } catch (e: any) {
+    console.error('Gagal membaca tarif marketplace dari Settings:', e?.message || e);
+    return TARIF_DEFAULT;
   }
 }

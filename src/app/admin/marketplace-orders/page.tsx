@@ -23,9 +23,16 @@ import { CartTable } from '@/components/admin/marketplace/CartTable';
 import { Product } from '@/lib/types';
 import * as Sentry from '@sentry/nextjs';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { getUserAndRole } from '@/lib/supabase-helpers';
+import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { millisId, timestampId } from '@/lib/ids';
+import {
+  TARIF_DEFAULT,
+  hitungBiayaAdmin,
+  keteranganMode,
+  type ModeHargaMarketplace,
+  type TarifMarketplace,
+} from '@/lib/marketplace-fee';
 type Channel = 'SHOPEE' | 'TIKTOK';
 
 interface CartItem {
@@ -104,6 +111,34 @@ export default function MarketplaceOrdersPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [warehouseId, setWarehouseId] = useState('gudang-utama');
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  /**
+   * Cara mengisi harga:
+   *   AUTO   - harga jual di marketplace; sistem memotong biaya admin.
+   *   MANUAL - harga bersih hasil potongan marketplace (input manual).
+   */
+  const [hargaMode, setHargaMode] = useState<ModeHargaMarketplace>('AUTO');
+  const [tarifMarketplace, setTarifMarketplace] = useState<TarifMarketplace>(TARIF_DEFAULT);
+
+  // Tarif biaya admin dibaca dari Settings (baris `system`). Server tetap
+  // menghitung ulang saat menyimpan, jadi angka di sini hanya untuk tampilan.
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await sbGetDoc('settings', 'system', false);
+        const fees = snap.exists() ? (snap.data() as any)?.marketplaceFees : null;
+        if (fees) {
+          setTarifMarketplace({
+            shopee: Number(fees.shopee ?? TARIF_DEFAULT.shopee),
+            tiktok: Number(fees.tiktok ?? TARIF_DEFAULT.tiktok),
+            tokopedia: Number(fees.tokopedia ?? TARIF_DEFAULT.tokopedia),
+            lazada: Number(fees.lazada ?? TARIF_DEFAULT.lazada),
+          });
+        }
+      } catch {
+        // Pakai tarif default; server akan memakai angka sebenarnya saat simpan.
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -244,6 +279,15 @@ export default function MarketplaceOrdersPage() {
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const total = subtotal + shippingCost;
 
+  // Biaya admin mengikuti mode yang dipilih. Angka final dihitung ulang di
+  // server saat menyimpan; ini untuk ditampilkan di ringkasan.
+  const biayaAdmin = hitungBiayaAdmin({
+    mode: hargaMode,
+    jumlahDiisi: subtotal,
+    channel,
+    tarif: tarifMarketplace,
+  });
+
   const handleSaveOrder = async () => {
     if (cart.length === 0) return notify.error('Keranjang kosong');
     if (!externalOrderId) return notify.error('Order ID Marketplace wajib diisi');
@@ -320,6 +364,8 @@ export default function MarketplaceOrdersPage() {
         warehouseId,
         warehouseName: warehouses.find(w => w.id === warehouseId)?.name || warehouseId,
         adminId,
+        // Server menghitung ulang biaya admin memakai tarif dari Settings.
+        hargaMode,
       });
 
       if (!res.success) {
@@ -333,6 +379,7 @@ export default function MarketplaceOrdersPage() {
       setExternalOrderId('');
       setCustomerName('');
       setShippingCost(0);
+      setHargaMode('AUTO');
       fetchProducts(); // Refresh stok di tampilan
     } catch (err) {
       Sentry.captureException(err);
@@ -440,6 +487,62 @@ export default function MarketplaceOrdersPage() {
                 <div className="flex justify-between items-center text-gray-400">
                   <span className="text-xs font-black uppercase tracking-widest">Shipping</span>
                   <span className="text-xs font-black">Rp{shippingCost.toLocaleString()}</span>
+                </div>
+
+                {/* Mode harga + biaya admin marketplace */}
+                <div className="pt-4 border-t border-gray-50 space-y-3">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                    Cara Mengisi Harga
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setHargaMode('AUTO')}
+                      className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition ${
+                        hargaMode === 'AUTO'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Otomatis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHargaMode('MANUAL')}
+                      className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition ${
+                        hargaMode === 'MANUAL'
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Manual
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    {keteranganMode(hargaMode, biayaAdmin.tarif)}
+                  </p>
+
+                  {hargaMode === 'AUTO' ? (
+                    <div className="space-y-1 rounded-xl bg-orange-50 p-3">
+                      <div className="flex justify-between text-[11px] font-black text-orange-700">
+                        <span>Harga jual (bruto)</span>
+                        <span>Rp{subtotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-black text-rose-600">
+                        <span>Biaya admin {channel} ({biayaAdmin.tarif}%)</span>
+                        <span>− Rp{biayaAdmin.biaya.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-black text-emerald-700 pt-1 border-t border-orange-100">
+                        <span>Uang bersih diterima</span>
+                        <span>Rp{biayaAdmin.bersih.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-emerald-50 p-3 text-[11px] font-bold text-emerald-800">
+                      Uang bersih diterima: Rp{subtotal.toLocaleString()} — biaya admin tidak
+                      dikurangkan lagi (sudah dipotong marketplace).
+                    </div>
+                  )}
                 </div>
                 <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
                   <span className="text-xs font-black uppercase tracking-widest">Grand Total</span>

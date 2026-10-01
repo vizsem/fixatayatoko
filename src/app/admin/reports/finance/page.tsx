@@ -269,15 +269,34 @@ let unsub: (() => void) | undefined;
           });
 
           if (['CASH', 'TRANSFER', 'QRIS'].includes(pm)) {
+            // Order marketplace: uang yang masuk ke rekening adalah HASIL BERSIH
+            // setelah biaya admin dipotong marketplace, bukan nilai bruto.
+            const biayaUntukKas = Number(orderRaw.biayaAdmin || 0);
             cashItems.push({
               id: `SALE-CF-${od.id}`,
               date: created.toISOString(),
               description: `Penerimaan Penjualan #${od.id.slice(-6).toUpperCase()}`,
               category: 'Penerimaan Penjualan',
               direction: 'in',
-              amount: Number(order.total || goodsRev),
+              amount: Math.max(0, Number(order.total || goodsRev) - biayaUntukKas),
               paymentMethod: pm,
               reference: od.id
+            });
+          }
+
+          // Biaya admin marketplace (dihitung server saat order dibuat).
+          // Mode MANUAL tidak punya angka ini karena harga yang diisi sudah bersih.
+          const biayaAdminOrder = Number(orderRaw.biayaAdmin || 0);
+          if (biayaAdminOrder > 0) {
+            financeRecords.push({
+              id: `FEE-${od.id}`,
+              date: created.toISOString(),
+              description: `Biaya Admin ${ch} #${od.id.slice(-6).toUpperCase()} (${orderRaw.tarifAdmin ?? 0}%)`,
+              category: `Biaya Marketplace ${ch}`,
+              type: 'expense',
+              amount: biayaAdminOrder,
+              paymentMethod: 'POTONGAN',
+              channel: ch
             });
           }
 
@@ -522,8 +541,11 @@ let unsub: (() => void) | undefined;
     const cogs = filteredRecords.filter(r => r.type === 'profit').reduce((s, r) => s + (r.cost || 0), 0);
     const grossProfit = netRevenue - cogs;
     const opex = filteredRecords.filter(r => r.type === 'expense' && r.category.startsWith('Operasional')).reduce((s, r) => s + r.amount, 0);
+    // Biaya admin marketplace: beban tersendiri, BUKAN bagian dari opex, supaya
+    // terlihat terpisah di laporan dan tidak tercampur dengan biaya toko.
+    const biayaMarketplace = filteredRecords.filter(r => r.type === 'expense' && r.category.startsWith('Biaya Marketplace')).reduce((s, r) => s + r.amount, 0);
     const stockPurchases = filteredRecords.filter(r => r.type === 'expense' && r.category === 'Pembelian Stok').reduce((s, r) => s + r.amount, 0);
-    const netIncome = grossProfit - opex;
+    const netIncome = grossProfit - opex - biayaMarketplace;
 
     // Laba yang TIDAK bisa dipercaya: berasal dari baris item yang Modal
     // produknya belum diisi (HPP-nya hanya estimasi 85% harga jual). Angka ini
@@ -532,7 +554,7 @@ let unsub: (() => void) | undefined;
     const itemEstimasi = filteredRecords.reduce((s, r) => s + (r.itemEstimasi || 0), 0);
 
     return {
-      salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, stockPurchases, netIncome,
+      salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, biayaMarketplace, stockPurchases, netIncome,
       labaEstimasi, itemEstimasi, netIncomeDipercaya: netIncome - labaEstimasi,
       grossMargin: netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0,
       netMargin: netRevenue > 0 ? (netIncome / netRevenue) * 100 : 0
@@ -609,12 +631,14 @@ let unsub: (() => void) | undefined;
     const cogs = IS.cogs;
     const stockPurchases = IS.stockPurchases;
     const opex = IS.opex;
-    const total = cogs + stockPurchases + opex;
+    const biayaMarketplace = IS.biayaMarketplace;
+    const total = cogs + stockPurchases + opex + biayaMarketplace;
 
     const items = [
       { name: 'HPP Modal Terjual', value: cogs, color: '#ef4444' },
       { name: 'Pembelian Stok Masuk', value: stockPurchases, color: '#f59e0b' },
       { name: 'Beban Operasional Toko', value: opex, color: '#6366f1' },
+      { name: 'Biaya Admin Marketplace', value: biayaMarketplace, color: '#0ea5e9' },
     ].filter(i => i.value > 0);
 
     return { items, total };
@@ -679,7 +703,7 @@ let unsub: (() => void) | undefined;
         'Profit Margin (%)': Number(c.margin.toFixed(2))
       }))), 'Ringkasan Channel');
     } else if (activeTab === 'income_statement') {
-      const { salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, stockPurchases, netIncome, grossMargin, netMargin } = IS;
+      const { salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, biayaMarketplace, stockPurchases, netIncome, grossMargin, netMargin } = IS;
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
         { 'Laporan Laba Rugi': '', 'Periode': period, '': '' },
         { 'Laporan Laba Rugi': 'PENDAPATAN', 'Periode': '', '': '' },
@@ -693,6 +717,7 @@ let unsub: (() => void) | undefined;
         { 'Laporan Laba Rugi': '', 'Periode': '', '': '' },
         { 'Laporan Laba Rugi': 'BEBAN OPERASIONAL', 'Periode': '', '': '' },
         { 'Laporan Laba Rugi': '  Biaya Operasional Toko', 'Periode': -opex, '': '' },
+        { 'Laporan Laba Rugi': '  Biaya Admin Marketplace', 'Periode': -biayaMarketplace, '': '' },
         { 'Laporan Laba Rugi': '  Pembelian Stok (Kas)', 'Periode': -stockPurchases, '': '' },
         { 'Laporan Laba Rugi': '', 'Periode': '', '': '' },
         { 'Laporan Laba Rugi': 'LABA BERSIH', 'Periode': netIncome, '': `Net Margin: ${netMargin.toFixed(1)}%` },
@@ -1297,7 +1322,7 @@ let unsub: (() => void) | undefined;
 
         {/* ─── TAB 2: INCOME STATEMENT ─── */}
         {activeTab === 'income_statement' && (() => {
-          const { salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, stockPurchases, netIncome, grossMargin, netMargin } = IS;
+          const { salesRev, ongkir, returns, netRevenue, cogs, grossProfit, opex, biayaMarketplace, stockPurchases, netIncome, grossMargin, netMargin } = IS;
           const isProfit = netIncome >= 0;
           return (
             <div className="space-y-6">
@@ -1365,6 +1390,7 @@ let unsub: (() => void) | undefined;
                     <div className="text-xs font-black uppercase tracking-widest text-slate-400 pt-4 pb-1">Beban Operasional</div>
                     {[
                       { label: 'Biaya Operasional Toko', value: -opex },
+                      { label: 'Biaya Admin Marketplace', value: -biayaMarketplace },
                       { label: 'Pembelian Stok (Kas Keluar)', value: -stockPurchases }
                     ].map(row => (
                       <div key={row.label} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50">
