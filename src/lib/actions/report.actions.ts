@@ -1,8 +1,13 @@
 'use server'
 
-import { supabase } from '@/lib/supabase';
+import { requireStaff } from '@/lib/actions/session';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function getReportSummary(startDate: Date, endDate: Date) {
+  // Action ini memakai klien service role (melewati RLS), jadi identitas WAJIB
+  // diverifikasi lebih dulu. Tanpa ini, pembacaan orders/customers oleh klien
+  // anon hanya mengembalikan array kosong dan laporan tampak nol.
+  await requireStaff();
   try {
     const startIso = new Date(startDate);
     startIso.setHours(0, 0, 0, 0);
@@ -10,14 +15,14 @@ export async function getReportSummary(startDate: Date, endDate: Date) {
     endIso.setHours(23, 59, 59, 999);
 
     const [ordersRes, productsRes, customersRes, lowStockRes] = await Promise.all([
-      supabase
+      supabaseAdmin
         .from('orders')
         .select('*')
         .gte('created_at', startIso.toISOString())
         .lte('created_at', endIso.toISOString()),
-      supabase.from('products').select('*', { count: 'exact', head: true }),
-      supabase.from('customers').select('*', { count: 'exact', head: true }),
-      supabase.from('products').select('id, stock, raw_data'),
+      supabaseAdmin.from('products').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('products').select('id, stock, raw_data'),
     ]);
 
     const orders = ordersRes.data || [];

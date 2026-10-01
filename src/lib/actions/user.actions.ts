@@ -1,11 +1,14 @@
 'use server'
 
-import { supabase } from '@/lib/supabase';
+import { requireAdmin } from '@/lib/actions/session';
+import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 
 export async function getUsers() {
+  // Direktori pengguna hanya untuk admin (sama seperti policy RLS `admin_all`).
+  await requireAdmin();
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('users')
       .select('*')
       .order('created_at', { ascending: false });
@@ -34,9 +37,12 @@ export async function createUser(data: {
   password: string;
   role: 'OWNER' | 'ADMIN' | 'WAREHOUSE' | 'SALES' | 'DRIVER' | 'CASHIER' | 'SUPER_ADMIN';
 }) {
+  await requireAdmin();
   try {
-    // Buat user via Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin?.createUser({
+    // Buat user via Supabase Auth. Klien service role WAJIB di sini: `auth.admin`
+    // tidak tersedia pada klien anon, sehingga dulu selalu jatuh ke cabang
+    // fallback yang menulis langsung ke tabel `users` dan juga gagal.
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
       user_metadata: { full_name: data.name, role: data.role },
@@ -47,7 +53,7 @@ export async function createUser(data: {
       // Fallback: simpan ke tabel users saja jika admin API tidak tersedia
       const now = new Date().toISOString();
       const id = `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const { error: insertError } = await supabase.from('users').insert({
+      const { error: insertError } = await supabaseAdmin.from('users').insert({
         id,
         name: data.name,
         email: data.email,
@@ -64,7 +70,7 @@ export async function createUser(data: {
     // Update tabel users dengan role
     if (authData?.user?.id) {
       const now = new Date().toISOString();
-      await supabase.from('users').upsert({
+      await supabaseAdmin.from('users').upsert({
         id: authData.user.id,
         name: data.name,
         email: data.email,
@@ -97,10 +103,11 @@ export async function updateUser(id: string, data: {
   password?: string;
   role?: string;
 }) {
+  await requireAdmin();
   try {
     const now = new Date().toISOString();
 
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('users')
       .select('raw_data')
       .eq('id', id)
@@ -122,7 +129,7 @@ export async function updateUser(id: string, data: {
     if (data.email) updatePayload.email = data.email;
     if (data.role) updatePayload.role = data.role;
 
-    const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
+    const { error } = await supabaseAdmin.from('users').update(updatePayload).eq('id', id);
     if (error) throw error;
 
     revalidatePath('/admin/users');
@@ -134,8 +141,9 @@ export async function updateUser(id: string, data: {
 }
 
 export async function deleteUser(id: string) {
+  await requireAdmin();
   try {
-    const { error } = await supabase.from('users').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('users').delete().eq('id', id);
     if (error) throw error;
 
     revalidatePath('/admin/users');

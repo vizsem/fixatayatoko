@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { supabase } from '@/lib/supabase'
+import { requireAdmin, requireStaff } from '@/lib/actions/session'
+import { supabaseAdmin } from '@/lib/supabase'
 
 function parseDate(val: any): Date {
   if (!val) return new Date();
@@ -20,8 +21,12 @@ export async function getExpenses(filters?: {
   startDate?: Date
   endDate?: Date
 }) {
+  // Kebijakan RLS hanya memberi `anon` hak SELECT, dan action berjalan tanpa
+  // sesi pengguna — karena itu identitas diverifikasi dulu, lalu data dibaca
+  // memakai klien service role.
+  await requireStaff();
   try {
-    const query = supabase
+    const query = supabaseAdmin
       .from('operational_expenses')
       .select('*')
       .order('created_at', { ascending: false });
@@ -64,6 +69,10 @@ export async function createExpense(data: {
   description?: string
   date: Date
 }) {
+  // Menulis pengeluaran memengaruhi laporan keuangan -> perlu peran admin.
+  // Ini juga sejalan dengan policy RLS: `operational_expenses` tidak ada di
+  // daftar `app_staff_manage`, hanya `admin_all`.
+  await requireAdmin();
   try {
     const id = `exp_${Date.now()}`;
     const raw_data = {
@@ -74,7 +83,7 @@ export async function createExpense(data: {
       createdAt: new Date().toISOString(),
     };
 
-    await supabase.from('operational_expenses').insert({
+    await supabaseAdmin.from('operational_expenses').insert({
       id,
       raw_data,
       created_at: new Date().toISOString(),
@@ -90,8 +99,9 @@ export async function createExpense(data: {
 }
 
 export async function deleteExpense(id: string) {
+  await requireAdmin();
   try {
-    await supabase.from('operational_expenses').delete().eq('id', id);
+    await supabaseAdmin.from('operational_expenses').delete().eq('id', id);
     revalidatePath('/admin/operational-expenses');
     return { success: true };
   } catch (error) {
@@ -101,6 +111,7 @@ export async function deleteExpense(id: string) {
 }
 
 export async function getExpenseSummary() {
+  await requireStaff();
   try {
     const expenses = await getExpenses();
     const now = new Date();

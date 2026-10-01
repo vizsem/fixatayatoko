@@ -1,8 +1,13 @@
 'use server'
 
-import { supabase } from '@/lib/supabase';
+import { requireStaff } from '@/lib/actions/session';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function getDashboardStats() {
+  // Action ini memakai klien service role (melewati RLS), jadi identitas WAJIB
+  // diverifikasi lebih dulu. Server Action berjalan tanpa sesi pengguna, sehingga
+  // klien anon tidak bisa membaca orders/users/operational_expenses sama sekali.
+  await requireStaff();
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -22,11 +27,11 @@ export async function getDashboardStats() {
       lowStockRes,
       expensesRes,
     ] = await Promise.all([
-      supabase.from('orders').select('*').order('created_at', { ascending: false }),
-      supabase.from('products').select('*', { count: 'exact', head: true }),
-      supabase.from('users').select('*', { count: 'exact', head: true }),
-      supabase.from('products').select('id, stock, price, cost_price, raw_data'),
-      supabase.from('operational_expenses').select('*'),
+      supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('products').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('products').select('id, stock, price, cost_price, raw_data'),
+      supabaseAdmin.from('operational_expenses').select('*'),
     ]);
 
     const allOrders = allOrdersRes.data || [];
