@@ -4,6 +4,7 @@ import { requireAdmin, requireStaff } from '@/lib/actions/session';
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
+import { mergeRowWithRawData } from '@/lib/db-schema'
 
 function parseDate(val: any): Date {
   if (!val) return new Date();
@@ -17,26 +18,124 @@ function parseDate(val: any): Date {
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
+/**
+ * Ambil SELURUH baris `capital_transactions` dengan paging eksplisit.
+ *
+ * Batas bawaan PostgREST (`db-max-rows`) adalah 1000 baris, jadi `select()`
+ * TANPA `limit()` pun dipotong di angka itu tanpa error apa pun. Paging di sini
+ * membuat perhitungan saldo tidak pernah diam-diam terpotong saat transaksi
+ * bertambah banyak.
+ */
+async function fetchAllCapitalRows(): Promise<Record<string, any>[]> {
+  const PAGE = 1000;
+  const rows: Record<string, any>[] = [];
+
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from('capital_transactions')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) throw new Error(error.message);
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+
+  return rows;
+}
+
+/**
+ * SATU-SATUNYA perhitungan saldo modal di seluruh aplikasi.
+ *
+ * Sebelumnya rumus yang sama ditulis ulang di empat tempat dan hasilnya berbeda:
+ *
+ *   `/admin/capital`            : hanya 100 baris pertama (`.limit(100)`), jadi
+ *                                 "Modal Total Saat Ini" lebih kecil dari yang
+ *                                 seharusnya pada 171 baris yang ada.
+ *   `/admin/purchases/add` dan  : membaca kolom `type`/`amount` yang masih berisi
+ *   `/admin/purchases/edit/[id]`  nilai DEFAULT importer (NULL dan 0), sehingga
+ *                                 saldo terbaca Rp0 dan setiap pembelian tunai
+ *                                 ditolak "Saldo Modal Tidak Cukup" — padahal
+ *                                 halaman Modal menunjukkan saldo besar. Inilah
+ *                                 sebab dua halaman itu saling bertentangan.
+ *   `adjustTotalCapital`        : sumbernya benar, tetapi terpotong 1000 baris.
+ *
+ * `mergeRowWithRawData` dipakai supaya sumber angkanya persis sama dengan seluruh
+ * aplikasi: kolom yang dikelola bridge menang, kolom sisa importer tidak menimpa
+ * `raw_data`.
+ */
+export function hitungSaldoModal(rows: Record<string, any>[]) {
+  let injection = 0;
+  let withdrawal = 0;
+
+  for (const row of rows) {
+    const data = mergeRowWithRawData(row, 'capital_transactions');
+    const type = String(data.type ?? '').toUpperCase();
+    const amount = Number(data.amount ?? 0);
+
+    if (!Number.isFinite(amount)) continue;
+    if (type === 'INJECTION') injection += amount;
+    else if (type === 'WITHDRAWAL') withdrawal += amount;
+  }
+
+  return {
+    injection,
+    withdrawal,
+    balance: injection - withdrawal,
+    count: rows.length,
+  };
+}
+
+/**
+ * Saldo modal untuk validasi di luar halaman Modal.
+ *
+ * Dipakai `/admin/purchases/add` dan `/admin/purchases/edit/[id]` agar angka yang
+ * memblokir pembelian PERSIS sama dengan angka di `/admin/capital`. Dihitung di
+ * server dengan service role, sehingga tidak lagi bergantung pada sesi browser
+ * (dulu pembacaan di klien bisa gagal dan menghasilkan saldo Rp0 tanpa error).
+ */
+export async function getCapitalBalance() {
+  await requireStaff();
+  try {
+    const rows = await fetchAllCapitalRows();
+    return { success: true as const, data: hitungSaldoModal(rows) };
+  } catch (error: any) {
+    return { success: false as const, error: error?.message || 'Gagal memuat saldo modal' };
+  }
+}
+
 export async function getCapitalData() {
   await requireStaff();
   try {
-    const [txRes, loanRes, mpAccRes, mpTxRes, prodRes] = await Promise.all([
-      supabaseAdmin.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(100),
+    const [txRows, loanRes, mpAccRes, mpTxRes, prodRes] = await Promise.all([
+      // Seluruh baris, bukan `.limit(100)`. Daftar yang terpotong membuat angka
+      // "Modal Total Saat Ini" ikut salah; ringkasannya dihitung dari `txRows`.
+      fetchAllCapitalRows(),
       supabaseAdmin.from('loans').select('*').order('created_at', { ascending: false }),
       supabaseAdmin.from('marketplace_accounts').select('*').order('created_at', { ascending: true }),
       supabaseAdmin.from('marketplace_transactions').select('*').order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('products').select('stock, cost_price, is_active, raw_data'),
     ]);
 
-    const transactions = (txRes.data || []).map((t: any) => {
-      const raw = t.raw_data || {};
+    // `fetchAllCapitalRows` mengembalikan urutan ASC agar paging (`range`)
+    // stabil. Daftar yang DITAMPILKAN tetap terbaru-dulu seperti sebelumnya
+    // (dulu `.order('created_at', { ascending: false }).limit(100)`), supaya
+    // pengguna tidak melihat log mutasi terbalik. Ringkasan saldo tidak
+    // terpengaruh urutan.
+    const txNewestFirst = [...txRows].sort((a, b) =>
+      String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''))
+    );
+
+    const transactions = txNewestFirst.map((t: any) => {
+      const d = mergeRowWithRawData(t, 'capital_transactions');
       return {
         id: t.id,
-        type: raw.type || 'INJECTION',
-        amount: Number(raw.amount || 0),
-        description: raw.description || '',
-        recordedBy: raw.recordedBy || 'Admin',
-        date: parseDate(raw.date || t.created_at),
+        type: d.type || 'INJECTION',
+        amount: Number(d.amount || 0),
+        description: d.description || '',
+        recordedBy: d.recordedBy || 'Admin',
+        date: parseDate(d.date || t.created_at),
       };
     });
 
@@ -118,6 +217,9 @@ export async function getCapitalData() {
       success: true,
       data: {
         transactions,
+        // Ringkasan ini yang dipakai halaman Modal untuk angka "Modal Total
+        // Saat Ini" dan oleh validasi pembelian di halaman PO.
+        capitalSummary: hitungSaldoModal(txRows),
         loans,
         marketplaceAccounts,
         marketplaceLogs,
@@ -332,22 +434,9 @@ export async function adjustTotalCapital(data: {
 }) {
   await requireAdmin();
   try {
-    // 1. Fetch existing transactions to compute current capital
-    const { data: rows } = await supabaseAdmin
-      .from('capital_transactions')
-      .select('*');
-
-    const transactions = (rows || []).map((t: any) => {
-      const raw = t.raw_data || {};
-      return {
-        type: raw.type || 'INJECTION',
-        amount: Number(raw.amount || 0),
-      };
-    });
-
-    const injected = transactions.filter(t => t.type === 'INJECTION').reduce((s, t) => s + t.amount, 0);
-    const withdrawn = transactions.filter(t => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.amount, 0);
-    const currentCapital = injected - withdrawn;
+    // Saldo memakai perhitungan yang sama dengan halaman Modal dan halaman PO,
+    // supaya nilai target yang dimasukkan benar-benar cocok dengan yang tampil.
+    const currentCapital = hitungSaldoModal(await fetchAllCapitalRows()).balance;
 
     const target = Number(data.targetCapital || 0);
     const diff = target - currentCapital;

@@ -36,8 +36,8 @@ export async function getStockSyncMatrix(): Promise<StockSyncRow[]> {
   }
 
   return buildSyncMatrix(
-    (productsRes.data ?? []).map(normalizeRow),
-    (warehousesRes.data ?? []).map(normalizeRow),
-    (stockRes.data ?? []).map(normalizeRow)
+    (productsRes.data ?? []).map((row) => normalizeRow(row, 'products')),
+    (warehousesRes.data ?? []).map((row) => normalizeRow(row, 'warehouses')),
+    (stockRes.data ?? []).map((row) => normalizeRow(row, 'warehouseStock'))
   );
 }

@@ -40,7 +40,7 @@ export async function getInventoryReport(): Promise<InventoryReportResult> {
 
   return buildInventoryReport(
     products as unknown as Record<string, any>[],
-    (transactionsRes.data ?? []).map(normalizeRow),
-    (warehousesRes.data ?? []).map(normalizeRow)
+    (transactionsRes.data ?? []).map((row) => normalizeRow(row, 'inventory_transactions')),
+    (warehousesRes.data ?? []).map((row) => normalizeRow(row, 'warehouses'))
   );
 }

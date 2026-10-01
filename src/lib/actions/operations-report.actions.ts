@@ -48,16 +48,16 @@ export async function getOperationsMetrics(): Promise<OperationalMetric[]> {
     throw new Error(`Gagal memuat data laporan operasional: ${error.message}`);
   }
 
-  const rows = (res: { data: unknown }) =>
-    ((res.data ?? []) as Record<string, any>[]).map(normalizeRow);
+  const rows = (res: { data: unknown }, table: string) =>
+    ((res.data ?? []) as Record<string, any>[]).map((row) => normalizeRow(row, table));
 
   return buildOperationsMetrics({
-    employees: rows(employeesRes),
-    users: rows(usersRes),
-    warehouses: rows(warehousesRes),
-    products: rows(productsRes),
-    orders: rows(ordersRes),
-    expenses: rows(expensesRes),
+    employees: rows(employeesRes, 'employees'),
+    users: rows(usersRes, 'users'),
+    warehouses: rows(warehousesRes, 'warehouses'),
+    products: rows(productsRes, 'products'),
+    orders: rows(ordersRes, 'orders'),
+    expenses: rows(expensesRes, 'operational_expenses'),
     activeUserCutoff: activeUserCutoffFrom(Date.now()),
   });
 }

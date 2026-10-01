@@ -9,6 +9,7 @@ import {
   parseFirestoreTimestamp,
   extractTableColumns,
   generateId,
+  mergeRowWithRawData,
 } from '@/lib/db-schema';
 
 /**
@@ -67,10 +68,18 @@ export function createNormalizedTimestamp(date: Date): NormalizedTimestamp {
   };
 }
 
-export function normalizeRow(row: any): any {
+/**
+ * Ratakan satu baris tabel menjadi bentuk dokumen gaya Firestore.
+ *
+ * `table` WAJIB diisi bila diketahui: aturan urutan kolom ↔ `raw_data` bergantung
+ * padanya (lihat `mergeRowWithRawData` di `@/lib/db-schema`). Tanpa `table`, semua
+ * kolom diperlakukan sebagai otoritatif dan bug kolom DEFAULT importer dapat
+ * muncul lagi.
+ */
+export function normalizeRow(row: any, table?: string): any {
   if (!row) return {};
   const raw = row.raw_data || {};
-  const merged: any = { ...raw, ...row };
+  const merged: any = mergeRowWithRawData(row, table);
 
   const createdDate = row.created_at
     ? new Date(row.created_at)
@@ -96,8 +105,8 @@ export function normalizeRow(row: any): any {
   return merged;
 }
 
-export function normalizeRows(rows: any[]): any[] {
-  return (rows || []).map(normalizeRow);
+export function normalizeRows(rows: any[], table?: string): any[] {
+  return (rows || []).map((row) => normalizeRow(row, table));
 }
 
 // --- Auth helpers (Supabase-native) ---
@@ -159,7 +168,7 @@ export async function getUserAndRole(): Promise<UserRoleCheck> {
       .eq('id', user.id)
       .maybeSingle();
     if (data) {
-      userDocData = normalizeRow(data);
+      userDocData = normalizeRow(data, 'users');
     }
   } catch {
     // ignore
@@ -263,7 +272,7 @@ export async function sbGetDoc(table: string, id: string, useAdmin = true): Prom
   if (error || !data) {
     return { exists: () => false, data: () => ({}), id };
   }
-  const row = normalizeRow(data);
+  const row = normalizeRow(data, table);
   return { exists: () => true, data: () => row, id: data.id || id };
 }
 
@@ -318,7 +327,7 @@ export async function sbGetDocs(params: {
 
   const { data, error } = await builder;
   if (error) console.error(`sbGetDocs Supabase error on "${table}":`, error);
-  const rows = normalizeRows(data || []);
+  const rows = normalizeRows(data || [], table);
   const docs: Array<SbDocSnapshot> = rows.map((r) => ({
     data: () => r,
     id: r?.id || r?.uid || r?.skuid || '',

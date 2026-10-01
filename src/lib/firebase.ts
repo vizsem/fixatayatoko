@@ -20,6 +20,7 @@ import {
   parseFirestoreTimestamp,
   extractTableColumns,
   generateId,
+  mergeRowWithRawData,
 } from '@/lib/db-schema';
 
 const isServer = typeof window === 'undefined';
@@ -169,9 +170,12 @@ export function query(target: CollectionRef | QueryRef, ...constraints: QueryCon
 
 // Definisi tabel & kolom dipusatkan di @/lib/db-schema (single source of truth).
 
-function normalizeDocData(row: any) {
+function normalizeDocData(row: any, table?: string) {
   const raw = row.raw_data || {};
-  const merged: any = { ...raw, ...row };
+  // Aturan urutan kolom ↔ raw_data dipusatkan di `@/lib/db-schema` supaya bridge
+  // ini dan `supabase-helpers` tidak menyimpang. Lihat `mergeRowWithRawData`
+  // untuk alasan lengkapnya (kolom DEFAULT hasil impor tidak boleh menang).
+  const merged: any = mergeRowWithRawData(row, table);
 
   const createdDate = row.created_at
     ? new Date(row.created_at)
@@ -232,7 +236,7 @@ export async function getDoc<T = any>(docRef: DocRef): Promise<DocumentSnapshot<
       };
     }
 
-    const merged = normalizeDocData(data);
+    const merged = normalizeDocData(data, docRef.table);
     return {
       id: docRef.id,
       exists: () => true,
@@ -294,7 +298,7 @@ export async function getDocs<T = any>(target: CollectionRef | QueryRef): Promis
     }
     const rows = data || [];
     const docs: DocumentSnapshot<T>[] = rows.map((row: any) => {
-      const merged = normalizeDocData(row);
+      const merged = normalizeDocData(row, target.table);
       return {
         id: row.id,
         ref: { id: row.id, path: `${target.table}/${row.id}` },

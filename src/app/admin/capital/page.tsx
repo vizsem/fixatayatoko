@@ -50,6 +50,21 @@ export default function CapitalPage() {
   const [transactions, setTransactions] = useState<CapitalTransaction[]>([]);
   const [loans, setLoans] = useState<LoanRecord[]>([]);
   const [cashBalance, setCashBalance] = useState(0);
+
+  /**
+   * Saldo modal dari server (`getCapitalData().capitalSummary`).
+   *
+   * Halaman ini SENGAJA tidak menghitung ulang dari `transactions`: daftar itu
+   * dulu dibatasi 100 baris, sehingga "Modal Total Saat Ini" di sini berbeda
+   * dengan angka yang dipakai validasi pembelian di halaman PO. Sekarang keduanya
+   * memakai perhitungan yang sama (`hitungSaldoModal`).
+   */
+  const [capitalSummary, setCapitalSummary] = useState({
+    injection: 0,
+    withdrawal: 0,
+    balance: 0,
+    count: 0,
+  });
   const [marketplaceAccounts, setMarketplaceAccounts] = useState<MarketplaceAccount[]>([]);
   const [marketplaceLogs, setMarketplaceLogs] = useState<MarketplaceLog[]>([]);
   const [assetSummary, setAssetSummary] = useState<{
@@ -105,6 +120,7 @@ export default function CapitalPage() {
         setMarketplaceAccounts(res.data.marketplaceAccounts as unknown as MarketplaceAccount[]);
         setMarketplaceLogs(res.data.marketplaceLogs as unknown as MarketplaceLog[]);
         setAssetSummary(res.data.assetSummary);
+        setCapitalSummary(res.data.capitalSummary);
       } else {
         notify.error(res.error || 'Gagal memuat data modal');
       }
@@ -121,14 +137,14 @@ export default function CapitalPage() {
   }, [loadData]);
 
   const totals = useMemo(() => {
-    const injected = transactions.filter(t => t.type === 'INJECTION').reduce((s, t) => s + (t.amount || 0), 0);
-    const withdrawn = transactions.filter(t => t.type === 'WITHDRAWAL').reduce((s, t) => s + (t.amount || 0), 0);
-    const currentCapital = injected - withdrawn;
+    // Angka kanonik dari server — sama persis dengan yang dipakai validasi
+    // pembelian di halaman PO dan dengan laporan keuangan.
+    const currentCapital = capitalSummary.balance;
     const marketplaceAssets = marketplaceAccounts.reduce((s, a) => s + (a.activeBalance || 0) + (a.pendingBalance || 0), 0);
     const totalAssets = assetSummary.stockValue + assetSummary.receivables + cashBalance + marketplaceAssets;
     const netWorth = totalAssets - assetSummary.totalLiabilities;
     return { currentCapital, marketplaceAssets, totalAssets, netWorth, growth: netWorth - currentCapital };
-  }, [transactions, marketplaceAccounts, assetSummary, cashBalance]);
+  }, [capitalSummary, marketplaceAccounts, assetSummary, cashBalance]);
 
   const handleAction = async (type: string, payload?: any) => {
     setIsSubmitting(true);

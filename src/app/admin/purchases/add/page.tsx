@@ -14,6 +14,7 @@ import { playScanBeep } from '@/lib/sound';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
 import { createPurchaseOrder, getPurchaseOrderById } from '@/lib/actions/purchase.actions';
+import { getCapitalBalance } from '@/lib/actions/capital.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { buildDuplicateCart } from '@/lib/purchase-duplicate';
@@ -56,6 +57,23 @@ function AddPurchaseFormContent() {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showScanner, setShowScanner] = useState(false);
+
+  /**
+   * Saldo modal dari server, ditampilkan di kartu ringkasan supaya pengguna
+   * melihat angka yang PERSIS sama dengan yang dipakai validasi pembayaran tunai
+   * dan dengan halaman `/admin/capital` (`null` = belum termuat).
+   */
+  const [capitalBalance, setCapitalBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    let aktif = true;
+    getCapitalBalance().then((res) => {
+      if (aktif && res.success) setCapitalBalance(res.data.balance);
+    });
+    return () => {
+      aktif = false;
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -244,19 +262,30 @@ function AddPurchaseFormContent() {
     setLoading(true);
     try {
       // VALIDASI: Cek Saldo Modal jika Pembayaran Tunai (LUNAS & CASH)
+      //
+      // Saldo diambil dari Server Action `getCapitalBalance()` — sumber yang sama
+      // dengan halaman `/admin/capital`. Dulu halaman ini membaca tabelnya sendiri
+      // dari browser dan perhitungannya memakai kolom `type`/`amount` yang masih
+      // berisi nilai DEFAULT importer (NULL dan 0). Saldo jadi Rp0, sehingga
+      // pembelian tunai SELALU ditolak "Saldo Modal Tidak Cukup" walaupun halaman
+      // Modal menunjukkan saldo besar. Pembacaan di browser juga bergantung pada
+      // sesi, jadi bisa gagal tanpa pesan error apa pun.
       if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
-        const capitalQ = query(collection(db, 'capital_transactions'), orderBy('date', 'desc'));
-        const capitalSnap = await getDocs(capitalQ);
-        
-        let currentCapital = 0;
-        capitalSnap.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.type === 'INJECTION') currentCapital += (data.amount || 0);
-          else if (data.type === 'WITHDRAWAL') currentCapital -= (data.amount || 0);
-        });
+        const saldoRes = await getCapitalBalance();
+        if (!saldoRes.success) {
+          throw new Error(`Gagal memeriksa saldo modal: ${saldoRes.error}`);
+        }
+
+        const currentCapital = saldoRes.data.balance;
+        setCapitalBalance(currentCapital);
 
         if (total > currentCapital) {
-          throw new Error(`Saldo Modal Tidak Cukup! Saldo: Rp${currentCapital.toLocaleString()}, Butuh: Rp${total.toLocaleString()}`);
+          const kurang = total - currentCapital;
+          throw new Error(
+            `Saldo modal tidak cukup. Tersedia Rp${currentCapital.toLocaleString('id-ID')}, ` +
+              `butuh Rp${total.toLocaleString('id-ID')} (kurang Rp${kurang.toLocaleString('id-ID')}). ` +
+              `Pilih pembayaran HUTANG/TEMPO, atau tambah modal di halaman Modal.`
+          );
         }
       }
 
@@ -270,6 +299,12 @@ function AddPurchaseFormContent() {
         warehouseId: selectedWarehouse,
         notes: notes || undefined,
         autoReceive: true, // Pembelian baru otomatis menambah stok fisik ke gudang
+        // WAJIB dikirim: tanpa dua field ini `createPurchaseOrder` memakai
+        // default LUNAS + CASH, sehingga PO yang dibayar transfer atau tempo
+        // tetap tercatat lunas tunai — kas berkurang dan hutang supplier tidak
+        // pernah muncul. Nilainya juga dipakai untuk cek saldo modal di atas.
+        paymentStatus,
+        paymentMethod,
         items: cart.map(item => ({
           productId: item.id,
           quantity: item.quantity,          // qty asli (misal 1 Dus) — backend yang konversi
@@ -677,6 +712,34 @@ function AddPurchaseFormContent() {
               <span className="text-xs font-black uppercase tracking-widest opacity-60">Grand Total</span>
               <span className="text-2xl font-black text-green-400 italic">Rp {total.toLocaleString()}</span>
             </div>
+
+            {/* Saldo modal ditampilkan langsung di sini agar pengguna tidak perlu
+                membuka halaman Modal untuk tahu apakah pembelian tunai akan
+                lolos validasi. Warnanya berubah saat saldo tidak mencukupi. */}
+            {capitalBalance !== null && (
+              <div className="flex justify-between items-center text-[11px] font-bold border-t border-white/10 pt-4">
+                <span className="uppercase tracking-widest opacity-60">Saldo Modal</span>
+                <span
+                  className={
+                    paymentStatus === 'LUNAS' && paymentMethod === 'CASH' && total > capitalBalance
+                      ? 'text-amber-400'
+                      : 'text-gray-300'
+                  }
+                >
+                  Rp {capitalBalance.toLocaleString('id-ID')}
+                </span>
+              </div>
+            )}
+
+            {capitalBalance !== null &&
+              paymentStatus === 'LUNAS' &&
+              paymentMethod === 'CASH' &&
+              total > capitalBalance && (
+                <p className="text-[10px] font-bold text-amber-400 leading-relaxed -mt-2">
+                  Saldo modal kurang Rp {(total - capitalBalance).toLocaleString('id-ID')}. Ubah pembayaran ke
+                  HUTANG/TEMPO, atau tambah modal di halaman Modal.
+                </p>
+              )}
 
             <div className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-2">

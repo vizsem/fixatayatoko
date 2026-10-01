@@ -14,6 +14,7 @@ import { playScanBeep } from '@/lib/sound';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
 import { updatePurchaseOrder } from '@/lib/actions/purchase.actions';
+import { getCapitalBalance } from '@/lib/actions/capital.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
@@ -210,16 +211,19 @@ function EditPurchaseFormContent() {
     setLoading(true);
     try {
       // VALIDASI: Cek Saldo Modal jika Pembayaran Tunai (LUNAS & CASH)
+      //
+      // Saldo diambil dari Server Action `getCapitalBalance()` — sumber yang sama
+      // dengan halaman `/admin/capital` dan halaman tambah PO. Pembacaan langsung
+      // dari browser sebelumnya memakai kolom `type`/`amount` yang masih berisi
+      // nilai DEFAULT importer (NULL dan 0), sehingga saldo terbaca Rp0 dan
+      // pengubahan PO tunai selalu ditolak walaupun saldo sebenarnya cukup.
       if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
-        const capitalQ = query(collection(db, 'capital_transactions'), orderBy('date', 'desc'));
-        const capitalSnap = await getDocs(capitalQ);
-        
-        let currentCapital = 0;
-        capitalSnap.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.type === 'INJECTION') currentCapital += (data.amount || 0);
-          else if (data.type === 'WITHDRAWAL') currentCapital -= (data.amount || 0);
-        });
+        const saldoRes = await getCapitalBalance();
+        if (!saldoRes.success) {
+          throw new Error(`Gagal memeriksa saldo modal: ${saldoRes.error}`);
+        }
+
+        const currentCapital = saldoRes.data.balance;
 
         // Pada Edit, jika sebelumnya CASH, kita refund dulu saldonya dalam perhitungan di bawah ini, 
         // namun validasi saldo murni saat ini tetap penting untuk jaga-jaga.
@@ -228,7 +232,11 @@ function EditPurchaseFormContent() {
         const requiredExtraCapital = oldIsCashLunas ? total - oldTotal : total;
         
         if (requiredExtraCapital > currentCapital) {
-          throw new Error(`Saldo Modal Tidak Cukup! Saldo: Rp${currentCapital.toLocaleString()}, Butuh tambahan: Rp${requiredExtraCapital.toLocaleString()}`);
+          throw new Error(
+            `Saldo modal tidak cukup. Tersedia Rp${currentCapital.toLocaleString('id-ID')}, ` +
+              `butuh tambahan Rp${requiredExtraCapital.toLocaleString('id-ID')}. ` +
+              `Pilih pembayaran HUTANG/TEMPO, atau tambah modal di halaman Modal.`
+          );
         }
       }
 

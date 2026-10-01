@@ -173,6 +173,60 @@ export function resolveQueryField(table: string, field: string): { targetField?:
 }
 
 /**
+ * Gabungkan kolom asli dengan `raw_data` saat sebuah baris DIBACA.
+ *
+ * URUTAN PRIORITAS
+ *   1. Kolom asli yang dikelola bridge (`TABLE_COLUMNS[table]`) — selalu menang,
+ *      jadi `products.stock` tetap dibaca dari kolom yang memang di-update.
+ *   2. `raw_data` — menang atas kolom yang TIDAK dikelola bridge.
+ *   3. Kolom non-bridge dipakai hanya bila `raw_data` tidak punya field itu.
+ *   Di semua kasus, kolom bernilai NULL/undefined dianggap "tidak berisi" dan
+ *   tidak boleh menghapus nilai yang ada di `raw_data`.
+ *
+ * MENGAPA URUTAN INI PENTING (bug nyata, diverifikasi ke database 2026-10-01)
+ * Importer massal Firestore → Postgres mengisi `raw_data`, `created_at`, dan
+ * `updated_at`, tetapi membiarkan kolom tambahan pada nilai DEFAULT-nya:
+ *
+ *   capital_transactions : 171/171 baris punya `type = NULL` dan `amount = 0`
+ *                          di kolom, padahal `raw_data` berisi
+ *                          `type = 'WITHDRAWAL'`, `amount = 2600000`.
+ *   ledger_entries       : 167/167 baris `amount = 0`.
+ *   operational_expenses : 46/46 baris `amount = 0`.
+ *
+ * Dengan urutan lama — `{ ...raw, ...row }` — kolom DEFAULT itu MENIMPA nilai
+ * sebenarnya. Akibatnya saldo modal terbaca Rp0 sehingga setiap pembelian tunai
+ * ditolak dengan "Saldo Modal Tidak Cukup", dan laporan keuangan menampilkan
+ * arus kas Rp0. Kolom `date` pada ketiga tabel itu juga masih berisi waktu
+ * INSERT importer, bukan tanggal transaksi.
+ *
+ * Kolom yang TIDAK dikelola bridge tidak dipercaya karena bridge tidak pernah
+ * menulisnya: nilai awalnya berasal dari DEFAULT kolom saat impor, atau diisi
+ * di luar aplikasi. Sebaliknya kolom yang dikelola selalu ditulis bridge pada
+ * setiap `setDoc`/`updateDoc`, jadi nilainya otoritatif.
+ */
+export function mergeRowWithRawData(
+  row: Record<string, any>,
+  table?: string
+): Record<string, any> {
+  const raw =
+    row.raw_data && typeof row.raw_data === 'object' ? (row.raw_data as Record<string, any>) : {};
+  const managed = table ? TABLE_COLUMNS[table] : undefined;
+  const merged: Record<string, any> = { ...raw };
+
+  for (const [key, value] of Object.entries(row)) {
+    // Kolom `raw_data` sendiri tidak ikut diratakan ke permukaan.
+    if (key === 'raw_data') continue;
+    // NULL/undefined tidak membawa informasi: jangan menghapus isi raw_data.
+    if (value === null || value === undefined) continue;
+    // Kolom di luar kendali bridge jangan menimpa raw_data.
+    if (managed && !managed.has(key) && key in raw) continue;
+    merged[key] = value;
+  }
+
+  return merged;
+}
+
+/**
  * Konversi timestamp Firestore (objek `{ _seconds, _nanoseconds }`) atau
  * ISO string / epoch ms menjadi `Date`.
  */
