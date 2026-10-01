@@ -192,8 +192,16 @@ END $$;
 -- 3. GRANT
 -- ============================================================================
 -- Migrasi 20261001 hanya memberi grant pada tabel yang ada SAAT ITU. Tabel baru
--- perlu grant sendiri. `anon` sengaja TIDAK diberi apa pun: pesan chat dan
--- keranjang bukan data publik.
+-- perlu grant sendiri. Grant di bawah untuk `authenticated`; `anon` TIDAK diberi
+-- grant eksplisit.
+--
+-- CATATAN KOREKSI: `ALTER DEFAULT PRIVILEGES` di migrasi 20261001 ternyata juga
+-- berlaku untuk tabel baru, sehingga `anon` TETAP mendapat SELECT pada tabel di
+-- bawah ini. Pengaman sebenarnya BUKAN grant, melainkan RLS — dan itu memadai:
+-- tanpa sesi, `auth.uid()` dan `public.current_app_role()` bernilai NULL sehingga
+-- tidak ada policy yang meloloskan satu baris pun.
+-- Terverifikasi 2026-10-01: anon GET /chats, /messages, /carts -> HTTP 200
+-- dengan body `[]` (nol baris).
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.carts    TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.messages TO authenticated;
 GRANT ALL ON public.carts    TO service_role;
