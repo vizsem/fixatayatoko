@@ -16,6 +16,11 @@ import {
 import MonthlyClosingTab from '@/components/admin/finance/MonthlyClosingTab';
 import notify from '@/lib/notify';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import {
+  hitungHppItem,
+  hitungPetaModalPembelian,
+  type SumberHpp,
+} from '@/lib/hpp';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { Timestamp, auth } from '@/lib/firebase';
@@ -35,7 +40,8 @@ type FinancialRecord = {
   profit?: number;
   paymentMethod: string;
   channel?: string;
-  hppSource?: 'FIFO' | 'Fallback' | 'Estimate (85%)';
+  /** Dari mana HPP baris ini diambil — lihat `src/lib/hpp.ts`. */
+  hppSource?: SumberHpp;
 };
 
 type CashFlowItem = {
@@ -84,6 +90,8 @@ export default function FinanceReport() {
   const [cashflowItems, setCashflowItems] = useState<CashFlowItem[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [totalInventoryValue, setTotalInventoryValue] = useState(0);
+  // Baris item yang labanya TIDAK bisa dipercaya karena Modal produk kosong.
+  const [hppEstimasiItems, setHppEstimasiItems] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   // Overview Filters State
@@ -192,20 +200,20 @@ let unsub: (() => void) | undefined;
         });
         setTotalInventoryValue(calculatedInv);
 
-        const latestCostMap = new Map<string, { costPerPcs: number; ts: number }>();
-        (await sbGetDocs({ table: 'purchases' })).docs.forEach(pd => {
-          const pdata = pd.data() as any;
-          const ts = parseDateAny(pdata.createdAt).getTime();
-          (pdata.items || []).forEach((it: any) => {
-            const conv = Math.max(1, Number(it.conversion || 1));
-            const costPerPcs = Number(it.purchasePrice || 0) / conv;
-            const cur = latestCostMap.get(it.id);
-            if (!cur || ts > cur.ts) latestCostMap.set(it.id, { costPerPcs, ts });
-          });
-        });
+        // Peta modal per pcs dari PO terakhir. Kuncinya WAJIB id PRODUK
+        // (`item.productId`), sebelumnya dipakai `item.id` (id baris pembelian)
+        // sehingga pencariannya selalu gagal — lihat `hitungPetaModalPembelian`.
+        const latestCostMap = hitungPetaModalPembelian(
+          (await sbGetDocs({ table: 'purchases' })).docs
+        );
 
         const financeRecords: FinancialRecord[] = [];
         const cashItems: CashFlowItem[] = [...allCapItems];
+
+        // Berapa baris item yang HPP-nya hanya ESTIMASI (85% harga jual) karena
+        // Modal produk belum diisi. Angka laba dari baris itu BUKAN laba nyata,
+        // jadi pengguna harus diberi tahu, bukan disuguhi angka yang terlihat wajar.
+        let hppEstimasiItem = 0;
 
         for (const od of salesSnap.docs) {
           const order = od.data() as any;
@@ -222,34 +230,24 @@ let unsub: (() => void) | undefined;
 
           let goodsRev = 0, totalCost = 0;
           orderItems.forEach((it: any) => {
-            const price = Number(it.price || 0), qty = Number(it.quantity || 1), pid = it.id || it.productId;
+            const pid = it.id || it.productId;
             const prod = productsMap.get(pid || '');
-            const raw = prod?.raw_data || {};
-            
-            let conv = 1;
-            const itemUnit = (it.unit || '').toUpperCase();
-            if (itemUnit && itemUnit !== 'PCS') {
-              const uObj = (raw.units || []).find((x: any) => (x.code || '').toUpperCase() === itemUnit || (x.name || '').toUpperCase() === itemUnit);
-              if (uObj && uObj.contains) {
-                conv = Number(uObj.contains);
-              } else if (['CTN', 'KARTON', 'DUS', 'BOX'].includes(itemUnit)) {
-                const ctn = (raw.units || []).find((x: any) => ['CTN', 'KARTON', 'DUS', 'BOX'].includes((x.code || '').toUpperCase()));
-                if (ctn && ctn.contains) conv = Number(ctn.contains);
-              }
-            }
-            
-            // Prioritas: cost_price (kolom Supabase) > raw.costPrice > raw.Modal > raw.purchasePrice > latestCostMap (dari purchase) > fallback 85%
-            const costFromProd = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
-            const fallback = latestCostMap.get(pid || '')?.costPerPcs || 0;
-            const cost = costFromProd > 0 ? costFromProd : (fallback > 0 ? fallback : price * 0.85);
-            const hppSource: FinancialRecord['hppSource'] = costFromProd > 0 ? 'FIFO' : (fallback > 0 ? 'Fallback' : 'Estimate (85%)');
-            
-            goodsRev += price * qty; 
-            totalCost += cost * (qty * conv);
+
+            // Rumus HPP dipusatkan di `src/lib/hpp.ts` supaya konversi satuan
+            // (CTN -> pcs) TIDAK bisa hilang lagi, dan agar sumber modalnya
+            // jelas (master produk / baris order / pembelian / estimasi).
+            const hitung = hitungHppItem({
+              item: it,
+              produk: prod,
+              costPembelianPerPcs: latestCostMap.get(pid || '')?.costPerPcs,
+            });
+
+            goodsRev += hitung.pendapatan;
+            totalCost += hitung.hpp;
+            if (hitung.sumber === 'ESTIMASI') hppEstimasiItem += 1;
           });
           const pm = (order.payment?.method || order.paymentMethod || orderRaw.paymentMethod || 'CASH').toUpperCase();
           const ch = (order.channel || orderRaw.channel || orderRaw.transactionType || 'OFFLINE').toUpperCase();
-
           financeRecords.push({
             id: `SALE-${od.id}`,
             date: created.toISOString(),
@@ -363,25 +361,18 @@ let unsub: (() => void) | undefined;
           if (r.status !== 'APPROVED' || r.type !== 'SALES_RETURN') return;
           let retRev = 0, retCost = 0;
           (r.items || []).forEach((it: any) => {
-            const prod = productsMap.get(it.productId || '');
-            const raw = prod?.raw_data || {};
-            const modal = Number(prod?.cost_price ?? raw.costPrice ?? raw.Modal ?? raw.purchasePrice ?? 0);
-            
-            let conv = 1;
-            const itemUnit = (it.unit || '').toUpperCase();
-            if (itemUnit && itemUnit !== 'PCS') {
-              const uObj = (raw.units || []).find((x: any) => (x.code || '').toUpperCase() === itemUnit || (x.name || '').toUpperCase() === itemUnit);
-              if (uObj && uObj.contains) {
-                conv = Number(uObj.contains);
-              } else if (['CTN', 'KARTON', 'DUS', 'BOX'].includes(itemUnit)) {
-                const ctn = (raw.units || []).find((x: any) => ['CTN', 'KARTON', 'DUS', 'BOX'].includes((x.code || '').toUpperCase()));
-                if (ctn && ctn.contains) conv = Number(ctn.contains);
-              }
-            }
-            
-            retRev += Number(it.price || 0) * Number(it.quantity || 0);
-            const costPerPcs = (modal > 0 ? modal : Number(it.price || 0) * 0.85);
-            retCost += costPerPcs * (Number(it.quantity || 0) * conv);
+            const prod = productsMap.get(it.productId || it.id || '');
+
+            // Rumus yang sama dengan penjualan — termasuk konversi satuan.
+            const hitung = hitungHppItem({
+              item: it,
+              produk: prod,
+              costPembelianPerPcs: latestCostMap.get(it.productId || it.id || '')?.costPerPcs,
+            });
+
+            retRev += hitung.pendapatan;
+            retCost += hitung.hpp;
+            if (hitung.sumber === 'ESTIMASI') hppEstimasiItem += 1;
           });
           financeRecords.push({
             id: `RET-${rd.id}`,
@@ -401,6 +392,7 @@ let unsub: (() => void) | undefined;
         cashItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setRecords(financeRecords);
         setCashflowItems(cashItems);
+        setHppEstimasiItems(hppEstimasiItem);
       } catch (err) {
         console.error('Finance fetch error:', err);
       } finally {
@@ -1152,6 +1144,24 @@ let unsub: (() => void) | undefined;
                   </div>
                 </div>
               </div>
+
+              {/* Peringatan HPP estimasi — laba tidak bisa dipercaya bila Modal produk kosong */}
+              {hppEstimasiItems > 0 && (
+                <div className="mx-5 mt-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <Lightbulb size={16} className="mt-0.5 flex-shrink-0 text-amber-600" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-black uppercase tracking-widest">Laba belum akurat</p>
+                    <p className="mt-1 leading-relaxed">
+                      <strong>{hppEstimasiItems} baris item</strong> tidak punya data Modal, sehingga HPP-nya
+                      hanya <strong>estimasi 85% dari harga jual</strong> (laba terlihat selalu ~15%). Isi
+                      &ldquo;Modal&rdquo; produk di halaman Produk agar laba bersihnya nyata.{' '}
+                      <Link href="/admin/products" className="font-bold underline">
+                        Buka Produk
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Transactions Table */}
               <div className="overflow-x-auto">
