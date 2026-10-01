@@ -54,7 +54,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      await sbGetDoc('users', result.user.uid);
+      // `false` = klien ber-sesi; klien service-role di browser tidak membawa
+      // sesi sehingga RLS menolak dan hasilnya selalu kosong.
+      await sbGetDoc('users', result.user.uid, false);
       await requestForToken();
       router.push('/profil');
     } catch (error: unknown) {
