@@ -13,10 +13,10 @@ import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScanner
 import { playScanBeep } from '@/lib/sound';
 import useProducts from '@/lib/hooks/useProducts';
 import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
-import { createPurchaseOrder } from '@/lib/actions/purchase.actions';
+import { createPurchaseOrder, getPurchaseOrderById } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
-import { sbGetDoc } from '@/lib/supabase-helpers';
+import { buildDuplicateCart } from '@/lib/purchase-duplicate';
 import { supabase } from '@/lib/supabase';
 import { collection, db, doc, getDoc, getDocs, onSnapshot, orderBy, query, where, writeBatch } from '@/lib/firebase';
 interface Supplier { id: string; name: string; }
@@ -68,36 +68,71 @@ function AddPurchaseFormContent() {
     const fetchDuplicateData = async () => {
       setIsDuplicating(true);
       try {
-        const docSnap = await sbGetDoc('purchases', duplicateFrom);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setSelectedSupplier(data.supplierId || '');
-          setSelectedWarehouse(data.warehouseId || '');
-          setPaymentStatus(data.paymentStatus || 'LUNAS');
-          setPaymentMethod(data.paymentMethod || 'CASH');
-          setShippingCost(data.shippingCost || 0);
-          setNotes(data.notes || '');
+        // Dibaca lewat Server Action (`getPurchaseOrderById`), BUKAN lewat
+        // `sbGetDoc()` langsung dari browser.
+        //
+        // `sbGetDoc()` memakai `supabaseAdmin`, dan di browser klien itu dibuat
+        // dengan publishable key + `persistSession: false`, sehingga TIDAK
+        // membawa sesi login pengguna -> permintaan berjalan sebagai `anon`.
+        // RLS menolak `anon` membaca `purchases`, jadi hasilnya baris kosong
+        // (bukan error) dan halaman selalu bilang "Data order tidak ditemukan".
+        // Server Action berjalan dengan service role di server, jadi lolos.
+        const po = await getPurchaseOrderById(duplicateFrom);
 
-          // Map items to cart
-          if (data.items && Array.isArray(data.items)) {
-            const mappedCart = data.items.map((item: any) => {
-              const matchedProduct = liveProducts.find(p => p.id === item.id);
-              return {
-                id: item.id,
-                name: item.name,
-                purchasePrice: item.purchasePrice || 0,
-                quantity: item.quantity || 1,
-                unit: item.unit || 'PCS',
-                conversion: item.conversion || 1,
-                availableUnits: matchedProduct?.units || item.availableUnits || [{ code: item.unit || 'PCS', contains: item.conversion || 1 }]
-              };
-            });
-            setCart(mappedCart);
-          }
-          setDuplicateLoaded(true);
-          notify.admin.success('Detail order berhasil disalin!');
-        } else {
+        if (!po) {
           notify.admin.error('Data order yang disalin tidak ditemukan.');
+          return;
+        }
+
+        const raw = (po as { raw_data?: Record<string, any> }).raw_data || {};
+
+        // `supplierId` tidak dikembalikan di level atas oleh `getPurchaseOrderById`,
+        // jadi dibaca dari `raw_data` (tempat aslinya disimpan).
+        setSelectedSupplier(raw.supplierId || '');
+        setSelectedWarehouse(po.warehouseId || '');
+        setPaymentStatus(raw.paymentStatus || 'LUNAS');
+        setPaymentMethod(raw.paymentMethod || 'CASH');
+        setShippingCost(Number(raw.shippingCost || 0));
+        setNotes(po.notes || '');
+
+        // `raw.items` menyimpan satuan & konversi asli pembelian, jadi pakai itu
+        // bila ada. Kalau tidak, jatuh ke bentuk hasil pemetaan aksi.
+        type ItemHasilPemetaan = {
+          productId?: string;
+          id?: string;
+          unitPrice?: number;
+          quantity?: number;
+          product?: { name?: string; unit?: string };
+        };
+
+        const sumberItem =
+          Array.isArray(raw.items) && raw.items.length > 0
+            ? raw.items
+            : ((po.items || []) as ItemHasilPemetaan[]).map((i) => ({
+                productId: i.productId,
+                id: i.id,
+                name: i.product?.name,
+                purchasePrice: i.unitPrice,
+                quantity: i.quantity,
+                unit: i.product?.unit,
+              }));
+
+        const { cart: mappedCart, dilewati } = buildDuplicateCart(sumberItem, liveProducts);
+
+        if (mappedCart.length === 0) {
+          notify.admin.error('PO ini tidak punya item yang bisa dipesan ulang.');
+          return;
+        }
+
+        setCart(mappedCart);
+        setDuplicateLoaded(true);
+
+        if (dilewati > 0) {
+          notify.admin.warning(
+            `Detail PO disalin, tetapi ${dilewati} item dilewati karena produknya sudah tidak ada.`
+          );
+        } else {
+          notify.admin.success('Detail order berhasil disalin!');
         }
       } catch (err) {
         console.error('Gagal memuat data order duplikat:', err);
