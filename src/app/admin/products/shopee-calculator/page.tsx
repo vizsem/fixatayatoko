@@ -327,7 +327,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50" style={{fontFamily:"system-ui,sans-serif"}}>
+    <div className="bg-gradient-to-br from-orange-50 to-amber-50" style={{fontFamily:"system-ui,sans-serif"}}>
 
       {/* HEADER MODERN */}
       <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 p-8 text-white shadow-2xl rounded-b-3xl relative overflow-hidden">

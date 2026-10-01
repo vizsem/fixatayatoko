@@ -212,7 +212,7 @@ function AuditPageContent() {
   ];
 
   return (
-    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
+    <div className="p-3 md:p-6 bg-[#F8FAFC]">
       <Toaster position="top-right" />
       
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">

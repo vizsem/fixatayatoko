@@ -161,7 +161,7 @@ export default function AdminDashboard() {
   const maxChartValue = Math.max(...salesChartData.map(d => d.amount), 1);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-3 md:p-4 font-sans text-gray-900">
+    <div className="bg-gray-50/50 p-3 md:p-4 font-sans text-gray-900">
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>

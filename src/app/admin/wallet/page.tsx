@@ -136,7 +136,7 @@ export default function AdminWalletDashboard() {
   };
 
   return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen font-sans text-black">
+    <div className="p-3 md:p-4 bg-gray-50 font-sans text-black">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-3">

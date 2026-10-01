@@ -140,7 +140,7 @@ export default function StockOutPage() {
   const filtered = products.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
+    <div className="p-3 md:p-6 bg-[#F8FAFC]">
       <Toaster position="top-right" />
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-10">

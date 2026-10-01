@@ -384,7 +384,7 @@ function AddPromotionContent() {
   ];
 
   return (
-    <div className="p-3 md:p-6 bg-[#F4F6FA] min-h-screen text-slate-800 font-sans pb-24">
+    <div className="p-3 md:p-6 bg-[#F4F6FA] text-slate-800 font-sans">
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">

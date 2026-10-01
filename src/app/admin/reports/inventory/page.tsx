@@ -73,7 +73,7 @@ export default function InventoryReport() {
   if (loading || building) return <div className="p-6"><TableSkeleton rows={15} /></div>;
 
   return (
-    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
+    <div className="p-3 md:p-6 bg-[#F8FAFC]">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">

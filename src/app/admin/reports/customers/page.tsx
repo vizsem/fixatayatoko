@@ -213,7 +213,7 @@ export default function CustomerReport() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-3 md:p-4">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 md:p-4">
       <Toaster position="top-right" />
       
       {/* Header Section */}

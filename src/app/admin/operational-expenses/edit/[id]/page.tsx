@@ -112,7 +112,7 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
   }
 
   return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen">
+    <div className="p-3 md:p-4 bg-gray-50">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 flex items-center gap-4">
           <Link 

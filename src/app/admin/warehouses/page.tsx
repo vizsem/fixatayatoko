@@ -63,7 +63,7 @@ export default function AdminWarehouses() {
   return (
     <>
       <Toaster />
-      <div className="min-h-screen bg-gray-50 p-3 md:p-5">
+      <div className="bg-gray-50 p-3 md:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl font-black text-gray-900">Gudang</h1>

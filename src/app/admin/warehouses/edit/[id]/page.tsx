@@ -124,7 +124,7 @@ export default function EditWarehousePage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 md:p-4">
+    <div className="bg-slate-50 p-3 md:p-4">
       <Toaster position="top-right" />
 
       <div className="max-w-2xl mx-auto">

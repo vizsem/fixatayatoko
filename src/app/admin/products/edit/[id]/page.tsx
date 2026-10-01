@@ -780,7 +780,7 @@ export default function EditProductPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div></div>;
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 bg-slate-50/70 min-h-screen pb-24 text-slate-800 font-sans">
+    <div className="p-3 sm:p-4 md:p-6 bg-slate-50/70 text-slate-800 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* Header Navigation */}

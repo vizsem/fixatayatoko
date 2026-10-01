@@ -526,7 +526,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 md:p-4 pb-24 text-black font-sans">
+    <div className="bg-gray-50 md:p-4 text-black font-sans">
       <Toaster position="top-right" />
       <div className="max-w-4xl mx-auto bg-white shadow-2xl md:rounded-[3rem] overflow-hidden border border-white">
         <div className="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">

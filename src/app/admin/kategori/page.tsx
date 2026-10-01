@@ -131,7 +131,7 @@ export default function AdminCategories() {
   const filtered = categories.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="max-w-7xl mx-auto p-3 md:p-6 min-h-screen pb-32">
+    <div className="max-w-7xl mx-auto p-3 md:p-6">
       <Toaster position="top-right" />
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">

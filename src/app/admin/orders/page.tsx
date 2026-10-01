@@ -136,7 +136,7 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-3 md:p-6 pb-32">
+    <div className="bg-[#F8FAFC] p-3 md:p-6">
       <Toaster position="top-right" />
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">

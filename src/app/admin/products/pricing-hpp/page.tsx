@@ -732,7 +732,7 @@ export default function PricingHPPPage() {
   const selectedCount = selectedIds.size;
 
   return (
-    <div className="p-4 md:p-8 bg-[#F8FAFC] min-h-screen pb-32">
+    <div className="p-4 md:p-8 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* HEADER */}

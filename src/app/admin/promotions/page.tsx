@@ -190,7 +190,7 @@ export default function PromotionsPage() {
   ];
 
   return (
-    <div className="p-3 md:p-6 bg-[#F4F6FA] min-h-screen text-slate-800 font-sans pb-24">
+    <div className="p-3 md:p-6 bg-[#F4F6FA] text-slate-800 font-sans">
       {/* Top Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

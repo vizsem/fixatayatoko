@@ -129,7 +129,7 @@ export default function StockSyncMonitorPage() {
   if (loading) return <div className="p-6"><TableSkeleton rows={10} /></div>;
 
   return (
-    <div className="p-3 md:p-6 bg-[#F8FAFC] min-h-screen pb-32">
+    <div className="p-3 md:p-6 bg-[#F8FAFC]">
       <Toaster position="top-right" />
       
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">

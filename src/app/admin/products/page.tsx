@@ -684,7 +684,7 @@ export default function AdminProducts() {
 
   return (
     <ErrorBoundary>
-      <div className="p-3 bg-gray-50 min-h-screen text-black">
+      <div className="p-3 bg-gray-50 text-black">
       <Toaster />
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 

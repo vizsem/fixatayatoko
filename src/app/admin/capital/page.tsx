@@ -262,7 +262,7 @@ export default function CapitalPage() {
   if (loading) return <TableSkeleton />;
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 bg-slate-50 min-h-screen pb-24 md:pb-8">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 bg-slate-50">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80">
         <div>

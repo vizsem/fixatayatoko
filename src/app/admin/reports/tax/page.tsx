@@ -162,7 +162,7 @@ export default function TaxReportPage() {
   if (loading) return <div className="p-8 font-black text-xs animate-pulse text-center">Memuat Laporan Pajak STP Cortex...</div>;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen font-sans text-slate-900">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 bg-slate-50 font-sans text-slate-900">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
         <div>

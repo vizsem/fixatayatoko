@@ -336,7 +336,7 @@ function EditPurchaseFormContent() {
   }
 
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">

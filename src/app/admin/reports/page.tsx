@@ -149,7 +149,7 @@ export default function ReportsDashboard() {
   };
 
   return (
-    <div className="p-3 md:p-4 bg-gray-50/50 min-h-screen">
+    <div className="p-3 md:p-4 bg-gray-50/50">
       <Toaster position="top-right" />
       
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">

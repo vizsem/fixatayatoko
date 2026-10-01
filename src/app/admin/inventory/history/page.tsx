@@ -164,7 +164,7 @@ export default function InventoryHistoryPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="bg-gray-50">
       <div className="max-w-4xl mx-auto p-6">
         <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">

@@ -176,7 +176,7 @@ export default function InventoryLayersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-900 p-3 md:p-4">
+    <div className="bg-gray-50 text-slate-900 p-3 md:p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

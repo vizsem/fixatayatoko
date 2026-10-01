@@ -348,7 +348,7 @@ export default function AdminSettings() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-xs tracking-widest animate-pulse">Initializing system...</div>;
 
   return (
-    <div className="p-3 md:p-4 max-w-7xl mx-auto bg-[#F8FAFC] min-h-screen pb-32 font-sans text-slate-900">
+    <div className="p-3 md:p-4 max-w-7xl mx-auto bg-[#F8FAFC] font-sans text-slate-900">
       <Toaster position="top-right" />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">

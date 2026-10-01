@@ -176,7 +176,7 @@ export default function ReturnsPage() {
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
-    <div className="p-3 md:p-4 min-h-screen bg-gray-50 text-slate-800">
+    <div className="p-3 md:p-4 bg-gray-50 text-slate-800">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-end mb-6">
           <div>

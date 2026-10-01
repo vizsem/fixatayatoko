@@ -353,7 +353,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black" style={{fontFamily:"system-ui,sans-serif"}}>
+    <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-black" style={{fontFamily:"system-ui,sans-serif"}}>
 
       {/* HEADER MODERN */}
       <div className="p-8 shadow-2xl rounded-b-3xl relative overflow-hidden" style={{background:"linear-gradient(135deg,#0f0f0f 0%,#1a0a1e 40%,#2d0a1a 100%)"}}>

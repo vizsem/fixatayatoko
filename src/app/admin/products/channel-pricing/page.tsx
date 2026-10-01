@@ -266,7 +266,7 @@ export default function ChannelPricingPage() {
   };
 
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans">
       <Toaster />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">

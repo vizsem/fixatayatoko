@@ -1417,7 +1417,7 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBFBFE] font-sans">
+    <div className="bg-[#FBFBFE] font-sans">
       <Toaster position="top-right" />
 
       {/* Hero Header */}

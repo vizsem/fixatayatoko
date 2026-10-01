@@ -306,7 +306,7 @@ export default function AddProductPage() {
     return () => { unsubW(); };
   }, []);
   return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-24 text-black font-sans">
+    <div className="p-3 md:p-4 bg-gray-50 text-black font-sans">
       <div className="max-w-4xl mx-auto">
 
         {/* Header Navigation */}
