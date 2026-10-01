@@ -109,6 +109,64 @@ export async function listTable(table: string): Promise<ActionResult<Record<stri
   }
 }
 
+export type SettingsPageData = {
+  system: Record<string, unknown> | null;
+  points: Record<string, unknown> | null;
+  categories: Record<string, unknown>[];
+  employees: Record<string, unknown>[];
+  banners: Record<string, unknown>[];
+  warehouses: Record<string, unknown>[];
+};
+
+/**
+ * Seluruh data yang dibutuhkan halaman pengaturan, dalam SATU panggilan.
+ *
+ * MENGAPA DIGABUNG (performa)
+ * ---------------------------
+ * Sebelumnya halaman memanggil enam Server Action sekaligus
+ * (`getSettingsDoc` ×2 + `listTable` ×4). Setiap Server Action adalah satu
+ * permintaan POST tersendiri DAN memverifikasi token ke Supabase sekali lagi
+ * (`requireStaff` -> `authorize` -> `auth.getUser`). Jadi satu kali buka
+ * halaman = 6 respons jaringan ke aplikasi + 6 verifikasi token + 6 kueri role.
+ *
+ * Dengan digabung: 1 permintaan, 1 verifikasi token, lalu kueri-kueri kecilnya
+ * dijalankan paralel di server (jaringan server -> Supabase jauh lebih cepat
+ * daripada peramban -> server -> Supabase).
+ */
+export async function getSettingsPageData(): Promise<ActionResult<SettingsPageData>> {
+  await requireStaff();
+  try {
+    const [system, points, categories, employees, banners, warehouses] = await Promise.all([
+      sbGetDoc('settings', 'system'),
+      sbGetDoc('settings', 'points'),
+      sbGetDocs({ table: 'categories' }),
+      sbGetDocs({ table: 'employees' }),
+      sbGetDocs({ table: 'banners' }),
+      sbGetDocs({ table: 'warehouses' }),
+    ]);
+
+    const baris = (snapshot: { docs: Array<{ id: string; data: () => unknown }> }) =>
+      snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) }));
+
+    return {
+      ok: true,
+      data: {
+        system: system.exists() ? (system.data() as Record<string, unknown>) : null,
+        points: points.exists() ? (points.data() as Record<string, unknown>) : null,
+        categories: baris(categories),
+        employees: baris(employees),
+        banners: baris(banners),
+        warehouses: baris(warehouses),
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Gagal memuat data pengaturan',
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Penulisan
 // ---------------------------------------------------------------------------

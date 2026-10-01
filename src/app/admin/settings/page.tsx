@@ -2,7 +2,6 @@
 
 import { useEffect, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
 import {
   Settings, CreditCard, Printer, Store,
   Shield, Upload, Download,
@@ -25,8 +24,7 @@ import {
   deleteFromTable,
   getBackupData,
   getBackupTableNames,
-  getSettingsDoc,
-  listTable,
+  getSettingsPageData,
   replaceTableContents,
   saveSettingsDoc,
   updateInTable,
@@ -140,15 +138,21 @@ export default function AdminSettings() {
       if (!user) { router.push('/profil/login'); return; }
       if (!isAdmin) { router.push('/'); return; }
 
-      await Promise.all([loadSettings(), loadPointSettings(), loadCategories(), loadEmployees(), loadBanners(), loadWarehouses()]);
+      await loadAll();
       setLoading(false);
     };
     checkAuth();
 
     let __unsubscribe: (() => void) | undefined;
     (async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-        checkAuth();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        // HANYA bereaksi saat sesi HILANG.
+        //
+        // Supabase memancarkan INITIAL_SESSION segera setelah subscribe. Kalau
+        // callback ini memanggil `checkAuth()` tanpa syarat, SELURUH data
+        // (6 Server Action sekaligus) dimuat DUA KALI setiap halaman dibuka —
+        // inilah sebab utama halaman Settings terasa lambat.
+        if (event === 'SIGNED_OUT') checkAuth();
       });
       __unsubscribe = () => subscription.unsubscribe();
     })();
@@ -156,37 +160,39 @@ export default function AdminSettings() {
     return () => { if (__unsubscribe) __unsubscribe(); };
   }, [router]);
 
-  const loadSettings = async () => {
-    const result = await getSettingsDoc('system');
-    if (result.ok && result.data) {
-      const data = result.data as unknown as SystemSettings;
-      setSettings({ ...defaultSettings, ...data, store: { ...defaultSettings.store, ...data.store }, deliveryMethods: data.deliveryMethods || defaultSettings.deliveryMethods });
+  /**
+   * Muat SELURUH data halaman ini dalam satu panggilan server.
+   *
+   * Sebelumnya ada enam pemanggilan terpisah (2 dokumen + 4 daftar). Tiap
+   * panggilan adalah permintaan jaringan tersendiri DAN memverifikasi token ke
+   * Supabase sekali lagi, sehingga satu kali buka halaman menambah enam kali
+   * bolak-balik. Padanan enam fungsi lama tetap ada di `settings.actions.ts`
+   * untuk kebutuhan lain (mis. menyegarkan satu daftar setelah mengubah data).
+   */
+  const loadAll = async () => {
+    const result = await getSettingsPageData();
+    if (!result.ok) {
+      notify.admin.error(result.error);
+      return;
     }
-  };
 
-  const loadPointSettings = async () => {
-    const result = await getSettingsDoc('points');
-    if (result.ok && result.data) setPointConfig(result.data as unknown as PointSettings);
-  };
+    const data = result.data;
 
-  const loadCategories = async () => {
-    const result = await listTable('categories');
-    if (result.ok) setCategories(result.data as unknown as Category[]);
-  };
+    if (data.system) {
+      const sistem = data.system as unknown as SystemSettings;
+      setSettings({
+        ...defaultSettings,
+        ...sistem,
+        store: { ...defaultSettings.store, ...sistem.store },
+        deliveryMethods: sistem.deliveryMethods || defaultSettings.deliveryMethods,
+      });
+    }
 
-  const loadEmployees = async () => {
-    const result = await listTable('employees');
-    if (result.ok) setEmployees(result.data as unknown as Employee[]);
-  };
-
-  const loadBanners = async () => {
-    const result = await listTable('banners');
-    if (result.ok) setBanners(result.data as unknown as Banner[]);
-  };
-
-  const loadWarehouses = async () => {
-    const result = await listTable('warehouses');
-    if (result.ok) setWarehouses(result.data as unknown as Warehouse[]);
+    if (data.points) setPointConfig(data.points as unknown as PointSettings);
+    setCategories(data.categories as unknown as Category[]);
+    setEmployees(data.employees as unknown as Employee[]);
+    setBanners(data.banners as unknown as Banner[]);
+    setWarehouses(data.warehouses as unknown as Warehouse[]);
   };
 
   const handleSaveSystem = async () => {
@@ -216,6 +222,11 @@ export default function AdminSettings() {
       const result = await getBackupData();
       if (!result.ok) throw new Error(result.error);
 
+      // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ini ditekan.
+      // Impor statis di atas membuat halaman ini mengunduhnya SEBELUM bisa
+      // tampil, sehingga terasa lambat dibuka.
+      const XLSX = await import('xlsx');
+
       const wb = XLSX.utils.book_new();
       for (const [table, rows] of Object.entries(result.data)) {
         if (rows.length > 0) {
@@ -236,6 +247,8 @@ export default function AdminSettings() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
+        // Dimuat saat dipakai saja — lihat catatan di `handleBackup`.
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(evt.target?.result, { type: 'binary' });
 
         const allowedResult = await getBackupTableNames();
