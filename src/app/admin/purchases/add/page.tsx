@@ -247,6 +247,11 @@ function AddPurchaseFormContent() {
         throw new Error(purchaseRes.error || 'Gagal menyimpan Purchase Order ke database');
       }
 
+      // PO bisa tersimpan sementara stoknya belum seluruhnya masuk (mis. satu produk
+      // dihapus admin lain). Itu dilaporkan lewat `warning`, bukan `success: false`,
+      // supaya pengguna tahu harus klik "Terima" di daftar PO.
+      const warningStok = (purchaseRes as { warning?: string }).warning;
+
       // 2. Safe sync ke Firestore untuk kompatibilitas riwayat/modal
       try {
         const batch = writeBatch(db);
@@ -285,7 +290,11 @@ function AddPurchaseFormContent() {
         console.warn('Firestore sync skipped or failed:', fsErr);
       }
 
-      notify.admin.success("Purchase Order berhasil disimpan & stok telah ditambahkan!");
+      if (warningStok) {
+        notify.admin.warning(warningStok);
+      } else {
+        notify.admin.success("Purchase Order berhasil disimpan & stok telah ditambahkan!");
+      }
       router.push('/admin/purchases');
     } catch (err: any) {
       console.error(err);

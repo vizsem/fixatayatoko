@@ -13,6 +13,21 @@ type PurchaseItemInput = {
   unit?: string
 }
 
+/**
+ * Hasil aksi PO.
+ *
+ * `warning` dipakai untuk kasus "sebagian berhasil": PO sudah tersimpan tetapi
+ * stok belum seluruhnya masuk. Ini BUKAN kegagalan — melaporkannya sebagai
+ * `success: false` membuat pengguna mengira PO tidak dibuat, padahal barisnya
+ * sudah ada di daftar.
+ */
+export type PurchaseActionResult = {
+  success: boolean
+  error?: string
+  warning?: string
+  data?: any
+}
+
 function normalizeStatus(status?: string): string {
   if (!status) return 'RECEIVED';
   const s = status.toUpperCase();
@@ -161,7 +176,7 @@ export async function createPurchaseOrder(data: {
   paymentStatus?: 'LUNAS' | 'HUTANG' | string
   paymentMethod?: string
   dueDate?: string
-}) {
+}): Promise<PurchaseActionResult> {
   await requireAdmin();
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -249,11 +264,21 @@ export async function createPurchaseOrder(data: {
       return { success: false, error: error.message };
     }
 
-    // Jika autoReceive diaktifkan, langsung proses penambahan stok ke produk dan inventory_logs
+    // Jika autoReceive diaktifkan, langsung proses penambahan stok ke produk dan inventory_logs.
+    //
+    // Catatan perbaikan: dulu loop ini TANPA try/catch. Kalau addStock gagal untuk
+    // satu produk, error-nya naik ke catch di bawah dan fungsi mengembalikan
+    // `success: false` — padahal baris PO-nya SUDAH masuk database sebelum loop ini.
+    // Akibatnya pengguna melihat "Gagal membuat PO" sambil PO tetap muncul di
+    // daftar, dan stoknya tidak pernah masuk. Sekarang tiap item ditangani
+    // terpisah dan kegagalan dilaporkan sebagai `warning`, bukan kegagalan total.
     if (isAutoReceive) {
+      const gagal: string[] = [];
+
       for (const item of enrichedItems) {
-        if (item.productId) {
-          const baseStockToAdd = Number(item.quantity || 1) * Number(item.conversion || 1);
+        if (!item.productId) continue;
+        const baseStockToAdd = Number(item.quantity || 1) * Number(item.conversion || 1);
+        try {
           await addStock({
             productId: item.productId,
             amount: baseStockToAdd,
@@ -264,7 +289,32 @@ export async function createPurchaseOrder(data: {
             notes: `Pembelian Langsung (${item.quantity} ${item.unit || 'PCS'}): ${poNumber}`,
             incomingPrice: item.conversion ? (item.unitPrice / item.conversion) : item.unitPrice,
           });
+        } catch (e: any) {
+          console.error(`addStock gagal saat autoReceive PO ${poNumber} (${item.productId}):`, e);
+          gagal.push(`${item.name || item.productId} (${e?.message || 'gagal'})`);
         }
+      }
+
+      if (gagal.length > 0) {
+        // Stok belum masuk (sebagian). Turunkan status ke APPROVED supaya tombol
+        // "Terima" muncul di daftar dan stok bisa disusulkan tanpa membuat PO baru.
+        raw_data.status = 'APPROVED';
+        raw_data.receivedAt = undefined;
+
+        await supabaseAdmin
+          .from('purchases')
+          .update({ raw_data, updated_at: new Date().toISOString() })
+          .eq('id', id);
+
+        revalidatePath('/admin/purchases');
+        revalidatePath('/admin/inventory');
+        revalidatePath('/admin/products');
+
+        return {
+          success: true,
+          warning: `PO tersimpan, tetapi stok gagal ditambahkan untuk ${gagal.length} item: ${gagal.join('; ')}. Status PO dikembalikan ke "Disetujui" — klik "Terima" untuk mencoba lagi.`,
+          data: { id, ...raw_data },
+        };
       }
     }
 
@@ -278,6 +328,19 @@ export async function createPurchaseOrder(data: {
   }
 }
 
+/**
+ * Terima PO: tambahkan stok, lalu tandai PO `DITERIMA`.
+ *
+ * URUTAN INI PENTING — dulu urutannya terbalik (status diubah lebih dulu, baru
+ * addStock dipanggil). Kalau addStock gagal, PO sudah berstatus "DITERIMA"
+ * padahal stok tidak masuk, dan percobaan ulang ditolak dengan "PO sudah
+ * diterima sebelumnya" — stoknya hilang tanpa bisa disusulkan. Sekarang status
+ * hanya berubah SETELAH semua stok berhasil masuk.
+ *
+ * Supaya aman diklik berulang (mis. gagal separuh jalan, koneksi putus, tombol
+ * terklik dua kali), penambahan stok dijaga idempoten lewat `inventory_logs`:
+ * kalau sudah ada log MASUK untuk PO + produk yang sama, item itu dilewati.
+ */
 export async function receivePurchaseOrder(poId: string, warehouseId: string, batchNumber?: string, expiryDate?: string) {
   await requireStaff();
   try {
@@ -291,6 +354,56 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
     }
 
     const targetWarehouse = warehouseId || raw.warehouseId || 'gudang-utama';
+    const poRef = raw.poNumber || poId;
+    const gagal: string[] = [];
+
+    // Tambah stok ke produk & catat log inventory via supabaseAdmin
+    for (const item of (raw.items || [])) {
+      const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
+      if (!prodId) continue;
+
+      // Idempotensi: jangan tambah dua kali untuk PO + produk yang sama.
+      const { data: logAda } = await supabaseAdmin
+        .from('inventory_logs')
+        .select('id')
+        .eq('reference_id', poRef)
+        .eq('product_id', prodId)
+        .eq('type', 'MASUK')
+        .limit(1);
+
+      if (logAda && logAda.length > 0) continue;
+
+      const qty = Number(item.quantity || 1);
+      const conversion = Number(item.conversion || 1);
+      const baseStockToAdd = qty * conversion;
+
+      try {
+        await addStock({
+          productId: prodId,
+          amount: baseStockToAdd,
+          warehouseId: targetWarehouse,
+          batchNumber: batchNumber || `${poRef}-${prodId.slice(-4)}`,
+          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+          reference: poRef,
+          notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${poRef}`,
+          incomingPrice: conversion ? (item.unitPrice / conversion) : item.unitPrice,
+        });
+      } catch (e: any) {
+        console.error(`addStock gagal saat menerima PO ${poRef} (${prodId}):`, e);
+        gagal.push(`${item.name || prodId} (${e?.message || 'gagal'})`);
+      }
+    }
+
+    if (gagal.length > 0) {
+      // Status SENGAJA tidak diubah: PO tetap "Disetujui" sehingga tombol "Terima"
+      // masih muncul dan stok bisa disusulkan. Item yang sudah berhasil tidak akan
+      // ditambahkan dua kali karena guard idempotensi di atas.
+      return {
+        success: false,
+        error: `Stok gagal ditambahkan untuk ${gagal.length} item: ${gagal.join('; ')}. PO belum ditandai diterima — klik "Terima" lagi untuk mencoba item yang gagal.`,
+      };
+    }
+
     raw.status = 'DITERIMA';
     raw.receivedAt = new Date().toISOString();
     raw.warehouseId = targetWarehouse;
@@ -301,27 +414,12 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
     }).eq('id', poId);
 
     if (updateErr) {
-      return { success: false, error: updateErr.message };
-    }
-
-    // Tambah stok ke produk & catat log inventory via supabaseAdmin
-    for (const item of (raw.items || [])) {
-      const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
-      const qty = Number(item.quantity || 1);
-      const conversion = Number(item.conversion || 1);
-      const baseStockToAdd = qty * conversion;
-      if (prodId) {
-        await addStock({
-          productId: prodId,
-          amount: baseStockToAdd,
-          warehouseId: targetWarehouse,
-          batchNumber: batchNumber || `${raw.poNumber || poId}-${prodId.slice(-4)}`,
-          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-          reference: raw.poNumber || poId,
-          notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${raw.poNumber || poId}`,
-          incomingPrice: conversion ? (item.unitPrice / conversion) : item.unitPrice,
-        });
-      }
+      // Stok sudah masuk, jadi ini bukan kegagalan total. Klik "Terima" sekali lagi
+      // akan menyelesaikan status tanpa menambah stok dua kali.
+      return {
+        success: false,
+        error: `Stok sudah ditambahkan, tetapi status PO gagal disimpan (${updateErr.message}). Klik "Terima" sekali lagi untuk menyelesaikan.`,
+      };
     }
 
     revalidatePath('/admin/purchases');

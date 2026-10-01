@@ -90,19 +90,32 @@ export default function AdminPurchases() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-    Promise.all([
+  /**
+   * Muat ulang produk/supplier/gudang.
+   *
+   * Dulu ini hanya dijalankan sekali saat halaman dibuka, sehingga kolom
+   * "STOK SAAT INI" tetap angka lama setelah PO diterima. Halaman ini TIDAK
+   * bisa mengandalkan Realtime untuk memperbaruinya: publication
+   * `supabase_realtime` belum memuat tabel `products` (lihat migrasi
+   * 20261006_realtime_publication.sql). Jadi pemuatan ulang eksplisit inilah
+   * yang menjamin angkanya benar.
+   */
+  const loadMeta = useCallback(async () => {
+    const [s, p, w] = await Promise.all([
       getSuppliers(),
       getProducts({ isActive: true, limit: 1000 }),
       getWarehouses(),
-    ]).then(([s, p, w]) => {
-      setSuppliers(s);
-      // Strictly filter to ensure only active products are presented
-      setProducts((p as any[]).filter((prod) => prod.isActive !== false));
-      setWarehouses(w);
-    });
-  }, [load]);
+    ]);
+    setSuppliers(s);
+    // Strictly filter to ensure only active products are presented
+    setProducts((p as any[]).filter((prod) => prod.isActive !== false));
+    setWarehouses(w);
+  }, []);
+
+  useEffect(() => {
+    load();
+    loadMeta();
+  }, [load, loadMeta]);
 
   const filtered = useMemo(() => pos.filter(p => {
     const matchSearch = p.poNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -172,7 +185,14 @@ export default function AdminPurchases() {
       dueDate: form.dueDate || undefined,
     });
     if (result.success) {
-      notify.success(form.autoReceive ? 'PO berhasil dibuat & stok telah ditambahkan!' : 'Purchase Order berhasil dibuat');
+      // `warning` = PO tersimpan tetapi stok belum seluruhnya masuk. Jangan
+      // tampilkan pesan sukses biasa, karena pengguna akan mengira stok sudah
+      // bertambah dan tidak mengecek lagi.
+      if ((result as { warning?: string }).warning) {
+        notify.admin.warning((result as { warning?: string }).warning!);
+      } else {
+        notify.success(form.autoReceive ? 'PO berhasil dibuat & stok telah ditambahkan!' : 'Purchase Order berhasil dibuat');
+      }
       setModalOpen(false);
       setForm({
         supplierId: '',
@@ -187,6 +207,7 @@ export default function AdminPurchases() {
       });
       setItems([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
       await load();
+      await loadMeta();
     } else {
       notify.error(result.error || 'Gagal membuat PO');
     }
@@ -206,7 +227,9 @@ export default function AdminPurchases() {
       notify.success('Barang berhasil diterima & stok diperbarui (FEFO)');
       setReceiveModal(null);
       setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' });
+      // Muat ulang produk juga, supaya stok di form PO berikutnya tidak basi.
       await load();
+      await loadMeta();
     } else {
       notify.error(result.error || 'Gagal menerima PO');
     }

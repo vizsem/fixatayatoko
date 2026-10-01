@@ -35,7 +35,9 @@
     "verify:loyalty": "node scripts/verify-loyalty-deploy.mjs",
     "verify:hr": "node scripts/verify-hr-deploy.mjs",
     "audit:rls": "node scripts/rls-audit.mjs",
-    "audit:schema": "node scripts/rls-schema-dump.mjs"
+    "audit:schema": "node scripts/rls-schema-dump.mjs",
+    "audit:realtime": "node scripts/audit-realtime-coverage.mjs",
+    "diagnose:stock": "node scripts/diagnose-stock-flow.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
