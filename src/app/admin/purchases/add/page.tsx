@@ -355,8 +355,11 @@ function AddPurchaseFormContent() {
     );
   }
 
+  // Tanpa `min-h-screen` dan `pb-32`: `<main>` di layout admin sudah punya
+  // keduanya (pb-32 khusus mobile untuk bottom nav), sehingga sebelumnya
+  // terhitung dua kali dan menyisakan ruang kosong besar di bawah.
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] min-h-screen pb-32 font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
@@ -366,7 +369,7 @@ function AddPurchaseFormContent() {
           </Link>
           <div>
             <h1 className="text-base sm:text-2xl font-black text-gray-800 uppercase tracking-tighter">Pembelian Baru</h1>
-            <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-0.5 hidden sm:block">Input stok masuk dari supplier</p>
+            <p className="text-gray-500 text-xs font-black uppercase tracking-widest mt-0.5 hidden sm:block">Input stok masuk dari supplier</p>
           </div>
         </div>
       </div>
@@ -413,7 +416,7 @@ function AddPurchaseFormContent() {
           <div className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="p-4 sm:p-8 border-b border-gray-50">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 <input
                   id="product-search"
                   name="product-search"
@@ -450,7 +453,7 @@ function AddPurchaseFormContent() {
                       >
                         <div>
                           <p className="text-xs font-black uppercase text-gray-800">{p.name}</p>
-                          <p className="text-xs font-bold text-gray-400">STOK SAAT INI: {p.stock} {p.unit}</p>
+                          <p className="text-xs font-bold text-gray-500">STOK SAAT INI: {p.stock} {p.unit}</p>
                         </div>
                         <Plus size={16} className="text-gray-300 group-hover:text-black" />
                       </button>
@@ -474,7 +477,7 @@ function AddPurchaseFormContent() {
                       </button>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Subtotal</p>
                       <p className="text-sm font-black text-gray-900">
                         Rp {(item.quantity * item.purchasePrice).toLocaleString()}
                       </p>
@@ -483,7 +486,7 @@ function AddPurchaseFormContent() {
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Qty</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Qty</p>
                       <input
                         id={`qty-${item.id}`}
                         name={`qty-${item.id}`}
@@ -494,7 +497,7 @@ function AddPurchaseFormContent() {
                       />
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Satuan</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Satuan</p>
                       <select
                         id={`unit-${item.id}`}
                         name={`unit-${item.id}`}
@@ -520,7 +523,7 @@ function AddPurchaseFormContent() {
                       </select>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Isi (Pcs)</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Isi (Pcs)</p>
                       <input
                         id={`conv-${item.id}`}
                         name={`conv-${item.id}`}
@@ -531,7 +534,7 @@ function AddPurchaseFormContent() {
                       />
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Harga Beli</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Harga Beli</p>
                       <input
                         id={`price-${item.id}`}
                         name={`price-${item.id}`}
@@ -550,12 +553,12 @@ function AddPurchaseFormContent() {
               <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead className="bg-gray-50/50">
                   <tr>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Produk</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Qty</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Satuan</th>
-                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Isi (Pcs)</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Harga Beli</th>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-right">Subtotal</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-500 uppercase">Produk</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-center">Satuan</th>
+                    <th className="px-3 md:px-4 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-center">Isi (Pcs)</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-center">Harga Beli</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -713,14 +716,14 @@ function AddPurchaseFormContent() {
 
             <button
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all hidden lg:flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
               <Save size={18} /> {loading ? 'Saving Order...' : 'Post Purchase Order'}
             </button>
           </div>
 
           <div className="bg-white p-5 sm:p-8 rounded-3xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
               <Info size={14} /> Additional Notes
             </h3>
             <textarea
@@ -731,6 +734,25 @@ function AddPurchaseFormContent() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+          </div>
+        </div>
+
+        {/* Aksi utama menempel di dasar layar, khusus mobile: tanpa ini tombol
+            berada di ujung bawah halaman dan harus dicari dengan menggulir.
+            Di desktop tombol di dalam kartu ringkasan yang dipakai. */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Total</p>
+              <p className="text-sm font-black text-gray-900 truncate">Rp {total.toLocaleString()}</p>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 py-3.5 rounded-2xl text-xs font-black uppercase tracking-[0.15em] text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {loading ? 'Menyimpan...' : 'Post Purchase Order'}
+            </button>
           </div>
         </div>
 

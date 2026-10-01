@@ -190,8 +190,9 @@ export default function PurchaseDetail() {
 
   const isReceived = purchase.status === 'DITERIMA' || purchase.status === 'RECEIVED';
 
+  // Tanpa `min-h-screen` dan `pb-32`: sudah disediakan `<main>` di layout admin.
   return (
-    <div className="p-3 md:p-4 bg-gray-50 min-h-screen pb-32 font-sans text-black">
+    <div className="p-3 md:p-4 bg-gray-50 font-sans text-black">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <Toaster position="top-right" />
         <div className="flex items-center gap-3">
@@ -200,7 +201,7 @@ export default function PurchaseDetail() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Detail Pembelian</h1>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
+            <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Transaction ID: #{purchase.id}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -240,7 +241,7 @@ export default function PurchaseDetail() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-8 py-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
                 <Package size={14} /> Itemized List
               </h3>
               <span className="text-xs font-black uppercase px-3 py-1 bg-blue-50 text-blue-600 rounded-lg">
@@ -253,10 +254,10 @@ export default function PurchaseDetail() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-2">{item.name}</p>
-                      <p className="text-xs font-bold text-gray-400 mt-1">Product ID: {item.id.slice(0, 8)}</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">Product ID: {item.id.slice(0, 8)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Subtotal</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Subtotal</p>
                       <p className="text-sm font-black text-gray-900">
                         Rp {(item.quantity * item.purchasePrice).toLocaleString()}
                       </p>
@@ -265,11 +266,11 @@ export default function PurchaseDetail() {
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Qty</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Qty</p>
                       <p className="text-sm font-black text-gray-900">{item.quantity} {item.unit}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-2xl">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Unit Price</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Unit Price</p>
                       <p className="text-sm font-black text-gray-900">Rp {item.purchasePrice.toLocaleString()}</p>
                     </div>
                   </div>
@@ -281,10 +282,10 @@ export default function PurchaseDetail() {
               <table className="w-full text-left min-w-[680px] md:min-w-0">
                 <thead>
                   <tr className="border-b border-gray-50">
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Product Name</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-center">Qty</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-400 uppercase">Unit Price</th>
-                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-400 uppercase text-right">Subtotal</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-500 uppercase">Product Name</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-center">Qty</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4 text-xs font-black text-gray-500 uppercase">Unit Price</th>
+                    <th className="px-3 md:px-8 py-3 md:py-4 text-xs font-black text-gray-500 uppercase text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -292,7 +293,7 @@ export default function PurchaseDetail() {
                     <tr key={idx} className="hover:bg-gray-50/50 transition-all">
                       <td className="px-3 md:px-8 py-3 md:py-5">
                         <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{item.name}</span>
-                        <p className="text-xs text-gray-400 font-bold uppercase mt-0.5">Product ID: {item.id.slice(0, 8)}</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase mt-0.5">Product ID: {item.id.slice(0, 8)}</p>
                       </td>
                       <td className="px-3 md:px-6 py-3 md:py-5 text-center">
                         <span className="text-xs font-black text-gray-700 bg-gray-100 px-3 py-1 rounded-lg">
@@ -333,7 +334,7 @@ export default function PurchaseDetail() {
             <div className="bg-white p-8 rounded-[2rem] border border-gray-100 flex gap-4 items-start">
               <AlertCircle size={20} className="text-gray-300" />
               <div>
-                <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Order Notes</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Order Notes</h4>
                 <p className="text-xs text-gray-600 leading-relaxed font-medium">{purchase.notes}</p>
               </div>
             </div>
@@ -345,7 +346,7 @@ export default function PurchaseDetail() {
 
           {/* Status Card */}
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-2">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-6 flex items-center gap-2">
               <History size={14} /> Transaction Status
             </h3>
 
@@ -355,7 +356,7 @@ export default function PurchaseDetail() {
                   {purchase.status === 'DITERIMA' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                 </div>
                 <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Order Status</p>
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Order Status</p>
                   <p className="text-sm font-black text-gray-800 uppercase">{purchase.status}</p>
                 </div>
               </div>
@@ -365,7 +366,7 @@ export default function PurchaseDetail() {
                   <CreditCard size={24} />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Payment ({purchase.paymentMethod})</p>
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Payment ({purchase.paymentMethod})</p>
                   <p className="text-sm font-black text-gray-800 uppercase">{purchase.paymentStatus}</p>
                 </div>
               </div>
@@ -381,7 +382,7 @@ export default function PurchaseDetail() {
                   <Store size={14} /> Supplier & Delivery
                 </h3>
                 <p className="text-lg font-black uppercase leading-tight">{purchase.supplierName}</p>
-                <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest italic">{dateFormatted}</p>
+                <p className="text-xs font-bold text-gray-500 mt-1 uppercase tracking-widest italic">{dateFormatted}</p>
               </div>
 
               <div className="pt-6 border-t border-white/10">
@@ -408,7 +409,7 @@ export default function PurchaseDetail() {
 
           {/* Log Info */}
           <div className="px-8 py-2">
-            <p className="text-xs font-bold text-gray-400 uppercase text-center tracking-[0.3em]">
+            <p className="text-xs font-bold text-gray-500 uppercase text-center tracking-[0.3em]">
               Verified by System on {dateFormatted}
             </p>
           </div>
@@ -433,7 +434,7 @@ export default function PurchaseDetail() {
               {/* Header Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Tanggal Transaksi</label>
+                  <label className="text-xs font-black uppercase text-gray-500 mb-2 block tracking-widest">Tanggal Transaksi</label>
                   <input 
                     type="datetime-local" 
                     value={editDate}
@@ -442,7 +443,7 @@ export default function PurchaseDetail() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Metode Pembayaran</label>
+                  <label className="text-xs font-black uppercase text-gray-500 mb-2 block tracking-widest">Metode Pembayaran</label>
                   <select 
                     value={editForm.paymentMethod}
                     onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}
@@ -458,7 +459,7 @@ export default function PurchaseDetail() {
               {/* Items List */}
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <label className="text-xs font-black uppercase text-gray-400 block tracking-widest">Item Produk ({editForm.items.length})</label>
+                  <label className="text-xs font-black uppercase text-gray-500 block tracking-widest">Item Produk ({editForm.items.length})</label>
                 </div>
                 
                 <div className="space-y-3">
@@ -466,12 +467,12 @@ export default function PurchaseDetail() {
                     <div key={idx} className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 hover:border-blue-200 transition-colors group">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black uppercase truncate text-gray-800">{item.name}</p>
-                        <p className="text-xs text-gray-400 font-bold uppercase mt-1 bg-white inline-block px-2 py-0.5 rounded">{item.unit}</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase mt-1 bg-white inline-block px-2 py-0.5 rounded">{item.unit}</p>
                       </div>
                       
                       <div className="flex items-center gap-3 w-full md:w-auto">
                         <div className="w-24">
-                          <label className="text-xs font-bold uppercase text-gray-400 block mb-1">Qty</label>
+                          <label className="text-xs font-bold uppercase text-gray-500 block mb-1">Qty</label>
                           <input 
                             type="number" 
                             value={item.quantity}
@@ -480,9 +481,9 @@ export default function PurchaseDetail() {
                           />
                         </div>
                         <div className="w-36">
-                          <label className="text-xs font-bold uppercase text-gray-400 block mb-1">Harga Beli</label>
+                          <label className="text-xs font-bold uppercase text-gray-500 block mb-1">Harga Beli</label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">Rp</span>
                             <input 
                               type="number" 
                               value={item.purchasePrice}
@@ -506,7 +507,7 @@ export default function PurchaseDetail() {
                   
                   {editForm.items.length === 0 && (
                     <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                      <p className="text-xs font-bold text-gray-400 uppercase">Tidak ada item</p>
+                      <p className="text-xs font-bold text-gray-500 uppercase">Tidak ada item</p>
                     </div>
                   )}
                 </div>

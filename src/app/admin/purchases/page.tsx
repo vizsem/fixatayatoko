@@ -267,7 +267,9 @@ export default function AdminPurchases() {
   return (
     <>
       <Toaster />
-      <div className="min-h-screen bg-gray-50 p-3 md:p-5">
+      {/* Tanpa `min-h-screen`: layout admin sudah menyediakannya, dan menambahkannya
+          lagi membuat halaman selalu lebih tinggi dari layar (ruang kosong ekstra). */}
+      <div className="bg-gray-50 p-3 md:p-5">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
@@ -287,7 +289,7 @@ export default function AdminPurchases() {
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -337,11 +339,11 @@ export default function AdminPurchases() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-sm">{po.supplier.name}</p>
-                    <p className="text-xs text-gray-400">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
+                    <p className="text-xs text-gray-500">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <div>
-                      <p className="text-xs uppercase font-bold text-gray-400">Total Nilai</p>
+                      <p className="text-xs uppercase font-bold text-gray-500">Total Nilai</p>
                       <p className="font-black text-sm text-gray-900">Rp{po.totalAmount.toLocaleString('id-ID')}</p>
                     </div>
                     <div className="flex gap-1.5">
@@ -381,7 +383,7 @@ export default function AdminPurchases() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800">{po.supplier.name}</p>
-                        <p className="text-xs text-gray-400">{po.items.length} item</p>
+                        <p className="text-xs text-gray-500">{po.items.length} item</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${STATUS_COLOR[po.status]}`}>
@@ -726,17 +728,17 @@ export default function AdminPurchases() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-bold uppercase">Supplier</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">Supplier</p>
                 <p className="font-bold text-gray-800 text-xs truncate">{detailModal.supplier.name}</p>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-bold uppercase">Status PO</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">Status PO</p>
                 <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${STATUS_COLOR[detailModal.status]}`}>
                   {STATUS_LABEL[detailModal.status] || detailModal.status}
                 </span>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-bold uppercase">Pembayaran</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">Pembayaran</p>
                 <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                   detailModal.paymentStatus === 'HUTANG' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                 }`}>
@@ -744,7 +746,7 @@ export default function AdminPurchases() {
                 </span>
               </div>
               <div className="bg-gray-50 rounded-xl p-3">
-                <p className="text-xs text-gray-400 font-bold uppercase">Metode</p>
+                <p className="text-xs text-gray-500 font-bold uppercase">Metode</p>
                 <p className="font-bold text-gray-800 text-xs uppercase">{detailModal.paymentMethod || 'CASH'}</p>
               </div>
             </div>
