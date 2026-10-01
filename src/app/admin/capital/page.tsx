@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Landmark, Plus, CreditCard, Wallet, RefreshCcw, Save, X, SlidersHorizontal } from 'lucide-react';
+import Link from 'next/link';
+import { Landmark, Plus, CreditCard, Wallet, RefreshCcw, Save, X, SlidersHorizontal, Scale } from 'lucide-react';
 import notify from '@/lib/notify';
 import { CapitalTransaction, LoanRecord } from '@/types/finance';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
@@ -328,6 +329,14 @@ export default function CapitalPage() {
             <CreditCard className="w-3.5 h-3.5" />
             Tambah Pinjaman
           </button>
+          <Link
+            href="/admin/capital/rekonsiliasi"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs text-xs font-bold transition active:scale-95"
+            title="Periksa PO yang uangnya belum tercatat di buku besar modal"
+          >
+            <Scale className="w-3.5 h-3.5" />
+            Rekonsiliasi PO
+          </Link>
         </div>
       </div>
 

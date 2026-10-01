@@ -4,7 +4,7 @@ import { requireAdmin, requireStaff } from '@/lib/actions/session';
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
-import { hitungSaldoModal } from '@/lib/capital-ledger'
+import { hitungSaldoModal, ambilSemuaBarisModal } from '@/lib/capital-ledger'
 import { mergeRowWithRawData } from '@/lib/db-schema'
 
 function parseDate(val: any): Date {
@@ -20,31 +20,10 @@ function parseDate(val: any): Date {
 }
 
 /**
- * Ambil SELURUH baris `capital_transactions` dengan paging eksplisit.
- *
- * Batas bawaan PostgREST (`db-max-rows`) adalah 1000 baris, jadi `select()`
- * TANPA `limit()` pun dipotong di angka itu tanpa error apa pun. Paging di sini
- * membuat perhitungan saldo tidak pernah diam-diam terpotong saat transaksi
- * bertambah banyak.
+ * Paging tabel modal ada di `@/lib/capital-ledger` (`ambilSemuaBarisModal`)
+ * supaya halaman Modal dan halaman rekonsiliasi memakai pembacaan yang sama —
+ * batas bawaan PostgREST (1000 baris) memotong `select()` TANPA error apa pun.
  */
-async function fetchAllCapitalRows(): Promise<Record<string, any>[]> {
-  const PAGE = 1000;
-  const rows: Record<string, any>[] = [];
-
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabaseAdmin
-      .from('capital_transactions')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .range(from, from + PAGE - 1);
-
-    if (error) throw new Error(error.message);
-    rows.push(...(data || []));
-    if (!data || data.length < PAGE) break;
-  }
-
-  return rows;
-}
 
 /**
  * Perhitungan saldo modal ada di `@/lib/capital-ledger`
@@ -67,7 +46,7 @@ async function fetchAllCapitalRows(): Promise<Record<string, any>[]> {
 export async function getCapitalBalance() {
   await requireStaff();
   try {
-    const rows = await fetchAllCapitalRows();
+    const rows = await ambilSemuaBarisModal();
     return { success: true as const, data: hitungSaldoModal(rows) };
   } catch (error: any) {
     return { success: false as const, error: error?.message || 'Gagal memuat saldo modal' };
@@ -80,14 +59,14 @@ export async function getCapitalData() {
     const [txRows, loanRes, mpAccRes, mpTxRes, prodRes] = await Promise.all([
       // Seluruh baris, bukan `.limit(100)`. Daftar yang terpotong membuat angka
       // "Modal Total Saat Ini" ikut salah; ringkasannya dihitung dari `txRows`.
-      fetchAllCapitalRows(),
+      ambilSemuaBarisModal(),
       supabaseAdmin.from('loans').select('*').order('created_at', { ascending: false }),
       supabaseAdmin.from('marketplace_accounts').select('*').order('created_at', { ascending: true }),
       supabaseAdmin.from('marketplace_transactions').select('*').order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('products').select('stock, cost_price, is_active, raw_data'),
     ]);
 
-    // `fetchAllCapitalRows` mengembalikan urutan ASC agar paging (`range`)
+    // `ambilSemuaBarisModal` mengembalikan urutan ASC agar paging (`range`)
     // stabil. Daftar yang DITAMPILKAN tetap terbaru-dulu seperti sebelumnya
     // (dulu `.order('created_at', { ascending: false }).limit(100)`), supaya
     // pengguna tidak melihat log mutasi terbalik. Ringkasan saldo tidak
@@ -405,7 +384,7 @@ export async function adjustTotalCapital(data: {
   try {
     // Saldo memakai perhitungan yang sama dengan halaman Modal dan halaman PO,
     // supaya nilai target yang dimasukkan benar-benar cocok dengan yang tampil.
-    const currentCapital = hitungSaldoModal(await fetchAllCapitalRows()).balance;
+    const currentCapital = hitungSaldoModal(await ambilSemuaBarisModal()).balance;
 
     const target = Number(data.targetCapital || 0);
     const diff = target - currentCapital;

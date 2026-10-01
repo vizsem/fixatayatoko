@@ -28,37 +28,29 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { mergeRowWithRawData } from '@/lib/db-schema';
+import {
+  bacaJenisMutasi,
+  bacaNominalMutasi,
+  bandingkanPO,
+  pembayaranKeluarUang,
+  petakanMutasiMentah,
+  petakanPOUntukRekonsiliasi,
+  posisiTercatat,
+  ringkasMutasiPerPO,
+  ringkasRekonsiliasi,
+  type BarisRekonsiliasi,
+  type CapitalEntryType,
+  type MutasiTercatat,
+} from '@/lib/capital-reconcile';
 
-export type CapitalEntryType = 'INJECTION' | 'WITHDRAWAL';
+// Aturan "PO mana yang mengeluarkan uang" dan pembacaan jenis/nominal mutasi
+// hidup di `@/lib/capital-reconcile` (modul murni tanpa impor) supaya Server
+// Action, skrip terminal, dan unit test memakai definisi yang sama.
+// Di-reekspor agar pemanggil lama tetap bekerja.
+export { pembayaranKeluarUang, type CapitalEntryType };
 
-/**
- * Metode pembayaran yang benar-benar mengeluarkan uang saat PO dibuat.
- *
- * Nilai ini sengaja PERSIS SAMA dengan pilihan di formulir PO
- * (`CASH`/`TRANSFER`/`HUTANG`) dan dengan perilaku lama di peramban, supaya
- * tidak ada perubahan arti akuntansi secara diam-diam. Pembayaran `HUTANG`
- * (tempo) tidak menyentuh modal sampai nanti dilunasi.
- */
-const METODE_KELUAR_UANG = new Set(['CASH', 'TRANSFER']);
-
-/** Apakah PO ini mengeluarkan uang tunai/transfer saat dibuat? */
-export function pembayaranKeluarUang(
-  paymentStatus?: string | null,
-  paymentMethod?: string | null
-): boolean {
-  const status = String(paymentStatus ?? '').trim().toUpperCase();
-  const metode = String(paymentMethod ?? '').trim().toUpperCase();
-  return status === 'LUNAS' && METODE_KELUAR_UANG.has(metode);
-}
-
-export type RingkasanMutasi = {
-  /** Total uang yang masuk kembali / ditambahkan ke modal. */
-  injection: number;
-  /** Total uang yang keluar dari modal. */
-  withdrawal: number;
-  /** Jumlah baris yang diperiksa. */
-  count: number;
-};
+/** Bentuk ringkasan mutasi (alias agar API lama tetap jalan). */
+export type RingkasanMutasi = MutasiTercatat;
 
 /**
  * Hitung mutasi modal yang SUDAH tercatat.
@@ -72,12 +64,11 @@ export function ringkasMutasi(rows: Record<string, any>[]): RingkasanMutasi {
 
   for (const row of rows || []) {
     const data = mergeRowWithRawData(row, 'capital_transactions');
-    const type = String(data.type ?? '').toUpperCase();
-    const amount = Number(data.amount ?? 0);
+    const jenis = bacaJenisMutasi(data.type);
+    const nominal = bacaNominalMutasi(data.amount);
 
-    if (!Number.isFinite(amount) || amount <= 0) continue;
-    if (type === 'INJECTION') injection += amount;
-    else if (type === 'WITHDRAWAL') withdrawal += amount;
+    if (jenis === 'INJECTION') injection += nominal;
+    else if (jenis === 'WITHDRAWAL') withdrawal += nominal;
   }
 
   return { injection, withdrawal, count: (rows || []).length };
@@ -124,8 +115,7 @@ export function hitungPenyesuaian(
   tercatat: RingkasanMutasi
 ): { type: CapitalEntryType; amount: number } | null {
   const target = Math.round(Number(diharapkan) || 0);
-  const uangKeluarTercatat = Math.round(tercatat.withdrawal - tercatat.injection);
-  const selisih = target - uangKeluarTercatat;
+  const selisih = target - Math.round(posisiTercatat(tercatat));
 
   if (selisih === 0) return null;
   return selisih > 0
@@ -269,4 +259,64 @@ export async function catatMutasiModalPO(params: {
     `PO tersimpan, tetapi pencatatan mutasi modal gagal (${hasil.error}). ` +
     'Periksa halaman Modal dan sesuaikan bila perlu.'
   );
+}
+
+/**
+ * Ambil SELURUH baris sebuah tabel dengan paging eksplisit.
+ *
+ * Batas bawaan PostgREST (`db-max-rows`, 1000 baris) memotong `select()` tanpa
+ * error apa pun. Paging di sini memastikan perhitungan keuangan tidak pernah
+ * diam-diam terpotong saat data bertambah.
+ */
+async function ambilSemuaBaris(table: string): Promise<Record<string, any>[]> {
+  const PAGE = 1000;
+  const rows: Record<string, any>[] = [];
+
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .select('*')
+      .order('created_at', { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) throw new Error(`${table}: ${error.message}`);
+    const batch = (data || []) as Record<string, any>[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+
+  return rows;
+}
+
+/** Seluruh baris `capital_transactions` (sumber saldo modal). */
+export function ambilSemuaBarisModal(): Promise<Record<string, any>[]> {
+  return ambilSemuaBaris('capital_transactions');
+}
+
+/** Seluruh Purchase Order. */
+export function ambilSemuaPurchaseOrder(): Promise<Record<string, any>[]> {
+  return ambilSemuaBaris('purchases');
+}
+
+/**
+ * Hitung selisih antara Purchase Order dan buku besar modal.
+ *
+ * Dipakai halaman `/admin/capital/rekonsiliasi` (lihat
+ * `src/lib/actions/capital-reconcile.actions.ts`). Hanya MEMBACA.
+ */
+export async function hitungRekonsiliasiModal(): Promise<{
+  baris: BarisRekonsiliasi[];
+  ringkasan: ReturnType<typeof ringkasRekonsiliasi>;
+}> {
+  const [purchaseRows, modalRows] = await Promise.all([
+    ambilSemuaPurchaseOrder(),
+    ambilSemuaBarisModal(),
+  ]);
+
+  const baris = bandingkanPO(
+    purchaseRows.map(petakanPOUntukRekonsiliasi),
+    ringkasMutasiPerPO(petakanMutasiMentah(modalRows))
+  );
+
+  return { baris, ringkasan: ringkasRekonsiliasi(baris) };
 }
