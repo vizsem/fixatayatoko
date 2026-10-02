@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 
 import { sbUpdateDoc } from '@/lib/supabase-helpers';
 import { db, doc, limit, ref, writeBatch } from '@/lib/firebase';
+import { applyBulkPriceAdjustment, type BulkPricingMode } from '@/lib/channel-pricing-bulk';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
 type ChannelPricingState = {
@@ -60,6 +61,235 @@ export default function ChannelPricingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(200);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState<BulkPricingMode>('set-nominal');
+  const [bulkValue, setBulkValue] = useState<number>(0);
+  const [bulkMinPrice, setBulkMinPrice] = useState<number>(0);
+  const [bulkChannels, setBulkChannels] = useState<ChannelKey[]>(['offline', 'website', 'shopee', 'tiktok']);
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
+
+  const filteredProducts = useMemo(() => {
+    const products = liveProducts as Product[];
+    if (!search) return products;
+    const lower = search.toLowerCase();
+    return products.filter(p => {
+      return (p.name || '').toLowerCase().includes(lower);
+    });
+  }, [liveProducts, search]);
+
+  const bulkTargetProducts = useMemo(() => {
+    if (!selectedProductIds.length) return filteredProducts;
+    const selectedSet = new Set(selectedProductIds);
+    return filteredProducts.filter((product) => selectedSet.has(product.id));
+  }, [filteredProducts, selectedProductIds]);
+
+  const bulkPreview = useMemo(() => {
+    return bulkTargetProducts.slice(0, 5).flatMap((product) => {
+      const unitCode = selectedUnit[product.id] || (product.unit || 'PCS').toString().toUpperCase();
+      const unitState = prices[product.id]?.[unitCode] || {};
+
+      return bulkChannels.map((channel) => {
+        const before = Number(unitState[channel] ?? 0);
+        const after = applyBulkPriceAdjustment(before, bulkMode, bulkValue, bulkMinPrice);
+
+        return {
+          productId: product.id,
+          productName: product.name || 'Produk',
+          channel,
+          unit: unitCode,
+          before,
+          after,
+        };
+      });
+    });
+  }, [bulkChannels, bulkMinPrice, bulkMode, bulkTargetProducts, bulkValue, prices, selectedUnit]);
+
+  const bulkSummary = useMemo(() => {
+    const modifiedProducts = bulkTargetProducts.length;
+    const totalChanges = bulkPreview.filter(item => item.before !== item.after).length;
+    const firstChange = bulkPreview[0];
+    const totalDelta = bulkPreview.reduce((sum, item) => sum + (item.after - item.before), 0);
+    const avgDelta = totalChanges > 0 ? totalDelta / totalChanges : 0;
+
+    return {
+      modifiedProducts,
+      totalChanges,
+      firstChange,
+      totalDelta,
+      avgDelta,
+    };
+  }, [bulkPreview, bulkTargetProducts]);
+
+  const handleExportBulkPreview = () => {
+    if (!bulkPreview.length) {
+      notify.admin.error('Belum ada preview perubahan untuk di-export.');
+      return;
+    }
+
+    const data = bulkPreview.map((row) => ({
+      'Product ID': row.productId,
+      'Product Name': row.productName,
+      'Unit': row.unit,
+      'Channel': row.channel,
+      'Harga Saat Ini': row.before,
+      'Harga Setelah Update': row.after,
+      'Selisih': row.after - row.before,
+      'Mode': bulkMode,
+      'Nilai': bulkValue,
+      'Minimum Aman': bulkMinPrice,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Bulk Pricing Preview');
+    XLSX.writeFile(wb, 'bulk-pricing-preview.xlsx');
+    notify.admin.success('Preview update massal berhasil di-export.', { id: 'bulk-preview-export' });
+  };
+
+  const toggleProductSelect = (productId: string) => {
+    setSelectedProductIds((prev) => {
+      if (prev.includes(productId)) {
+        return prev.filter((id) => id !== productId);
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedProductIds(filteredProducts.map((product) => product.id));
+  };
+
+  const clearSelectedProducts = () => {
+    setSelectedProductIds([]);
+  };
+
+  const toggleChannel = (channel: ChannelKey) => {
+    setBulkChannels((prev) =>
+      prev.includes(channel)
+        ? prev.filter((value) => value !== channel)
+        : [...prev, channel],
+    );
+  };
+
+  const openBulkConfirmModal = () => {
+    const targetProducts = bulkTargetProducts;
+
+    if (!targetProducts.length) {
+      notify.admin.error('Pilih minimal satu produk untuk update massal.');
+      return;
+    }
+
+    if (!bulkChannels.length) {
+      notify.admin.error('Pilih minimal satu channel untuk update massal.');
+      return;
+    }
+
+    if (!Number.isFinite(bulkValue)) {
+      notify.admin.error('Nilai update tidak valid.');
+      return;
+    }
+
+    setShowBulkConfirmModal(true);
+  };
+
+  const handleBulkApply = async () => {
+    const targetProducts = bulkTargetProducts;
+
+    if (!targetProducts.length) {
+      notify.admin.error('Pilih minimal satu produk untuk update massal.');
+      return;
+    }
+
+    if (!bulkChannels.length) {
+      notify.admin.error('Pilih minimal satu channel untuk update massal.');
+      return;
+    }
+
+    if (!Number.isFinite(bulkValue)) {
+      notify.admin.error('Nilai update tidak valid.');
+      return;
+    }
+
+    setBulkApplying(true);
+    setShowBulkConfirmModal(false);
+    const toastId = notify.admin.loading('Menerapkan update harga massal...');
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      const nowIso = new Date().toISOString();
+      const batch = writeBatch(db);
+
+      targetProducts.forEach((product) => {
+        const unitCode = selectedUnit[product.id] || (product.unit || 'PCS').toString().toUpperCase();
+        const existingPricing = (product.channelPricing || {}) as Record<string, Record<string, { price?: number }>>;
+        const nextPricing = { ...existingPricing } as Record<string, Record<string, { price?: number }>>;
+
+        bulkChannels.forEach((channel) => {
+          const currentPrice = Number((prices[product.id]?.[unitCode] || {})[channel] ?? existingPricing[channel]?.[unitCode]?.price ?? 0);
+          const computedPrice = applyBulkPriceAdjustment(currentPrice, bulkMode, bulkValue, bulkMinPrice);
+
+          if (!nextPricing[channel]) nextPricing[channel] = {};
+          nextPricing[channel][unitCode] = { price: computedPrice };
+
+          setPrices((prev) => ({
+            ...prev,
+            [product.id]: {
+              ...(prev[product.id] || {}),
+              [unitCode]: {
+                ...((prev[product.id]?.[unitCode] || {}) as ChannelPricingState),
+                [channel]: computedPrice,
+              },
+            },
+          }));
+        });
+
+        batch.update(doc(db, 'products', product.id), {
+          channelPricing: nextPricing,
+          updatedAt: nowIso,
+        });
+      });
+
+      await batch.commit();
+
+      try {
+        await supabase.from('audit_logs').insert({
+          action: 'bulk_channel_price_update',
+          targetType: 'products',
+          targetId: targetProducts.map((product) => product.id).join(','),
+          payload: {
+            productCount: targetProducts.length,
+            channels: bulkChannels,
+            mode: bulkMode,
+            value: bulkValue,
+            minimumPrice: bulkMinPrice,
+            summary: bulkPreview.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              channel: item.channel,
+              before: item.before,
+              after: item.after,
+            })),
+          },
+          actorId: currentUser?.id || 'system',
+          actorName: currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Admin',
+          actorRole: currentUser?.user_metadata?.role || 'admin',
+          createdAt: nowIso,
+        });
+      } catch (auditError) {
+        console.warn('Bulk pricing audit log failed:', auditError);
+      }
+
+      notify.admin.success(`Update harga massal berhasil untuk ${targetProducts.length} produk.`, { id: toastId });
+      setSelectedProductIds([]);
+    } catch (error) {
+      console.error(error);
+      notify.admin.error('Update harga massal gagal. Silakan coba lagi.', { id: toastId });
+    } finally {
+      setBulkApplying(false);
+    }
+  };
 
   useEffect(() => {
     if (!liveProducts.length) return;
@@ -113,15 +343,6 @@ export default function ChannelPricingPage() {
       return next;
     });
   }, [liveProducts]);
-
-  const filteredProducts = useMemo(() => {
-    const products = liveProducts as Product[];
-    if (!search) return products;
-    const lower = search.toLowerCase();
-    return products.filter(p => {
-      return (p.name || '').toLowerCase().includes(lower);
-    });
-  }, [liveProducts, search]);
 
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -269,6 +490,95 @@ export default function ChannelPricingPage() {
     <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans">
       <Toaster />
 
+      {showBulkConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_30px_80px_-24px_rgba(15,23,42,0.45)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-600">Konfirmasi perubahan massal</p>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">Review update harga</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkConfirmModal(false)}
+                className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-slate-300 hover:text-slate-700"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+              <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
+                <div>
+                  <p className="text-slate-500 uppercase tracking-[0.18em]">Produk</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{bulkTargetProducts.length}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 uppercase tracking-[0.18em]">Channel</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{bulkChannels.length}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 uppercase tracking-[0.18em]">Mode</p>
+                  <p className="mt-1 text-sm font-black uppercase text-slate-900">{bulkMode}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 uppercase tracking-[0.18em]">Nilai</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">
+                    {bulkMode.includes('percent') ? `${bulkValue}%` : `Rp${Math.round(bulkValue).toLocaleString()}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 max-h-72 overflow-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em]">Produk</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em]">Channel</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em] text-right">Sebelum</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em] text-right">Sesudah</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {bulkPreview.length ? bulkPreview.slice(0, 8).map((row) => (
+                    <tr key={`${row.productId}-${row.channel}-${row.unit}`}>
+                      <td className="px-3 py-3 font-bold text-slate-700">{row.productName}</td>
+                      <td className="px-3 py-3 font-bold uppercase text-slate-700">{row.channel}</td>
+                      <td className="px-3 py-3 text-right font-bold text-slate-600">Rp{Math.round(row.before).toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right font-black text-slate-900">Rp{Math.round(row.after).toLocaleString()}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-8 text-center font-bold text-slate-400">
+                        Tidak ada preview yang tersedia.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBulkConfirmModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-slate-600"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkApply}
+                className="rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-indigo-200"
+              >
+                Ya, lanjutkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
         <div className="flex items-center gap-4">
           <Link
@@ -306,7 +616,7 @@ export default function ChannelPricingPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)] overflow-hidden">
         <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -349,6 +659,186 @@ export default function ChannelPricingPage() {
                 className="w-16 pl-2 pr-6 py-1 rounded-lg text-xs font-bold border border-blue-200 outline-none focus:ring-2 focus:ring-blue-400"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-slate-50 via-white to-indigo-50">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-gray-500">Update Massal</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {bulkTargetProducts.length} produk siap diubah • {bulkChannels.length} channel aktif
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:border-gray-300"
+              >
+                Pilih semua tampilan
+              </button>
+              <button
+                type="button"
+                onClick={clearSelectedProducts}
+                className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:border-gray-300"
+              >
+                Bersihkan
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Mode</span>
+              <select
+                value={bulkMode}
+                onChange={(event) => setBulkMode(event.target.value as BulkPricingMode)}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold text-gray-700 outline-none"
+              >
+                <option value="set-nominal">Set nominal</option>
+                <option value="add-nominal">Tambah nominal</option>
+                <option value="subtract-nominal">Kurangi nominal</option>
+                <option value="set-percent">Set persen</option>
+                <option value="add-percent">Tambah persen</option>
+                <option value="subtract-percent">Kurangi persen</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                {bulkMode.includes('percent') ? 'Nilai %' : 'Nilai Rp'}
+              </span>
+              <input
+                type="number"
+                value={bulkValue}
+                onChange={(event) => setBulkValue(Number(event.target.value))}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold text-gray-700 outline-none"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Minimum aman</span>
+              <input
+                type="number"
+                value={bulkMinPrice}
+                min={0}
+                onChange={(event) => setBulkMinPrice(Number(event.target.value))}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold text-gray-700 outline-none"
+              />
+            </label>
+
+            <div className="md:col-span-2 xl:col-span-2 flex flex-col gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Channel</span>
+              <div className="flex flex-wrap gap-2">
+                {(['offline', 'website', 'shopee', 'tiktok'] as ChannelKey[]).map((channel) => (
+                  <button
+                    key={channel}
+                    type="button"
+                    onClick={() => toggleChannel(channel)}
+                    className={`rounded-lg border px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] ${
+                      bulkChannels.includes(channel)
+                        ? 'border-blue-500 bg-blue-600 text-white'
+                        : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    {channel}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="text-xs text-gray-600">
+              Preview: {bulkSummary.totalChanges} perubahan dari {bulkSummary.modifiedProducts} produk
+              {bulkSummary.firstChange ? ` • contoh: ${bulkSummary.firstChange.productName} → ${bulkSummary.firstChange.channel}` : ''}
+            </div>
+            <button
+              type="button"
+              onClick={openBulkConfirmModal}
+              disabled={bulkApplying || !bulkTargetProducts.length}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-black text-white text-xs font-black uppercase tracking-[0.18em] shadow-lg shadow-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkApplying ? 'Memproses...' : 'Terapkan update massal'}
+            </button>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 bg-gradient-to-r from-indigo-50 via-white to-sky-50 border-b border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Produk target</p>
+              <p className="mt-2 text-2xl font-black text-gray-900">{bulkSummary.modifiedProducts}</p>
+            </div>
+            <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Perubahan</p>
+              <p className="mt-2 text-2xl font-black text-gray-900">{bulkSummary.totalChanges}</p>
+            </div>
+            <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Delta rata-rata</p>
+              <p className={`mt-2 text-xl font-black ${bulkSummary.avgDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {bulkSummary.avgDelta >= 0 ? '+' : '-'}Rp{Math.abs(Math.round(bulkSummary.avgDelta)).toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Total delta</p>
+              <p className={`mt-2 text-xl font-black ${bulkSummary.totalDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {bulkSummary.totalDelta >= 0 ? '+' : '-'}Rp{Math.abs(Math.round(bulkSummary.totalDelta)).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="text-xs text-gray-600">
+              Snapshot siap di-export sebelum proses penyimpanan.
+            </div>
+            <button
+              type="button"
+              onClick={handleExportBulkPreview}
+              disabled={!bulkPreview.length}
+              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={16} />
+              Export Preview
+            </button>
+          </div>
+
+          <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="max-h-72 overflow-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em]">Produk</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em]">Channel</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em]">Unit</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em] text-right">Sebelum</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em] text-right">Sesudah</th>
+                    <th className="px-3 py-3 font-black uppercase tracking-[0.15em] text-right">Selisih</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bulkPreview.length ? bulkPreview.map((row) => (
+                    <tr key={`${row.productId}-${row.channel}-${row.unit}`}>
+                      <td className="px-3 py-3 font-bold text-gray-700">{row.productName}</td>
+                      <td className="px-3 py-3 font-bold text-gray-700 uppercase">{row.channel}</td>
+                      <td className="px-3 py-3 font-bold text-gray-700">{row.unit}</td>
+                      <td className="px-3 py-3 text-right font-bold text-gray-600">Rp{Math.round(row.before).toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right font-black text-gray-900">Rp{Math.round(row.after).toLocaleString()}</td>
+                      <td className={`px-3 py-3 text-right font-black ${row.after - row.before >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {row.after - row.before >= 0 ? '+' : '-'}Rp{Math.abs(Math.round(row.after - row.before)).toLocaleString()}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-gray-400 font-bold">
+                        Belum ada data preview. Pilih produk untuk melihat impact update.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -412,12 +902,20 @@ export default function ChannelPricingPage() {
 
                   return (
                       <div key={p.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
-                          <div className="flex justify-between items-start">
-                              <div>
-                                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
-                                  <div className="flex flex-col gap-0.5 mt-1">
-                                    <p className="text-xs font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
-                                    <p className="text-xs font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
+                          <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3">
+                                  <input
+                                      type="checkbox"
+                                      checked={selectedProductIds.includes(p.id)}
+                                      onChange={() => toggleProductSelect(p.id)}
+                                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <div>
+                                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
+                                      <div className="flex flex-col gap-0.5 mt-1">
+                                        <p className="text-xs font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
+                                        <p className="text-xs font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
+                                      </div>
                                   </div>
                               </div>
                               <select
@@ -502,6 +1000,20 @@ export default function ChannelPricingPage() {
               <table className="w-full text-left min-w-[720px] md:min-w-0">
               <thead className="bg-gray-50/60">
                 <tr>
+                  <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase">
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && filteredProducts.every((product) => selectedProductIds.includes(product.id))}
+                      onChange={() => {
+                        if (filteredProducts.every((product) => selectedProductIds.includes(product.id))) {
+                          setSelectedProductIds((prev) => prev.filter((id) => !filteredProducts.some((product) => product.id === id)));
+                          return;
+                        }
+                        selectAllVisible();
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase">Produk</th>
                   <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase text-right">
                     Offline
@@ -537,6 +1049,14 @@ export default function ChannelPricingPage() {
                   
                   return (
                     <tr key={p.id}>
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(p.id)}
+                          onChange={() => toggleProductSelect(p.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-black text-gray-800 uppercase">
