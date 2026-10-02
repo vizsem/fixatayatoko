@@ -3,10 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Box, Layers, Search, Warehouse, ChevronLeft, Calendar, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { supabase } from '@/lib/supabase';
-
-import { sbGetDocs } from '@/lib/supabase-helpers';
+import { getInventoryLayerReport } from '@/lib/actions/inventory-layers.actions';
 type ProductLayer = { qty: number; costPerPcs: number; ts?: any; purchaseId?: string; supplierName?: string; warehouseId?: string };
 type Product = {
   id: string;
@@ -21,6 +18,7 @@ export default function InventoryLayersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
   const itemsPerPage = 100;
@@ -36,19 +34,12 @@ export default function InventoryLayersPage() {
 
   useEffect(() => {
     (async () => {
-      const snap = await sbGetDocs({ table: 'products' });
-      const items = snap.docs.map(d => {
-        const data = d.data() as any;
-        return {
-          id: d.id,
-          name: String(data.name || data.Nama || 'Produk'),
-          unit: (data.unit || 'PCS')?.toString().toUpperCase(),
-          stock: Number(data.stock || data.Stok || 0),
-          inventoryLayers: Array.isArray(data.inventoryLayers) ? data.inventoryLayers as ProductLayer[] : [],
-          isActive: data.isActive !== false
-        };
-      });
-      setProducts(items);
+      const res = await getInventoryLayerReport();
+      if (res.ok) {
+        setProducts(res.products as Product[]);
+      } else {
+        setError(res.error);
+      }
       setLoading(false);
     })();
   }, []);
@@ -112,7 +103,8 @@ export default function InventoryLayersPage() {
     setWarehouseSummary(byWh);
   }, [filtered]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const XLSX = await import('xlsx');
     const now = new Date();
     const threshold = new Date(now.getTime());
     threshold.setMonth(threshold.getMonth() - 3);
@@ -149,7 +141,8 @@ export default function InventoryLayersPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'Layers');
     XLSX.writeFile(wb, `audit-layers-${new Date().toISOString().slice(0,10)}.xlsx`);
   };
-  const handleExportWarehouses = () => {
+  const handleExportWarehouses = async () => {
+    const XLSX = await import('xlsx');
     const rows = Object.entries(warehouseSummary).map(([wid, v]) => {
       const oldAvg = v.oldQty > 0 ? v.oldValue / v.oldQty : 0;
       const newAvg = v.newQty > 0 ? v.newValue / v.newQty : 0;
@@ -178,6 +171,11 @@ export default function InventoryLayersPage() {
   return (
     <div className="bg-gray-50 text-slate-900 p-3 md:p-4">
       <div className="max-w-6xl mx-auto">
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold">
+            {error}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Link href="/admin/inventory" className="p-2 bg-white rounded-xl border border-gray-100">

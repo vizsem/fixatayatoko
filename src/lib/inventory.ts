@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { pushLayer, consumeFifo, type InventoryLayer } from '@/lib/inventory-layers';
 
 export type InventorySource = 'PURCHASE' | 'ORDER' | 'CASHIER' | 'MANUAL' | 'MARKETPLACE' | 'OPNAME' | 'TRANSFER' | 'RECONCILIATION';
 
@@ -243,7 +244,31 @@ export async function deductStockFEFO(
     }
 
     const now = new Date().toISOString();
-    const updatedRaw = { ...raw, stock: newStock, stockByWarehouse, updatedAt: now };
+
+    // ── FIFO: konsumsi lapisan persediaan (batch tertua dulu) ──
+    const existingLayers: InventoryLayer[] = (Array.isArray(raw.inventoryLayers)
+      ? raw.inventoryLayers
+      : []
+    ).map((l: any) => ({
+      qty: Number(l.qty || 0),
+      costPerPcs: Number(l.costPerPcs || 0),
+      ts: l.ts,
+      purchaseId: l.purchaseId,
+      supplierName: l.supplierName,
+      warehouseId: l.warehouseId,
+    }));
+    const fifo = consumeFifo(existingLayers, amount);
+    const fallbackCost = Number(product.cost_price ?? raw.Modal ?? 0);
+    const cogs = Math.round(fifo.consumedCost + fifo.shortage * fallbackCost);
+    const inventoryLayers = fifo.remaining;
+
+    const updatedRaw = {
+      ...raw,
+      stock: newStock,
+      stockByWarehouse,
+      inventoryLayers,
+      updatedAt: now,
+    };
 
     const { error: updateErr } = await supabaseAdmin
       .from('products')
@@ -274,7 +299,7 @@ export async function deductStockFEFO(
       });
     }
 
-    return { success: true, deducted: amount, warehousesUsed };
+    return { success: true, deducted: amount, warehousesUsed, cogs };
   } catch (err: any) {
     console.error('deductStockFEFO error:', err);
     return { success: false, error: err.message || 'Gagal mengurangi stok' };
@@ -338,12 +363,37 @@ export const addStock = async (params: {
     }
 
     const now = new Date().toISOString();
+
+    // ── FIFO: catat batch masuk sebagai lapisan persediaan ──
+    const layerCostPerPcs =
+      incomingPrice !== undefined && incomingPrice >= 0 ? incomingPrice : newCostPrice;
+    const existingLayers: InventoryLayer[] = (Array.isArray(raw.inventoryLayers)
+      ? raw.inventoryLayers
+      : []
+    ).map((l: any) => ({
+      qty: Number(l.qty || 0),
+      costPerPcs: Number(l.costPerPcs || 0),
+      ts: l.ts,
+      purchaseId: l.purchaseId,
+      supplierName: l.supplierName,
+      warehouseId: l.warehouseId,
+    }));
+    const inventoryLayers = pushLayer(existingLayers, {
+      qty: amount,
+      costPerPcs: layerCostPerPcs,
+      ts: now,
+      purchaseId: reference,
+      supplierName: raw.supplierName || raw.supplier || undefined,
+      warehouseId,
+    });
+
     const updatedRaw = {
       ...raw,
       stock: newStock,
       stockByWarehouse,
       Modal: newCostPrice,
       units: updatedUnits,
+      inventoryLayers,
       updatedAt: now,
     };
 
@@ -373,6 +423,7 @@ export const addStock = async (params: {
       warehouseId,
       source: source || 'PURCHASE',
       batchNumber,
+      costPerPcs: layerCostPerPcs,
     });
 
     return { success: true, newStock };
