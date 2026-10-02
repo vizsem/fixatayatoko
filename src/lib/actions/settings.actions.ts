@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { ActionAuthError, requireAdmin, requireStaff } from '@/lib/actions/session';
+import { cekAksesAdmin, cekAksesStaf } from '@/lib/actions/access';
 import { describeDatabaseError, type ActionErrorCode } from '@/lib/actions/guard';
 import { toPlainRow, toPlainRows } from '@/lib/db-schema';
 import {
@@ -37,53 +37,10 @@ export type ActionResult<T = undefined> =
   | { ok: true; data: T }
   | { ok: false; error: string; code?: ActionErrorCode };
 
-/** Kegagalan verifikasi izin, sudah berbentuk hasil (bukan lemparan). */
-type IzinGagal = { ok: false; error: string; code: ActionErrorCode };
-
-/**
- * Periksa izin TANPA melempar.
- *
- * MENGAPA TIDAK MELEMPAR (pelajaran `/admin/settings`, 2026-10-02)
- * -----------------------------------------------------------------
- * Server Action yang melempar tidak mengirim pesannya ke peramban di produksi:
- * yang sampai hanya "An error occurred in the Server Components render..."
- * (React #441) tanpa penjelasan. Halaman lalu tampak rusak/"tidak bisa dibuka"
- * dan tidak ada cara bagi pengguna untuk tahu bahwa sesinya sudah kedaluwarsa.
- *
- * Sifat FAIL-CLOSED tetap: verifikasi dijalankan lebih dulu, dan bila gagal
- * fungsi ini mengembalikan kegagalan sehingga tidak ada satu baris pun dibaca
- * atau ditulis.
- */
-function kegagalanIzin(error: unknown): IzinGagal {
-  if (error instanceof ActionAuthError) {
-    return { ok: false, error: error.message, code: error.code };
-  }
-  return {
-    ok: false,
-    error: error instanceof Error ? error.message : 'Verifikasi izin gagal.',
-    code: 'INTERNAL',
-  };
-}
-
-/** `null` = diizinkan. Selain itu = kegagalan siap dikembalikan ke klien. */
-async function cekAksesStaf(): Promise<IzinGagal | null> {
-  try {
-    await requireStaff();
-    return null;
-  } catch (error) {
-    return kegagalanIzin(error);
-  }
-}
-
-/** `null` = diizinkan. Selain itu = kegagalan siap dikembalikan ke klien. */
-async function cekAksesAdmin(): Promise<IzinGagal | null> {
-  try {
-    await requireAdmin();
-    return null;
-  } catch (error) {
-    return kegagalanIzin(error);
-  }
-}
+// Verifikasi izin yang tidak melempar ada di `src/lib/actions/access.ts`
+// (`cekAksesStaf`/`cekAksesAdmin`). Lihat modul itu untuk alasan lengkapnya:
+// Server Action yang melempar tidak mengirim pesannya ke peramban di produksi
+// (hanya React #441), sehingga halaman tampak rusak tanpa penjelasan.
 
 /** Tabel yang boleh disentuh operasi harian halaman pengaturan. */
 const SETTINGS_TABLES = new Set([

@@ -30,6 +30,11 @@ export const TABLES_WITH_RAW_DATA = new Set([
   'warehouses', 'categories', 'cashier_shifts', 'inventory_logs', 'stock_logs',
   'chats', 'ledger_entries', 'capital_transactions', 'wallet_logs', 'notifications', 'settings',
   'operational_expenses',
+  // `returns` (retur penjualan/pembelian): di remote tabel ini HANYA punya
+  // `id`, `raw_data`, `created_at`, `updated_at` (diverifikasi 2026-10-02).
+  // Tanpa pendaftaran di sini, `buildWritePayload` tidak menulis `raw_data`
+  // sehingga seluruh isi retur hilang saat disimpan.
+  'returns',
   // Terverifikasi punya kolom raw_data di Supabase remote (2026-10-01):
   'inventory_transactions',
   // Dibuat oleh migrasi 20261007. `messages` menampung pesan chat (dulu
@@ -101,6 +106,9 @@ export const TABLE_COLUMNS: Record<string, Set<string>> = {
   // dari path subcollection Firestore `chats/{chatId}/messages`.
   messages: new Set(['id', 'chat_id', 'text', 'sender_id', 'type', 'image_url', 'is_read', 'raw_data', 'created_at', 'updated_at']),
   operational_expenses: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
+  // Hanya kolom ini yang ada di remote; sisanya (jenis, refId, items, status,
+  // totalValue, ...) memang disimpan di dalam `raw_data`.
+  returns: new Set(['id', 'created_at', 'updated_at', 'raw_data']),
   // Kolom camelCase (dibuat oleh migrasi 20260930). Sengaja dipertahankan
   // camelCase karena `product.actions.ts` menulis `insert({ productId, ... })`.
   product_cost_logs: new Set(['id', 'productId', 'productName', 'oldCost', 'newCost', 'adminEmail', 'changeDate', 'notes', 'source', 'created_at', 'raw_data']),
