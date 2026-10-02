@@ -17,8 +17,19 @@ import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { Timestamp, auth, collection, db, getDocs, limit, orderBy, query, ref, where } from '@/lib/firebase';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, TaxSettings } from '@/lib/tax';
 import { hitungItemOrder, keBentukProdukHpp, PRODUK_RINGKAS } from '@/lib/hpp';
+import { coerceDate, isWithinRange } from '@/lib/date-utils';
 
 type AuditTab = 'stock' | 'transaction' | 'finance' | 'profit' | 'cost' | 'capital' | 'tax';
+
+const toDateOrNull = (value: any) => coerceDate(value);
+const fmtClock = (value: any) => {
+  const date = toDateOrNull(value);
+  return date ? format(date, 'HH:mm') : '-';
+};
+const fmtDay = (value: any) => {
+  const date = toDateOrNull(value);
+  return date ? format(date, 'd MMM yyyy') : '-';
+};
 
 function AuditPageContent() {
   const router = useRouter();
@@ -87,27 +98,75 @@ function AuditPageContent() {
       const endT = Timestamp.fromDate(end);
 
       if (activeTab === 'stock') {
-        const q = query(collection(db, 'inventory_logs'), where('date', '>=', startT), where('date', '<=', endT), orderBy('date', 'desc'), limit(limitCount));
-        const snap = await getDocs(q);
-        setStockLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const { data, error } = await supabase
+          .from('inventory_logs')
+          .select('*')
+          .gte('date', start.toISOString())
+          .lte('date', end.toISOString())
+          .order('date', { ascending: false })
+          .limit(limitCount);
+        if (error) throw error;
+        setStockLogs((data || []).map((row: any) => ({ ...row, date: row.date || row.created_at || row.createdAt })));
         setLoading(false);
       } else if (activeTab === 'transaction') {
-        const q = query(collection(db, 'orders'), where('createdAt', '>=', startT), where('createdAt', '<=', endT), orderBy('createdAt', 'desc'), limit(limitCount));
-        const snap = await getDocs(q);
-        setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .gte('created_at', start.toISOString())
+          .lte('created_at', end.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(limitCount);
+        if (error) throw error;
+        setTransactions((data || []).map((row: any) => ({ ...row, createdAt: row.created_at || row.createdAt })));
         setLoading(false);
       } else if (activeTab === 'finance') {
-        const q = query(collection(db, 'cashier_shifts'), where('openedAt', '>=', startT), where('openedAt', '<=', endT), orderBy('openedAt', 'desc'), limit(limitCount));
-        const snap = await getDocs(q);
-        setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const { data: shiftRows, error } = await supabase
+          .from('cashier_shifts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(limitCount);
+
+        if (error) throw error;
+
+        const safeRows = (shiftRows || []).filter((row: any) => {
+          const openedAt = row.openedAt || row.opened_at || row.raw_data?.openedAt || row.raw_data?.opened_at || row.created_at || row.createdAt;
+          return isWithinRange(openedAt, start, end);
+        });
+
+        setShifts(safeRows.map((row: any) => {
+          const raw = row.raw_data || {};
+          return {
+            ...row,
+            cashierName: raw.cashierName || row.cashierName || row.cashier_name || 'Kasir',
+            expectedCash: Number(raw.expectedCash ?? row.expectedCash ?? row.expected_cash ?? 0),
+            difference: Number(raw.difference ?? row.difference ?? 0),
+            openedAt: raw.openedAt || row.openedAt || row.opened_at || row.created_at || raw.createdAt,
+            closedAt: raw.closedAt || row.closedAt || row.closed_at || null,
+          };
+        }));
         setLoading(false);
       } else if (activeTab === 'profit') {
-        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']), where('createdAt', '>=', startT), where('createdAt', '<=', endT));
-        const qExp = query(collection(db, 'operational_expenses'), where('date', '>=', startT), where('date', '<=', endT));
-        const [oSnap, eSnap] = await Promise.all([getDocs(qOrders), getDocs(qExp)]);
+        const [ordersRes, expensesRes] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('*')
+            .in('status', ['SELESAI', 'SUCCESS'])
+            .gte('created_at', start.toISOString())
+            .lte('created_at', end.toISOString()),
+          supabase
+            .from('operational_expenses')
+            .select('*')
+            .gte('date', start.toISOString())
+            .lte('date', end.toISOString()),
+        ]);
+        if (ordersRes.error) throw ordersRes.error;
+        if (expensesRes.error) throw expensesRes.error;
+
+        const oDocs = ordersRes.data || [];
+        const eDocs = expensesRes.data || [];
         
         let tS = 0, tC = 0, tD = 0, tE = 0, tEstimasi = 0, nEstimasi = 0;
-        eSnap.docs.forEach(d => tE += (d.data().amount || 0));
+        eDocs.forEach(d => tE += (Number(d.amount || d.raw_data?.amount || 0)));
 
         // HPP memakai RUMUS YANG SAMA dengan Dashboard & Laporan Keuangan
         // (`src/lib/hpp.ts`). Sebelumnya halaman ini membaca `i.cost`/`i.modal`
@@ -119,9 +178,9 @@ function AuditPageContent() {
         const produkMap = new Map<string, any>();
         produkSnap.docs.forEach(ps => produkMap.set(ps.id, keBentukProdukHpp(ps.data())));
 
-        const logs = oSnap.docs.map(d => {
-           const data = d.data();
-           const items = data.items || [];
+        const logs = oDocs.map((d: any) => {
+           const data = d.raw_data || d;
+           const items = Array.isArray(d.items) ? d.items : (data.items || []);
 
            const { ringkasan } = hitungItemOrder({
               items,
@@ -129,9 +188,9 @@ function AuditPageContent() {
            });
 
            // Order tanpa baris item (data lama) jatuh ke total order.
-           const pendapatan = ringkasan.itemTotal > 0 ? ringkasan.pendapatan : Number(data.total || 0);
+           const pendapatan = ringkasan.itemTotal > 0 ? ringkasan.pendapatan : Number(d.total || data.total || 0);
            const oC = ringkasan.hppDipercaya + ringkasan.hppEstimasi;
-           const oD = items.reduce((s: number, i: any) => s + Math.max(0, ((i.originalPrice || i.price) - i.price) * (i.quantity || 1)), 0);
+           const oD = items.reduce((s: number, i: any) => s + Math.max(0, ((Number(i.originalPrice || i.price || 0)) - Number(i.price || 0)) * (Number(i.quantity || 1))), 0);
 
            tS += pendapatan; tC += oC; tD += oD;
            tEstimasi += ringkasan.labaEstimasi;
@@ -139,7 +198,7 @@ function AuditPageContent() {
 
            return {
               id: d.id,
-              date: data.createdAt,
+              date: d.created_at || d.createdAt || data.createdAt,
               sales: pendapatan,
               cost: oC,
               profit: pendapatan - oC,
@@ -160,9 +219,15 @@ function AuditPageContent() {
         });
         setLoading(false);
       } else if (activeTab === 'cost') {
-        const q = query(collection(db, 'product_cost_logs'), where('changeDate', '>=', startT), where('changeDate', '<=', endT), orderBy('changeDate', 'desc'), limit(limitCount));
-        const snap = await getDocs(q);
-        setCostLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const { data, error } = await supabase
+          .from('product_cost_logs')
+          .select('*')
+          .gte('changeDate', start.toISOString())
+          .lte('changeDate', end.toISOString())
+          .order('changeDate', { ascending: false })
+          .limit(limitCount);
+        if (error) throw error;
+        setCostLogs((data || []).map((row: any) => ({ ...row, changeDate: row.changeDate || row.change_date || row.created_at })));
         setLoading(false);
       } else if (activeTab === 'capital') {
         const { data: capData } = await supabase.from('capital_transactions').select('*').order('created_at', { ascending: false }).limit(limitCount);
@@ -185,20 +250,28 @@ function AuditPageContent() {
         setLoading(false);
       } else if (activeTab === 'tax') {
         // Audit Audit Pajak (PPN & PPh)
-        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['SELESAI', 'SUCCESS']));
-        const sSnap = await sbGetDocs({ table: 'settings' });
+        const [ordersRes, sSnap] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('*')
+            .in('status', ['SELESAI', 'SUCCESS']),
+          sbGetDocs({ table: 'settings' }),
+        ]);
+        if (ordersRes.error) throw ordersRes.error;
+
         let taxSettings = DEFAULT_TAX_SETTINGS;
         sSnap.docs.forEach(d => { if (d.id === 'system' && d.data()?.tax) taxSettings = { ...DEFAULT_TAX_SETTINGS, ...d.data().tax }; });
         
-        const oSnap = await getDocs(qOrders);
+        const oDocs = ordersRes.data || [];
         const tLogs: any[] = [];
         let sumSales = 0, sumDPP = 0, sumTax = 0;
 
-        oSnap.docs.forEach(d => {
-          const data = d.data();
-          const created = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || new Date());
+        oDocs.forEach((d: any) => {
+          const data = d.raw_data || d;
+          const created = toDateOrNull(d.created_at || d.createdAt || data.createdAt) || new Date();
           if (created >= start && created <= end) {
-            (data.items || []).forEach((item: any) => {
+            const items = Array.isArray(d.items) ? d.items : (data.items || []);
+            items.forEach((item: any) => {
               const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
               const breakdown = calculateTaxBreakdown({
                 amount: itemTotal,
@@ -242,9 +315,15 @@ function AuditPageContent() {
 
   const handleExport = async () => {
     let data: any[] = [];
-    if (activeTab === 'stock') data = stockLogs.map(l => ({ Tanggal: format(l.date.toDate(), 'Pp'), Produk: l.productName, Tipe: l.type, Qty: l.amount, Sisa: l.nextStock, Admin: l.adminId }));
-    else if (activeTab === 'transaction') data = transactions.map(t => ({ Tanggal: format(t.createdAt.toDate(), 'Pp'), ID: t.id, Customer: t.customerName, Total: t.total, Status: t.status }));
-    else if (activeTab === 'tax') data = taxLogs.map(t => ({ Tanggal: format(t.date, 'Pp'), Nota: t.orderId, Customer: t.customer, Produk: t.product, Kategori: t.category, Omzet: t.sales, DPP: t.dpp, Pajak: t.taxAmount, Status: t.taxLabel }));
+    if (activeTab === 'stock') data = stockLogs.map(l => {
+      const d = toDateOrNull(l.date) || new Date();
+      return { Tanggal: format(d, 'Pp'), Produk: l.productName, Tipe: l.type, Qty: l.amount, Sisa: l.nextStock, Admin: l.adminId };
+    });
+    else if (activeTab === 'transaction') data = transactions.map(t => {
+      const d = toDateOrNull(t.createdAt) || new Date();
+      return { Tanggal: format(d, 'Pp'), ID: t.id, Customer: t.customerName, Total: t.total, Status: t.status };
+    });
+    else if (activeTab === 'tax') data = taxLogs.map(t => ({ Tanggal: format(toDateOrNull(t.date) || new Date(), 'Pp'), Nota: t.orderId, Customer: t.customer, Produk: t.product, Kategori: t.category, Omzet: t.sales, DPP: t.dpp, Pajak: t.taxAmount, Status: t.taxLabel }));
 
     // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ekspor ditekan.
     const XLSX = await import('xlsx');
@@ -420,12 +499,13 @@ function AuditPageContent() {
                     const refId = refIdMatch ? refIdMatch[1] : null;
                     const isReturn = l.note?.toLowerCase().includes('retur');
                     const refUrl = isReturn ? `/admin/returns` : (refId ? `/admin/orders/${refId}` : null);
+                    const logDate = toDateOrNull(l.date);
 
                     return (
                       <tr key={l.id} className="hover:bg-slate-50/50 transition-all group">
                         <td className="px-8 py-5">
-                            <p className="text-xs font-black text-slate-800">{l.date && format(l.date.toDate(), 'HH:mm')}</p>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{l.date && format(l.date.toDate(), 'd MMM yyyy')}</p>
+                            <p className="text-xs font-black text-slate-800">{logDate ? format(logDate, 'HH:mm') : '-'}</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{logDate ? format(logDate, 'd MMM yyyy') : '-'}</p>
                         </td>
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
@@ -458,11 +538,13 @@ function AuditPageContent() {
                       </tr>
                     );
                   })}
-                  {activeTab === 'transaction' && transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+                  {activeTab === 'transaction' && transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase())).map(t => {
+                    const created = toDateOrNull(t.createdAt);
+                    return (
                     <tr key={t.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-xs font-black text-slate-800">{t.createdAt && format(t.createdAt.toDate(), 'HH:mm')}</p>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.createdAt && format(t.createdAt.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{created ? format(created, 'HH:mm') : '-'}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{created ? format(created, 'd MMM yyyy') : '-'}</p>
                        </td>
                        <td className="px-8 py-5">
                           <Link href={`/admin/orders/${t.id}`} className="flex items-center gap-3 group/ref">
@@ -485,32 +567,37 @@ function AuditPageContent() {
                           </span>
                        </td>
                     </tr>
-                  ))}
-                  {activeTab === 'finance' && shifts.map(s => (
-                    <tr key={s.id} className="hover:bg-slate-50/50 transition-all group">
-                       <td className="px-8 py-5">
-                          <p className="text-xs font-black text-slate-800">{s.openedAt && format(s.openedAt.toDate(), 'HH:mm')}</p>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{s.openedAt && format(s.openedAt.toDate(), 'd MMM yyyy')}</p>
-                       </td>
-                       <td className="px-8 py-5">
-                          {s.closedAt ? (
-                            <>
-                              <p className="text-xs font-black text-slate-800">{format(s.closedAt.toDate(), 'HH:mm')}</p>
-                              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{format(s.closedAt.toDate(), 'd MMM yyyy')}</p>
-                            </>
-                          ) : <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">AKTIF</span>}
-                       </td>
-                       <td className="px-8 py-5 text-xs font-bold text-slate-600 uppercase">{s.cashierName}</td>
-                       <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {s.expectedCash?.toLocaleString()}</td>
-                       <td className="px-8 py-5 text-right">
-                          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${s.difference === 0 ? 'bg-slate-50 text-slate-400' : s.difference > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                             {s.difference > 0 ? '+' : ''}{s.difference?.toLocaleString()}
-                          </span>
-                       </td>
-                    </tr>
-                  ))}
+                    );
+                  })}
+                  {activeTab === 'finance' && shifts.map(s => {
+                    const openedAt = coerceDate(s.openedAt);
+                    const closedAt = coerceDate(s.closedAt);
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50/50 transition-all group">
+                         <td className="px-8 py-5">
+                            <p className="text-xs font-black text-slate-800">{openedAt ? format(openedAt, 'HH:mm') : '-'}</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{openedAt ? format(openedAt, 'd MMM yyyy') : '-'}</p>
+                         </td>
+                         <td className="px-8 py-5">
+                            {closedAt ? (
+                              <>
+                                <p className="text-xs font-black text-slate-800">{format(closedAt, 'HH:mm')}</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{format(closedAt, 'd MMM yyyy')}</p>
+                              </>
+                            ) : <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">AKTIF</span>}
+                         </td>
+                         <td className="px-8 py-5 text-xs font-bold text-slate-600 uppercase">{s.cashierName}</td>
+                         <td className="px-8 py-5 font-black text-xs text-slate-900">Rp {Number(s.expectedCash || 0).toLocaleString()}</td>
+                         <td className="px-8 py-5 text-right">
+                            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${Number(s.difference || 0) === 0 ? 'bg-slate-50 text-slate-400' : Number(s.difference || 0) > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                               {Number(s.difference || 0) > 0 ? '+' : ''}{Number(s.difference || 0).toLocaleString()}
+                            </span>
+                         </td>
+                      </tr>
+                    );
+                  })}
                   {activeTab === 'capital' && capitalLogs.map(c => {
-                    const dateObj = c.date ? (c.date.toDate ? c.date.toDate() : new Date(c.date)) : new Date();
+                    const dateObj = toDateOrNull(c.date) || new Date(c.created_at || Date.now());
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
                          <td className="px-8 py-5">
@@ -549,11 +636,13 @@ function AuditPageContent() {
                        </td>
                     </tr>
                   ))}
-                  {activeTab === 'cost' && costLogs.filter(c => c.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(c => (
+                  {activeTab === 'cost' && costLogs.filter(c => c.productName?.toLowerCase().includes(searchTerm.toLowerCase())).map(c => {
+                    const changeDate = toDateOrNull(c.changeDate);
+                    return (
                     <tr key={c.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-xs font-black text-slate-800">{c.changeDate && format(c.changeDate.toDate(), 'HH:mm')}</p>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{c.changeDate && format(c.changeDate.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{changeDate ? format(changeDate, 'HH:mm') : '-'}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{changeDate ? format(changeDate, 'd MMM yyyy') : '-'}</p>
                        </td>
                        <td className="px-8 py-5 font-black text-xs text-slate-800 uppercase">{c.productName}</td>
                        <td className="px-8 py-5 text-xs font-bold text-slate-400">Rp {c.oldCost?.toLocaleString()}</td>
@@ -564,12 +653,15 @@ function AuditPageContent() {
                           </span>
                        </td>
                     </tr>
-                  ))}
-                  {activeTab === 'profit' && profitLogs.map(p => (
+                    );
+                  })}
+                  {activeTab === 'profit' && profitLogs.map(p => {
+                    const profitDate = toDateOrNull(p.date);
+                    return (
                     <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-5">
-                          <p className="text-xs font-black text-slate-800">{p.date && format(p.date.toDate(), 'HH:mm')}</p>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{p.date && format(p.date.toDate(), 'd MMM yyyy')}</p>
+                          <p className="text-xs font-black text-slate-800">{profitDate ? format(profitDate, 'HH:mm') : '-'}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{profitDate ? format(profitDate, 'd MMM yyyy') : '-'}</p>
                        </td>
                        <td className="px-8 py-5 font-black text-xs text-slate-500 uppercase">#{p.id?.substring(0,8)}</td>
                        <td className="px-8 py-5 text-xs font-black text-slate-900">Rp {p.sales?.toLocaleString()}</td>
@@ -578,7 +670,8 @@ function AuditPageContent() {
                           +Rp {p.profit?.toLocaleString()}
                        </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                </tbody>
             </table>
           </div>
