@@ -106,6 +106,7 @@ export default function FinanceReport() {
   const [selectedType, setSelectedType] = useState('ALL');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [onlyLoss, setOnlyLoss] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -486,6 +487,9 @@ let unsub: (() => void) | undefined;
         const pm = (r.paymentMethod || 'CASH').toUpperCase();
         if (pm !== selectedPaymentMethod) return false;
       }
+      if (onlyLoss && !(r.type === 'profit' && (r.profit || 0) < 0)) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchDesc = r.description.toLowerCase().includes(q);
@@ -496,15 +500,16 @@ let unsub: (() => void) | undefined;
       }
       return true;
     });
-  }, [records, selectedChannel, selectedCategory, selectedType, selectedPaymentMethod, searchQuery]);
+  }, [records, selectedChannel, selectedCategory, selectedType, selectedPaymentMethod, onlyLoss, searchQuery]);
 
-  const hasActiveRecordFilters = selectedChannel !== 'ALL' || selectedCategory !== 'ALL' || selectedType !== 'ALL' || selectedPaymentMethod !== 'ALL' || searchQuery.trim() !== '';
+  const hasActiveRecordFilters = selectedChannel !== 'ALL' || selectedCategory !== 'ALL' || selectedType !== 'ALL' || selectedPaymentMethod !== 'ALL' || onlyLoss || searchQuery.trim() !== '';
 
   const resetRecordFilters = () => {
     setSelectedChannel('ALL');
     setSelectedCategory('ALL');
     setSelectedType('ALL');
     setSelectedPaymentMethod('ALL');
+    setOnlyLoss(false);
     setSearchQuery('');
     setCurrentPage(1);
   };
@@ -1126,6 +1131,17 @@ let unsub: (() => void) | undefined;
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setOnlyLoss(v => !v); setCurrentPage(1); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-colors border ${
+                        onlyLoss
+                          ? 'bg-rose-600 text-white border-rose-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-rose-50 hover:text-rose-600'
+                      }`}
+                      title="Tampilkan hanya transaksi penjualan yang rugi (laba negatif)"
+                    >
+                      <TrendingDown size={12} /> Hanya Rugi
+                    </button>
                     {hasActiveRecordFilters && (
                       <button
                         onClick={resetRecordFilters}
