@@ -702,7 +702,7 @@ export default function AdminProducts() {
             <Package size={16} />
           </div>
           <div>
-            <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight leading-none">Produk</h1>
+            <h1 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-none">Produk</h1>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Inventory Management</p>
           </div>
         </div>
@@ -747,7 +747,7 @@ export default function AdminProducts() {
           <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Package size={16} /></div>
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total SKU</p>
-            <p className="text-sm font-black text-gray-900 leading-none">{stats.totalJenis}</p>
+            <p className="text-sm font-black text-gray-900 leading-none tabular-nums">{stats.totalJenis}</p>
           </div>
         </div>
         
@@ -757,7 +757,7 @@ export default function AdminProducts() {
           </div>
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total Value</p>
-            <p className="text-sm font-black text-emerald-700 leading-none">
+            <p className="text-sm font-black text-emerald-700 leading-none tabular-nums">
               <span className="text-xs font-bold mr-0.5">Rp</span>
               {stats.totalAset.toLocaleString('id-ID')}
             </p>
@@ -934,7 +934,7 @@ export default function AdminProducts() {
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
                       </div>
-                      <h3 className="font-black text-gray-900 text-xs uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
+                      <h3 className="font-black text-gray-900 text-sm uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
                     </div>
                   </div>
@@ -942,7 +942,7 @@ export default function AdminProducts() {
                   <div className="grid grid-cols-2 gap-2 py-1.5 px-2 border-y border-gray-50 bg-gray-50/30 rounded-lg">
                     <div className="space-y-0.5">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Stock</p>
-                      <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                      <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
                         {p.stock} <span className="text-xs uppercase">{p.unit}</span>
                       </p>
                       <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
@@ -965,7 +965,7 @@ export default function AdminProducts() {
                     </div>
                     <div className="space-y-0.5 text-right">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
-                      <p className="text-xs font-black text-emerald-600 leading-none">
+                      <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
                         <span className="text-xs mr-0.5">Rp</span>
                         {(p.priceEcer || 0).toLocaleString('id-ID')}
                       </p>
@@ -985,31 +985,31 @@ export default function AdminProducts() {
                     <div className="flex gap-1.5">
                       <button 
                         onClick={() => setSelectedProductRestock(p)} 
-                        className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                         title="Quick Stock"
                       >
-                        <Calculator size={12} />
+                        <Calculator size={16} />
                       </button>
                       <Link 
                         href={`/admin/products/edit/${p.id}`} 
-                        className="w-7 h-7 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
+                        className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-600 rounded-xl hover:bg-black hover:text-white transition-all shadow-sm"
                         title="Edit Item"
                       >
-                        <Edit size={12} />
+                        <Edit size={16} />
                       </Link>
                       <button 
                         onClick={() => handleArchive(p, p.isActive !== false)} 
-                        className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
+                        className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
                         title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
                       >
-                        {p.isActive === false ? <RotateCcw size={12} /> : <Archive size={12} />}
+                        {p.isActive === false ? <RotateCcw size={16} /> : <Archive size={16} />}
                       </button>
                       <button 
                         onClick={() => handleDelete(p)} 
-                        className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                        className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
                         title="Hapus Permanen"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -1071,7 +1071,7 @@ export default function AdminProducts() {
                               {p.isActive === false ? 'Arsip' : 'Aktif'}
                             </span>
                           </div>
-                          <h3 className="font-black text-gray-900 text-xs leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
+                          <h3 className="font-black text-gray-900 text-sm leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
                           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
                         </div>
                       </div>
@@ -1079,7 +1079,7 @@ export default function AdminProducts() {
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <p className={`font-black text-xs leading-none ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                          <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
                             {p.stock} <span className="text-xs uppercase">{p.unit}</span>
                           </p>
                         </div>
@@ -1112,7 +1112,7 @@ export default function AdminProducts() {
                         <p className="text-xs font-bold text-blue-500 italic">
                           Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                         </p>
-                        <p className="text-xs font-black text-emerald-600 leading-none">
+                        <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
                           Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                         </p>
                         {Number(p.priceGrosir || 0) > 0 && (
@@ -1138,46 +1138,46 @@ export default function AdminProducts() {
                       <div className="flex justify-end gap-1.5">
                         <button 
                           onClick={() => setSelectedProductRestock(p)} 
-                          className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                          className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                           title="Restock"
                         >
-                          <Calculator size={12} />
+                          <Calculator size={14} />
                         </button>
                         <Link 
                           href={`/admin/products/print-label/${p.id}`} 
-                          className="w-7 h-7 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
+                          className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
                           title="Cetak Label Rak"
                         >
-                          <Printer size={12} />
+                          <Printer size={14} />
                         </Link>
                         <Link 
                           href={`/admin/products/edit/${p.id}`} 
-                          className="w-7 h-7 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
+                          className="w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
                           title="Edit"
                         >
-                          <Edit size={12} />
+                          <Edit size={14} />
                         </Link>
                         <button 
                           onClick={() => handleDuplicate(p)} 
                           disabled={duplicatingId === p.id}
-                          className="w-7 h-7 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                          className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
                           title="Duplikat Produk"
                         >
-                          {duplicatingId === p.id ? <RefreshCw size={12} className="animate-spin" /> : <Copy size={12} />}
+                          {duplicatingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}
                         </button>
                         <button 
                           onClick={() => handleArchive(p, p.isActive !== false)} 
-                          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
                           title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
                         >
-                          {p.isActive === false ? <RotateCcw size={12} /> : <Archive size={12} />}
+                          {p.isActive === false ? <RotateCcw size={14} /> : <Archive size={14} />}
                         </button>
                         <button 
                           onClick={() => handleDelete(p)} 
-                          className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                          className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
                           title="Hapus Permanen"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
