@@ -1,4 +1,4 @@
-import ProductDetailClient, { Product, RelatedProduct, Review } from './ProductDetailClient';
+import ProductDetailClient, { Product, RelatedProduct, PromoProduct, Review } from './ProductDetailClient';
 import { Metadata } from 'next';
 import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
@@ -95,6 +95,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   let product: Product | null = null;
   let relatedProducts: RelatedProduct[] = [];
+  let promoProducts: PromoProduct[] = [];
   const reviews: Review[] = [];
 
   try {
@@ -127,41 +128,80 @@ export default async function ProductDetailPage({ params }: PageProps) {
         units: raw.units || [],
       };
 
-      // Fetch Related Products (hanya yang aktif)
-      let relatedQuery = supabase
+      // Fetch active products for recommendations and promo items
+      const { data: allActiveData } = await supabase
         .from('products')
         .select('*')
-        .neq('id', id)
         .eq('is_active', true)
-        .limit(8);
+        .limit(60);
 
-      if (cleanCategory !== 'Umum') {
-        relatedQuery = relatedQuery.eq('category', cleanCategory);
-      }
+      const isValidActive = (p: any) => {
+        if (!p || p.id === id) return false;
+        const r = p.raw_data || {};
+        if (p.is_active === false || r.isActive === false) return false;
+        if (r.status === 'ARCHIVED' || r.Status === 'ARCHIVED') return false;
+        return true;
+      };
 
-      const { data: relatedData } = await relatedQuery;
+      const validList = (allActiveData || []).filter(isValidActive);
 
-      if (relatedData && relatedData.length > 0) {
-        relatedProducts = relatedData
-          .filter((d: any) => {
-            const rRaw = d.raw_data || {};
-            return (
-              d.is_active !== false &&
-              rRaw.isActive !== false &&
-              rRaw.status !== 'ARCHIVED' &&
-              rRaw.Status !== 1
-            );
-          })
-          .map((d: any) => {
-            const rRaw = d.raw_data || {};
-            return {
-              id: d.id,
-              name: d.name || rRaw.name || rRaw.Nama || 'Produk',
-              price: Number(d.price ?? rRaw.price ?? rRaw.Ecer ?? 0),
-              image: d.image_url || rRaw.imageUrl || rRaw.Link_Foto || rRaw.image || '/logo-atayatoko.png',
-            };
-          });
-      }
+      // A. Related Products (Prioritize same category, fallback to other active products)
+      const targetCategoryLower = cleanCategory.toLowerCase();
+      const sameCategory = validList.filter(
+        (p: any) =>
+          cleanCategory !== 'Umum' &&
+          (p.category || p.raw_data?.category || '').toLowerCase() === targetCategoryLower
+      );
+      const sameCategoryIds = new Set(sameCategory.map((p: any) => p.id));
+      const otherCategory = validList.filter((p: any) => !sameCategoryIds.has(p.id));
+
+      const combinedRelated = [...sameCategory, ...otherCategory].slice(0, 10);
+      relatedProducts = combinedRelated.map((d: any) => {
+        const rRaw = d.raw_data || {};
+        return {
+          id: d.id,
+          name: d.name || rRaw.name || rRaw.Nama || 'Produk',
+          price: Number(d.price ?? rRaw.price ?? rRaw.Ecer ?? 0),
+          wholesalePrice: Number(rRaw.wholesalePrice ?? rRaw.Grosir ?? rRaw.Harga_Grosir ?? 0),
+          minWholesale: Number(rRaw.minWholesale ?? rRaw.Min_Grosir ?? 1),
+          unit: d.unit || rRaw.unit || rRaw.Satuan || 'PCS',
+          category: d.category || rRaw.category || rRaw.Kategori || 'Umum',
+          image: d.image_url || rRaw.imageUrl || rRaw.Link_Foto || rRaw.image || '/logo-atayatoko.png',
+          stock: Number(d.stock ?? rRaw.stock ?? rRaw.Stok ?? 0),
+        };
+      });
+
+      // B. Promo Products (Products with wholesale discount or promo deals)
+      const promoCandidates = validList
+        .filter((p: any) => {
+          const r = p.raw_data || {};
+          const normalPrice = Number(p.price ?? r.price ?? r.Ecer ?? 0);
+          const grosir = Number(r.wholesalePrice ?? r.Grosir ?? r.Harga_Grosir ?? 0);
+          return grosir > 0 && grosir < normalPrice;
+        })
+        .slice(0, 8);
+
+      promoProducts = promoCandidates.map((d: any) => {
+        const r = d.raw_data || {};
+        const normalPrice = Number(d.price ?? r.price ?? r.Ecer ?? 0);
+        const grosir = Number(r.wholesalePrice ?? r.Grosir ?? r.Harga_Grosir ?? 0);
+        const discountVal = normalPrice - grosir;
+        const discountPercent = normalPrice > 0 ? Math.round((discountVal / normalPrice) * 100) : 0;
+        return {
+          id: d.id,
+          name: d.name || r.name || r.Nama || 'Produk Promo',
+          price: grosir,
+          originalPrice: normalPrice,
+          wholesalePrice: grosir,
+          minWholesale: Number(r.minWholesale ?? r.Min_Grosir ?? 1),
+          unit: d.unit || r.unit || r.Satuan || 'PCS',
+          category: d.category || r.category || r.Kategori || 'Umum',
+          image: d.image_url || r.imageUrl || r.Link_Foto || r.image || '/logo-atayatoko.png',
+          stock: Number(d.stock ?? r.stock ?? r.Stok ?? 0),
+          promoBadge: discountPercent > 0 ? `Hemat ${discountPercent}%` : 'Grosir Spesial',
+          discountPercent,
+        };
+      });
     }
   } catch (error) {
     console.error('Error fetching product data:', error);
@@ -249,9 +289,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
         />
       )}
       <ProductDetailClient
-        initialProduct={product}
-        initialRelatedProducts={relatedProducts}
-        initialReviews={reviews}
+        initialProduct={product ? JSON.parse(JSON.stringify(product)) : null}
+        initialRelatedProducts={JSON.parse(JSON.stringify(relatedProducts))}
+        initialPromoProducts={JSON.parse(JSON.stringify(promoProducts))}
+        initialReviews={JSON.parse(JSON.stringify(reviews))}
       />
     </>
   );

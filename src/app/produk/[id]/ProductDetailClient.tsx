@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Heart, ShoppingCart, Plus, Minus, Loader2, Sparkles, Info, ShieldCheck, Truck,
-  Star, MessageSquare, ChevronRight, Zap, Package, Tag, Clock
+  Star, MessageSquare, ChevronRight, Zap, Package, Tag, Clock, Flame, ArrowRight, Percent, CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
 import { addToWishlist, getWishlist } from '@/lib/wishlist';
@@ -44,7 +44,32 @@ export type Product = {
   }[];
 };
 
-export type RelatedProduct = Pick<Product, 'id' | 'name' | 'price' | 'image'>;
+export type RelatedProduct = {
+  id: string;
+  name: string;
+  price: number;
+  wholesalePrice?: number;
+  minWholesale?: number;
+  unit?: string;
+  category?: string;
+  image: string;
+  stock?: number;
+};
+
+export type PromoProduct = {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  wholesalePrice?: number;
+  minWholesale?: number;
+  unit?: string;
+  category?: string;
+  image: string;
+  stock?: number;
+  promoBadge?: string;
+  discountPercent?: number;
+};
 
 type CartItem = {
   productId: string;
@@ -62,17 +87,20 @@ type CartItem = {
 interface ProductDetailClientProps {
   initialProduct: Product | null;
   initialRelatedProducts: RelatedProduct[];
+  initialPromoProducts?: PromoProduct[];
   initialReviews: Review[];
 }
 
 export default function ProductDetailClient({ 
   initialProduct, 
   initialRelatedProducts, 
+  initialPromoProducts = [],
   initialReviews 
 }: ProductDetailClientProps) {
   const router = useRouter();
   const [product] = useState<Product | null>(initialProduct);
   const [relatedProducts] = useState<RelatedProduct[]>(initialRelatedProducts);
+  const [promoProducts] = useState<PromoProduct[]>(initialPromoProducts);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [loading, setLoading] = useState(!initialProduct);
   const [inWishlist, setInWishlist] = useState(false);
@@ -203,6 +231,43 @@ export default function ProductDetailClient({
   const handleQuantity = (type: 'plus' | 'minus') => {
     if (type === 'plus') setQuantity(prev => prev + 1);
     if (type === 'minus' && quantity > 1) setQuantity(prev => prev - 1);
+  };
+
+  const addQuickProductToCart = (item: {
+    id: string;
+    name: string;
+    price: number;
+    image?: string;
+    unit?: string;
+    stock?: number;
+    wholesalePrice?: number;
+    minWholesale?: number;
+  }) => {
+    if ((item.stock ?? 1) <= 0) {
+      toast.error('Maaf, stok barang sedang habis');
+      return;
+    }
+    const localCart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
+    const baseUnit = (item.unit || 'PCS').toString().toUpperCase();
+    const existingIndex = localCart.findIndex((c) => c.productId === item.id);
+    if (existingIndex > -1) {
+      localCart[existingIndex].quantity += 1;
+    } else {
+      localCart.push({
+        productId: item.id,
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        image: item.image,
+        unit: baseUnit,
+        quantity: 1,
+        wholesalePrice: item.wholesalePrice,
+        minWholesale: item.minWholesale,
+      });
+    }
+    localStorage.setItem('cart', JSON.stringify(localCart));
+    window.dispatchEvent(new Event('cart-updated'));
+    toast.success(`${item.name} berhasil ditambahkan ke keranjang!`);
   };
 
   if (loading || !product) return <ProductSkeleton />;
@@ -470,28 +535,253 @@ export default function ProductDetailClient({
           </div>
         </div>
 
-        {/* RELATED PRODUCTS */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-4 mb-12">
-            <h2 className="text-base font-black uppercase tracking-wider text-slate-800 mb-5 px-1 flex items-center gap-2">
-              <Sparkles size={18} className="text-amber-500" /> Produk Lainnya
-            </h2>
-            <div className="flex overflow-x-auto gap-4 pb-6 scrollbar-hide snap-x">
-              {relatedProducts.map(item => (
-                <div key={item.id} className="min-w-[150px] md:min-w-[180px] snap-start group cursor-pointer">
-                  <Link href={`/produk/${item.id}`}>
-                    <div className="aspect-square rounded-2xl md:rounded-3xl overflow-hidden bg-white border border-slate-100 shadow-sm group-hover:shadow-lg group-hover:-translate-y-1 transition-all duration-300 mb-3">
-                      <img src={getProxiedImage(item.image)} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                    </div>
-                    <div className="px-1">
-                      <h3 className="text-xs font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors mb-1">{item.name}</h3>
-                      <p className="text-sm font-black text-emerald-600">Rp{item.price.toLocaleString('id-ID')}</p>
-                    </div>
-                  </Link>
+        {/* 1. PROMO PRODUCTS SECTION */}
+        {promoProducts.length > 0 && (
+          <section className="mt-8 mb-10" aria-label="Penawaran Spesial dan Promo">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-gradient-to-br from-red-500 to-orange-500 text-white rounded-2xl shadow-md shadow-orange-500/20 animate-pulse">
+                  <Flame size={20} fill="currentColor" />
                 </div>
-              ))}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base md:text-lg font-black tracking-tight text-slate-900">
+                      Penawaran Spesial &amp; Promo
+                    </h2>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                      Hemat Banyak
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Harga grosir spesial dan potongan hemat untuk belanja partai atau eceran
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/promo"
+                className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors flex items-center gap-1 self-start sm:self-auto"
+              >
+                Lihat Semua Promo <ArrowRight size={14} />
+              </Link>
             </div>
-          </div>
+
+            <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide snap-x">
+              {promoProducts.map((item) => {
+                const isItemOut = (item.stock ?? 1) <= 0;
+                const unitStr = (item.unit || 'PCS').toUpperCase();
+                return (
+                  <div
+                    key={`promo-${item.id}`}
+                    className="min-w-[170px] sm:min-w-[200px] md:min-w-[220px] max-w-[230px] snap-start bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden group"
+                  >
+                    <div className="relative aspect-square bg-slate-50 overflow-hidden">
+                      <Link href={`/produk/${item.id}`} className="block w-full h-full">
+                        <img
+                          src={getProxiedImage(item.image)}
+                          alt={item.name}
+                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isItemOut ? 'grayscale opacity-50' : ''}`}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </Link>
+
+                      {/* Promo Badge */}
+                      <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 to-orange-500 text-white text-[10px] font-black px-2 py-1 rounded-xl uppercase tracking-wider shadow-md flex items-center gap-1">
+                        <Percent size={10} /> {item.promoBadge || 'Grosir Spesial'}
+                      </div>
+
+                      {/* Wishlist button */}
+                      <button
+                        onClick={() => {
+                          addToWishlist(item.id);
+                          toast.success('Disimpan ke wishlist');
+                        }}
+                        className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-sm text-slate-400 hover:text-red-500 hover:bg-white active:scale-75 transition-all"
+                        aria-label="Tambah ke favorit"
+                      >
+                        <Heart size={14} />
+                      </button>
+
+                      {isItemOut && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                          <span className="bg-white text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
+                            Habis
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3.5 flex flex-col flex-1 justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          {item.category || 'Promo'}
+                        </span>
+                        <Link href={`/produk/${item.id}`} className="block">
+                          <h3 className="text-xs sm:text-sm font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors">
+                            {item.name}
+                          </h3>
+                        </Link>
+                      </div>
+
+                      <div>
+                        {/* Price Block */}
+                        <div className="mb-2">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-sm sm:text-base font-black text-emerald-600">
+                              Rp{item.price.toLocaleString('id-ID')}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-400">/{unitStr}</span>
+                          </div>
+                          {item.originalPrice && item.originalPrice > item.price && (
+                            <div className="text-[11px] font-medium text-slate-400 line-through">
+                              Rp{item.originalPrice.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quick Add Button */}
+                        <button
+                          onClick={() => addQuickProductToCart(item)}
+                          disabled={isItemOut}
+                          className={`w-full py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                            isItemOut
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-md'
+                          }`}
+                        >
+                          <ShoppingCart size={13} /> + Keranjang
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* 2. RELATED PRODUCTS SECTION */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-8 mb-14" aria-label="Rekomendasi Produk Terkait">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-2xl shadow-sm">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base md:text-lg font-black tracking-tight text-slate-900">
+                      Rekomendasi Pilihan Untukmu
+                    </h2>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                      Serupa
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Produk terkait dan populer dalam kategori <span className="font-bold text-slate-700">{product.category}</span>
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/kategori/${product.category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1 self-start sm:self-auto"
+              >
+                Lihat Semua Kategori <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+              {relatedProducts.map((item) => {
+                const isItemOut = (item.stock ?? 1) <= 0;
+                const unitStr = (item.unit || 'PCS').toUpperCase();
+                const hasWholesale = (item.wholesalePrice ?? 0) > 0 && (item.wholesalePrice ?? 0) < item.price;
+                return (
+                  <div
+                    key={`rel-${item.id}`}
+                    className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden group"
+                  >
+                    <div className="relative aspect-square bg-slate-50 overflow-hidden">
+                      <Link href={`/produk/${item.id}`} className="block w-full h-full">
+                        <img
+                          src={getProxiedImage(item.image)}
+                          alt={item.name}
+                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isItemOut ? 'grayscale opacity-50' : ''}`}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </Link>
+
+                      {hasWholesale && (
+                        <div className="absolute top-2 left-2 z-10 bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-xl uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <Package size={10} /> Grosir
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          addToWishlist(item.id);
+                          toast.success('Disimpan ke wishlist');
+                        }}
+                        className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-sm text-slate-400 hover:text-red-500 hover:bg-white active:scale-75 transition-all"
+                        aria-label="Tambah ke favorit"
+                      >
+                        <Heart size={14} />
+                      </button>
+
+                      {isItemOut && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                          <span className="bg-white text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
+                            Habis
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 sm:p-3.5 flex flex-col flex-1 justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          {item.category || product.category}
+                        </span>
+                        <Link href={`/produk/${item.id}`} className="block">
+                          <h3 className="text-xs sm:text-sm font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors">
+                            {item.name}
+                          </h3>
+                        </Link>
+                      </div>
+
+                      <div>
+                        <div className="mb-2">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-sm sm:text-base font-black text-emerald-600">
+                              Rp{item.price.toLocaleString('id-ID')}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-400">/{unitStr}</span>
+                          </div>
+                          {hasWholesale && (
+                            <div className="text-[11px] font-bold text-blue-600">
+                              Grosir: Rp{item.wholesalePrice?.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => addQuickProductToCart(item)}
+                          disabled={isItemOut}
+                          className={`w-full py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
+                            isItemOut
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-md'
+                          }`}
+                        >
+                          <ShoppingCart size={13} /> + Keranjang
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
 
