@@ -6,7 +6,7 @@ import { sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc, sbUpsertDoc
 import { authorize } from '@/lib/actions/guard';
 import { resolveAccessToken } from '@/lib/actions/session';
 import { isAdminRole } from '@/lib/auth-helpers';
-import { increment, INCREMENT_MARKER } from '@/lib/firebase';
+import { increment, INCREMENT_MARKER } from '@/lib/db-schema';
 
 /**
  * Lapisan data untuk modul HR/payroll (`admin/employees`).

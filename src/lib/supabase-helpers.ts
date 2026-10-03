@@ -1,6 +1,5 @@
 import { supabase, supabaseAdmin as _supabaseAdmin } from '@/lib/supabase';
 import { isAdminRole, isAuthorizedAdmin, isStaffOrAdmin } from '@/lib/auth-helpers';
-import { INCREMENT_MARKER } from '@/lib/firebase';
 import {
   TABLES_WITH_RAW_DATA,
   TABLE_COLUMNS,
@@ -11,6 +10,7 @@ import {
   generateId,
   mergeRowWithRawData,
   toFilterValue,
+  INCREMENT_MARKER,
 } from '@/lib/db-schema';
 
 /**

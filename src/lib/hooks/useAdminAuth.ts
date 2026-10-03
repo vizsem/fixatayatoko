@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import notify from '@/lib/notify';
-
-import { auth, getDoc, onAuthStateChanged } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 type AllowedRole = 'admin' | 'superadmin' | 'super_admin' | 'owner' | 'cashier' | 'employee' | 'staff';

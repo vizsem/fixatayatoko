@@ -457,3 +457,17 @@ export function extractTableColumns(table: string, data: any): Record<string, an
 export function generateId(table: string): string {
   return `${table.slice(0, 4)}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
+
+/**
+ * Simbol penanda untuk operasi increment atomik.
+ * `sbUpdateDoc` mendeteksi ini dan menggunakan nilai delta, bukan menimpa.
+ */
+export const INCREMENT_MARKER = Symbol('supabase_increment');
+
+/**
+ * Bungkus nilai delta agar `sbUpdateDoc` tahu ini adalah increment atomik,
+ * bukan penugasan langsung.
+ */
+export function increment(n: number): any {
+  return { [INCREMENT_MARKER as any]: true, delta: n };
+}

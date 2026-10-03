@@ -12,8 +12,8 @@ import { id } from 'date-fns/locale';
 import { ActivityLog } from '@/lib/activity';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
-import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, limit, onSnapshot, orderBy, query } from '@/lib/firebase';
+import { getUserAndRole } from '@/lib/supabase-helpers';
+
 import { isAdminRole } from '@/lib/auth-helpers';
 
 const TYPE_ICONS: Record<string, any> = {
@@ -61,20 +61,39 @@ let unsubAuth: (() => void) | undefined;
   unsubAuth = () => subscription.unsubscribe();
 })();
 
-    const q = query(
-      collection(db, 'activity_logs'),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLog)));
+    // Fetch awal
+    const fetchLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      setLogs((data || []).map((row: any) => ({
+        id: row.id,
+        type: row.type,
+        adminId: row.admin_id,
+        adminName: row.admin_name,
+        targetId: row.target_id,
+        targetName: row.target_name,
+        description: row.description,
+        metadata: row.metadata,
+        timestamp: row.created_at,
+      } as ActivityLog)));
       setLoading(false);
-    });
+    };
+    fetchLogs();
+
+    // Supabase Realtime – push update saat ada baris baru
+    const channel = supabase
+      .channel('activity_logs:changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, () => {
+        fetchLogs();
+      })
+      .subscribe();
 
     return () => {
       if (unsubAuth) unsubAuth();
-      unsub();
+      supabase.removeChannel(channel);
     };
   }, [router]);
 

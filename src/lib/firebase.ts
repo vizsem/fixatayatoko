@@ -22,6 +22,7 @@ import {
   generateId,
   mergeRowWithRawData,
   toFilterValue,
+  INCREMENT_MARKER,
 } from '@/lib/db-schema';
 
 const isServer = typeof window === 'undefined';
@@ -599,15 +600,9 @@ export function serverTimestamp(): string {
   return new Date().toISOString();
 }
 
-export const INCREMENT_MARKER = Symbol('supabase_increment');
-
-/**
- * Returns a special marker object for atomic increments.
- * updateDoc detects this and calls Supabase RPC `increment_column` instead of overwriting.
- */
-export function increment(n: number): any {
-  return { [INCREMENT_MARKER as any]: true, delta: n };
-}
+// Sumber kebenaran INCREMENT_MARKER ada di db-schema.ts
+// Di-reekspor agar impor lama `@/lib/firebase` tetap bekerja.
+export { INCREMENT_MARKER, increment } from '@/lib/db-schema';
 
 
 export function arrayUnion(...items: any[]): any {

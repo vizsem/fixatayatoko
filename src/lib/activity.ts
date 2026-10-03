@@ -1,7 +1,5 @@
 // lib/activity.ts - Rewritten for Supabase
 import { supabase } from '@/lib/supabase';
-
-import { auth, limit } from '@/lib/firebase';
 export type ActivityType = 
   | 'LOGIN' 
   | 'LOGOUT' 

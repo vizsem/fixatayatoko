@@ -1,72 +1,68 @@
+import { supabase } from '@/lib/supabase';
 import { Product, NotificationItem } from '@/lib/types';
-import { sbGetDoc } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 
 export async function fetchUserHomeData(userId: string) {
   try {
-    const [userSnap, ordersSnap, notifSnap] = await Promise.all([
-      sbGetDoc('users', userId, false),
-      getDocs(query(
-        collection(db, 'orders'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      )).catch(() => ({ docs: [] })),
-      getDocs(query(
-        collection(db, 'notifications'),
-        where('userId', 'in', [userId, 'all']),
-        orderBy('createdAt', 'desc'),
-        limit(30)
-      )).catch(() => ({ docs: [] })),
+    const [userRes, ordersRes, notifRes] = await Promise.all([
+      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
+      supabase
+        .from('orders')
+        .select('items')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('notifications')
+        .select('*')
+        .in('user_id', [userId, 'all'])
+        .order('created_at', { ascending: false })
+        .limit(30),
     ]);
 
-    const userName = userSnap.exists() ? userSnap.data()?.name : null;
+    const userData = userRes.data;
+    const userName: string | null =
+      userData?.full_name || userData?.name || (userData?.raw_data as any)?.name || null;
 
-    // Repurchase products
+    // Kumpulkan ID produk unik dari riwayat pesanan untuk rekomendasi beli ulang
+    const allItems: any[] = (ordersRes.data || []).flatMap((o: any) => o.items || []);
+    const uniqueItemIds: string[] = Array.from(
+      new Set(allItems.map((i: any) => i.id || i.productId).filter(Boolean))
+    ).slice(0, 10) as string[];
+
     let repurchaseProducts: Product[] = [];
-    const allItems = ordersSnap.docs.flatMap((d: any) => d.data().items || []);
-    const uniqueItemIds = Array.from(new Set(allItems.map((i: any) => i.id))).slice(0, 10);
-
     if (uniqueItemIds.length > 0) {
       try {
-        const pSnap = await getDocs(
-          query(collection(db, 'products'), where('__name__', 'in', uniqueItemIds))
-        );
-        repurchaseProducts = pSnap.docs.map((doc: any) => {
-          const data = { id: doc.id, ...doc.data() };
-          return {
-            id: data.id,
-            name: String(data.name || data.Nama || 'Produk'),
-            price: Number(data.price || data.Ecer) || 0,
-            wholesalePrice: Number(data.wholesalePrice || data.Grosir) || 0,
-            minWholesale: Number(data.minWholesale || data.Min_Grosir || 1),
-            stock: Number(data.stock || data.Stok || 0),
-            unit: String(data.unit || data.Satuan || 'pcs'),
-            category: String(data.category || data.Kategori || 'Umum'),
-            image: String(data.image || data.Link_Foto || '/logo-atayatoko.png'),
-          } as Product;
-        });
+        const { data: products } = await supabase
+          .from('products')
+          .select('id,name,Nama,price,Ecer,wholesalePrice,Grosir,minWholesale,Min_Grosir,stock,Stok,unit,Satuan,category,Kategori,image,Link_Foto,image_url,Status')
+          .in('id', uniqueItemIds)
+          .eq('Status', 1);
+
+        repurchaseProducts = (products || []).map((data: any) => ({
+          id: data.id,
+          name: String(data.name || data.Nama || 'Produk'),
+          price: Number(data.price || data.Ecer) || 0,
+          wholesalePrice: Number(data.wholesalePrice || data.Grosir) || 0,
+          minWholesale: Number(data.minWholesale || data.Min_Grosir || 1),
+          stock: Number(data.stock || data.Stok || 0),
+          unit: String(data.unit || data.Satuan || 'pcs'),
+          category: String(data.category || data.Kategori || 'Umum'),
+          image: String(data.image_url || data.image || data.Link_Foto || '/logo-atayatoko.png'),
+        })) as Product[];
       } catch (err) {
         console.error('Error fetching repurchase products:', err);
       }
     }
 
-    const notifications: NotificationItem[] = notifSnap.docs.map((d: any) => ({
-      id: d.id,
-      ...d.data(),
+    const notifications: NotificationItem[] = (notifRes.data || []).map((row: any) => ({
+      id: row.id,
+      ...(row.raw_data || row),
+      created_at: row.created_at,
     }));
 
-    return {
-      userName,
-      repurchaseProducts,
-      notifications,
-    };
+    return { userName, repurchaseProducts, notifications };
   } catch (err) {
     console.error('Error fetching user home data:', err);
-    return {
-      userName: null,
-      repurchaseProducts: [],
-      notifications: [],
-    };
+    return { userName: null, repurchaseProducts: [], notifications: [] };
   }
 }

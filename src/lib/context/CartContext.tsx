@@ -5,7 +5,6 @@ import { CartItem } from '@/lib/types';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { auth } from '@/lib/firebase';
 interface CartContextType {
   cart: CartItem[];
   itemCount: number;

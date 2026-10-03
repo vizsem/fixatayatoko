@@ -15,7 +15,6 @@ import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, limit, orderBy, query, addDoc } from '@/lib/firebase';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import {
   updateProductPrice,
@@ -241,9 +240,12 @@ export default function PricingHPPPage() {
 
       // Fetch cost / price change history
       try {
-        const qLogs = query(collection(db, 'product_cost_logs'), orderBy('changeDate', 'desc'), limit(150));
-        const logSnap = await getDocs(qLogs);
-        const logs = logSnap.docs.map(d => ({ id: d.id, ...d.data() } as CostPriceLog));
+        const { data: logsData } = await supabase
+          .from('product_cost_logs')
+          .select('*')
+          .order('changeDate', { ascending: false })
+          .limit(150);
+        const logs = (logsData || []).map(d => ({ id: d.id, ...d } as CostPriceLog));
         setCostLogs(logs);
       } catch (err) {
         console.warn('Gagal load log cost_logs:', err);
@@ -666,7 +668,9 @@ export default function PricingHPPPage() {
       const hasPriceChanged = oldPrice !== newPrice;
       if (hasCostChanged || hasPriceChanged) {
         try {
-          await addDoc(collection(db, 'product_cost_logs'), {
+          const now = new Date().toISOString();
+          await supabase.from('product_cost_logs').insert({
+            id: `prcl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             productId: editingProduct.id,
             productName: editingProduct.name,
             oldCost,
@@ -674,12 +678,13 @@ export default function PricingHPPPage() {
             oldPrice,
             newPrice,
             adminEmail,
-            changeDate: new Date(),
+            changeDate: now,
             notes: editIsHppLocked
               ? 'Update harga & kunci HPP'
               : (hasCostChanged && hasPriceChanged
                   ? 'Update cepat modal & harga jual'
                   : (hasCostChanged ? 'Update cepat harga modal' : 'Update cepat harga jual ecer')),
+            created_at: now,
           });
         } catch (logErr) {
           console.warn('Gagal tulis log audit:', logErr);

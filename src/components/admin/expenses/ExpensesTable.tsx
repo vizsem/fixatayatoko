@@ -1,7 +1,6 @@
 import { Trash2, Edit, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
-import { Timestamp } from '@/lib/firebase';
 interface Expense {
   id: string;
   date: any;
@@ -19,7 +18,7 @@ interface TableProps {
 export function ExpensesTable({ expenses, onDelete }: TableProps) {
   const formatDate = (date: any) => {
     if (!date) return '-';
-    const d = date instanceof Timestamp ? date.toDate() : new Date(date);
+    const d = date && typeof date.toDate === 'function' ? date.toDate() : new Date(date);
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 

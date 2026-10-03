@@ -9,7 +9,6 @@ import { toast, Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { sbUpsertDoc } from '@/lib/supabase-helpers';
-import { auth, createUserWithEmailAndPassword } from '@/lib/firebase';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -25,23 +24,34 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      await sbUpsertDoc('users', userCredential.user.uid, {
-        name: formData.name, email: formData.email, phone: formData.phone,
-        address: formData.address, role: 'user', points: 0,
-        createdAt: new Date().toISOString(), lastActive: new Date().toISOString()
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: { data: { full_name: formData.name } },
       });
+      if (error) throw error;
+      const uid = data.user?.id;
+      if (uid) {
+        await sbUpsertDoc('users', uid, {
+          name: formData.name, email: formData.email, phone: formData.phone,
+          address: formData.address, role: 'user', points: 0,
+          createdAt: new Date().toISOString(), lastActive: new Date().toISOString()
+        });
+      }
       toast.success('Registrasi berhasil! Silakan masuk.');
       router.push('/profil/login');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Register error:', error);
-      const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
-      const messages: Record<string, string> = {
-        'auth/email-already-in-use': 'Email sudah terdaftar. Gunakan email lain.',
-        'auth/invalid-email': 'Format email tidak valid.',
-        'auth/weak-password': 'Password minimal 6 karakter.',
-      };
-      toast.error(messages[code] || 'Gagal mendaftar. Coba lagi.');
+      const msg = error?.message || '';
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
+        toast.error('Email sudah terdaftar. Gunakan email lain.');
+      } else if (msg.includes('invalid')) {
+        toast.error('Format email tidak valid.');
+      } else if (msg.includes('password')) {
+        toast.error('Password minimal 6 karakter.');
+      } else {
+        toast.error('Gagal mendaftar. Coba lagi.');
+      }
     } finally {
       setLoading(false);
     }

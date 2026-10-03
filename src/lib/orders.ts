@@ -1,7 +1,5 @@
 // lib/orders.ts - Rewritten for Supabase
 import { supabase } from '@/lib/supabase';
-
-import { auth } from '@/lib/firebase';
 export const createOrder = async (orderData: {
   customerName: string;
   customerPhone: string;

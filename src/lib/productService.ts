@@ -2,7 +2,6 @@
 import { supabase } from '@/lib/supabase';
 import { Product } from './types';
 
-import { query } from '@/lib/firebase';
 // ✅ Membuat Produk Baru
 export async function createProduct(product: Omit<Product, 'id'>): Promise<string> {
   const payload: any = { ...product };

@@ -4,15 +4,15 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
-import { auth, signOut } from '@/lib/firebase';
 export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
     const handleLogout = async () => {
       try {
-        await signOut(auth);
+        await supabase.auth.signOut();
         toast.success('Berhasil logout!');
         router.push('/');
       } catch (error) {

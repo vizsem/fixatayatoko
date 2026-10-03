@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { doc, collection } from '@/lib/firebase';
 
 type Account =
   | 'Cash'
@@ -54,12 +53,6 @@ export const postJournal = async (entry: LedgerEntry, tx?: any) => {
       createdAt: now,
       updatedAt: now,
     };
-
-    if (tx && typeof tx.set === 'function') {
-      const docRef = doc(collection({} as any, 'ledger_entries'), id);
-      tx.set(docRef, raw_data);
-      return;
-    }
 
     const { error } = await supabase.from('ledger_entries').insert({
       id,

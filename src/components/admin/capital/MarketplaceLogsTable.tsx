@@ -1,6 +1,5 @@
 import { Store } from 'lucide-react';
 
-import { Timestamp } from '@/lib/firebase';
 interface MarketplaceLog {
   id: string;
   accountId: string;
@@ -46,7 +45,7 @@ export function MarketplaceLogsTable({ logs }: { logs: MarketplaceLog[] }) {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {logs.map((lg) => {
-                const dateObj = lg.date ? (lg.date instanceof Timestamp ? lg.date.toDate() : new Date(lg.date)) : null;
+                const dateObj = lg.date ? (lg.date && typeof lg.date.toDate === 'function' ? lg.date.toDate() : new Date(lg.date)) : null;
                 const isAdjust = lg.type === 'ADJUST';
                 const adjustText = isAdjust
                   ? `Aktif: ${((lg.activeChange || 0) >= 0 ? '+' : '') + (lg.activeChange || 0).toLocaleString()} | Tertahan: ${((lg.pendingChange || 0) >= 0 ? '+' : '') + (lg.pendingChange || 0).toLocaleString()}`

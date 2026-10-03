@@ -38,7 +38,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, query, signOut, where, getCountFromServer } from '@/lib/firebase';
+
 interface NavItem {
   label: string;
   href: string;
@@ -111,13 +111,12 @@ export default function AdminMobileHeader() {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) return;
       try {
-        const q = query(
-          collection(db, 'messages'),
-          where('read', '==', false),
-          where('recipientId', '==', user.id)
-        );
-        const snap = await getCountFromServer(q);
-        setUnreadCount(snap.data().count);
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('read', false)
+          .eq('recipientId', user.id);
+        setUnreadCount(count ?? 0);
       } catch (e) {
         console.error('Failed to get unread count', e);
       }
@@ -144,7 +143,7 @@ export default function AdminMobileHeader() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await supabase.auth.signOut();
       window.location.href = '/profil/login';
     } catch (error) {
       notify.admin.error('Gagal logout');

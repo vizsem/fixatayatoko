@@ -8,7 +8,6 @@ import { stockSyncService } from '@/lib/stockSyncService';
 import { type StockSyncLog, type StockValidation, type SyncConfig } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
-import { limit } from '@/lib/firebase';
 export function useStockSync(productId?: string, warehouseId?: string) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);

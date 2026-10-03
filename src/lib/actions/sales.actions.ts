@@ -5,7 +5,6 @@ import { requireStaff } from '@/lib/actions/session';
 import { deductStockFEFO, addStock, addInventoryLog } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
-import { limit } from '@/lib/firebase';
 type SalesItemInput = {
   productId: string
   quantity: number

@@ -8,7 +8,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc } from '@/lib/supabase-helpers';
-import { auth, doc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Supplier = {
   id: string;

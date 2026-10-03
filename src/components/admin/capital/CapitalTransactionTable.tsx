@@ -1,6 +1,5 @@
 import { History, Trash2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
-import { Timestamp } from '@/lib/firebase';
 interface Transaction {
   id: string;
   type: 'INJECTION' | 'WITHDRAWAL';
@@ -47,7 +46,7 @@ export function CapitalTransactionTable({ transactions, onDelete }: TableProps) 
             </thead>
             <tbody className="divide-y divide-slate-50">
               {transactions.map((t) => {
-                const dateObj = t.date ? (t.date instanceof Timestamp ? t.date.toDate() : new Date(t.date)) : null;
+                const dateObj = t.date ? (t.date && typeof t.date.toDate === 'function' ? t.date.toDate() : new Date(t.date)) : null;
                 const isInjection = t.type === 'INJECTION';
                 
                 return (

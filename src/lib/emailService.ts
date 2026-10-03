@@ -2,7 +2,6 @@ import nodemailer from 'nodemailer';
 import { Order, User } from './types';
 import logger from './logger';
 
-import { auth } from '@/lib/firebase';
 // Email configuration dari environment variables
 const SMTP_CONFIG = {
   host: process.env.SMTP_HOST || 'smtp.gmail.com',

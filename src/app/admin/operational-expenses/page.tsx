@@ -16,7 +16,7 @@ import { ExpensesTable } from '@/components/admin/expenses/ExpensesTable';
 import { supabase } from '@/lib/supabase';
 
 import { sbDeleteDoc } from '@/lib/supabase-helpers';
-import { Timestamp, collection, db, doc, getDocs, orderBy, query } from '@/lib/firebase';
+
 export default function OperationalExpensesPage() {
   const [expenses, setExpenses] = useState<OperationalExpense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,9 +30,12 @@ export default function OperationalExpensesPage() {
     const fetchExpenses = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'operational_expenses'), orderBy('date', 'desc'));
-        const snapshot = await getDocs(q);
-        setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as OperationalExpense[]);
+        const { data, error } = await supabase
+          .from('operational_expenses')
+          .select('*')
+          .order('date', { ascending: false });
+        if (error) throw error;
+        setExpenses((data || []) as OperationalExpense[]);
       } catch (error) {
         Sentry.captureException(error);
         notify.error('Failed to load expenses');
