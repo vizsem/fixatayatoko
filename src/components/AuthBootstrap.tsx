@@ -3,8 +3,6 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { writeAccessTokenCookie } from '@/lib/auth-cookie';
-
-import { auth } from '@/lib/firebase';
 export default function AuthBootstrap() {
   useEffect(() => {
     // Salinan sesi untuk sisi server.

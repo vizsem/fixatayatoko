@@ -36,7 +36,7 @@ export const HomeBanners = ({ banners, activePromos }: HomeBannersProps) => {
         </div>
 
         {/* Dynamic Banners */}
-        {banners.map((bn) => (
+        {banners.map((bn, idx) => (
           <div key={bn.id} className={`min-w-[92%] md:min-w-full snap-center rounded-[2.5rem] bg-gradient-to-r ${bn.gradient} text-white p-8 relative overflow-hidden shadow-lg`}>
             <div className="relative z-10">
               <span className="bg-white/20 text-xs font-black px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Pengumuman</span>
@@ -52,7 +52,8 @@ export const HomeBanners = ({ banners, activePromos }: HomeBannersProps) => {
                   src={bn.imageUrl} 
                   alt="Banner" 
                   className="w-full h-full object-cover rounded-2xl" 
-                  loading="eager"
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  decoding="async"
                 />
               </div>
             ) : null}

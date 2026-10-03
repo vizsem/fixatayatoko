@@ -9,7 +9,6 @@ import {
 import { UserProfile, NotificationItem } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
-import { query, ref } from '@/lib/firebase';
 interface HomeHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;

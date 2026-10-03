@@ -1,8 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { MessageCircle, X } from 'lucide-react';
-import CustomerChat from './CustomerChat';
+
+const CustomerChat = dynamic(() => import('./CustomerChat'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full min-h-[300px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+    </div>
+  ),
+});
 
 export default function FloatingChatButton() {
   const [isOpen, setIsOpen] = useState(false);

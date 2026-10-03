@@ -4,12 +4,11 @@ import Script from 'next/script';
 import './globals.css';
 import MobileNav from '@/components/MobileNav';
 import { Toaster } from 'react-hot-toast';
-import CustomerChatWidget from '@/components/CustomerChatWidget';
 import AuthBootstrap from '@/components/AuthBootstrap';
 import BuyerHeaderActions from '@/components/BuyerHeaderActions';
-import FloatingChatButton from '@/components/FloatingChatButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { CartProvider } from '@/lib/context/CartContext';
+import ChatWidgets from '@/components/ChatWidgets';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -18,8 +17,6 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#ffffff',
 };
@@ -112,8 +109,7 @@ export default function RootLayout({
           <CartProvider>
             <Toaster position="top-center" />
             <AuthBootstrap />
-            <CustomerChatWidget />
-            <FloatingChatButton />
+            <ChatWidgets />
             <div className="hidden md:flex fixed top-4 right-4 z-[120] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg rounded-full px-2 py-1">
               <BuyerHeaderActions />
             </div>

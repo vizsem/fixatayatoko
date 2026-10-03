@@ -920,7 +920,7 @@ export default function AdminProducts() {
                     </button>
                     <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.trim().startsWith('http') || p.imageUrl.trim().startsWith('/')) ? (
-                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
+                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                       ) : (
                         <Camera size={16} className="text-gray-300" />
                       )}
@@ -1056,7 +1056,11 @@ export default function AdminProducts() {
                             <img
                               src={p.imageUrl}
                               alt={p.name}
-                              className="object-cover"
+                              className="object-cover w-full h-full"
+                              width={40}
+                              height={40}
+                              loading="lazy"
+                              decoding="async"
                             />
                           ) : (
                             <Camera size={14} className="text-gray-300" />

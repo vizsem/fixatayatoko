@@ -259,10 +259,10 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
                   <img 
                     src={getProxiedImage(product.image)} 
                     alt={product.name}
-                    className="object-cover"
+                    className="object-cover w-full h-full"
                     sizes={viewMode === 'grid' ? "50vw" : "100px"}
-                    
-                    
+                    loading="lazy"
+                    decoding="async"
                   />
                   {product.wholesalePrice > 0 && (
                     <div className="absolute top-2 left-2 bg-blue-600 text-xs text-white font-bold px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">

@@ -99,7 +99,22 @@ const nextConfig: NextConfig = {
   },
   // NOTE: TypeScript build errors must be fixed — ignoreBuildErrors removed for production safety
   // typescript: { ignoreBuildErrors: true }, // DO NOT re-enable this
-
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.optimization = config.optimization || {};
+      config.optimization.splitChunks = config.optimization.splitChunks || {};
+      config.optimization.splitChunks.cacheGroups = {
+        ...(config.optimization.splitChunks.cacheGroups || {}),
+        firebase: {
+          test: /[\\/]src[\\/]lib[\\/]firebase\.ts|[\\/]node_modules[\\/](@firebase|firebase)[\\/]/,
+          name: 'firebase-compat',
+          chunks: 'all',
+          priority: 40,
+        },
+      };
+    }
+    return config;
+  },
 };
 
 export default withBundleAnalyzer(withPWA(nextConfig));

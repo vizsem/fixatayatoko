@@ -151,6 +151,8 @@ function WishlistCard({ product, onRemove, onAdd, isWishlist }: {
             src={imgSrc}
             alt={product.name || 'Produk'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            decoding="async"
           />
         </Link>
         {isWishlist && (
