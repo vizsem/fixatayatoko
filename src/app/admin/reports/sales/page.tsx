@@ -17,7 +17,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDocs } from '@/lib/supabase-helpers';
-import { Timestamp } from '@/lib/firebase';
+
 type SaleItem = {
   id: string;
   date: string;

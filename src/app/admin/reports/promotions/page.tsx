@@ -14,7 +14,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth } from '@/lib/firebase';
+
 
 type PromotionRecord = {
   id: string;

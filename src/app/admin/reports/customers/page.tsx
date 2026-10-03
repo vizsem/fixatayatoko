@@ -18,7 +18,7 @@ import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth, doc } from '@/lib/firebase';
+
 type Customer = {
   id: string;
   name: string;

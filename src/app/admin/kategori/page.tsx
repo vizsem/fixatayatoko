@@ -13,7 +13,7 @@ import { InventorySkeleton } from '@/components/admin/InventorySkeleton';
 import { supabase } from '@/lib/supabase';
 
 import { sbDeleteDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { collection, db, doc, limit, query, where, getCountFromServer } from '@/lib/firebase';
+
 type Category = {
   id: string;
   name: string;
@@ -43,13 +43,11 @@ export default function AdminCategories() {
         const data = doc.data();
         let count = 0;
         try {
-          const q1 = query(collection(db, 'products'), where('Kategori', '==', data.name), limit(1));
-          const q2 = query(collection(db, 'products'), where('category', '==', data.name), limit(1));
-          const [snap1, snap2] = await Promise.all([
-            getCountFromServer(q1).catch(() => ({ data: () => ({ count: 0 }) })),
-            getCountFromServer(q2).catch(() => ({ data: () => ({ count: 0 }) }))
-          ]);
-          count = snap1.data().count + snap2.data().count;
+          const { count: c } = await supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('category', data.name);
+          count = c || 0;
         } catch (error) {
           Sentry.captureException(error);
           count = data.productCount || 0;

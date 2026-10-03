@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { getUserAndRole, sbGetDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth, deleteObject, doc, getDownloadURL, ref, storage, uploadBytes } from '@/lib/firebase';
+import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -144,17 +144,14 @@ export default function EditProductPage() {
     if (!imageFile) return product.image;
 
     try {
-      // Hapus gambar lama jika ada
-      if (product.image && !product.image.includes('placehold.co')) {
-        const oldRef = ref(storage, product.image);
-        await deleteObject(oldRef).catch(() => {}); // Ignore error if file not found
+      const fd = new FormData();
+      fd.append('file', imageFile);
+      fd.append('folder', `products/${id}`);
+      const res = await uploadImageAction(fd);
+      if (!res.success || !res.url) {
+        throw new Error(res.error || 'Gagal upload');
       }
-
-      // Upload gambar baru
-      const imageRef = ref(storage, `products/${id}/${Date.now()}`);
-      await uploadBytes(imageRef, imageFile);
-      const downloadURL = await getDownloadURL(imageRef);
-      return downloadURL;
+      return res.url;
     } catch (err) {
       console.error('Gagal upload gambar:', err);
       toast.error('Gagal mengupload gambar. Gunakan gambar default.');

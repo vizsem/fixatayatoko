@@ -21,7 +21,6 @@ import {
 } from '@/lib/shipping';
 
 import { sbGetDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, getDocs, limit, query, where } from '@/lib/firebase';
 
 type CartValidationResult = { ok: boolean; msg: string };
 

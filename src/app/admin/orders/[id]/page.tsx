@@ -19,8 +19,7 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
-
-import { Timestamp } from '@/lib/firebase';
+import { FirestoreTimestamp } from '@/lib/types';
 import { getUserAndRole, getRoleFromUser } from '@/lib/supabase-helpers';
 // Seluruh akses data halaman ini kini lewat Server Action yang memeriksa peran
 // pemanggilnya. Sebelumnya halaman membaca dan menulis `orders`, `products`,
@@ -79,7 +78,7 @@ type Order = {
   deliveryMethod: string;
   deliveryAddress?: string;
   deliveryLocation?: DeliveryLocation;
-  createdAt: Timestamp | null;
+  createdAt: FirestoreTimestamp | Date | null;
   notes?: string;
   dueDate?: string;
   userId?: string;

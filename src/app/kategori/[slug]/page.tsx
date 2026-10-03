@@ -11,8 +11,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { sbGetDoc } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
+import { sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 type Product = {
   id: string;
   name: string;
@@ -63,13 +62,15 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
         const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
 
         // Coba query terindeks berdasarkan kategori asli (nama kategori penuh)
-        const qIndexed = query(
-          collection(db, 'products'),
-          where('isActive', '==', true),
-          where('category', '==', slug),
-          orderBy('name', 'asc')
-        );
-        const indexedSnap = await getDocs(qIndexed);
+        const indexedSnap = await sbGetDocs({
+          table: 'products',
+          where: [
+            { field: 'isActive', op: '==', val: true },
+            { field: 'category', op: '==', val: slug }
+          ],
+          orderBy: [{ field: 'name', direction: 'asc' }],
+          useAdmin: false,
+        });
         let products: Product[] = indexedSnap.docs
           .map(docSnap => {
             const d = docSnap.data() as Record<string, unknown>;
@@ -102,12 +103,12 @@ function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
 
         // Fallback: jika tidak ada hasil (mungkin field bukan 'category' atau link memakai slug)
         if (products.length === 0) {
-          const qActive = query(
-            collection(db, 'products'),
-            where('isActive', '==', true),
-            orderBy('name', 'asc')
-          );
-          const activeSnap = await getDocs(qActive);
+          const activeSnap = await sbGetDocs({
+            table: 'products',
+            where: [{ field: 'isActive', op: '==', val: true }],
+            orderBy: [{ field: 'name', direction: 'asc' }],
+            useAdmin: false,
+          });
           const mapped = activeSnap.docs
             .map(docSnap => {
               const d = docSnap.data() as Record<string, unknown>;

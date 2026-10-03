@@ -12,7 +12,7 @@ import {
 import notify from '@/lib/notify';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { getUserAndRole, sbInsertDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, limit, orderBy, query, addDoc, Timestamp } from '@/lib/firebase';
+
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 
 interface SamplingProduct {
@@ -116,8 +116,11 @@ export default function DailyCheckPage() {
 
       // Fetch histories
       try {
-        const qHist = query(collection(db, 'inventory_logs'), orderBy('createdAt', 'desc'), limit(50));
-        const snap = await getDocs(qHist);
+        const snap = await sbGetDocs({
+          table: 'inventory_logs',
+          orderBy: [{ field: 'createdAt', direction: 'desc' }],
+          limit: 50,
+        });
         const dailyLogs: SamplingHistory[] = [];
         snap.docs.forEach(d => {
           const dt = d.data();
@@ -243,12 +246,12 @@ export default function DailyCheckPage() {
       const matched = itemsPayload.filter(i => i.difference === 0).length;
       const discrepancies = itemsPayload.filter(i => i.difference !== 0);
 
-      // Simpan log ke Firebase/Supabase
-      await addDoc(collection(db, 'inventory_logs'), {
+      // Simpan log ke Supabase
+      await sbInsertDoc('inventory_logs', {
         type: 'DAILY_SAMPLING',
         source: 'DAILY_SAMPLING',
-        createdAt: now,
-        date: Timestamp.fromDate(now),
+        createdAt: now.toISOString(),
+        date: now.toISOString(),
         adminEmail,
         adminId,
         totalChecked: itemsPayload.length,

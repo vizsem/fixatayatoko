@@ -24,8 +24,7 @@ import notify from '@/lib/notify';
 import { StockSyncLog } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
-import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
-import { Timestamp, auth, collection, db, doc, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
+import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
 import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncLogsPage() {
   const router = useRouter();
@@ -39,22 +38,20 @@ export default function SyncLogsPage() {
   useEffect(() => {
     const loadLogs = async () => {
       try {
-        const logsRef = collection(db, 'stockSyncLogs');
-        let q = query(
-          logsRef,
-          orderBy('timestamp', 'desc'),
-          limit(limitCount)
-        );
-
+        const whereFilters: Array<{ field: string; op: '=='; val: any }> = [];
         if (filter !== 'ALL') {
-          q = query(q, where('status', '==', filter));
+          whereFilters.push({ field: 'status', op: '==', val: filter });
         }
-
         if (logType !== 'ALL') {
-          q = query(q, where('type', '==', logType));
+          whereFilters.push({ field: 'type', op: '==', val: logType });
         }
 
-        const snapshot = await getDocs(q);
+        const snapshot = await sbGetDocs({
+          table: 'stockSyncLogs',
+          where: whereFilters,
+          orderBy: [{ field: 'timestamp', direction: 'desc' }],
+          limit: limitCount,
+        });
         const logsData: StockSyncLog[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -98,7 +95,7 @@ export default function SyncLogsPage() {
   // Export logs
   const handleExport = () => {
     const data = filteredLogs.map(log => ({
-      'Waktu': (log.timestamp as Timestamp).toDate().toLocaleString('id-ID'),
+      'Waktu': (log.timestamp as any)?.toDate ? (log.timestamp as any).toDate().toLocaleString('id-ID') : new Date(log.timestamp as any).toLocaleString('id-ID'),
       'Tipe': log.type,
       'Status': log.status,
       'Produk': log.productId,
@@ -267,7 +264,7 @@ export default function SyncLogsPage() {
               {filteredLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
-                    {(log.timestamp as Timestamp).toDate().toLocaleString('id-ID')}
+                    {(log.timestamp as any)?.toDate ? (log.timestamp as any).toDate().toLocaleString('id-ID') : new Date(log.timestamp as any).toLocaleString('id-ID')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">

@@ -5,7 +5,6 @@ import { Send, Info, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 import { sbInsertDoc } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
@@ -23,17 +22,16 @@ export default function NotificationsPage() {
 
   const fetchHistory = async () => {
     try {
-        // Fetch recent broadcast notifications
-        const q = query(
-            collection(db, 'notifications'),
-            where('userId', '==', 'all'),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-        );
-        const snap = await getDocs(q);
-        setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('userId', 'all')
+        .order('createdAt', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setHistory(data || []);
     } catch (e) {
-        console.error(e);
+      console.error(e);
     }
   };
 

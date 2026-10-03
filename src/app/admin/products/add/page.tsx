@@ -16,7 +16,7 @@ import imageCompression from 'browser-image-compression';
 import { addProductFull, getCategories } from '@/lib/actions/product.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
-import { onSnapshot, collection, db } from '@/lib/firebase';
+import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 export default function AddProductPage() {
   const router = useRouter();
@@ -290,20 +290,15 @@ export default function AddProductPage() {
   };
 
 
-  // Load warehouses (masih dari Firestore) + categories (dari Supabase)
+  // Load warehouses & categories dari Supabase
   useEffect(() => {
-    const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => {
-      setWarehouses(s.docs.map(d => {
-        const data = d.data() as Record<string, unknown>;
-        const name = (typeof data.name === 'string' && data.name) ? data.name : d.id;
-        return { id: d.id, name };
-      }));
-    });
-    // Load kategori dari Supabase
+    getWarehouses().then((whs) => {
+      setWarehouses(whs.map(w => ({ id: w.id, name: w.name })));
+    }).catch(console.error);
+
     getCategories().then((cats) => {
       setCategories(cats.map((c) => ({ id: c.id, name: c.name })));
-    });
-    return () => { unsubW(); };
+    }).catch(console.error);
   }, []);
   return (
     <div className="p-3 md:p-4 bg-gray-50 text-black font-sans">

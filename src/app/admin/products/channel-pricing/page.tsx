@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
 import { sbUpdateDoc } from '@/lib/supabase-helpers';
-import { db, doc, limit, ref, writeBatch } from '@/lib/firebase';
+
 import { applyBulkPriceAdjustment, type BulkPricingMode } from '@/lib/channel-pricing-bulk';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
@@ -216,12 +216,9 @@ export default function ChannelPricingPage() {
     const toastId = notify.admin.loading('Menerapkan update harga massal...');
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user;
       const nowIso = new Date().toISOString();
-      const batch = writeBatch(db);
-
-      targetProducts.forEach((product) => {
+      await Promise.all(targetProducts.map((product) => {
         const unitCode = selectedUnit[product.id] || (product.unit || 'PCS').toString().toUpperCase();
         const existingPricing = (product.channelPricing || {}) as Record<string, Record<string, { price?: number }>>;
         const nextPricing = { ...existingPricing } as Record<string, Record<string, { price?: number }>>;
@@ -245,13 +242,11 @@ export default function ChannelPricingPage() {
           }));
         });
 
-        batch.update(doc(db, 'products', product.id), {
+        return sbUpdateDoc('products', product.id, {
           channelPricing: nextPricing,
           updatedAt: nowIso,
         });
-      });
-
-      await batch.commit();
+      }));
 
       try {
         await supabase.from('audit_logs').insert({
@@ -464,15 +459,8 @@ export default function ChannelPricingPage() {
       const chunkSize = 400; 
       
       for (let i = 0; i < productIds.length; i += chunkSize) {
-        const batch = writeBatch(db);
         const chunk = productIds.slice(i, i + chunkSize);
-        
-        chunk.forEach(pid => {
-            const ref = doc(db, 'products', pid);
-            batch.update(ref, { channelPricing: updates[pid] });
-        });
-        
-        await batch.commit();
+        await Promise.all(chunk.map((pid) => sbUpdateDoc('products', pid, { channelPricing: updates[pid] })));
       }
 
       notify.admin.success(`Berhasil memperbarui harga untuk ${productIds.length} produk`, { id: toastId });

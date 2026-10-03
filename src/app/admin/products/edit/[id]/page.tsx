@@ -21,7 +21,7 @@ import { getPurchaseStatsByProductId } from '@/lib/actions/purchase.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { collection, db, getDocs, orderBy, query, where } from '@/lib/firebase';
+
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 
 type ChannelPrices = {
@@ -238,12 +238,11 @@ export default function EditProductPage() {
   
   const fetchCostHistory = useCallback(async () => {
     try {
-      const q = query(
-        collection(db, 'product_cost_logs'), 
-        where('productId', '==', id),
-        orderBy('changeDate', 'desc')
-      );
-      const snap = await getDocs(q);
+      const snap = await sbGetDocs({
+        table: 'product_cost_logs',
+        where: [{ field: 'productId', op: '==', val: id }],
+        orderBy: [{ field: 'changeDate', direction: 'desc' }],
+      });
       const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setCostHistory(logs);
     } catch (e) {

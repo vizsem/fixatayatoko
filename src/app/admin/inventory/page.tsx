@@ -12,8 +12,6 @@ import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjust
 import { getProducts } from '@/lib/actions/product.actions';
 import HppCalculatorModal from '@/components/admin/inventory/HppCalculatorModal';
 
-import { limit } from '@/lib/firebase';
-
 /** Compute stock expressed in each configured unit */
 function stockInUnits(stock: number, units?: { code: string; contains?: number }[]): { code: string; qty: number }[] {
   if (!units || units.length === 0) return [];

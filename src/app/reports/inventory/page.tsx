@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth, doc } from '@/lib/firebase';
+
 
 type InventoryItem = {
   id: string;

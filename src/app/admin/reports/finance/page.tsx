@@ -24,7 +24,7 @@ import {
 } from '@/lib/hpp';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { Timestamp, auth } from '@/lib/firebase';
+
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -70,7 +70,7 @@ function toLocal(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function parseDateAny(val: any): Date {
-  if (val instanceof Timestamp) return val.toDate();
+  if (typeof val?.toDate === 'function') return val.toDate();
   if (val?.seconds) return new Date(val.seconds * 1000);
   return new Date(val || new Date().toISOString());
 }
@@ -336,10 +336,7 @@ let unsub: (() => void) | undefined;
 
         expenseSnap.docs.forEach(d => {
           const data = d.data() as any;
-          let created: Date;
-          if (data.date instanceof Timestamp) created = data.date.toDate();
-          else if (data.date?.seconds) created = new Date(data.date.seconds * 1000);
-          else created = new Date(data.date || new Date().toISOString());
+          const created = parseDateAny(data.date);
 
           if (!(created >= startDate && created <= endDate)) return;
           const amount = Number(data.amount || 0);

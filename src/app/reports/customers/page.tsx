@@ -17,7 +17,6 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth, doc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 type Order = {
   id: string;

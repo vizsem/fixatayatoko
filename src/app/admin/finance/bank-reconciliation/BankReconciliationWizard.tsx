@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, doc, getDocs, query, where, writeBatch } from '@/lib/firebase';
+import { sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
 // Types
 type BankMutation = {
   id: string; // generated
@@ -49,12 +49,10 @@ export default function BankReconciliationWizard() {
   useEffect(() => {
     const fetchPayouts = async () => {
       try {
-        const q = query(
-          collection(db, 'marketplace_transactions'),
-          where('type', '==', 'WITHDRAWAL')
-          // where('status', '!=', 'reconciled') // Requires index, filtering in JS for now
-        );
-        const snap = await getDocs(q);
+        const snap = await sbGetDocs({
+          table: 'marketplace_transactions',
+          where: [{ field: 'type', op: '==', val: 'WITHDRAWAL' }],
+        });
         const list: Payout[] = snap.docs.map(d => ({
           id: d.id,
           ...d.data()
@@ -208,23 +206,16 @@ export default function BankReconciliationWizard() {
   const handleConfirm = async () => {
     setProcessing(true);
     try {
-      const batch = writeBatch(db);
-      
-      // Update matched payouts to 'reconciled'
       const matchedMutations = mutations.filter(m => m.matched && m.matchId);
       
-      for (const m of matchedMutations) {
-        if (m.matchId) {
-          const payoutRef = doc(db, 'marketplace_transactions', m.matchId);
-          batch.update(payoutRef, { 
-            status: 'reconciled',
-            reconciledAt: new Date().toISOString(),
-            reconciledWith: m.description
-          });
-        }
-      }
+      await Promise.all(matchedMutations.map(m => {
+        return sbUpdateDoc('marketplace_transactions', m.matchId!, {
+          status: 'reconciled',
+          reconciledAt: new Date().toISOString(),
+          reconciledWith: m.description,
+        });
+      }));
       
-      await batch.commit();
       notify.admin.success(`Berhasil merekonsiliasi ${matchedMutations.length} transaksi.`);
       setStep(4); // Success/Summary
     } catch (err) {

@@ -12,7 +12,7 @@ import Link from 'next/link';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { auth, storage } from '@/lib/firebase';
+
 export default function AddOperationalExpensePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);

@@ -9,8 +9,7 @@ import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/lib/supabase';
 
-
-import { auth, collection, db, doc, getDocs, limit, onAuthStateChanged, query, ref, where } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('id');
@@ -28,11 +27,12 @@ function SuccessContent() {
         setLoading(false);
         return;
       }
-      try {
-        // PERBAIKAN: Menggunakan Query where('orderId') 
-        // karena doc ID firestore biasanya berbeda dengan ID Pesanan (ATY-XXXX)
-        const q = query(collection(db, 'orders'), where('orderId', '==', orderId), limit(1));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await sbGetDocs({
+          table: 'orders',
+          where: [{ field: 'orderId', op: '==', val: orderId }],
+          limit: 1,
+          useAdmin: false,
+        });
         if (!querySnapshot.empty) {
           setOrderData({ id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Order);
         }
@@ -42,10 +42,11 @@ function SuccessContent() {
         setLoading(false);
       }
     };
-    const unsub = onAuthStateChanged(auth, () => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       fetchOrder();
     });
-    return () => unsub();
+    fetchOrder();
+    return () => subscription.unsubscribe();
   }, [orderId]);
 
   useEffect(() => {

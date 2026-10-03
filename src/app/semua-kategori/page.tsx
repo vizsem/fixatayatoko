@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 import { supabase } from '@/lib/supabase';
-
-import { collection, db, doc, getDocs, orderBy, query, where } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 export default function AllCategoriesPage() {
   const [categories, setCategories] = useState<{ name: string, slug: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,12 +40,12 @@ export default function AllCategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const q = query(
-          collection(db, 'products'),
-          where('isActive', '==', true),
-          orderBy('name', 'asc')
-        );
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'isActive', op: '==', val: true }],
+          orderBy: [{ field: 'name', direction: 'asc' }],
+          useAdmin: false,
+        });
         const allKategori = querySnapshot.docs
           .map(doc => {
             const data = doc.data();

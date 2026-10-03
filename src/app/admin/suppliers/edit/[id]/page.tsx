@@ -7,7 +7,6 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
  import { ArrowLeft, Save, Users, Phone, Mail, MapPin } from 'lucide-react';
 

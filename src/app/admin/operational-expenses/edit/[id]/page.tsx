@@ -13,7 +13,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { Timestamp, db, doc, getDoc, getDownloadURL, ref, storage, updateDoc, uploadBytes } from '@/lib/firebase';
+
 export default function EditOperationalExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -32,7 +32,6 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
   useEffect(() => {
     const fetchExpense = async () => {
       try {
-        const docRef = doc(db, 'operational_expenses', id);
         const docSnap = await sbGetDoc('operational_expenses', id, false);
         
         if (docSnap.exists()) {
@@ -77,17 +76,23 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
 
       // Upload new file if selected
       if (file) {
-        const storageRef = ref(storage, `operational_expenses_proofs/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        proofUrl = await getDownloadURL(snapshot.ref);
+        const filePath = `operational_expenses_proofs/${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('operational_expenses_proofs')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('operational_expenses_proofs')
+          .getPublicUrl(filePath);
+        proofUrl = publicUrl;
       }
 
       // Update document
-      const docRef = doc(db, 'operational_expenses', id);
       await sbUpdateDoc('operational_expenses', id, {
         category,
         amount: Number(amount),
-        date: Timestamp.fromDate(new Date(date)),
+        date: new Date(date).toISOString(),
         description,
         proofOfPayment: proofUrl,
         updatedAt: new Date().toISOString()

@@ -19,7 +19,6 @@ import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
-import { auth, db, doc, getDoc } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
@@ -91,7 +90,6 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
 
     const fetchOrder = async () => {
       try {
-        const docRef = doc(db, 'orders', id);
         const docSnap = await sbGetDoc('orders', id, false);
 
         if (!docSnap.exists()) {

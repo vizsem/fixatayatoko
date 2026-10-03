@@ -14,7 +14,6 @@ import { Toaster } from 'react-hot-toast';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder } from '@/lib/actions/sales.actions';
 
-import { limit } from '@/lib/firebase';
 type Order = {
   id: string;
   soNumber: string;

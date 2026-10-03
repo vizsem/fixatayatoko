@@ -13,7 +13,6 @@ import {
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 /* ================= TYPES ================= */

@@ -25,7 +25,6 @@ import { SyncConfig } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
 import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth } from '@/lib/firebase';
 import { isAdminRole } from '@/lib/auth-helpers';
 export default function SyncConfigPage() {
   const router = useRouter();

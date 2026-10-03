@@ -7,7 +7,7 @@ import { Product } from '@/lib/types';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { collection, db, documentId, getDocs, limit, orderBy, query, where } from '@/lib/firebase';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 
 export default function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
@@ -21,16 +21,24 @@ export default function WishlistPage() {
         const wishlistIds = localWishlist ? JSON.parse(localWishlist) : [];
 
         if (wishlistIds.length > 0) {
-          const qWishlist = query(collection(db, 'products'), where(documentId(), 'in', wishlistIds.slice(0, 30)));
-          const wishlistSnap = await getDocs(qWishlist);
+          const wishlistSnap = await sbGetDocs({
+            table: 'products',
+            where: [{ field: 'id', op: 'in', val: wishlistIds.slice(0, 30) }],
+            useAdmin: false,
+          });
           setWishlistProducts(wishlistSnap.docs.map(d => {
             const data = d.data();
             return { id: d.id, name: data.name || 'Produk', price: Number(data.price) || 0, image: data.image || '/logo-atayatoko.png', category: data.category || 'Umum', unit: data.unit || 'pcs' } as Product;
           }));
         }
 
-        const qRec = query(collection(db, 'products'), where('isActive', '==', true), orderBy('name', 'asc'), limit(20));
-        const recSnap = await getDocs(qRec);
+        const recSnap = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'isActive', op: '==', val: true }],
+          orderBy: [{ field: 'name', direction: 'asc' }],
+          limit: 20,
+          useAdmin: false,
+        });
         const wishlistIdsSet = new Set(JSON.parse(localStorage.getItem('atayatoko-wishlist') || '[]'));
         setRecommendedProducts(
           recSnap.docs
