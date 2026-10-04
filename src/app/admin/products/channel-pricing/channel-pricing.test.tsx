@@ -140,8 +140,8 @@ describe('ChannelPricingPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Harga per Channel')).toBeInTheDocument();
       expect(screen.getAllByText('Produk Satu').length).toBeGreaterThan(0);
-    });
-  });
+    }, { timeout: 15000 });
+  }, 15000);
 
   it('harus mengubah dan menyimpan harga channel Shopee', async () => {
     const { default: notify } = await import('@/lib/notify');

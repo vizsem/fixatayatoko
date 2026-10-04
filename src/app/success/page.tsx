@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle, ShoppingBag, MessageCircle, Printer,
   Copy, Check, Loader2, Download, Clock, RefreshCw,
-  Wifi, WifiOff, AlertCircle, Sparkles, QrCode,
+  Wifi, WifiOff, AlertCircle, Sparkles, QrCode, ImageDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Order, OrderItem } from '@/lib/types';
@@ -154,10 +154,63 @@ function QrisSection({
   const [autoMode, setAutoMode] = useState(true);
   const [pollCount, setPollCount] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
+  const [isSavingQr, setIsSavingQr] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const paidRef = useRef(false);
+  const qrCardRef = useRef<HTMLDivElement>(null);
   // Parse expiry dari QR validity (15 menit dari sekarang, di-set saat QR generate)
   const [expiresAt] = useState(() => new Date(Date.now() + QR_VALIDITY_MINUTES * 60 * 1000).toISOString());
+
+  // ── Save QR to gallery ──────────────────────────────────────────────────
+  const saveQrToGallery = useCallback(async () => {
+    if (!qrCardRef.current || isSavingQr) return;
+    setIsSavingQr(true);
+    try {
+      const htmlToImage = await import('html-to-image');
+      // Render as high-res PNG (3× untuk galeri mobile)
+      const dataUrl = await htmlToImage.toPng(qrCardRef.current, {
+        quality: 1,
+        pixelRatio: 3,
+        backgroundColor: '#ffffff',
+        style: { borderRadius: '16px' },
+      });
+
+      // Coba Web Share API dulu (native share sheet di iOS/Android)
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.share &&
+        navigator.canShare
+      ) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          const file = new File([blob], `QRIS-${orderId}.png`, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: 'QRIS Ataya Toko',
+              text: `Kode QRIS untuk pesanan #${orderId}`,
+              files: [file],
+            });
+            toast.success('QR berhasil dibagikan / disimpan!');
+            return;
+          }
+        } catch (shareErr: unknown) {
+          // User cancel share — tidak perlu error toast
+          if ((shareErr as DOMException)?.name === 'AbortError') return;
+        }
+      }
+
+      // Fallback: trigger download biasa (tersimpan di folder Downloads/Galeri)
+      const link = document.createElement('a');
+      link.download = `QRIS-Ataya-${orderId}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('✅ QR disimpan ke galeri / folder Unduhan');
+    } catch {
+      toast.error('Gagal menyimpan QR — coba screenshot manual');
+    } finally {
+      setIsSavingQr(false);
+    }
+  }, [orderId, isSavingQr]);
 
   const checkStatus = useCallback(async () => {
     if (paidRef.current) return;
@@ -245,13 +298,18 @@ function QrisSection({
         {/* QR Code */}
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="relative flex-shrink-0">
-            <div className="bg-white p-3 rounded-2xl border-4 border-slate-100 shadow-inner">
+            {/* qrCardRef menangkap area ini untuk disimpan sebagai gambar */}
+            <div
+              ref={qrCardRef}
+              className="bg-white p-4 rounded-2xl border-4 border-slate-100 shadow-inner flex flex-col items-center gap-2"
+            >
               <QRCodeSVG
                 value={qrisContent}
                 size={180}
                 level="M"
                 includeMargin={false}
               />
+              <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">ATAYA TOKO · QRIS BRI</p>
             </div>
             {/* Pulse indicator */}
             {autoMode && (
@@ -297,7 +355,17 @@ function QrisSection({
         <CountdownBar expiresAt={expiresAt} />
 
         {/* Controls */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
+          <button
+            onClick={saveQrToGallery}
+            disabled={isSavingQr}
+            className="flex flex-col items-center gap-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors disabled:opacity-50"
+          >
+            {isSavingQr
+              ? <Loader2 size={14} className="text-emerald-500 animate-spin" />
+              : <ImageDown size={14} className="text-emerald-600" />}
+            <span className="text-[10px] font-bold text-emerald-600">Simpan QR</span>
+          </button>
           <button
             onClick={copyQr}
             className="flex flex-col items-center gap-1 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors"

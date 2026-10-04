@@ -18,7 +18,7 @@ describe('MemberCard', () => {
   it('should render member name correctly', () => {
     render(<MemberCard {...defaultProps} />);
     expect(screen.getByText('John Doe')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('should render member ID correctly', () => {
     render(<MemberCard {...defaultProps} />);

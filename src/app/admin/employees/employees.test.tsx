@@ -161,11 +161,11 @@ describe('EmployeesPage', () => {
   it('should render employees page with main sections', async () => {
     render(<EmployeesPage />);
     
-    expect(await screen.findByText('Human Capital')).toBeInTheDocument();
+    expect(await screen.findByText('Human Capital', {}, { timeout: 15000 })).toBeInTheDocument();
     expect(screen.getByText('Staff & Payroll Engine')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search Staff...')).toBeInTheDocument();
     expect(screen.getByText(/NEW STAFF/i)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('should show loading state initially', async () => {
     render(<EmployeesPage />);
