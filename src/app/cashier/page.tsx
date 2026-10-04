@@ -18,6 +18,7 @@ import { enqueueOfflineTx, getOfflineQueue, syncOfflineQueue, removeOfflineTx } 
 import type { OfflineTx } from '@/lib/offlineQueue';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
+import QrisPaymentModal from '@/components/QrisPaymentModal';
 import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
 import { getUserAndRole } from '@/lib/supabase-helpers';
@@ -182,6 +183,12 @@ export default function CashierPOS() {
   // Offline queue
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // QRIS Modal state
+  const [showQrisModal, setShowQrisModal] = useState(false);
+  const [qrisReferenceNo, setQrisReferenceNo] = useState('');
+  const [qrisConfirmed, setQrisConfirmed] = useState(false); // true = BRI SNAP sudah konfirmasi, skip upload bukti
+  const qrisConfirmedRef = useRef(false); // ref untuk akses sinkron di handleTransaction
 
   // Order history filter
   const [orderDateFilter, setOrderDateFilter] = useState<string>('');
@@ -1224,7 +1231,9 @@ export default function CashierPOS() {
   const handleTransaction = async () => {
     if (!currentShift) return toast.error('Kasir belum dibuka!');
     if (cart.length === 0) return;
-    if ((paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') && !paymentProof && !isOffline) return toast.error('Wajib upload bukti!');
+    // QRIS Dinamis (sudah dikonfirmasi via BRI SNAP) tidak perlu upload bukti manual
+    if (paymentMethod === 'QRIS' && !qrisConfirmedRef.current && !paymentProof && !isOffline) return toast.error('Bayar via QRIS terlebih dahulu atau upload bukti!');
+    if (paymentMethod === 'TRANSFER' && !paymentProof && !isOffline) return toast.error('Wajib upload bukti transfer!');
     if (paymentMethod === 'CASH' && change < 0) return toast.error('Uang kurang!');
     if (paymentMethod === 'TEMPO') {
       if (!customerName || !customerPhone || !tempoDueDate) return toast.error('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
@@ -1371,6 +1380,7 @@ export default function CashierPOS() {
             setCashGiven(''); setPaymentProof(null); setProofPreview(null);
             setCustomerName(''); setCustomerPhone(''); setTempoDueDate('');
             setSelectedCustomer(null); setCustomerSearch('');
+            qrisConfirmedRef.current = false; setQrisConfirmed(false);
           } catch (qErr) {
             toast.error('Gagal menyimpan transaksi offline. Catat manual!');
             console.error('Offline queue error:', qErr);
@@ -1438,6 +1448,7 @@ export default function CashierPOS() {
       setTempoDueDate('');
       setSelectedCustomer(null);
       setCustomerSearch('');
+      qrisConfirmedRef.current = false; setQrisConfirmed(false);
     } catch (e) {
       console.error(e);
       toast.error('Gagal Transaksi');
@@ -2107,10 +2118,26 @@ export default function CashierPOS() {
                   {['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'].map(m => (
                     <button
                       key={m}
-                      onClick={() => setPaymentMethod(m)}
-                      className={`p-3 rounded-xl text-xs font-black uppercase transition-all border-2 ${paymentMethod === m ? 'bg-green-50 text-green-600 border-green-200' : 'bg-gray-50 border-transparent hover:border-gray-200'}`}
+                      onClick={() => {
+                        if (m === 'QRIS') {
+                          // Buka modal QRIS — generate referenceNo unik
+                          const ref = `POS-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+                          setQrisReferenceNo(ref);
+                          setPaymentMethod('QRIS');
+                          setShowQrisModal(true);
+                        } else {
+                          setPaymentMethod(m);
+                        }
+                      }}
+                      className={`p-3 rounded-xl text-xs font-black uppercase transition-all border-2 ${
+                        paymentMethod === m
+                          ? m === 'QRIS'
+                            ? 'bg-blue-50 text-blue-600 border-blue-300'
+                            : 'bg-green-50 text-green-600 border-green-200'
+                          : 'bg-gray-50 border-transparent hover:border-gray-200'
+                      }`}
                     >
-                      {m}
+                      {m === 'QRIS' ? '⚡ QRIS' : m}
                     </button>
                   ))}
                 </div>
@@ -2757,6 +2784,27 @@ export default function CashierPOS() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── QRIS MPM Dinamis Modal ── */}
+      {showQrisModal && qrisReferenceNo && (
+        <QrisPaymentModal
+          total={total}
+          referenceNo={qrisReferenceNo}
+          description={`Kasir - ${cart.length} item`}
+          autoDetect={true}
+          onClose={() => {
+            setShowQrisModal(false);
+            qrisConfirmedRef.current = false;
+            setQrisConfirmed(false);
+          }}
+          onPaid={() => {
+            qrisConfirmedRef.current = true;
+            setQrisConfirmed(true);
+            setShowQrisModal(false);
+            handleTransaction();
+          }}
+        />
       )}
     </div>
   );
