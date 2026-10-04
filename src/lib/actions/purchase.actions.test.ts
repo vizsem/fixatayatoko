@@ -330,9 +330,8 @@ describe('payPurchaseDebt', () => {
     expect(hasil.success).toBe(true);
     const update = lastPurchaseUpdate();
     expect(update).toBeDefined();
-    expect(update!.payload.payment_status).toBe('LUNAS');
-    expect(update!.payload.payment_method).toBe('TRANSFER');
     expect(update!.payload.raw_data.paymentStatus).toBe('LUNAS');
+    expect(update!.payload.raw_data.paymentMethod).toBe('TRANSFER');
     expect(update!.payload.raw_data.notes).toContain('Lunas via BCA');
   });
 

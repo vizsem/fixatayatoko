@@ -916,8 +916,6 @@ export async function payPurchaseDebt(
     const { error: updateErr } = await supabaseAdmin
       .from('purchases')
       .update({
-        payment_status: 'LUNAS',
-        payment_method: paymentMethod || raw.paymentMethod || 'CASH',
         raw_data: updatedRaw,
         updated_at: new Date().toISOString()
       })
