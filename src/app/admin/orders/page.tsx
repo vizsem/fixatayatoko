@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ShoppingCart, Search, Truck, Printer,
+  ShoppingCart, Search, Truck, Printer, FileText, Receipt,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
   Clock, CheckCircle2, Trash2, RefreshCcw, Calendar,
   AlertTriangle, Ban, X, Loader2, Package
@@ -33,6 +33,7 @@ export default function AdminOrders() {
   const [activeTab, setActiveTab] = useState<'SEMUA' | 'DRAFT' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED'>('SEMUA');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [printMenuOpen, setPrintMenuOpen] = useState<string | null>(null);
   const itemsPerPage = 15;
 
   // State Modal Pembatalan & Restock
@@ -52,8 +53,16 @@ export default function AdminOrders() {
     loadOrders();
   }, [loadOrders]);
 
-  const handlePrint = (orderId: string) => {
-    router.push(`/admin/orders/print/${orderId}`);
+  // Close print menu when clicking outside
+  useEffect(() => {
+    if (!printMenuOpen) return;
+    const handler = () => setPrintMenuOpen(null);
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [printMenuOpen]);
+
+  const handlePrint = (orderId: string, mode: 'a4' | 'thermal' = 'a4') => {
+    router.push(`/admin/orders/print/${orderId}?mode=${mode}`);
   };
 
   const handleBulkUpdate = async (newStatus: string) => {
@@ -233,7 +242,43 @@ export default function AdminOrders() {
 
                 <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-none border-slate-50">
                   <Link href={`/admin/orders/${order.id}`} className="flex-1 md:flex-none px-5 py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest text-center">Detail</Link>
-                  <button onClick={() => handlePrint(order.id)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-900 transition-all"><Printer size={16} /></button>
+                  {/* Print split-button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setPrintMenuOpen(printMenuOpen === order.id ? null : order.id)}
+                      className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-900 hover:bg-slate-100 transition-all"
+                      title="Pilih format cetak"
+                    >
+                      <Printer size={16} />
+                    </button>
+                    {printMenuOpen === order.id && (
+                      <div className="absolute right-0 bottom-full mb-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-44">
+                        <div className="px-3 py-2 border-b border-slate-50">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Format Cetak</p>
+                        </div>
+                        <button
+                          onClick={() => { handlePrint(order.id, 'a4'); setPrintMenuOpen(null); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                        >
+                          <FileText size={15} className="text-blue-500" />
+                          <div>
+                            <p className="text-xs font-black">Invoice A4</p>
+                            <p className="text-xs text-slate-400 font-normal">Profesional, A4</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => { handlePrint(order.id, 'thermal'); setPrintMenuOpen(null); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left"
+                        >
+                          <Receipt size={15} className="text-slate-500" />
+                          <div>
+                            <p className="text-xs font-black">Struk Thermal</p>
+                            <p className="text-xs text-slate-400 font-normal">58mm / 80mm</p>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

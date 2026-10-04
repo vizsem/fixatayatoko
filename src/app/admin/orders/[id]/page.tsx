@@ -12,7 +12,8 @@ import {
   MessageSquare,
   Receipt,
   RefreshCcw,
-  XCircle
+  XCircle,
+  FileText
 } from 'lucide-react';
 
 import notify from '@/lib/notify';
@@ -112,6 +113,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [returnItems, setReturnItems] = useState<{ productId: string; name: string; quantity: number; price: number; selected: boolean }[]>([]);
   const [returnReason, setReturnReason] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const [printDropdownOpen, setPrintDropdownOpen] = useState(false);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({
     name: 'Ataya Toko',
     address: 'Jl. Pandan 98, Semen, Kediri',
@@ -199,11 +201,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }, [order]);
 
-  const handlePrint = () => {
+  const handlePrint = (mode: 'a4' | 'thermal' = 'a4') => {
     if (typeof window !== 'undefined' && order?.id) {
-      window.open(`/admin/orders/print/${order.id}`, '_blank');
+      window.open(`/admin/orders/print/${order.id}?mode=${mode}`, '_blank');
     }
   };
+
+  // Close print dropdown when clicking outside
+  useEffect(() => {
+    if (!printDropdownOpen) return;
+    const handler = () => setPrintDropdownOpen(false);
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [printDropdownOpen]);
 
   const updateStatus = async (newStatus: OrderStatus) => {
     if (!order || isUpdating) return;
@@ -555,12 +565,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             >
               <MessageSquare size={14} /> WhatsApp
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 text-xs font-semibold bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-all"
-            >
-              <Printer size={14} /> Cetak
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setPrintDropdownOpen(o => !o)}
+                className="flex items-center gap-2 text-xs font-semibold bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-all"
+              >
+                <Printer size={14} /> Cetak
+              </button>
+              {printDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-44">
+                  <div className="px-3 py-2 border-b border-slate-50">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Format Cetak</p>
+                  </div>
+                  <button
+                    onClick={() => { handlePrint('a4'); setPrintDropdownOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                  >
+                    <FileText size={15} className="text-blue-500" />
+                    <div>
+                      <p className="text-xs font-black">Invoice A4</p>
+                      <p className="text-xs text-slate-400 font-normal">Profesional, A4</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { handlePrint('thermal'); setPrintDropdownOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left"
+                  >
+                    <Receipt size={15} className="text-slate-500" />
+                    <div>
+                      <p className="text-xs font-black">Struk Thermal</p>
+                      <p className="text-xs text-slate-400 font-normal">58mm / 80mm</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             {order.status === 'SELESAI' && (
               <button
                 onClick={() => setIsReturnModalOpen(true)}
