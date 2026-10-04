@@ -6,13 +6,16 @@ import { useRouter } from 'next/navigation';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
-  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera
+  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera,
+  Settings, Zap, ScanLine
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
 import { simpanTransaksiKasir } from '@/lib/actions/cashier.actions';
+import { enqueueOfflineTx, getOfflineQueue, syncOfflineQueue, removeOfflineTx } from '@/lib/offlineQueue';
+import type { OfflineTx } from '@/lib/offlineQueue';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 import { supabase } from '@/lib/supabase';
@@ -108,8 +111,12 @@ export default function CashierPOS() {
 
   // States
   const [loading, setLoading] = useState(true);
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Default list view on mobile (grid on desktop)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'grid'
+  );
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [displayLimit, setDisplayLimit] = useState(80);
@@ -172,6 +179,13 @@ export default function CashierPOS() {
   const [selectedCategory, setSelectedCategory] = useState<string>('SEMUA');
   const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'outstock'>('all');
 
+  // Offline queue
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Order history filter
+  const [orderDateFilter, setOrderDateFilter] = useState<string>('');
+
   // Chat State
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
@@ -181,6 +195,16 @@ export default function CashierPOS() {
   // Scanner state
   const [showScanner, setShowScanner] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+
+  // Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  // scanMode: 'direct' = langsung masuk keranjang, 'confirm' = tampil toast lalu masuk keranjang
+  const [scanMode, setScanMode] = useState<'direct' | 'confirm'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('pos-scan-mode') as 'direct' | 'confirm') || 'direct';
+    }
+    return 'direct';
+  });
 
   const handleScan = useCallback(async (code: string) => {
     try {
@@ -246,14 +270,27 @@ export default function CashierPOS() {
       }
 
       playScanBeep();
-      setScannedProduct(matchedProd);
-      toast.success(`Produk ditemukan: ${matchedProd.name}`);
       setShowScanner(false);
+
+      if (scanMode === 'direct') {
+        // Mode langsung: tambah ke keranjang tanpa jeda
+        const unitMatch = matchedProd.units?.find((u: any) => u.barcode === cleanCode);
+        if (unitMatch) {
+          addToCartWithUnit(matchedProd, unitMatch);
+        } else {
+          addToCart(matchedProd);
+        }
+        toast.success(`✅ ${matchedProd.name} ditambahkan`);
+      } else {
+        // Mode konfirmasi: lewat state intermediate (toast dulu baru masuk keranjang)
+        setScannedProduct(matchedProd);
+        toast.success(`Produk ditemukan: ${matchedProd.name}`);
+      }
     } catch (err) {
       console.error('Scan error:', err);
       toast.error('Gagal membaca barcode');
     }
-  }, [products]);
+  }, [products, scanMode, addToCart, addToCartWithUnit]);
 
   // NOTE: Auth & shift loading is handled by the main useEffect below.
   // Removed duplicate auth listener that caused race conditions.
@@ -482,7 +519,22 @@ export default function CashierPOS() {
 
   useEffect(() => {
     // Detect Offline Status
-    const handleOnline = () => setIsOffline(false);
+    const handleOnline = async () => {
+      setIsOffline(false);
+      // Auto-sync offline queue when back online
+      try {
+        const q = await getOfflineQueue();
+        if (q.length > 0) {
+          setIsSyncing(true);
+          toast('🔄 Koneksi pulih — menyinkronkan ' + q.length + ' transaksi offline...', { duration: 4000 });
+          const { synced, failed } = await syncOfflineQueue(simpanTransaksiKasir);
+          setOfflineQueueCount(failed);
+          if (synced > 0) toast.success(`✅ ${synced} transaksi offline berhasil disinkronkan!`);
+          if (failed > 0) toast.error(`❌ ${failed} transaksi gagal disinkronkan. Cek riwayat.`);
+          setIsSyncing(false);
+        }
+      } catch { setIsSyncing(false); }
+    };
     const handleOffline = () => setIsOffline(true);
     
     window.addEventListener('online', handleOnline);
@@ -490,6 +542,8 @@ export default function CashierPOS() {
     
     // Initial check
     setIsOffline(!navigator.onLine);
+    // Load offline queue count
+    getOfflineQueue().then(q => setOfflineQueueCount(q.length)).catch(() => {});
 
     const savedCart = localStorage.getItem('pos-cart');
     if (savedCart) setCart(JSON.parse(savedCart));
@@ -656,6 +710,7 @@ export default function CashierPOS() {
     if (loading) return;
 
     const fetchProducts = async () => {
+      setIsFetchingProducts(true);
       try {
         const { count, error: countErr } = await supabase
           .from('products')
@@ -688,14 +743,13 @@ export default function CashierPOS() {
         const p: Product[] = [];
         for (const d of rows) {
           const raw = d.raw_data || {};
-          // Only show active products (exclude archived)
+          // Only exclude products explicitly marked inactive via is_active column (source of truth).
+          // raw.Status === 1 was a legacy "archived" flag but is NOT reliable — omit it.
           const isArchived =
             d.is_active === false ||
             raw.isActive === false ||
             raw.isActive === 'false' ||
-            raw.status === 'ARCHIVED' ||
-            raw.Status === 1 ||
-            raw.Status === '1';
+            raw.status === 'ARCHIVED';
 
           if (isArchived) continue;
 
@@ -740,12 +794,22 @@ export default function CashierPOS() {
         setProducts(p);
         setFilteredProducts(p);
 
-        // Extract Categories
-        const cats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || 'UMUM'))).filter(Boolean) as string[];
-        setCategories(cats.sort());
+        // Fetch categories from master table (not derived from active products)
+        // so ALL categories appear even if their products are currently filtered out.
+        const { data: catRows } = await supabase
+          .from('categories')
+          .select('name')
+          .order('name', { ascending: true });
+        const masterCats = (catRows || []).map((c: any) => String(c.name)).filter(Boolean);
+        // Augment with any category found in active products that may not be in master table
+        const productCats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || ''))).filter(Boolean) as string[];
+        const allCats = Array.from(new Set([...masterCats, ...productCats])).sort();
+        setCategories(allCats);
       } catch (error) {
         console.error('Error fetching products:', error);
         toast.error('Gagal memuat produk. Silakan coba lagi.');
+      } finally {
+        setIsFetchingProducts(false);
       }
     };
     
@@ -1281,11 +1345,47 @@ export default function CashierPOS() {
       });
 
       if (!simpan.success || !simpan.data) {
-        return toast.error(
-          isOffline
-            ? 'Mode offline: transaksi TIDAK tersimpan (butuh koneksi). Sambungkan internet lalu ulangi.'
-            : (simpan.error || 'Gagal menyimpan transaksi')
-        );
+        // Jika offline atau koneksi gagal, simpan ke antrian IndexedDB
+        const isNetworkError = !navigator.onLine || 
+          (simpan.error || '').toLowerCase().includes('fetch') ||
+          (simpan.error || '').toLowerCase().includes('network') ||
+          isOffline;
+        
+        if (isNetworkError) {
+          try {
+            await enqueueOfflineTx({
+              orderId,
+              items: cart.map(item => ({
+                id: item.id, name: item.name, price: item.price,
+                quantity: item.quantity, unit: item.unit, contains: item.contains || 1,
+              })),
+              subtotal, shippingCost, total, paymentMethod,
+              transactionType, deliveryMethod,
+              status: orderData.status, dueDate: orderData.dueDate,
+              customerName: orderData.customerName, customerPhone: orderData.customerPhone,
+              userId: orderData.userId, payAmount: finalPayAmount, changeAmount: finalChange,
+              shiftId: currentShift.id, warehouseId: selectedWarehouse, warehouseName,
+            });
+            const q = await getOfflineQueue();
+            setOfflineQueueCount(q.length);
+            toast(
+              `📂 Mode Offline: transaksi disimpan lokal (${q.length} antrian). Akan otomatis sinkron saat online.`,
+              { duration: 6000, icon: '📴' }
+            );
+            // Cetak struk lokal & bersihkan keranjang
+            printReceipt({ ...orderData, id: orderId, createdAt: new Date() });
+            setCart([]); localStorage.removeItem('pos-cart');
+            setCashGiven(''); setPaymentProof(null); setProofPreview(null);
+            setCustomerName(''); setCustomerPhone(''); setTempoDueDate('');
+            setSelectedCustomer(null); setCustomerSearch('');
+          } catch (qErr) {
+            toast.error('Gagal menyimpan transaksi offline. Catat manual!');
+            console.error('Offline queue error:', qErr);
+          }
+          return;
+        }
+        
+        return toast.error(simpan.error || 'Gagal menyimpan transaksi');
       }
 
       const deductionResults = simpan.data.items;
@@ -1560,6 +1660,9 @@ export default function CashierPOS() {
           
           {/* Mobile Notifications */}
           <div className="flex md:hidden items-center gap-3">
+            <button onClick={() => setShowSettings(true)} className="p-1.5 bg-gray-100 rounded-full hover:bg-purple-50 group transition-colors" title="Pengaturan Kasir">
+              <Settings size={18} className="group-hover:text-purple-600" />
+            </button>
             <button onClick={() => setShowChatModal(true)} className="relative p-1.5 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
               <MessageSquare size={18} className="group-hover:text-green-600" />
               {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
@@ -1572,9 +1675,19 @@ export default function CashierPOS() {
         </div>
         
         <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pb-1 md:pb-0 w-full md:w-auto">
-          {isOffline && (
-            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 shrink-0">
-              <span className="w-2 h-2 bg-red-600 rounded-full"></span> OFFLINE MODE
+          {/* Offline + Queue Badge */}
+          {(isOffline || offlineQueueCount > 0) && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all ${
+              isOffline ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isOffline ? 'bg-red-500' : 'bg-amber-500'}`} />
+              {isOffline ? 'OFFLINE' : ''}
+              {offlineQueueCount > 0 && (
+                <span className="bg-amber-500 text-white px-1.5 py-0.5 rounded-full text-[10px] font-black">
+                  {offlineQueueCount} antrian
+                </span>
+              )}
+              {isSyncing && <span className="animate-spin text-[10px]">🔄</span>}
             </div>
           )}
           <div className="flex bg-gray-100 rounded-lg p-1 shrink-0">
@@ -1596,6 +1709,9 @@ export default function CashierPOS() {
         
         {/* Desktop Notifications */}
         <div className="hidden md:flex items-center gap-4">
+          <button onClick={() => setShowSettings(true)} className="p-2 bg-gray-100 rounded-full hover:bg-purple-50 group transition-colors" title="Pengaturan Kasir">
+            <Settings size={20} className="group-hover:text-purple-600" />
+          </button>
           <button onClick={() => setShowChatModal(true)} className="relative p-2 bg-gray-100 rounded-full hover:bg-green-50 group transition-colors">
             <MessageSquare size={20} className="group-hover:text-green-600" />
             {chatUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">{chatUnreadCount}</span>}
@@ -1639,57 +1755,59 @@ export default function CashierPOS() {
                 </div>
               </div>
 
-              {/* Advanced Filters */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-                <select 
-                  value={selectedCategory} 
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-white border border-gray-100 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 outline-none focus:ring-2 focus:ring-green-500 shadow-sm min-w-[120px]"
-                >
-                  <option value="SEMUA">SEMUA KATEGORI</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat.toUpperCase()}</option>
+              {/* Category Pill Chips + Stock Filter */}
+              <div className="space-y-2">
+                {/* Category pills */}
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {['SEMUA', ...categories].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide transition-all border whitespace-nowrap ${
+                        selectedCategory === cat
+                          ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-200'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-600'
+                      }`}
+                    >
+                      {cat === 'SEMUA' ? 'Semua Kategori' : cat}
+                    </button>
                   ))}
-                </select>
-
-                <div className="flex bg-gray-100 p-1 rounded-xl">
-                  <button 
-                    onClick={() => setStockFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    SEMUA STOK
-                  </button>
-                  <button 
-                    onClick={() => setStockFilter('instock')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'instock' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    READY
-                  </button>
-                  <button 
-                    onClick={() => setStockFilter('outstock')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${stockFilter === 'outstock' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    HABIS
-                  </button>
                 </div>
 
-                {(selectedCategory !== 'SEMUA' || stockFilter !== 'all' || searchQuery) && (
-                  <button 
-                    onClick={() => {
-                      setSelectedCategory('SEMUA');
-                      setStockFilter('all');
-                      setSearchQuery('');
-                    }}
-                    className="p-2 text-red-400 hover:text-red-600 transition-colors"
-                    title="Reset Filter"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                {/* Stock filter + count */}
+                <div className="flex items-center gap-2">
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    {(['all', 'instock', 'outstock'] as const).map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setStockFilter(f)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${
+                          stockFilter === f
+                            ? f === 'all' ? 'bg-white text-gray-900 shadow-sm'
+                              : f === 'instock' ? 'bg-white text-green-600 shadow-sm'
+                              : 'bg-white text-red-600 shadow-sm'
+                            : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        {f === 'all' ? 'Semua' : f === 'instock' ? '✓ Ready' : '✗ Habis'}
+                      </button>
+                    ))}
+                  </div>
 
-                <span className="text-xs font-bold text-gray-400 shrink-0 ml-auto">
-                  {filteredProducts.length} Produk
-                </span>
+                  {(selectedCategory !== 'SEMUA' || stockFilter !== 'all' || searchQuery) && (
+                    <button
+                      onClick={() => { setSelectedCategory('SEMUA'); setStockFilter('all'); setSearchQuery(''); }}
+                      className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                      title="Reset Filter"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+
+                  <span className="text-xs font-bold text-gray-400 shrink-0 ml-auto">
+                    {isFetchingProducts ? 'Memuat...' : `${filteredProducts.length} produk`}
+                  </span>
+                </div>
               </div>
             </div>
             <CameraBarcodeScannerModal
@@ -1700,11 +1818,30 @@ export default function CashierPOS() {
               onScan={handleScan}
             />
 
-            <div 
-              className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2" : "flex flex-col gap-2 overflow-y-auto pr-2"} 
-              style={{ maxHeight: 'calc(100vh - 200px)' }}
-              data-testid="product-grid-view"
-            >
+            {/* Product Skeleton or Grid */}
+            {isFetchingProducts && products.length === 0 ? (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-4 gap-3' : 'flex flex-col gap-2'}>
+                {Array.from({ length: viewMode === 'grid' ? 12 : 6 }).map((_, i) => (
+                  <div key={i} className={`bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse ${
+                    viewMode === 'grid' ? 'flex flex-col p-3' : 'flex flex-row items-center p-3 gap-4'
+                  }`}>
+                    <div className={`bg-gray-100 rounded-xl ${
+                      viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14 shrink-0'
+                    }`} />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-gray-100 rounded-full w-3/4" />
+                      <div className="h-4 bg-green-50 rounded-full w-1/2" />
+                      <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-1" : "flex flex-col gap-2 overflow-y-auto pr-1"}
+                style={{ maxHeight: 'calc(100vh - 240px)' }}
+                data-testid="product-grid-view"
+              >
               {filteredProducts.slice(0, displayLimit).map(p => (
                 <div 
                   key={p.id} 
@@ -1765,10 +1902,25 @@ export default function CashierPOS() {
                 </div>
               ))}
 
-              {filteredProducts.length === 0 && (
-                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-16 text-center text-gray-400 font-bold" : "py-16 text-center text-gray-400 font-bold"}>
-                  <Package size={40} className="mx-auto mb-2 text-gray-300" />
-                  <p>Tidak ada produk aktif yang cocok</p>
+              {filteredProducts.length === 0 && !isFetchingProducts && (
+                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-20 text-center" : "py-20 text-center"}>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Package size={32} className="text-gray-300" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-400">Tidak ada produk yang cocok</p>
+                  <p className="text-xs text-gray-300 mt-1">
+                    {selectedCategory !== 'SEMUA' ? `Kategori: ${selectedCategory}` : ''}
+                    {stockFilter !== 'all' ? ` · Stok: ${stockFilter}` : ''}
+                    {searchQuery ? ` · "${searchQuery}"` : ''}
+                  </p>
+                  {(selectedCategory !== 'SEMUA' || stockFilter !== 'all' || searchQuery) && (
+                    <button
+                      onClick={() => { setSelectedCategory('SEMUA'); setStockFilter('all'); setSearchQuery(''); }}
+                      className="mt-4 px-4 py-2 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-all"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1776,13 +1928,17 @@ export default function CashierPOS() {
                 <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-4 text-center" : "py-4 text-center"}>
                   <button
                     onClick={() => setDisplayLimit(prev => prev + 80)}
-                    className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-black uppercase tracking-wider rounded-2xl shadow-sm transition-all hover:scale-105 active:scale-95"
+                    className="px-6 py-2.5 bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 text-xs font-black uppercase tracking-wider rounded-2xl shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
                   >
-                    Muat Lebih Banyak ({displayLimit} dari {filteredProducts.length} Produk)
+                    <span>Muat {Math.min(80, filteredProducts.length - displayLimit)} Produk Berikutnya</span>
+                    <span className="bg-green-600 text-white px-2 py-0.5 rounded-full text-[10px]">
+                      {displayLimit}/{filteredProducts.length}
+                    </span>
                   </button>
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Desktop Sidebar / Mobile Floating Drawer */}
@@ -1833,10 +1989,10 @@ export default function CashierPOS() {
                 {cart.map(item => (
                   <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex justify-between items-start">
-                      <div className="flex flex-col">
+                    <div className="flex flex-col">
                         <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
-                        <span className="text-xs font-black text-gray-400 uppercase">
-                          Harga channel: {item.channel || 'OFFLINE'}
+                        <span className="text-xs font-medium text-gray-400">
+                          {item.unit}{item.contains && item.contains > 1 ? ` · Isi ${item.contains}` : ''}
                         </span>
                       </div>
                       {editingPriceId === item.id ? (
@@ -2094,34 +2250,24 @@ export default function CashierPOS() {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-xs font-black text-gray-400 uppercase">Total</span>
-                  <span className={`text-xl font-black ${transactionType === 'online' ? 'text-blue-600' : 'text-green-600'}`}>Rp{total.toLocaleString()}</span>
-                </div>
-
-                <div className="flex items-center gap-2 mb-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <input 
-                    type="checkbox" 
-                    id="useBluetooth"
-                    checked={useBluetoothPrinter}
-                    onChange={(e) => setUseBluetoothPrinter(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <label htmlFor="useBluetooth" className="text-xs font-bold text-gray-700 cursor-pointer flex-1">
-                    Cetak dengan Printer Bluetooth
-                  </label>
+                <div className="flex justify-between items-center py-2 border-t border-gray-100">
+                  <div>
+                    <span className="text-xs font-black text-gray-400 uppercase">Total Belanja</span>
+                    {cart.length > 0 && <p className="text-xs text-gray-400">{cart.reduce((s, i) => s + i.quantity, 0)} item · {cart.length} produk</p>}
+                  </div>
+                  <span className={`text-2xl font-black ${transactionType === 'online' ? 'text-blue-600' : 'text-green-600'}`}>Rp{total.toLocaleString()}</span>
                 </div>
 
                 <button
                   disabled={isProcessing || cart.length === 0}
                   onClick={handleTransaction}
-                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:bg-gray-200 ${transactionType === 'online' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-green-600 hover:bg-green-700 shadow-green-100'
+                  className={`w-full py-4 rounded-2xl font-black uppercase text-sm text-white shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] ${transactionType === 'online' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200'
                     }`}
                 >
                   {isProcessing ? (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>PROSES KOMPRESI...</span>
+                      <span>Memproses Transaksi...</span>
                     </div>
                   ) : <><Printer size={16} /> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi'}</>}
                 </button>
@@ -2130,9 +2276,65 @@ export default function CashierPOS() {
           </div>
         </main>
       ) : (
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto space-y-4">
-            <h2 className="font-black text-xl text-gray-800 flex items-center gap-2"><History /> 20 Transaksi Terakhir</h2>
+            {/* Header + Filters */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <h2 className="font-black text-xl text-gray-800 flex items-center gap-2">
+                <History size={22} /> Riwayat Transaksi
+              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="date"
+                  value={orderDateFilter}
+                  onChange={e => setOrderDateFilter(e.target.value)}
+                  className="px-3 py-2 text-xs font-bold border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                />
+                {orderDateFilter && (
+                  <button
+                    onClick={() => setOrderDateFilter('')}
+                    className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                    title="Reset tanggal"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+                <span className="text-xs font-bold text-gray-400 bg-white px-3 py-2 rounded-xl border border-gray-100">
+                  {completedOrders.filter(o => {
+                    if (!orderDateFilter) return true;
+                    const d = o.createdAt ? new Date(o.createdAt as any) : null;
+                    return d && d.toISOString().startsWith(orderDateFilter);
+                  }).length} order
+                </span>
+              </div>
+            </div>
+
+            {/* Summary bar */}
+            {completedOrders.length > 0 && (() => {
+              const filtered = completedOrders.filter(o => {
+                if (!orderDateFilter) return true;
+                const d = o.createdAt ? new Date(o.createdAt as any) : null;
+                return d && d.toISOString().startsWith(orderDateFilter);
+              });
+              const totalRevenue = filtered.reduce((s, o) => s + (o.total || 0), 0);
+              const cashCount = filtered.filter(o => o.paymentMethod === 'CASH').length;
+              const nonCashCount = filtered.length - cashCount;
+              return (
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Total Omzet', value: `Rp${totalRevenue.toLocaleString('id-ID')}`, color: 'text-green-600', bg: 'bg-green-50' },
+                    { label: 'Tunai', value: `${cashCount} transaksi`, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: 'Non-Tunai', value: `${nonCashCount} transaksi`, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  ].map(s => (
+                    <div key={s.label} className={`${s.bg} rounded-2xl p-3 text-center`}>
+                      <p className={`text-sm font-black ${s.color}`}>{s.value}</p>
+                      <p className="text-xs text-gray-500 font-bold mt-0.5">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {completedOrders.length === 0 ? (
               <div className="bg-white p-12 rounded-3xl border border-gray-100 shadow-sm text-center">
                 <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2142,31 +2344,52 @@ export default function CashierPOS() {
                 <p className="text-xs text-gray-400 mt-1">Transaksi yang sudah diselesaikan akan muncul di sini.</p>
               </div>
             ) : (
-              completedOrders.map(order => (
-                <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                  <div className="flex gap-4 items-center">
-                    <div className={`p-3 rounded-xl ${order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}><CheckCircle size={24} /></div>
-                    <div>
-                      <p className="text-xs font-black text-gray-800 uppercase">Order #{order.id.slice(-6)}</p>
-                      <p className="text-xs font-bold text-gray-400 uppercase">
-                        {order.createdAt
-                          ? (typeof order.createdAt === 'object' && order.createdAt !== null && 'seconds' in order.createdAt
-                            ? new Date((order.createdAt as any).seconds * 1000).toLocaleString('id-ID')
-                            : new Date(order.createdAt as any).toLocaleString('id-ID'))
-                          : '-'}
-                      </p>
+              completedOrders.filter(o => {
+                if (!orderDateFilter) return true;
+                const d = o.createdAt ? new Date(o.createdAt as any) : null;
+                return d && d.toISOString().startsWith(orderDateFilter);
+              }).map(order => (
+                <div key={order.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex gap-3 items-center min-w-0">
+                      <div className={`p-2.5 rounded-xl shrink-0 ${
+                        order.status === 'BELUM_LUNAS' ? 'bg-orange-50 text-orange-600'
+                        : order.transactionType === 'online' ? 'bg-blue-50 text-blue-600' 
+                        : 'bg-green-50 text-green-600'
+                      }`}>
+                        <CheckCircle size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-black text-gray-800 uppercase">#{order.id.slice(-8)}</p>
+                          {order.status === 'BELUM_LUNAS' && (
+                            <span className="text-[10px] bg-orange-100 text-orange-700 font-black px-1.5 py-0.5 rounded-full uppercase">Tempo</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">
+                          {order.customerName !== 'Pelanggan Toko' ? order.customerName + ' · ' : ''}
+                          {order.createdAt
+                            ? new Date(order.createdAt as any).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-sm font-black text-green-600">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
+                      </div>
+                      <button onClick={() => printReceipt(order)} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
+                        <Printer size={16} />
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-green-600">Rp{order.total?.toLocaleString()}</p>
-                    <p className="text-xs font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
-                  </div>
-                  <button onClick={() => printReceipt(order)} className="ml-4 p-2 hover:bg-gray-100 rounded-lg text-gray-400"><Printer size={18} /></button>
                 </div>
               ))
             )}
           </div>
         </main>
+
       )}
 
       {isDrawerOpen && (
@@ -2414,6 +2637,133 @@ export default function CashierPOS() {
           </div>
         </div>
       )}
+
+      {/* ===== SETTINGS MODAL ===== */}
+      {showSettings && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center">
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-gray-800 uppercase tracking-tight">Pengaturan Kasir</h2>
+                  <p className="text-xs text-gray-400">Preferensi tersimpan otomatis</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-5">
+
+              {/* ── Scan Mode ── */}
+              <div>
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Mode Scanner Kamera</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Langsung */}
+                  <button
+                    onClick={() => {
+                      setScanMode('direct');
+                      localStorage.setItem('pos-scan-mode', 'direct');
+                    }}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                      scanMode === 'direct'
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${scanMode === 'direct' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}>
+                      <Zap size={20} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-black uppercase">Langsung</p>
+                      <p className="text-[10px] mt-0.5 leading-tight opacity-70">Scan → otomatis masuk keranjang</p>
+                    </div>
+                    {scanMode === 'direct' && (
+                      <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">AKTIF</span>
+                    )}
+                  </button>
+
+                  {/* Konfirmasi */}
+                  <button
+                    onClick={() => {
+                      setScanMode('confirm');
+                      localStorage.setItem('pos-scan-mode', 'confirm');
+                    }}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                      scanMode === 'confirm'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${scanMode === 'confirm' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                      <ScanLine size={20} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-black uppercase">Konfirmasi</p>
+                      <p className="text-[10px] mt-0.5 leading-tight opacity-70">Tampilkan info produk dulu</p>
+                    </div>
+                    {scanMode === 'confirm' && (
+                      <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">AKTIF</span>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2 text-center">
+                  {scanMode === 'direct'
+                    ? '⚡ Scan kamera langsung tambah ke keranjang tanpa jeda'
+                    : '🔍 Scan kamera akan tampilkan nama produk dahulu sebelum masuk keranjang'}
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* ── Bluetooth Printer ── */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500">
+                    <Printer size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Printer Bluetooth</p>
+                    <p className="text-xs text-gray-400">{useBluetoothPrinter ? 'Printer thermal BT aktif' : 'Mode cetak browser (default)'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setUseBluetoothPrinter(v => !v)}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${useBluetoothPrinter ? 'bg-green-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${useBluetoothPrinter ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+            </div>
+
+            <div className="px-6 pb-6">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-full py-3 bg-gray-900 text-white font-black rounded-2xl hover:bg-gray-700 transition-all text-sm uppercase tracking-widest"
+              >
+                Simpan & Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
