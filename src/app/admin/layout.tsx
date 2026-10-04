@@ -190,15 +190,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex print:bg-white print:block">
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden print:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform md:translate-x-0 md:static md:block shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform md:translate-x-0 md:static md:block shrink-0 print:hidden ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -243,10 +243,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </aside>
-      <main className="flex-1 min-w-0 overflow-x-hidden px-3 sm:px-4 md:px-6 pt-20 md:pt-6 pb-32 md:pb-6">
+      <main className="flex-1 min-w-0 overflow-x-hidden px-3 sm:px-4 md:px-6 pt-20 md:pt-6 pb-32 md:pb-6 print:p-0 print:m-0 print:overflow-visible">
         {children}
         {!!toasts.length && (
-          <div className="fixed bottom-4 right-4 z-[60] space-y-2">
+          <div className="fixed bottom-4 right-4 z-[60] space-y-2 print:hidden">
             {toasts.map((t) => {
               const isIn = t.change > 0;
               return (
@@ -281,8 +281,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         )}
       </main>
-      <AdminMobileHeader />
-      <AdminMobileNav />
+      <div className="print:hidden">
+        <AdminMobileHeader />
+        <AdminMobileNav />
+      </div>
     </div>
   );
 }

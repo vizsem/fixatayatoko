@@ -7,7 +7,7 @@ import notify from '@/lib/notify';
 import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
-  ChevronRight, Download, Filter, Truck, ClipboardList
+  ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
@@ -49,6 +49,17 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Dibatalkan',
 };
 
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  CASH: 'CASH / TUNAI',
+  TRANSFER: 'TRANSFER BANK',
+  TEMPO: 'TEMPO / NET',
+  DP: 'DP + PELUNASAN',
+  GIRO: 'GIRO / CEK',
+  QRIS: 'QRIS',
+  KREDIT: 'KREDIT',
+  KONSINYASI: 'KONSINYASI',
+};
+
 type POItem = {
   productId: string;
   quantity: number;
@@ -62,6 +73,8 @@ export default function AdminPurchases() {
   const [pos, setPos] = useState<PO[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [receiveModal, setReceiveModal] = useState<PO | null>(null);
   const [detailModal, setDetailModal] = useState<PO | null>(null);
@@ -118,11 +131,21 @@ export default function AdminPurchases() {
   }, [load, loadMeta]);
 
   const filtered = useMemo(() => pos.filter(p => {
-    const matchSearch = p.poNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (p.supplier?.name || '').toLowerCase().includes(search.toLowerCase());
+    const q = search.trim().toLowerCase();
+    const matchSearch = !q ||
+      p.poNumber.toLowerCase().includes(q) ||
+      (p.supplier?.name || '').toLowerCase().includes(q) ||
+      (p.paymentMethod || '').toLowerCase().includes(q) ||
+      (p.paymentStatus || '').toLowerCase().includes(q) ||
+      (p.notes || '').toLowerCase().includes(q) ||
+      (p.items || []).some(item => (item.product?.name || '').toLowerCase().includes(q));
+
     const matchStatus = statusFilter === 'all' || p.status === statusFilter;
-    return matchSearch && matchStatus;
-  }), [pos, search, statusFilter]);
+    const matchPaymentMethod = paymentMethodFilter === 'all' || (p.paymentMethod || 'CASH').toUpperCase() === paymentMethodFilter.toUpperCase();
+    const matchPaymentStatus = paymentStatusFilter === 'all' || (p.paymentStatus || 'LUNAS').toUpperCase() === paymentStatusFilter.toUpperCase();
+
+    return matchSearch && matchStatus && matchPaymentMethod && matchPaymentStatus;
+  }), [pos, search, statusFilter, paymentMethodFilter, paymentStatusFilter]);
 
   const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
@@ -295,24 +318,89 @@ export default function AdminPurchases() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Cari nomor PO atau supplier..."
-              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 space-y-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Cari no PO, supplier, metode bayar (cash, transfer, tempo), nama produk..."
+                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  title="Hapus pencarian"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap sm:flex-nowrap gap-2">
+              {/* Filter Metode Pembayaran */}
+              <div className="flex-1 sm:flex-initial">
+                <select
+                  value={paymentMethodFilter}
+                  onChange={e => setPaymentMethodFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700"
+                >
+                  <option value="all">💳 Semua Metode</option>
+                  <option value="CASH">CASH / TUNAI</option>
+                  <option value="TRANSFER">TRANSFER BANK</option>
+                  <option value="TEMPO">TEMPO / NET</option>
+                  <option value="DP">DP + PELUNASAN</option>
+                  <option value="GIRO">GIRO / CEK</option>
+                  <option value="QRIS">QRIS / INSTAN</option>
+                  <option value="KREDIT">KREDIT SUPPLIER</option>
+                  <option value="KONSINYASI">KONSINYASI</option>
+                </select>
+              </div>
+
+              {/* Filter Status Bayar */}
+              <div className="flex-1 sm:flex-initial">
+                <select
+                  value={paymentStatusFilter}
+                  onChange={e => setPaymentStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700"
+                >
+                  <option value="all">⚖️ Status Bayar</option>
+                  <option value="LUNAS">LUNAS</option>
+                  <option value="HUTANG">HUTANG / TEMPO</option>
+                </select>
+              </div>
+
+              {/* Filter Status PO */}
+              <div className="flex-1 sm:flex-initial">
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700"
+                >
+                  <option value="all">📦 Status PO</option>
+                  {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+
+              {/* Tombol Reset Filter jika aktif */}
+              {(search || paymentMethodFilter !== 'all' || paymentStatusFilter !== 'all' || statusFilter !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    setPaymentMethodFilter('all');
+                    setPaymentStatusFilter('all');
+                    setStatusFilter('all');
+                  }}
+                  className="px-2.5 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors flex items-center gap-1"
+                  title="Reset Filter"
+                >
+                  <RotateCcw size={13} /> Reset
+                </button>
+              )}
+            </div>
           </div>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="all">Semua Status</option>
-            {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
         </div>
 
         {/* Stats bar */}
@@ -331,7 +419,7 @@ export default function AdminPurchases() {
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
             <ClipboardList size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">Belum ada purchase order</p>
+            <p className="text-gray-500 font-medium">Belum ada purchase order yang sesuai</p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -349,15 +437,39 @@ export default function AdminPurchases() {
                     <p className="font-bold text-gray-900 text-sm">{po.supplier.name}</p>
                     <p className="text-xs text-gray-500">{po.items.length} item • {new Date(po.createdAt).toLocaleDateString('id-ID')}</p>
                   </div>
+
+                  {/* Info Pembayaran di Mobile */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 uppercase">
+                      {po.paymentMethod || 'CASH'}
+                    </span>
+                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-md ${
+                      po.paymentStatus === 'HUTANG' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}>
+                      {po.paymentStatus || 'LUNAS'}
+                    </span>
+                    {po.dueDate && po.paymentStatus === 'HUTANG' && (
+                      <span className="text-[10px] text-red-600 font-semibold">
+                        Tempo: {new Date(po.dueDate).toLocaleDateString('id-ID')}
+                      </span>
+                    )}
+                  </div>
+
                   <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <div>
                       <p className="text-xs uppercase font-bold text-gray-500">Total Nilai</p>
-                      <p className="font-black text-sm text-gray-900">Rp{po.totalAmount.toLocaleString('id-ID')}</p>
+                      <p className="font-black text-sm text-gray-900">Rp{po.totalAmount.toLocaleString('id-ID')} </p>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap justify-end">
                       <button onClick={() => setDetailModal(po)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors">
                         Detail
                       </button>
+                      <Link
+                        href={`/admin/purchases/print/${po.id}`}
+                        className="px-3 py-1.5 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-colors flex items-center gap-1 shadow-sm"
+                      >
+                        <Printer size={12} /> Cetak
+                      </Link>
                       {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
                         <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
                           className="px-3 py-1.5 bg-green-100 text-green-700 rounded-xl text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
@@ -377,10 +489,11 @@ export default function AdminPurchases() {
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">No. PO</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status PO</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Pembayaran</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
-                    <th className="px-4 py-3"></th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -398,6 +511,25 @@ export default function AdminPurchases() {
                           {STATUS_LABEL[po.status] || po.status}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-gray-800 uppercase">
+                              {po.paymentMethod || 'CASH'}
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-black uppercase ${
+                              po.paymentStatus === 'HUTANG' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              {po.paymentStatus || 'LUNAS'}
+                            </span>
+                          </div>
+                          {po.dueDate && po.paymentStatus === 'HUTANG' && (
+                            <span className="text-[10px] text-red-500 font-medium">
+                              Tempo: {new Date(po.dueDate).toLocaleDateString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900">
                         Rp{po.totalAmount.toLocaleString('id-ID')}
                       </td>
@@ -405,13 +537,21 @@ export default function AdminPurchases() {
                         {new Date(po.createdAt).toLocaleDateString('id-ID')}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2 justify-end transition-opacity">
-                          <button onClick={() => setDetailModal(po)} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">
+                        <div className="flex gap-1.5 justify-end transition-opacity">
+                          <button onClick={() => setDetailModal(po)} className="px-2.5 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors" title="Lihat Detail">
                             Detail
                           </button>
+                          <Link
+                            href={`/admin/purchases/print/${po.id}`}
+                            className="px-2.5 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors flex items-center gap-1 shadow-sm"
+                            title="Cetak Faktur PO / Struk Thermal"
+                          >
+                            <Printer size={13} /> Cetak
+                          </Link>
                           {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
                             <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
-                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
+                              className="px-2.5 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm"
+                              title="Terima Barang ke Gudang">
                               <Truck size={12} /> Terima
                             </button>
                           )}
@@ -784,6 +924,12 @@ export default function AdminPurchases() {
             </div>
 
             <div className="flex flex-wrap gap-2 mt-6">
+              <Link
+                href={`/admin/purchases/print/${detailModal.id}`}
+                className="flex-1 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <Printer size={16} /> Cetak PO
+              </Link>
               {detailModal.status !== 'CANCELLED' && (
                 <button
                   onClick={() => handleCancelPO(detailModal.id, detailModal.poNumber)}

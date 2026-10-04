@@ -231,10 +231,10 @@ export default function PurchaseDetail() {
             <Edit size={16} /> Edit
           </button>
           <button
-            onClick={() => window.print()}
-            className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2"
+            onClick={() => router.push(`/admin/purchases/print/${purchase.id}`)}
+            className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md"
           >
-            <Printer size={16} /> Cetak
+            <Printer size={16} /> Cetak Transaksi
           </button>
         </div>
       </div>
