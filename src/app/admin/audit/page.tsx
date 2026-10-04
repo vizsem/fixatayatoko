@@ -81,12 +81,36 @@ function AuditPageContent() {
         const { data, error } = await supabase
           .from('inventory_logs')
           .select('*')
-          .gte('date', start.toISOString())
-          .lte('date', end.toISOString())
-          .order('date', { ascending: false })
+          .gte('created_at', start.toISOString())
+          .lte('created_at', end.toISOString())
+          .order('created_at', { ascending: false })
           .limit(limitCount);
         if (error) throw error;
-        setStockLogs((data || []).map((row: any) => ({ ...row, date: row.date || row.created_at || row.createdAt })));
+        setStockLogs(
+          (data || []).map((row: any) => {
+            const raw = row.raw_data || {};
+            const logDate = row.created_at || raw.createdAt || raw.date;
+            const pName = row.product_name || raw.productName || raw.product_name || 'Produk';
+            const prev = Number(row.prev_stock ?? raw.prevStock ?? 0);
+            const next = Number(row.next_stock ?? raw.nextStock ?? 0);
+            const amt = Math.abs(Number(row.amount ?? row.quantity ?? raw.amount ?? raw.quantity ?? 0));
+            const adm = row.admin_id || raw.adminId || 'System';
+            return {
+              id: row.id,
+              ...raw,
+              ...row,
+              productName: pName,
+              amount: amt,
+              prevStock: prev,
+              nextStock: next,
+              adminId: adm,
+              type: (row.type || raw.type || 'MASUK').toUpperCase(),
+              source: (row.source || raw.source || 'MANUAL').toUpperCase(),
+              note: row.note || raw.note || raw.notes || '',
+              date: logDate,
+            };
+          })
+        );
 
       } else if (activeTab === 'transaction') {
         const { data, error } = await supabase
@@ -311,7 +335,7 @@ function AuditPageContent() {
   ];
 
   // Filtered data per tab
-  const filteredStock = stockLogs.filter(l => l.productName?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredStock = stockLogs.filter(l => (l.productName || l.note || '').toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTx = transactions.filter(t => t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || t.customerName?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredShifts = shifts.filter(s => s.cashierName?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredProfit = profitLogs.filter(p => p.id?.toLowerCase().includes(searchTerm.toLowerCase()));
