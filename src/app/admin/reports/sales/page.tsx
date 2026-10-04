@@ -20,6 +20,7 @@ import { sbGetDocs } from '@/lib/supabase-helpers';
 
 type SaleItem = {
   id: string;
+  soNumber: string;  // Nomor transaksi SO-xxx
   date: string;
   productName: string;
   quantity: number;
@@ -95,6 +96,7 @@ export default function SalesReport() {
           for (const item of order.items || []) {
             salesList.push({
               id: orderDoc.id,
+              soNumber: order.order_id || order.orderId || order.raw_data?.orderId || orderDoc.id,
               date: created.toISOString(),
               productName: String(item.name || ''),
               quantity: Number(item.quantity || 0),
@@ -120,7 +122,7 @@ export default function SalesReport() {
 
   const handleExport = () => {
     const exportData = sortedSales.map(sale => ({
-
+      'No. Transaksi': sale.soNumber,
       Tanggal: new Date(sale.date).toLocaleDateString('id-ID'),
       Produk: sale.productName,
       Kuantitas: sale.quantity,
@@ -344,6 +346,9 @@ export default function SalesReport() {
             <thead className="bg-gray-50 text-xs md:text-sm">
               <tr>
                 <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  No. Transaksi
+                </th>
+                <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Tanggal
                 </th>
                 <th className="px-3 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -377,6 +382,15 @@ export default function SalesReport() {
               ) : (
                 paginatedSales.map((sale, index) => (
                   <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <a
+                        href={`/admin/orders/${sale.id}`}
+                        className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-colors font-mono"
+                        title="Lihat detail order"
+                      >
+                        {sale.soNumber}
+                      </a>
+                    </td>
                     <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(sale.date).toLocaleDateString('id-ID', {
                         day: '2-digit',

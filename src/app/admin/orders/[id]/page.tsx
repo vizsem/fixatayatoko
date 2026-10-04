@@ -21,10 +21,8 @@ import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
 import { FirestoreTimestamp } from '@/lib/types';
-import { getUserAndRole, getRoleFromUser } from '@/lib/supabase-helpers';
-// Seluruh akses data halaman ini kini lewat Server Action yang memeriksa peran
-// pemanggilnya. Sebelumnya halaman membaca dan menulis `orders`, `products`,
-// `users`, `settings`, `wallet_logs`, dan `returns` langsung dari browser.
+// Auth dijaga oleh requireStaff() di dalam setiap Server Action.
+// Tidak perlu cek auth di sisi klien — itu hanya menambah round-trip.
 import {
   createReturnRequest,
   creditWalletRefund,
@@ -33,7 +31,6 @@ import {
   updateOrder,
   updateProductForOrder,
 } from '@/lib/actions/order-admin.actions';
-import { supabase } from '@/lib/supabase';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 type DeliveryLocation = { lat: number; lng: number };
@@ -105,7 +102,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [editableItems, setEditableItems] = useState<EditableOrderItem[]>([]);
   const [isConfirmingItems, setIsConfirmingItems] = useState(false);
@@ -122,39 +118,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     footerMsg: 'Terima kasih telah berbelanja!'
   });
 
+  // Auth dijaga oleh requireStaff() di setiap Server Action — tidak perlu
+  // cek ulang di sisi klien. Langsung fetch data agar tidak ada round-trip
+  // tambahan yang membuat halaman terasa berat.
   useEffect(() => {
-    const checkAuth = async () => {
-      const { user, userDocData, isAdmin, isStaff } = await getUserAndRole();
-      if (!user) {
-        router.push('/profil/login');
-        return;
-      }
-      const role = getRoleFromUser(user, userDocData);
-      if (!isAdmin && !isStaff && role !== 'cashier' && role !== 'kasir') {
-        router.push('/profil');
-        return;
-      }
-      setAuthChecked(true);
-    };
-    checkAuth();
-
-    let unsubscribe: (() => void) | undefined;
-    (async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-        checkAuth();
-      });
-      unsubscribe = () => subscription.unsubscribe();
-    })();
-
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, [router]);
-
-  useEffect(() => {
-    if (!authChecked || !id) return;
+    if (!id) return;
     const fetchAll = async () => {
       try {
         const detail = await getOrderDetail(String(id));
         if (!detail.ok) {
+          // Jika 401/403, redirect ke login
+          if (detail.error?.toLowerCase().includes('auth') || detail.error?.toLowerCase().includes('login')) {
+            router.push('/profil/login');
+            return;
+          }
           setError(detail.error);
           return;
         }
@@ -187,7 +164,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       }
     };
     fetchAll();
-  }, [id, authChecked]);
+  }, [id, router]);
 
   useEffect(() => {
     if (order && order.items) {
@@ -373,7 +350,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               productName: newItem.name,
               type: stockChange > 0 ? 'MASUK' : 'KELUAR',
               amount: Math.abs(stockChange),
-              adminId: (await supabase.auth.getUser()).data.user?.id || 'system',
+              adminId: 'system',
               source: 'ORDER',
               orderId: order.id,
               referenceId: order.id,
@@ -518,7 +495,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  if (loading || !authChecked) {
+  if (loading) {
     return (
       <div className="p-20 text-center font-black uppercase text-slate-400 animate-pulse">
         Syncing...

@@ -6,7 +6,7 @@ import {
   ShoppingCart, Search, Truck, Printer, FileText, Receipt,
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
   Clock, CheckCircle2, Trash2, RefreshCcw, Calendar,
-  AlertTriangle, Ban, X, Loader2, Package
+  AlertTriangle, Ban, X, Loader2, Package, PrinterCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -48,6 +48,12 @@ export default function AdminOrders() {
     setOrders(data as Order[]);
     setLoading(false);
   }, []);
+
+  const handleBulkPrint = (mode: 'a4' | 'thermal' = 'a4') => {
+    if (selectedOrders.length === 0) return;
+    const ids = selectedOrders.join(',');
+    router.push(`/admin/orders/print/bulk?ids=${ids}&mode=${mode}`);
+  };
 
   useEffect(() => {
     loadOrders();
@@ -319,6 +325,36 @@ export default function AdminOrders() {
               <Ban size={14} />
               <span>Batalkan</span>
             </button>
+
+            {/* Divider Halus */}
+            <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+
+            {/* Cetak Masal */}
+            <div className="relative group">
+              <button
+                onClick={() => handleBulkPrint('a4')}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-violet-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Cetak semua pesanan terpilih (A4)"
+              >
+                <Printer size={14} className="text-violet-400" />
+                <span className="hidden sm:inline">Cetak</span>
+              </button>
+              {/* Dropdown format cetak */}
+              <div className="absolute bottom-full mb-2 left-0 hidden group-hover:flex flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden w-36 z-50">
+                <button
+                  onClick={() => handleBulkPrint('a4')}
+                  className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-violet-600 hover:text-white transition-colors"
+                >
+                  <FileText size={13} /> Invoice A4
+                </button>
+                <button
+                  onClick={() => handleBulkPrint('thermal')}
+                  className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  <Receipt size={13} /> Struk Thermal
+                </button>
+              </div>
+            </div>
 
             {/* Divider Halus */}
             <div className="h-5 w-px bg-slate-800 hidden sm:block" />
