@@ -206,6 +206,108 @@ export default function CashierPOS() {
     return 'direct';
   });
 
+  const getChannelKey = useCallback((txType: string): ChannelKey => {
+    if (txType === 'toko') return 'offline';
+    if (txType === 'online') return 'website';
+    if (txType === 'shopee') return 'shopee';
+    if (txType === 'tiktok') return 'tiktok';
+    return 'offline';
+  }, []);
+
+  const addToCart = useCallback((product: Product) => {
+    if (product.stock <= 0) return toast.error("Stok habis!");
+    
+    const channel = getChannelKey(transactionType);
+    const baseCode = (product.unit || 'PCS').toUpperCase();
+    const containsBase = 1;
+    
+    let priceToUse = product.price;
+    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[baseCode]?.price;
+    
+    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+      priceToUse = chPrice;
+    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[baseCode]?.price) {
+       // Fallback logic: Shopee/TikTok -> Website -> Base
+       priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
+    }
+
+    setCart(prev => {
+      const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
+      
+      // Check stock limit
+      if (exist) {
+        if (exist.quantity + 1 > product.stock) {
+          toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
+          return prev;
+        }
+        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: priceToUse, 
+        originalPrice: product.price,
+        cost: product.cost,
+        quantity: 1, 
+        unit: baseCode, 
+        contains: containsBase, 
+        channel 
+      }];
+    });
+  }, [transactionType, getChannelKey]);
+
+  const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
+    if (product.stock <= 0) return toast.error("Stok habis!");
+
+    const code = (unit.code || product.unit || 'PCS').toUpperCase();
+    const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
+    
+    if (contains > product.stock) return toast.error(`Stok tidak cukup untuk satuan ini! Butuh: ${contains}, Sisa: ${product.stock}`);
+
+    const channel = getChannelKey(transactionType);
+    
+    let unitPrice = Number(unit.price || (contains > 0 ? product.price * contains : product.price));
+    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
+
+    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+      unitPrice = chPrice;
+    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[code]?.price) {
+      unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
+    }
+
+    const unitCost = product.cost * contains;
+    const unitOriginalPrice = product.price * contains;
+
+    setCart(prev => {
+      const exist = prev.find(i => i.id === product.id && i.unit === code);
+      
+      const currentTotalQtyBase = prev
+        .filter(i => i.id === product.id)
+        .reduce((sum, i) => sum + (i.quantity * (i.contains || 1)), 0);
+      
+      const requestedQtyBase = contains;
+
+      if (currentTotalQtyBase + requestedQtyBase > product.stock) {
+        toast.error(`Stok tidak cukup! Total di keranjang: ${currentTotalQtyBase}, Sisa Stok: ${product.stock}`);
+        return prev;
+      }
+
+      if (exist) return prev.map(i => (i.id === product.id && i.unit === code) ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: unitPrice, 
+        originalPrice: unitOriginalPrice,
+        cost: unitCost,
+        quantity: 1, 
+        unit: code, 
+        contains, 
+        channel 
+      }];
+    });
+  }, [transactionType, getChannelKey]);
+
   const handleScan = useCallback(async (code: string) => {
     try {
       if (!code) return;
@@ -312,116 +414,7 @@ export default function CashierPOS() {
     }
   }, []);
 
-  const getChannelKey = useCallback((txType: string): ChannelKey => {
-    if (txType === 'toko') return 'offline';
-    if (txType === 'online') return 'website';
-    if (txType === 'shopee') return 'shopee';
-    if (txType === 'tiktok') return 'tiktok';
-    return 'offline';
-  }, []);
 
-  const addToCart = useCallback((product: Product) => {
-    if (product.stock <= 0) return toast.error("Stok habis!");
-    
-    const channel = getChannelKey(transactionType);
-    const baseCode = (product.unit || 'PCS').toUpperCase();
-    const containsBase = 1;
-    
-    let priceToUse = product.price;
-    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[baseCode]?.price;
-    
-    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
-      priceToUse = chPrice;
-    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[baseCode]?.price) {
-       // Fallback logic: Shopee/TikTok -> Website -> Base
-       priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
-    }
-
-    setCart(prev => {
-      const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
-      
-      // Check stock limit
-      if (exist) {
-        if (exist.quantity + 1 > product.stock) {
-          toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
-          return prev;
-        }
-        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-
-      return [...prev, { 
-        id: product.id, 
-        name: product.name, 
-        price: priceToUse, 
-        originalPrice: product.price, // Store base price
-        cost: product.cost, // Include base cost
-        quantity: 1, 
-        unit: baseCode, 
-        contains: containsBase, 
-        channel 
-      }];
-    });
-  }, [transactionType, getChannelKey]);
-
-  const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
-    // Check basic stock availability
-    if (product.stock <= 0) return toast.error("Stok habis!");
-
-    const code = (unit.code || product.unit || 'PCS').toUpperCase();
-    const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
-    
-    // Check if adding this unit exceeds stock
-    // Since we don't know the exact current quantity of this unit in cart yet (inside set state), 
-    // we do a preliminary check. Real check happens inside setCart.
-    if (contains > product.stock) return toast.error(`Stok tidak cukup untuk satuan ini! Butuh: ${contains}, Sisa: ${product.stock}`);
-
-    const channel = getChannelKey(transactionType);
-    
-    let unitPrice = Number(unit.price || (contains > 0 ? product.price * contains : product.price));
-    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
-
-    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
-      unitPrice = chPrice;
-    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[code]?.price) {
-      // Fallback logic
-      unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
-    }
-
-    // Calculate unit cost based on contains
-    const unitCost = product.cost * contains;
-    // Calculate unit original price based on contains (assuming price scales linearly)
-    const unitOriginalPrice = product.price * contains;
-
-    setCart(prev => {
-      const exist = prev.find(i => i.id === product.id && i.unit === code);
-      
-      // Calculate total requested quantity in base units
-      // Current quantity in cart (all units converted to base)
-      const currentTotalQtyBase = prev
-        .filter(i => i.id === product.id)
-        .reduce((sum, i) => sum + (i.quantity * (i.contains || 1)), 0);
-      
-      const requestedQtyBase = contains; // Adding 1 of this unit = 'contains' base units
-
-      if (currentTotalQtyBase + requestedQtyBase > product.stock) {
-        toast.error(`Stok tidak cukup! Total di keranjang: ${currentTotalQtyBase}, Sisa Stok: ${product.stock}`);
-        return prev;
-      }
-
-      if (exist) return prev.map(i => (i.id === product.id && i.unit === code) ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { 
-        id: product.id, 
-        name: product.name, 
-        price: unitPrice, 
-        originalPrice: unitOriginalPrice,
-        cost: unitCost,
-        quantity: 1, 
-        unit: code, 
-        contains, 
-        channel 
-      }];
-    });
-  }, [transactionType, getChannelKey]);
 
   // Tambahkan item hasil scan ke keranjang setelah addToCart tersedia
   useEffect(() => {
