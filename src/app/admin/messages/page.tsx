@@ -18,7 +18,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { sbDeleteDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { collection, db, doc, onSnapshot, orderBy, query } from '@/lib/firebase';
+
 type Message = {
   id: string;
   name: string;
@@ -37,21 +37,37 @@ export default function AdminMessages() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'messages'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Message));
-      setMessages(msgs);
+    // Initial load
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (data) {
+        setMessages(data.map(d => ({
+          id: d.id,
+          name: d.name || d.raw_data?.name || '',
+          email: d.email || d.raw_data?.email || '',
+          whatsapp: d.whatsapp || d.raw_data?.whatsapp || '',
+          message: d.message || d.raw_data?.message || '',
+          createdAt: d.created_at || d.raw_data?.createdAt,
+          status: d.status || d.raw_data?.status || 'unread',
+          type: d.type || d.raw_data?.type,
+        } as Message)));
+      }
       setLoading(false);
-    });
+    };
+    fetchMessages();
 
-    return () => unsubscribe();
+    // Realtime updates
+    const channel = supabase
+      .channel('admin-messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleMarkAsRead = async (id: string) => {

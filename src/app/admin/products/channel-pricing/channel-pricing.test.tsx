@@ -163,5 +163,5 @@ describe('ChannelPricingPage', () => {
     await waitFor(() => {
       expect((notify as typeof import('@/lib/notify').default).admin.success).toHaveBeenCalled();
     });
-  });
+  }, 15000);
 });

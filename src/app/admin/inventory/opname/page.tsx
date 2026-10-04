@@ -21,7 +21,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
-import { auth, db, doc, runTransaction } from '@/lib/firebase';
+
 export default function StockOpnamePage() {
   const { products, loading: productsLoading } = useProducts({ isActive: true, orderByField: 'name' });
   const [loading, setLoading] = useState(false);
@@ -51,64 +51,54 @@ export default function StockOpnamePage() {
     setStatus(null);
 
     try {
-      const productRef = doc(db, 'products', selectedProduct.id);
+      const currentTotal = Number(selectedProduct.stock || 0);
+      const stockByWarehouse = (selectedProduct as any).stockByWarehouse || {};
+      const MAIN_WAREHOUSE_ID = 'gudang-utama';
+      const currentMain = Number(stockByWarehouse[MAIN_WAREHOUSE_ID] || 0);
 
-      await runTransaction(db, async (tx) => {
-        const pSnap = await tx.get(productRef);
-        if (!pSnap.exists()) throw new Error('Produk tidak ditemukan');
-        
-        const data = pSnap.data();
-        const currentTotal = Number(data.stock || 0);
-        const stockByWarehouse = data.stockByWarehouse || {};
-        const MAIN_WAREHOUSE_ID = 'gudang-utama';
-        const currentMain = Number(stockByWarehouse[MAIN_WAREHOUSE_ID] || 0);
+      // Hitung selisih dari Total Fisik vs Total DB
+      const totalDiff = physicalStock - currentTotal;
+      
+      // Bebankan selisih ke Gudang Utama
+      let newMainStock = currentMain + totalDiff;
+      if (newMainStock < 0) newMainStock = 0;
 
-        // Hitung selisih dari Total Fisik vs Total DB
-        const totalDiff = physicalStock - currentTotal;
-        
-        // Bebankan selisih ke Gudang Utama
-        let newMainStock = currentMain + totalDiff;
-        if (newMainStock < 0) newMainStock = 0; // Safety clamp
+      await adjustStockTx({
+        productId: selectedProduct.id,
+        newStock: newMainStock,
+        warehouseId: MAIN_WAREHOUSE_ID,
+        adminId: (await supabase.auth.getUser()).data.user?.id || 'system',
+        source: 'OPNAME',
+        note: note || (totalDiff >= 0 ? 'Kelebihan barang (Opname)' : 'Barang kurang/hilang (Opname)')
+      });
 
-        await adjustStockTx(tx, {
-          productId: selectedProduct.id,
-          newStock: newMainStock,
-          warehouseId: MAIN_WAREHOUSE_ID,
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-          source: 'OPNAME',
-          note: note || (totalDiff >= 0 ? 'Kelebihan barang (Opname)' : 'Barang kurang/hilang (Opname)')
-        });
+      // Catat kerugian/keuntungan ke Ledger
+      if (totalDiff !== 0) {
+        const costPrice = Number((selectedProduct as any).Modal || (selectedProduct as any).purchasePrice || 0);
+        const diffValue = Math.abs(totalDiff) * costPrice;
 
-        // Catat kerugian/keuntungan ke Ledger
-        if (totalDiff !== 0) {
-          const costPrice = Number(data.Modal || data.purchasePrice || 0);
-          const diffValue = Math.abs(totalDiff) * costPrice;
-
-          if (diffValue > 0) {
-            if (totalDiff < 0) {
-              // Barang Hilang -> Kerugian
-              await postJournal({
-                debitAccount: 'LossOnInventory',
-                creditAccount: 'Inventory',
-                amount: diffValue,
-                memo: `Penyesuaian Opname (Kurang ${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${note}`,
-                refType: 'OPNAME_LOSS',
-                refId: selectedProduct.id
-              }, tx);
-            } else {
-              // Kelebihan Barang -> Keuntungan (atau pemulihan HPP)
-              await postJournal({
-                debitAccount: 'Inventory',
-                creditAccount: 'GainOnInventory',
-                amount: diffValue,
-                memo: `Penyesuaian Opname (Lebih ${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${note}`,
-                refType: 'OPNAME_GAIN',
-                refId: selectedProduct.id
-              }, tx);
-            }
+        if (diffValue > 0) {
+          if (totalDiff < 0) {
+            await postJournal({
+              debitAccount: 'LossOnInventory',
+              creditAccount: 'Inventory',
+              amount: diffValue,
+              memo: `Penyesuaian Opname (Kurang ${Math.abs(totalDiff)} ${(selectedProduct as any).unit || 'pcs'}): ${note}`,
+              refType: 'OPNAME_LOSS',
+              refId: selectedProduct.id
+            });
+          } else {
+            await postJournal({
+              debitAccount: 'Inventory',
+              creditAccount: 'GainOnInventory',
+              amount: diffValue,
+              memo: `Penyesuaian Opname (Lebih ${Math.abs(totalDiff)} ${(selectedProduct as any).unit || 'pcs'}): ${note}`,
+              refType: 'OPNAME_GAIN',
+              refId: selectedProduct.id
+            });
           }
         }
-      });
+      }
 
       setStatus({ type: 'success', msg: 'Stok berhasil disesuaikan!' });
       setPhysicalStock(0);

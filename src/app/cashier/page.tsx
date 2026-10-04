@@ -22,7 +22,7 @@ import { getUserAndRole } from '@/lib/supabase-helpers';
 import { uploadToSupabase } from '@/lib/supabase';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { timestampId, uniqueFileName } from '@/lib/ids';
-import { collection, db, onSnapshot, query, where } from '@/lib/firebase';
+
 // Types
 type UnitOption = {
   code: string;
@@ -792,15 +792,16 @@ export default function CashierPOS() {
     };
   }, []);
 
-  // Listen for Unread Chats (Admin)
+  // Fetch Unread Chats count (Admin)
   useEffect(() => {
-    const q = query(collection(db, 'chats'), where('isReadByAdmin', '==', false));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setChatUnreadCount(snapshot.size);
-    }, (error) => {
-      logger.warn("Chat listener error (probably index missing):", error);
-    });
-    return () => unsubscribe();
+    const fetchUnreadCount = async () => {
+      const { count } = await supabase
+        .from('chats')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_read_by_admin', false);
+      setChatUnreadCount(count ?? 0);
+    };
+    fetchUnreadCount();
   }, []);
 
   // Load Warehouses from Supabase

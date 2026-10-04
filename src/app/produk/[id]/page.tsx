@@ -96,7 +96,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   let product: Product | null = null;
   let relatedProducts: RelatedProduct[] = [];
   let promoProducts: PromoProduct[] = [];
-  const reviews: Review[] = [];
+  let reviews: Review[] = [];
 
   try {
     const { data: prod } = await supabase
@@ -107,6 +107,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
     if (prod) {
       const raw = prod.raw_data || {};
+      if (Array.isArray(raw.reviews)) {
+        reviews = raw.reviews;
+      }
       const stock = Number(prod.stock ?? raw.stock ?? raw.Stok ?? 0);
       const price = Number(prod.price ?? raw.price ?? raw.Ecer ?? 0);
       const rawWholesale = Number(raw.wholesalePrice ?? raw.Grosir ?? raw.Harga_Grosir ?? 0);

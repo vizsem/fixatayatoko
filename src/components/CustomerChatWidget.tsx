@@ -10,7 +10,6 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbUpdateDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, onSnapshot, orderBy, query, ref, setDoc, updateDoc, where } from '@/lib/firebase';
 export default function CustomerChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -21,11 +20,10 @@ export default function CustomerChatWidget() {
 
   // 1. Auth Listener
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // Check role to hide widget for admins/cashiers
+    const checkRoleAndSetUser = async (sbUser: any) => {
+      if (sbUser) {
         try {
-          const userDoc = await sbGetDoc('users', currentUser.uid, false);
+          const userDoc = await sbGetDoc('users', sbUser.id, false);
           const role = userDoc.data()?.role;
           if (role === 'admin' || role === 'cashier') {
             setUser(null); // Hide widget
@@ -34,10 +32,19 @@ export default function CustomerChatWidget() {
         } catch (e) {
           console.error("Error checking role:", e);
         }
+        setUser({ uid: sbUser.id, ...sbUser });
+      } else {
+        setUser(null);
       }
-      setUser(currentUser);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      checkRoleAndSetUser(session?.user);
     });
-    return () => unsub();
+    supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
+      checkRoleAndSetUser(currentUser);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // 2. Fetch Messages & Listen for Unread
@@ -45,32 +52,53 @@ export default function CustomerChatWidget() {
     if (!user) return;
 
     if (isOpen) {
-      const q = query(
-        collection(db, 'chats', user.uid, 'messages'),
-        orderBy('createdAt', 'asc')
-      );
+      const fetchMessages = async () => {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', user.uid)
+          .order('created_at', { ascending: true });
+        if (!error && data) {
+          setMessages(data.map(d => ({
+            id: d.id,
+            text: d.text,
+            senderId: d.sender_id,
+            createdAt: d.created_at,
+            isRead: d.is_read,
+            type: d.type,
+            imageUrl: d.image_url,
+            ...(d.raw_data || {})
+          } as ChatMessage)));
+        }
+      };
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const msgs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as ChatMessage[];
-        
-        setMessages(msgs);
-      });
+      fetchMessages();
 
-      return () => unsubscribe();
+      const channel = supabase
+        .channel(`chat_messages_${user.uid}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${user.uid}` },
+          () => {
+            fetchMessages();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else {
-      // When closed, just do a one-time check for unread admin messages
       let isMounted = true;
-      const qUnread = query(
-        collection(db, 'chats', user.uid, 'messages'),
-        where('senderId', '==', 'admin'),
-        where('isRead', '==', false)
-      );
-      getDocs(qUnread).then((snap: any) => {
-        if (isMounted) setUnreadCount(snap.docs.length);
-      }).catch(() => {});
+      supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('chat_id', user.uid)
+        .eq('sender_id', 'admin')
+        .eq('is_read', false)
+        .then(({ count }) => {
+          if (isMounted && typeof count === 'number') setUnreadCount(count);
+        });
 
       return () => { isMounted = false; };
     }
@@ -83,10 +111,13 @@ export default function CustomerChatWidget() {
       
       // Mark admin messages as read
       const unreadAdminMsgs = messages.filter(m => m.senderId === 'admin' && !m.isRead);
-      unreadAdminMsgs.forEach(msg => {
-        updateDoc(doc(db, 'chats', user.uid, 'messages', msg.id), { isRead: true });
-      });
-      setUnreadCount(0);
+      if (unreadAdminMsgs.length > 0) {
+        supabase
+          .from('messages')
+          .update({ is_read: true })
+          .in('id', unreadAdminMsgs.map(m => m.id))
+          .then(() => setUnreadCount(0));
+      }
     }
   }, [messages, isOpen, user]);
 
@@ -99,7 +130,6 @@ export default function CustomerChatWidget() {
       setNewMessage('');
 
       // 1. Ensure Chat Thread Exists
-      const chatRef = doc(db, 'chats', user.uid);
       const chatSnap = await sbGetDoc('chats', user.uid, false);
 
       if (!chatSnap.exists()) {
@@ -107,9 +137,9 @@ export default function CustomerChatWidget() {
           id: user.uid,
           userInfo: {
             uid: user.uid,
-            name: user.displayName || 'Pelanggan',
+            name: user.user_metadata?.full_name || user.displayName || 'Pelanggan',
             email: user.email,
-            photoURL: user.photoURL
+            photoURL: user.user_metadata?.avatar_url || user.photoURL
           },
           createdAt: new Date().toISOString(),
           unreadCount: 0,
@@ -118,18 +148,32 @@ export default function CustomerChatWidget() {
       }
 
       // 2. Add Message
-      await addDoc(collection(db, 'chats', user.uid, 'messages'), {
+      const now = new Date().toISOString();
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const { error: msgErr } = await supabase.from('messages').insert({
+        id: msgId,
+        chat_id: user.uid,
         text,
-        senderId: user.uid,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        type: 'text'
+        sender_id: user.uid,
+        is_read: false,
+        type: 'text',
+        created_at: now,
+        updated_at: now,
+        raw_data: {
+          id: msgId,
+          text,
+          senderId: user.uid,
+          createdAt: now,
+          isRead: false,
+          type: 'text'
+        }
       });
+      if (msgErr) throw msgErr;
 
       // 3. Update Thread Metadata
       await sbUpdateDoc('chats', user.uid, {
         lastMessage: text,
-        lastMessageTime: new Date().toISOString(),
+        lastMessageTime: now,
         isReadByAdmin: false,
         unreadCount: (chatSnap.data()?.unreadCount || 0) + 1
       }, false);

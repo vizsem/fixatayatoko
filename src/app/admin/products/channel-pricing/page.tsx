@@ -216,7 +216,8 @@ export default function ChannelPricingPage() {
     const toastId = notify.admin.loading('Menerapkan update harga massal...');
 
     try {
-      const currentUser = userData?.user;
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUser = authData?.user;
       const nowIso = new Date().toISOString();
       await Promise.all(targetProducts.map((product) => {
         const unitCode = selectedUnit[product.id] || (product.unit || 'PCS').toString().toUpperCase();

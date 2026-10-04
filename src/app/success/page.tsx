@@ -27,6 +27,7 @@ function SuccessContent() {
         setLoading(false);
         return;
       }
+      try {
         const querySnapshot = await sbGetDocs({
           table: 'orders',
           where: [{ field: 'orderId', op: '==', val: orderId }],

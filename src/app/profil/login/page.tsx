@@ -10,7 +10,7 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { GoogleAuthProvider, auth, db, doc, getDoc, onAuthStateChanged, setDoc, signInWithEmailAndPassword, signInWithPopup } from '@/lib/firebase';
+
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -20,30 +20,25 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && !user.isAnonymous) router.push('/profil');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) router.push('/profil');
     });
-    return () => unsubscribe();
+    return () => { subscription.unsubscribe(); };
   }, [router]);
 
   const handleGoogleLogin = async () => {
     if (loading) return;
     setLoading(true);
-    const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result?.user;
-      if (!user) return;
-      const userSnap = await sbGetDoc('users', result.user.uid, false);
-      if (!userSnap.exists()) {
-        await sbUpsertDoc('users', result.user.uid, { uid: user.uid, name: user.displayName, email: user.email, role: 'customer', points: 0, createdAt: new Date().toISOString() });
-      }
-      await requestForToken();
-      router.push('/profil');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/profil` }
+      });
+      if (error) throw error;
+      // OAuth redirect akan handle sisanya
     } catch (error: unknown) {
       console.error('Google Login Error:', error);
       notify.user.error('Gagal login dengan Google. Coba lagi.');
-    } finally {
       setLoading(false);
     }
   };
@@ -53,10 +48,22 @@ export default function LoginPage() {
     if (!email || !password || loading) return;
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      // `false` = klien ber-sesi; klien service-role di browser tidak membawa
-      // sesi sehingga RLS menolak dan hasilnya selalu kosong.
-      await sbGetDoc('users', result.user.uid, false);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (data.user) {
+        // Pastikan user doc ada di tabel users
+        const { data: existing } = await supabase.from('users').select('id').eq('id', data.user.id).single();
+        if (!existing) {
+          await supabase.from('users').insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.user_metadata?.full_name || data.user.email,
+            role: 'customer',
+            points: 0,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
       await requestForToken();
       router.push('/profil');
     } catch (error: unknown) {

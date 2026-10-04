@@ -20,7 +20,7 @@ import { supabase } from '@/lib/supabase';
 
 
 
-import { Timestamp, collection, db, doc, getDocs, limit, onSnapshot, orderBy, query, where, getCountFromServer } from '@/lib/firebase';
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     change: number;
     type?: string;
     adminEmail?: string;
-    createdAt?: Timestamp;
+    createdAt?: string;
   }>>([]);
   const initialLoaded = useRef(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -45,86 +45,67 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch pending orders count
-        const qOrders = query(collection(db, 'orders'), where('status', 'in', ['MENUNGGU', 'PENDING']));
-        const ordersCount = await getCountFromServer(qOrders);
-        
-        // Fetch low stock products count
-        const qStock = query(collection(db, 'products'), where('stock', '<=', 10), where('isActive', '==', true));
-        const stockCount = await getCountFromServer(qStock);
-
-        // Fetch today sales
         const today = new Date();
-        today.setHours(0,0,0,0);
-        const qSales = query(collection(db, 'orders'), where('createdAt', '>=', today));
-        const salesSnap = await getDocs(qSales);
-        let total = 0;
-        salesSnap.forEach(d => total += (Number(d.data().total) || 0));
+        today.setHours(0, 0, 0, 0);
+
+        const [ordersRes, stockRes, salesRes] = await Promise.all([
+          supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['MENUNGGU', 'PENDING']),
+          supabase.from('products').select('id', { count: 'exact', head: true }).lte('stock', 10).eq('is_active', true),
+          supabase.from('orders').select('total,raw_data').gte('created_at', today.toISOString()),
+        ]);
+
+        let todaySales = 0;
+        (salesRes.data || []).forEach(d => {
+          todaySales += Number(d.total || d.raw_data?.total || 0);
+        });
 
         setMobileStats({
-          newOrders: ordersCount.data().count,
-          lowStock: stockCount.data().count,
-          todaySales: total
+          newOrders: ordersRes.count ?? 0,
+          lowStock: stockRes.count ?? 0,
+          todaySales,
         });
       } catch (err) {
         console.error('Error fetching admin layout stats', err);
       }
     };
-    
     fetchStats();
   }, []);
 
   // Fetch unread messages count once
   useEffect(() => {
     const fetchUnread = async () => {
-      const q = query(
-        collection(db, 'messages'),
-        where('status', '==', 'unread')
-      );
-      const snap = await getCountFromServer(q);
-      setUnreadMessages(snap.data().count);
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'unread');
+      setUnreadMessages(count ?? 0);
     };
     fetchUnread();
   }, []);
 
+  // Stock log realtime toast via Supabase Realtime
   useEffect(() => {
-    const q = query(
-      collection(db, 'stock_logs'),
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      if (!initialLoaded.current) {
-        initialLoaded.current = true;
-        return;
-      }
-      snap.docChanges().forEach((chg) => {
-        if (chg.type === 'added') {
-          const data = chg.doc.data() as {
-            productName?: string;
-            warehouseName?: string;
-            change?: number;
-            type?: string;
-            adminEmail?: string;
-            createdAt?: Timestamp;
-          };
-          const toast = {
-            id: chg.doc.id,
-            productName: String(data.productName || ''),
-            warehouseName: String(data.warehouseName || ''),
-            change: Number(data.change || 0),
-            type: String(data.type || ''),
-            adminEmail: String(data.adminEmail || ''),
-            createdAt: data.createdAt,
-          };
-          setToasts((prev) => [toast, ...prev].slice(0, 5));
-          setTimeout(() => {
-            setToasts((prev) => prev.filter(t => t.id !== toast.id));
-          }, 6000);
-        }
-      });
-    });
-    return () => unsub();
+    const channel = supabase
+      .channel('admin-stock-logs-toast')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stock_logs' }, (payload) => {
+        if (!initialLoaded.current) { initialLoaded.current = true; return; }
+        const data = payload.new as any;
+        const toast = {
+          id: data.id || String(Date.now()),
+          productName: String(data.product_name || data.productName || ''),
+          warehouseName: String(data.warehouse_name || data.warehouseName || ''),
+          change: Number(data.change || data.quantity || 0),
+          type: String(data.type || ''),
+          adminEmail: String(data.admin_email || data.adminEmail || ''),
+          createdAt: data.created_at || data.createdAt,
+        };
+        setToasts((prev) => [toast, ...prev].slice(0, 5));
+        setTimeout(() => {
+          setToasts((prev) => prev.filter(t => t.id !== toast.id));
+        }, 6000);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const menuItems = [

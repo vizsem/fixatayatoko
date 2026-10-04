@@ -31,7 +31,7 @@ import Link from 'next/link';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
-import { db, doc, runTransaction } from '@/lib/firebase';
+
 
 /** Compute stock expressed in each configured unit */
 function stockInUnits(stock: number, units?: { code: string; contains?: number }[]): { code: string; qty: number; contains: number }[] {
@@ -256,68 +256,53 @@ export default function StockReconciliationPage() {
       const adminId = (await supabase.auth.getUser()).data.user?.id || 'system';
       const timestamp = new Date().toISOString();
 
-      await runTransaction(db, async (tx) => {
-        const productRefs = mismatchedItems.map(item => doc(db, 'products', item.product.id));
-        const pSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
+      await Promise.all(mismatchedItems.map(async (item) => {
+        const currentTotal = Number(item.systemStock || 0);
+        const currentWhStock = Number(
+          (item.product as any).stockByWarehouse?.[selectedWarehouse] ??
+          (selectedWarehouse === 'gudang-utama' ? currentTotal : 0)
+        );
 
-        for (let i = 0; i < mismatchedItems.length; i++) {
-          const item = mismatchedItems[i];
-          const productRef = productRefs[i];
-          const pSnap = pSnaps[i];
+        const totalDiff = item.physicalStock - currentWhStock;
+        let newWarehouseStock = currentWhStock + totalDiff;
+        if (newWarehouseStock < 0) newWarehouseStock = 0;
 
-          if (!pSnap.exists()) {
-            throw new Error(`Produk ${item.product.name} tidak ditemukan`);
-          }
+        await adjustStockTx({
+          productId: item.product.id,
+          newStock: newWarehouseStock,
+          warehouseId: selectedWarehouse,
+          adminId,
+          source: 'RECONCILIATION',
+          note: reconciliationNote || `Rekonsiliasi stok [${selectedWarehouse}]: selisih ${totalDiff > 0 ? '+' : ''}${totalDiff} ${item.product.unit || 'pcs'}`,
+        });
 
-          const data = pSnap.data();
-          const currentTotal = Number(data.stock || 0);
-          const stockByWarehouse = data.stockByWarehouse || {};
-          const currentWhStock = Number(stockByWarehouse[selectedWarehouse] ?? (selectedWarehouse === 'gudang-utama' ? currentTotal : 0));
+        if (totalDiff !== 0) {
+          const costPrice = Number((item.product as any).Modal || (item.product as any).purchasePrice || 0);
+          const diffValue = Math.abs(totalDiff) * costPrice;
 
-          // Difference in this warehouse
-          const totalDiff = item.physicalStock - currentWhStock;
-          let newWarehouseStock = currentWhStock + totalDiff;
-          if (newWarehouseStock < 0) newWarehouseStock = 0;
-
-          await adjustStockTx(tx, {
-            productId: item.product.id,
-            newStock: newWarehouseStock,
-            warehouseId: selectedWarehouse,
-            adminId,
-            source: 'RECONCILIATION',
-            note: reconciliationNote || `Rekonsiliasi stok [${selectedWarehouse}]: selisih ${totalDiff > 0 ? '+' : ''}${totalDiff} ${item.product.unit || 'pcs'}`,
-            prefetchedSnap: pSnap
-          });
-
-          // Post to ledger if there is a difference
-          if (totalDiff !== 0) {
-            const costPrice = Number(data.Modal || data.purchasePrice || 0);
-            const diffValue = Math.abs(totalDiff) * costPrice;
-
-            if (diffValue > 0) {
-              if (totalDiff < 0) {
-                await postJournal({
-                  debitAccount: 'LossOnInventory',
-                  creditAccount: 'Inventory',
-                  amount: diffValue,
-                  memo: `Rekonsiliasi Kurang (${Math.abs(totalDiff)} ${data.unit || 'pcs'}): ${reconciliationNote || 'Penyesuaian Fisik'}`,
-                  referenceId: `RECON-${timestamp}-${item.product.id}`,
-                  postedBy: adminId
-                }, tx);
-              } else {
-                await postJournal({
-                  debitAccount: 'Inventory',
-                  creditAccount: 'GainOnInventory',
-                  amount: diffValue,
-                  memo: `Rekonsiliasi Lebih (+${totalDiff} ${data.unit || 'pcs'}): ${reconciliationNote || 'Penyesuaian Fisik'}`,
-                  referenceId: `RECON-${timestamp}-${item.product.id}`,
-                  postedBy: adminId
-                }, tx);
-              }
+          if (diffValue > 0) {
+            if (totalDiff < 0) {
+              await postJournal({
+                debitAccount: 'LossOnInventory',
+                creditAccount: 'Inventory',
+                amount: diffValue,
+                memo: `Rekonsiliasi Kurang (${Math.abs(totalDiff)} ${item.product.unit || 'pcs'}): ${reconciliationNote || 'Penyesuaian Fisik'}`,
+                referenceId: `RECON-${timestamp}-${item.product.id}`,
+                postedBy: adminId
+              });
+            } else {
+              await postJournal({
+                debitAccount: 'Inventory',
+                creditAccount: 'GainOnInventory',
+                amount: diffValue,
+                memo: `Rekonsiliasi Lebih (+${totalDiff} ${item.product.unit || 'pcs'}): ${reconciliationNote || 'Penyesuaian Fisik'}`,
+                referenceId: `RECON-${timestamp}-${item.product.id}`,
+                postedBy: adminId
+              });
             }
           }
         }
-      });
+      }));
 
       notify.admin.success(`Rekonsiliasi berhasil! ${mismatchedItems.length} produk disesuaikan.`);
 

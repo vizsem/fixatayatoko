@@ -13,8 +13,7 @@ import { ProductSkeleton } from '@/components/home/ProductSkeleton';
 import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
-import { sbGetDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-import { addDoc, auth, collection, db, doc, getDoc, getDocs, onAuthStateChanged, orderBy, query } from '@/lib/firebase';
+import { sbGetDoc, sbUpsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 export type Review = {
   id: string;
   userId: string;
@@ -138,18 +137,24 @@ export default function ProductDetailClient({
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      const id = u?.uid || localStorage.getItem('temp_user_id') || '';
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const id = session?.user?.id || localStorage.getItem('temp_user_id') || '';
       if (!id) return;
       try { localStorage.setItem('temp_user_id', id); } catch {}
       setUserId(id);
+    });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) {
+        setUserId(user.id);
+        try { localStorage.setItem('temp_user_id', user.id); } catch {}
+      }
     });
     if (product) {
       const wl = getWishlist();
       setInWishlist(wl.includes(product.id));
     }
     setLoading(false);
-    return () => unsub();
+    return () => subscription.unsubscribe();
   }, [product]);
 
   const syncToFirebaseCart = async (p: Product, q: number, redirectToCart = false) => {
@@ -189,7 +194,6 @@ export default function ProductDetailClient({
     window.dispatchEvent(new Event('cart-updated'));
     if (userId) {
       try {
-        const cartRef = doc(db, 'carts', userId);
         // `false` = klien ber-sesi; klien service-role di browser tidak punya
         // sesi sehingga RLS menolak dan keranjang cloud selalu tampak kosong.
         const cartSnap = await sbGetDoc('carts', userId, false);
@@ -206,26 +210,35 @@ export default function ProductDetailClient({
   };
 
   const handleSubmitReview = async () => {
-    if (!(await supabase.auth.getUser()).data.user) return toast.error('Silakan login untuk memberikan ulasan');
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) return toast.error('Silakan login untuk memberikan ulasan');
     if (userRating === 0) return toast.error('Silakan pilih bintang rating');
     if (!userComment.trim()) return toast.error('Silakan tulis ulasan Anda');
     if (!product) return;
     setSubmittingReview(true);
     try {
-      const currentUser = (await supabase.auth.getUser()).data.user;
-      if (!currentUser) return toast.error('Silakan login terlebih dahulu');
-      await addDoc(collection(db, 'products', product.id, 'reviews'), {
+      const newReview: Review = {
+        id: `rev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         userId: currentUser.id,
         userName: currentUser.user_metadata?.full_name || (currentUser as any).displayName || currentUser.email?.split('@')[0] || 'Pengguna',
-        rating: userRating, comment: userComment, createdAt: new Date().toISOString()
-      });
+        rating: userRating,
+        comment: userComment,
+        createdAt: new Date().toISOString() as any,
+      };
+      const prodSnap = await sbGetDoc('products', product.id, false);
+      const existingReviews = (prodSnap.exists() && Array.isArray(prodSnap.data().reviews) ? prodSnap.data().reviews : []) as Review[];
+      const updatedReviews = [newReview, ...existingReviews];
+      await sbUpdateDoc('products', product.id, { reviews: updatedReviews });
+      setReviews(updatedReviews);
       toast.success('Terima kasih! Ulasan berhasil dikirim.');
-      setUserComment(''); setUserRating(0);
-      const reviewsQ = query(collection(db, 'products', product.id, 'reviews'), orderBy('createdAt', 'desc'));
-      const reviewSnap = await getDocs(reviewsQ);
-      setReviews(reviewSnap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
-    } catch (err) { console.error(err); toast.error('Gagal mengirim ulasan'); }
-    finally { setSubmittingReview(false); }
+      setUserComment('');
+      setUserRating(0);
+    } catch (err) {
+      console.error(err);
+      toast.error('Gagal mengirim ulasan');
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const handleQuantity = (type: 'plus' | 'minus') => {

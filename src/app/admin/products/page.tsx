@@ -32,7 +32,7 @@ import { playScanBeep } from '@/lib/sound';
 import { supabase } from '@/lib/supabase';
 
 
-import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, ref, writeBatch } from '@/lib/firebase';
+
 
 /** Compute stock expressed in each configured unit. Returns array of {code, qty, contains}. */
 function stockInUnits(stock: number, units?: { code: string; contains?: number }[]): { code: string; qty: number; contains: number }[] {
@@ -375,12 +375,23 @@ export default function AdminProducts() {
 
   // Effects
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/admin/login?callbackUrl=/admin/products'); return; }
       setLoading(false);
+    };
+    checkAuth();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) router.push('/admin/login?callbackUrl=/admin/products');
+      else setLoading(false);
     });
-    const unsubW = onSnapshot(collection(db, 'warehouses'), (s) => setWarehouses(s.docs.map(d => ({ id: d.id, ...d.data() })) as Warehouse[]));
-    return () => { unsubAuth(); unsubW(); };
+
+    // Load warehouses once
+    supabase.from('warehouses').select('id,name').then(({ data }) => {
+      if (data) setWarehouses(data as Warehouse[]);
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, [router]);
 
   const rows = liveProducts as unknown as ProductRow[];
@@ -557,53 +568,62 @@ export default function AdminProducts() {
 
         for (let i = 0; i < data.length; i += CHUNK_SIZE) {
           const chunk = data.slice(i, i + CHUNK_SIZE);
-          const batch = writeBatch(db);
 
-          chunk.forEach((item) => {
+          await Promise.all(chunk.map(async (item) => {
             const exist = rows.find(p => p.sku === String(item.ID || ''));
-            const pData = { ...item, updatedAt: new Date().toISOString() };
-            // Optional: clean up ID if it's just meant for internal mapping
-            delete (pData as any).ID;
+            const now = new Date().toISOString();
 
             if (exist) {
-              batch.update(doc(db, 'products', exist.id), pData);
+              const pData = { ...item, updatedAt: now };
+              delete (pData as any).ID;
+              await supabase.from('products').update({
+                raw_data: pData,
+                updated_at: now
+              }).eq('id', exist.id);
+
               const newStock = Number(item.Stok);
               const oldStock = Number(exist.stock || exist.Stok || 0);
               const diff = newStock - oldStock;
               if (diff !== 0) {
-                const logRef = doc(collection(db, 'inventory_logs'));
-                batch.set(logRef, {
-                  productId: exist.id,
-                  productName: exist.name || '',
+                await supabase.from('inventory_logs').insert({
+                  id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                  product_id: exist.id,
+                  product_name: exist.name || '',
                   type: diff > 0 ? 'MASUK' : 'KELUAR',
                   amount: Math.abs(diff),
-                  adminId: currentAdminId,
+                  admin_id: currentAdminId,
                   source: 'MANUAL',
                   note: `Bulk Import Update. Prev: ${oldStock}, New: ${newStock}`,
-                  date: new Date().toISOString()
+                  date: now
                 });
               }
             } else {
-              const newRef = doc(collection(db, 'products'));
-              batch.set(newRef, { ...pData, createdAt: new Date().toISOString() });
+              const newId = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+              const pData = { ...item, createdAt: now };
+              delete (pData as any).ID;
+              await supabase.from('products').insert({
+                id: newId,
+                name: String(item.Nama || 'New Product'),
+                raw_data: pData,
+                created_at: now,
+                updated_at: now
+              });
               const stock = Number(item.Stok || 0);
               if (stock > 0) {
-                const logRef = doc(collection(db, 'inventory_logs'));
-                batch.set(logRef, {
-                  productId: newRef.id,
-                  productName: String(item.Nama || 'New Product'),
+                await supabase.from('inventory_logs').insert({
+                  id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                  product_id: newId,
+                  product_name: String(item.Nama || 'New Product'),
                   type: 'MASUK',
                   amount: stock,
-                  adminId: currentAdminId,
+                  admin_id: currentAdminId,
                   source: 'MANUAL',
                   note: 'Bulk Import (New Product)',
-                  date: new Date().toISOString()
+                  date: now
                 });
               }
             }
-          });
-
-          await batch.commit();
+          }));
         }
 
         notify.admin.success(`Berhasil mengimport ${data.length} produk!`, { id: t });

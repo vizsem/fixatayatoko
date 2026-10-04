@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabase';
 
 
 import { getUserAndRole, sbGetDoc, sbGetDocs, sbInsertDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, doc, getDocs, orderBy, query, runTransaction, where } from '@/lib/firebase';
+
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -56,18 +56,17 @@ function StockInContent() {
 
   const loadSupportingData = useCallback(async () => {
     try {
-      // Load products (aktif & urut nama) - memakai indeks
-      const productsQuery = query(
-        collection(db, 'products'),
-        where('isActive', '==', true),
-        orderBy('name', 'asc')
-      );
-      const productsSnap = await getDocs(productsQuery);
-      const productList = productsSnap.docs.map(d => {
-        const data = d.data() as Record<string, unknown>;
-        const baseUnit = String((data.unit || data.Satuan || 'PCS')).toUpperCase();
-        const units = Array.isArray((data as Record<string, unknown>).units)
-          ? ((data as Record<string, unknown>).units as Array<Record<string, unknown>>).map(u => ({
+      const { data: productRows } = await supabase
+        .from('products')
+        .select('id,name,unit,stock,raw_data')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      const productList = (productRows || []).map(d => {
+        const raw = d.raw_data || {};
+        const baseUnit = String(raw.unit || raw.Satuan || d.unit || 'PCS').toUpperCase();
+        const units = Array.isArray(raw.units)
+          ? (raw.units as Array<Record<string, unknown>>).map(u => ({
               code: String(u.code || '').toUpperCase(),
               contains: typeof u.contains === 'number' ? u.contains : Number(u.contains || 0),
             })).filter(u => u.code)
@@ -75,13 +74,13 @@ function StockInContent() {
         if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1 });
         return {
           id: d.id,
-          name: String(data.name || 'Produk'),
+          name: String(d.name || 'Produk'),
           unit: baseUnit,
-          stock: Number(data.stock || 0),
+          stock: Number(d.stock || 0),
           units,
-          stockByWarehouse: (data.stockByWarehouse as Record<string, number> | undefined) || {},
-          purchasePrice: typeof data.purchasePrice === 'number' ? data.purchasePrice : Number(data.purchasePrice || 0),
-          Modal: typeof data.Modal === 'number' ? data.Modal : Number(data.Modal || 0),
+          stockByWarehouse: (raw.stockByWarehouse as Record<string, number> | undefined) || {},
+          purchasePrice: Number(raw.purchasePrice || 0),
+          Modal: Number(raw.Modal || 0),
         } as Product;
       });
       setProducts(productList);
@@ -173,35 +172,34 @@ function StockInContent() {
       await sbInsertDoc('inventory_transactions', transactionData);
 
       // 2. Update stok produk (atomik + log via util)
-      await runTransaction(db, async (tx) => {
-        const productRef = doc(db, 'products', formData.productId);
-        const snap = await tx.get(productRef);
-        if (!snap.exists()) throw new Error('Produk tidak ditemukan');
-        const cur = snap.data() as any;
-        const currentStock = Number(cur.stock || 0);
-        const newStock = currentStock + pcsToAdd;
-        const currentCost = Number(cur.Modal || cur.purchasePrice || 0);
-        const effectiveOldCost = currentCost > 0 ? currentCost : incomingCostPerPcs;
-        const nextAvgCost = newStock > 0
-          ? Math.round(((currentStock * effectiveOldCost) + (pcsToAdd * incomingCostPerPcs)) / newStock)
-          : Math.round(incomingCostPerPcs);
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminId = user?.id || 'system';
 
-        await addStockTx(tx, {
-          productId: formData.productId,
-          amount: pcsToAdd,
-          warehouseId: 'gudang-utama',
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-          note: `Stock-In manual (${formData.unitCode} x ${formData.quantity})`,
-          source: 'MANUAL',
-          prefetchedSnap: snap
-        });
-        tx.update(productRef, {
-          purchasePrice: nextAvgCost,
-          Modal: nextAvgCost,
-          hargaBeli: nextAvgCost,
-          updatedAt: new Date().toISOString()
-        });
+      const { data: curProduct } = await supabase.from('products').select('stock,raw_data').eq('id', formData.productId).single();
+      if (!curProduct) throw new Error('Produk tidak ditemukan');
+
+      const currentStock = Number(curProduct.stock || 0);
+      const raw = curProduct.raw_data || {};
+      const currentCost = Number(raw.Modal || raw.purchasePrice || 0);
+      const effectiveOldCost = currentCost > 0 ? currentCost : incomingCostPerPcs;
+      const newStock = currentStock + pcsToAdd;
+      const nextAvgCost = newStock > 0
+        ? Math.round(((currentStock * effectiveOldCost) + (pcsToAdd * incomingCostPerPcs)) / newStock)
+        : Math.round(incomingCostPerPcs);
+
+      await addStockTx({
+        productId: formData.productId,
+        amount: pcsToAdd,
+        warehouseId: 'gudang-utama',
+        adminId,
+        note: `Stock-In manual (${formData.unitCode} x ${formData.quantity})`,
+        source: 'MANUAL',
       });
+
+      await supabase.from('products').update({
+        raw_data: { ...raw, purchasePrice: nextAvgCost, Modal: nextAvgCost, hargaBeli: nextAvgCost },
+        updated_at: new Date().toISOString()
+      }).eq('id', formData.productId);
 
       // 3. Trigger sinkronisasi otomatis
       try {

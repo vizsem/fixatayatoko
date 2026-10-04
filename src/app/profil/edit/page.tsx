@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { sbUpdateDoc } from '@/lib/supabase-helpers';
-import { arrayRemove, arrayUnion, auth, db, doc, onAuthStateChanged, onSnapshot } from '@/lib/firebase';
+
 type Address = {
   id: string;
   label: string;
@@ -34,42 +34,39 @@ export default function EditProfilePage() {
   const [savingAddress, setSavingAddress] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser || currentUser.isAnonymous) {
-        router.push('/profil/login');
-        return;
+    const loadProfile = async (userId: string) => {
+      const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+      if (!data) return;
+      const raw = data.raw_data || data;
+      setFormData({
+        name: raw.name || data.name || '',
+        email: raw.email || data.email || '',
+        phone: raw.whatsapp || raw.phone || '',
+      });
+      setAddresses(Array.isArray(raw.addresses) ? raw.addresses : []);
+      if (!Array.isArray(raw.addresses) || raw.addresses.length === 0) {
+        const legacy = String(raw.address || '');
+        if (legacy && !newAddress) setNewAddress(legacy);
+        const nm = String(raw.name || data.name || '');
+        const ph = String(raw.whatsapp || raw.phone || '');
+        if (nm && !newReceiverName) setNewReceiverName(nm);
+        if (ph && !newReceiverPhone) setNewReceiverPhone(ph);
       }
+      setLoading(false);
+    };
 
-      const unsubUser = onSnapshot(
-        doc(db, 'users', currentUser.uid),
-        (snap) => {
-          const data = snap.data() as any;
-          setFormData({
-            name: data?.name || '',
-            email: data?.email || '',
-            phone: data?.whatsapp || data?.phone || '',
-          });
-          setAddresses(Array.isArray(data?.addresses) ? data.addresses : []);
-          if (!Array.isArray(data?.addresses) || data.addresses.length === 0) {
-            const legacy = String(data?.address || '');
-            if (legacy && !newAddress) setNewAddress(legacy);
-            const nm = String(data?.name || '');
-            const ph = String(data?.whatsapp || data?.phone || '');
-            if (nm && !newReceiverName) setNewReceiverName(nm);
-            if (ph && !newReceiverPhone) setNewReceiverPhone(ph);
-          }
-          setLoading(false);
-        },
-        () => {
-          toast.error('Gagal memuat data profil');
-          setLoading(false);
-        },
-      );
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/profil/login'); return; }
+      loadProfile(user.id);
+    };
+    init();
 
-      return () => unsubUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) router.push('/profil/login');
+      else loadProfile(session.user.id);
     });
-
-    return () => unsubscribe();
+    return () => { subscription.unsubscribe(); };
   }, [router, newAddress, newReceiverName, newReceiverPhone]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -93,16 +90,19 @@ export default function EditProfilePage() {
       address: newAddress.trim(),
     };
 
+    const nextAddresses = [...addresses, addressObj];
     try {
       await sbUpdateDoc('users', user.id, {
-        addresses: arrayUnion(addressObj),
+        addresses: nextAddresses,
         address: addressObj.address,
         updatedAt: new Date().toISOString(),
       });
+      setAddresses(nextAddresses);
       setNewAddress('');
       setNewLabel('');
       setNewReceiverName('');
       setNewReceiverPhone('');
+      toast.success('Alamat berhasil ditambahkan');
     } catch {
       toast.error('Gagal menambah alamat');
     } finally {
@@ -114,13 +114,18 @@ export default function EditProfilePage() {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user || (user as any).isAnonymous) return;
     if (!window.confirm('Hapus alamat ini?')) return;
-    const addrToDelete = addresses.find((a) => a.id === addrId);
-    if (!addrToDelete) return;
+    const nextAddresses = addresses.filter((a) => a.id !== addrId);
 
     try {
-      const patch: Record<string, unknown> = { addresses: arrayRemove(addrToDelete), updatedAt: new Date().toISOString() };
-      if (addresses.length === 1) patch.address = '';
+      const patch: Record<string, unknown> = {
+        addresses: nextAddresses,
+        updatedAt: new Date().toISOString(),
+      };
+      if (nextAddresses.length === 0) patch.address = '';
+      else if (addresses.length > 0) patch.address = nextAddresses[0].address;
       await sbUpdateDoc('users', user.id, patch);
+      setAddresses(nextAddresses);
+      toast.success('Alamat berhasil dihapus');
     } catch {
       toast.error('Gagal menghapus alamat');
     }

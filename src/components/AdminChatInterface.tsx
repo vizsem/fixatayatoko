@@ -11,7 +11,6 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { getUserAndRole, sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { addDoc, auth, collection, db, doc, onSnapshot, orderBy, query, ref } from '@/lib/firebase';
 interface AdminChatInterfaceProps {
   onClose?: () => void;
   isModal?: boolean;
@@ -29,88 +28,80 @@ export default function AdminChatInterface({ onClose, isModal = false }: AdminCh
 
   // 1. Auth Check
   useEffect(() => {
-    const __checkAuthunsub = async () => {
-  const { user, userDocData } = await getUserAndRole();
-  if (!user) return;
-  const userDoc = { exists: () => !!userDocData, data: () => userDocData || {} };
-  
-      if (!user) {
-        // Handle unauthenticated state if needed
-        return;
-      }
-      try {
-        const userDoc = await sbGetDoc('users', user.uid, false);
-        const role = userDoc.data()?.role;
-        setUserRole(role);
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-      }
-};
-__checkAuthunsub();
-let unsub: (() => void) | undefined;
-(async () => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => __checkAuthunsub());
-  unsub = () => subscription.unsubscribe();
-})();
-    return () => { if (unsub) unsub(); };
+    const checkAuth = async () => {
+      const { user, role } = await getUserAndRole();
+      if (!user) return;
+      setUserRole(role || null);
+    };
+    checkAuth();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAuth();
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // 2. Fetch Chat Threads (Real-time) with Notifications
   useEffect(() => {
-    const q = query(
-      collection(db, 'chats'),
-      orderBy('lastMessageTime', 'desc')
-    );
-
     let previousThreads: ChatThread[] = [];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const threadsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatThread[];
+    const fetchThreads = async () => {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .order('updated_at', { ascending: false });
 
-      // Check for new messages and send notifications
-      if (previousThreads.length > 0) {
-        threadsData.forEach(newThread => {
-          const oldThread = previousThreads.find(t => t.id === newThread.id);
-          
-          // If there's a new message from customer (not admin)
-          if (oldThread && 
+      if (!error && data) {
+        const threadsData = data.map((d: any) => ({
+          id: d.id,
+          ...(d.raw_data || {}),
+        })) as ChatThread[];
+
+        // Check for new messages and send notifications
+        if (previousThreads.length > 0) {
+          threadsData.forEach((newThread) => {
+            const oldThread = previousThreads.find((t) => t.id === newThread.id);
+
+            // If there's a new message from customer (not admin)
+            if (
+              oldThread &&
               newThread.lastMessage !== oldThread.lastMessage &&
-              !newThread.isReadByAdmin) {
-            
-            // Show browser notification
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(`Pesan baru dari ${newThread.userInfo.name}`, {
-                body: newThread.lastMessage,
-                icon: '/icon-192x192.png',
-                badge: '/badge-72x72.png',
-                tag: `chat-${newThread.id}`,
-              });
-            }
+              !newThread.isReadByAdmin
+            ) {
+              // Show browser notification
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(`Pesan baru dari ${newThread.userInfo?.name || 'Pelanggan'}`, {
+                  body: newThread.lastMessage,
+                  icon: '/icon-192x192.png',
+                  badge: '/badge-72x72.png',
+                  tag: `chat-${newThread.id}`,
+                });
+              }
 
-            // Play notification sound
-            const audio = new Audio('/notification.mp3');
-            audio.play().catch(() => {
-              // Ignore audio errors
-            });
-
-            // Send push notification to other admins
-            if (userRole === 'admin') {
-              // TODO: Make a fetch call to a Next.js API route to send push notifications
-              // e.g., fetch('/api/notifications/chat', { method: 'POST', body: ... })
+              // Play notification sound
+              const audio = new Audio('/notification.mp3');
+              audio.play().catch(() => {});
             }
-          }
-        });
+          });
+        }
+
+        previousThreads = threadsData;
+        setThreads(threadsData);
+        setLoading(false);
       }
+    };
 
-      previousThreads = threadsData;
-      setThreads(threadsData);
-      setLoading(false);
-    });
+    fetchThreads();
 
-    return () => unsubscribe();
+    const channel = supabase
+      .channel('admin_chat_threads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => {
+        fetchThreads();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userRole]);
 
   // 3. Fetch Messages for Selected Thread
@@ -121,25 +112,49 @@ let unsub: (() => void) | undefined;
     if (!selectedThread.isReadByAdmin) {
       sbUpdateDoc('chats', selectedThread.id, {
         isReadByAdmin: true,
-        unreadCount: 0
+        unreadCount: 0,
       }, false);
     }
 
-    const q = query(
-      collection(db, 'chats', selectedThread.id, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', selectedThread.id)
+        .order('created_at', { ascending: true });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatMessage[];
-      setMessages(msgs);
-      scrollToBottom();
-    });
+      if (!error && data) {
+        const msgs = data.map((d: any) => ({
+          id: d.id,
+          text: d.text,
+          senderId: d.sender_id,
+          createdAt: d.created_at,
+          isRead: d.is_read,
+          type: d.type,
+          imageUrl: d.image_url,
+          ...(d.raw_data || {}),
+        })) as ChatMessage[];
+        setMessages(msgs);
+        scrollToBottom();
+      }
+    };
 
-    return () => unsubscribe();
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`admin_chat_${selectedThread.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${selectedThread.id}` },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedThread]);
 
   const scrollToBottom = () => {
@@ -156,20 +171,33 @@ let unsub: (() => void) | undefined;
       const text = newMessage.trim();
       setNewMessage('');
 
-      // Add message to subcollection
-      await addDoc(collection(db, 'chats', selectedThread.id, 'messages'), {
+      const now = new Date().toISOString();
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const { error: msgErr } = await supabase.from('messages').insert({
+        id: msgId,
+        chat_id: selectedThread.id,
         text,
-        senderId: 'admin',
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        type: 'text'
+        sender_id: 'admin',
+        is_read: false,
+        type: 'text',
+        created_at: now,
+        updated_at: now,
+        raw_data: {
+          id: msgId,
+          text,
+          senderId: 'admin',
+          createdAt: now,
+          isRead: false,
+          type: 'text',
+        },
       });
+      if (msgErr) throw msgErr;
 
       // Update thread metadata
       await sbUpdateDoc('chats', selectedThread.id, {
         lastMessage: text,
-        lastMessageTime: new Date().toISOString(),
-        isReadByAdmin: true // Admin just replied, so it's read by admin
+        lastMessageTime: now,
+        isReadByAdmin: true,
       }, false);
 
     } catch (error) {

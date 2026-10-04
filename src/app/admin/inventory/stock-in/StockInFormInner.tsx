@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 
 
 import { getUserAndRole, sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-import { auth, collection, db, doc, runTransaction } from '@/lib/firebase';
+
 import { isAdminRole } from '@/lib/auth-helpers';
 type Product = {
   id: string;
@@ -120,62 +120,57 @@ export default function StockInFormInner({ productId }: { productId: string }) {
     }
 
     try {
-      await runTransaction(db, async (tx) => {
-        // 1. Persiapkan data transaksi stok masuk (Purchase Record)
-        const transactionRef = doc(collection(db, 'inventory_transactions'));
-        const transactionData = {
-          type: 'STOCK_IN',
-          productId: formData.productId,
-          productName: selectedProduct?.name,
-          supplierId: formData.supplierId,
-          supplierName: suppliers.find(s => s.id === formData.supplierId)?.name,
-          quantity: formData.quantity,
-          purchasePrice: formData.purchasePrice,
-          expiredDate: formData.expiredDate,
-          createdAt: new Date().toISOString()
-        };
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminId = user?.id || 'system';
 
-        // Baca data produk untuk menghitung Modal (Average Cost) baru
-        const productRef = doc(db, 'products', formData.productId);
-        const productSnap = await tx.get(productRef);
-        if (!productSnap.exists()) throw new Error('Produk tidak ditemukan');
-        const productData = productSnap.data();
+      // Baca data produk untuk menghitung Average Cost baru
+      const { data: productData } = await supabase.from('products').select('stock,raw_data').eq('id', formData.productId).single();
+      if (!productData) throw new Error('Produk tidak ditemukan');
 
-        const oldStock = Number(productData.stock || 0);
-        const oldModal = Number(productData.Modal || 0);
-        // Hitung average cost berdasarkan pembelian baru
-        const newModal = computeAverageCost(oldStock, oldModal, formData.quantity, formData.purchasePrice, 1);
-        
-        const updateFields: Record<string, any> = {};
-        
-        // Cek jika modal berubah maka kita update dan simpan ke product_cost_logs
-        if (newModal !== oldModal) {
-          updateFields.Modal = newModal;
-          
-          const costLogRef = doc(collection(db, 'product_cost_logs'));
-          tx.set(costLogRef, {
-            productId: formData.productId,
-            oldCost: oldModal,
-            newCost: newModal,
-            adminEmail: (await supabase.auth.getUser()).data.user?.email || 'system',
-            changeDate: new Date().toISOString()
-          });
-        }
+      const oldStock = Number(productData.stock || 0);
+      const oldModal = Number(productData.raw_data?.Modal || 0);
+      const supplierName = suppliers.find(s => s.id === formData.supplierId)?.name;
+      const newModal = computeAverageCost(oldStock, oldModal, formData.quantity, formData.purchasePrice, 1);
 
-        // 2. Update stok produk & Log Inventory secara atomik
-        await addStockTx(tx, {
-          productId: formData.productId,
-          amount: formData.quantity,
-          warehouseId: 'gudang-utama',
-          adminId: (await supabase.auth.getUser()).data.user?.uid || 'system',
-          note: `Pembelian dari ${transactionData.supplierName}`,
-          source: 'PURCHASE',
-          prefetchedSnap: productSnap,
-          updateFields
+      // 1. Jika modal berubah — update produk & catat cost log
+      if (newModal !== oldModal) {
+        await supabase.from('products').update({
+          raw_data: { ...productData.raw_data, Modal: newModal },
+          updated_at: new Date().toISOString()
+        }).eq('id', formData.productId);
+
+        await supabase.from('product_cost_logs').insert({
+          id: `costlog_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          product_id: formData.productId,
+          old_cost: oldModal,
+          new_cost: newModal,
+          admin_email: user?.email || 'system',
+          change_date: new Date().toISOString()
         });
+      }
 
-        // 3. Simpan record transaksi setelah read selesai
-        tx.set(transactionRef, transactionData);
+      // 2. Tambah stok
+      await addStockTx({
+        productId: formData.productId,
+        amount: formData.quantity,
+        warehouseId: 'gudang-utama',
+        adminId,
+        note: `Pembelian dari ${supplierName}`,
+        source: 'PURCHASE',
+      });
+
+      // 3. Simpan record transaksi stok masuk
+      await supabase.from('inventory_transactions').insert({
+        id: `stkin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        type: 'STOCK_IN',
+        product_id: formData.productId,
+        product_name: selectedProduct?.name,
+        supplier_id: formData.supplierId,
+        supplier_name: supplierName,
+        quantity: formData.quantity,
+        purchase_price: formData.purchasePrice,
+        expired_date: formData.expiredDate || null,
+        created_at: new Date().toISOString()
       });
 
       notify.admin.success('Stok berhasil ditambahkan!');

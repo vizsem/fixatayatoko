@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
-import { addDoc, auth, collection, db, doc, getDocs, getDownloadURL, limit, onAuthStateChanged, onSnapshot, orderBy, query, ref, storage, uploadBytes, where } from '@/lib/firebase';
 interface ChatMessage {
   id: string;
   text: string;
@@ -30,10 +29,14 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user;
+      setUser(u ? { uid: u.id, ...u } : null);
     });
-    return () => unsub();
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      if (u) setUser({ uid: u.id, ...u });
+    });
+    return () => subscription.unsubscribe();
   }, []);
   const [uploadingImage, setUploadingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -49,19 +52,17 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
     const initializeChat = async () => {
       try {
         // Check if chat thread already exists for this user
-        const existingChatQuery = query(
-          collection(db, 'chats'),
-          where('userId', '==', user.uid),
-          limit(1)
-        );
-
-        const snapshot = await getDocs(existingChatQuery);
+        const { data: existingChats } = await supabase
+          .from('chats')
+          .select('*')
+          .eq('raw_data->>userId', user.uid)
+          .limit(1);
 
         let threadId: string;
 
-        if (!snapshot.empty) {
+        if (existingChats && existingChats.length > 0) {
           // Use existing chat thread
-          threadId = snapshot.docs[0].id;
+          threadId = existingChats[0].id;
         } else {
           // Create new chat thread
           const userDoc = await sbGetDoc('users', user.uid, false);
@@ -70,9 +71,9 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
           const newThread = await sbInsertDoc('chats', {
             userId: user.uid,
             userInfo: {
-              name: userData?.displayName || userData?.name || 'Pelanggan',
+              name: userData?.displayName || userData?.name || user.user_metadata?.full_name || 'Pelanggan',
               email: userData?.email || user.email,
-              photoURL: userData?.photoURL || user.photoURL,
+              photoURL: userData?.photoURL || user.user_metadata?.avatar_url,
             },
             lastMessage: '',
             lastMessageTime: new Date().toISOString(),
@@ -100,21 +101,44 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
   useEffect(() => {
     if (!chatId) return;
 
-    const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        const msgs = data.map(d => ({
+          id: d.id,
+          text: d.text,
+          senderId: d.sender_id,
+          createdAt: d.created_at,
+          isRead: d.is_read,
+          type: d.type,
+          imageUrl: d.image_url,
+          ...(d.raw_data || {})
+        })) as ChatMessage[];
+        setMessages(msgs);
+        scrollToBottom();
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatMessage[];
-      setMessages(msgs);
-      scrollToBottom();
-    });
+    fetchMessages();
 
-    return () => unsubscribe();
+    const channel = supabase
+      .channel(`chat_messages_${chatId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [chatId]);
 
   const scrollToBottom = () => {
@@ -131,21 +155,37 @@ export default function CustomerChat({ onClose, isModal = false }: CustomerChatP
       const text = newMessage.trim();
       setNewMessage('');
 
-      // Add message to subcollection
-      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+      const now = new Date().toISOString();
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const { error: msgErr } = await supabase.from('messages').insert({
+        id: msgId,
+        chat_id: chatId,
         text,
-        senderId: user?.uid || 'customer',
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        type: 'text'
+        sender_id: user?.uid || 'customer',
+        createdAt: now,
+        created_at: now,
+        updated_at: now,
+        is_read: false,
+        type: 'text',
+        raw_data: {
+          id: msgId,
+          text,
+          senderId: user?.uid || 'customer',
+          createdAt: now,
+          isRead: false,
+          type: 'text'
+        }
       });
+      if (msgErr) throw msgErr;
 
       // Update thread metadata
+      const chatSnap = await sbGetDoc('chats', chatId, false);
+      const unread = (chatSnap.data()?.unreadCount || 0) + 1;
       await sbUpdateDoc('chats', chatId, {
         lastMessage: text,
-        lastMessageTime: new Date().toISOString(),
+        lastMessageTime: now,
         isReadByAdmin: false,
-        unreadCount: (await sbGetDoc('chats', chatId, false)).data()?.unreadCount || 0 + 1
+        unreadCount: unread
       }, false);
 
       // Request notification permission if not granted

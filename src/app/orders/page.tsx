@@ -9,7 +9,6 @@ import { EmptyState, SkeletonList } from '@/components/UIState';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import { supabase } from '@/lib/supabase';
 
-import { auth, collection, db, onAuthStateChanged, onSnapshot, orderBy, query, where } from '@/lib/firebase';
 type FirebaseOrder = {
   status?: string;
   createdAt?: { toDate: () => Date } | string;
@@ -52,41 +51,50 @@ export default function UserOrdersPage() {
   const ordersPerPage = 10;
 
   useEffect(() => {
-    const setupOrdersListener = async () => {
-      const userId = (await supabase.auth.getUser()).data.user?.uid || localStorage.getItem('temp_user_id');
-      if (!userId) { setLoading(false); return; }
+    const fetchOrders = async (userId: string) => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id,status,total,created_at,raw_data')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-      const q = query(collection(db, 'orders'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
-      return onSnapshot(q,
-        (snap) => {
-          const list: UserOrder[] = snap.docs.map((d) => {
-            const data = d.data() as FirebaseOrder;
-            const rawCreatedAt = data.createdAt;
-            const createdAt = rawCreatedAt && typeof rawCreatedAt === 'object' && 'toDate' in rawCreatedAt
-              ? (rawCreatedAt as { toDate: () => Date }).toDate()
-              : new Date(rawCreatedAt ?? new Date().toISOString());
-            return {
-              id: d.id,
-              status: data.status ?? 'PENDING',
-              createdAt,
-              items: data.items?.map(i => ({ name: i.name ?? '', quantity: i.quantity ?? 0 })) ?? [],
-              pointsUsed: data.pointsUsed ?? 0,
-              voucherDiscount: data.voucherDiscount ?? 0,
-              voucherUsed: data.voucherUsed ?? false,
-              total: data.total ?? 0,
-              orderId: data.orderId,
-              payment: data.payment,
-            };
-          });
-          setOrders(list);
-          setCurrentPage(1);
-          setLoading(false);
-        },
-        () => { setOrders([]); setLoading(false); }
-      );
+      if (error || !data) { setOrders([]); setLoading(false); return; }
+
+      const list: UserOrder[] = data.map((d) => {
+        const raw = d.raw_data || {};
+        return {
+          id: d.id,
+          status: d.status ?? raw.status ?? 'PENDING',
+          createdAt: new Date(d.created_at || raw.createdAt || new Date().toISOString()),
+          items: (raw.items || []).map((i: any) => ({ name: i.name ?? '', quantity: i.quantity ?? 0 })),
+          pointsUsed: raw.pointsUsed ?? 0,
+          voucherDiscount: raw.voucherDiscount ?? 0,
+          voucherUsed: raw.voucherUsed ?? false,
+          total: raw.total ?? d.total ?? 0,
+          orderId: raw.orderId,
+          payment: raw.payment,
+        };
+      });
+      setOrders(list);
+      setCurrentPage(1);
+      setLoading(false);
     };
-    const unsub = onAuthStateChanged(auth, () => { setupOrdersListener(); });
-    return () => unsub();
+
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || localStorage.getItem('temp_user_id');
+      if (!userId) { setLoading(false); return; }
+      fetchOrders(userId);
+    };
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user?.id || localStorage.getItem('temp_user_id');
+      if (userId) fetchOrders(userId);
+      else { setOrders([]); setLoading(false); }
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   const activeOrdersCount = useMemo(() =>

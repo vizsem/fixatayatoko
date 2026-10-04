@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { randomCode } from '@/lib/ids';
-import { auth, db, doc, increment, onAuthStateChanged, updateDoc, FirebaseUser } from '@/lib/firebase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 interface UserData extends UserProfile {
   _addresses?: unknown[]; // internal extended field
 }
@@ -52,7 +52,7 @@ const VOUCHER_CHIPS: { key: ChipKey; label: string }[] = [
 
 export default function VoucherExchangePage() {
   const router = useRouter();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -61,18 +61,28 @@ export default function VoucherExchangePage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+    const init = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
         setUser(currentUser);
-        const userSnap = await sbGetDoc('users', currentUser.uid, false);
+        const userSnap = await sbGetDoc('users', currentUser.id, false);
         if (userSnap.exists()) setUserData(userSnap.data() as UserData);
-
       } else {
         router.push('/login');
       }
       setLoading(false);
+    };
+    init();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        const userSnap = await sbGetDoc('users', session.user.id, false);
+        if (userSnap.exists()) setUserData(userSnap.data() as UserData);
+      } else {
+        router.push('/login');
+      }
     });
-    return () => unsub();
+    return () => { subscription.unsubscribe(); };
   }, [router]);
 
   useEffect(() => {
@@ -113,17 +123,14 @@ export default function VoucherExchangePage() {
     setIsProcessing(true);
     try {
       if (!user) return;
-      const userRef = doc(db, 'users', user.uid);
-
-
       // Generate Kode Unik
       const voucherCode = randomCode('ATY');
 
-      // 1. Jalankan Transaksi ke Firestore
-      await sbUpdateDoc('users', user.uid, { points: increment(-voucher.cost) });
+      // 1. Kurangi poin user
+      await sbUpdateDoc('users', user.id, { points: (userData.points - voucher.cost) });
 
       await sbInsertDoc('user_vouchers', {
-        userId: user.uid,
+        userId: user.id,
         code: voucherCode,
         name: voucher.name,
         value: voucher.value,
@@ -132,7 +139,7 @@ export default function VoucherExchangePage() {
       });
 
       await sbInsertDoc('point_logs', {
-        userId: user.uid,
+        userId: user.id,
         pointsChanged: -voucher.cost,
         type: 'VOUCHER_EXCHANGE',
         description: `Tukar voucher: ${voucher.name} (${voucherCode})`,

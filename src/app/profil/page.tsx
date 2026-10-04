@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 
 
 import { sbUpdateDoc } from '@/lib/supabase-helpers';
-import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, signOut, where, FirebaseUser } from '@/lib/firebase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { isOperationalUser } from '@/lib/auth-helpers';
 
 const MAX_ADDRESSES = 5;
@@ -73,7 +73,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<string>('customer');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -111,65 +111,66 @@ export default function ProfilePage() {
 
   // --- AUTH & DATA SYNC ---
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        // PERBAIKAN: Arahkan ke /profil/login untuk menghindari 404
-        router.push('/profil/login');
-        return;
+    const loadUserData = async (userId: string) => {
+      const { data: userData } = await supabase.from('users').select('*').eq('id', userId).single();
+      if (userData) {
+        const raw = userData.raw_data || userData;
+        setProfile({
+          name: raw.name || userData.name || '',
+          email: raw.email || userData.email || '',
+          role: raw.role || userData.role || 'customer',
+          addresses: Array.isArray(raw.addresses) ? raw.addresses : [],
+          points: raw.points ?? userData.points ?? 0,
+          isPointsFrozen: raw.isPointsFrozen ?? false,
+          walletBalance: raw.walletBalance ?? 0,
+        });
+        setNewName(raw.name || userData.name || '');
+        setUserRole(raw.role || userData.role || 'customer');
+        setAddresses(Array.isArray(raw.addresses) ? raw.addresses : []);
       }
-      if (firebaseUser.isAnonymous) {
-        router.push('/profil/login');
-        return;
-      }
-      setUser(firebaseUser);
 
-      // Real-time Listener Data User
-      const unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (doc) => {
-        if (doc.exists()) {
-          const userData = doc.data() as UserProfile;
-          setProfile(userData);
-          setNewName(userData.name || '');
-          setUserRole(userData.role || 'customer');
-          setAddresses(userData.addresses || []);
-        }
-      });
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('id,status,total,created_at,raw_data')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-      // Real-time Listener Pesanan
-      const q = query(
-        collection(db, 'orders'),
-        where('userId', '==', firebaseUser.uid),
-        orderBy('createdAt', 'desc')
-      );
+      const orderList: Order[] = (ordersData || []).map(d => ({
+        id: d.id,
+        orderId: d.raw_data?.orderId,
+        items: d.raw_data?.items || [],
+        total: d.total || d.raw_data?.total || 0,
+        status: d.status || d.raw_data?.status || 'PENDING',
+        createdAt: d.created_at ? { toDate: () => new Date(d.created_at) } : null,
+        pointsUsed: d.raw_data?.pointsUsed ?? 0,
+      }));
+      setOrders(orderList);
 
-      const unsubscribeOrders = onSnapshot(q, (snapshot) => {
-        const orderData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Order));
-        setOrders(orderData);
-        
-        const actives = orderData.filter(o => ['PENDING', 'MENUNGGU', 'DIPROSES', 'DIKIRIM'].includes(o.status?.toUpperCase()));
-        setActiveOrdersList(actives);
-        setActiveOrdersCount(actives.length);
-        setLoading(false);
-      }, (err) => {
-        console.error("Firestore Order Error:", err);
-        setLoading(false);
-      });
+      const actives = orderList.filter(o => ['PENDING', 'MENUNGGU', 'DIPROSES', 'DIKIRIM'].includes(o.status?.toUpperCase()));
+      setActiveOrdersList(actives);
+      setActiveOrdersCount(actives.length);
+      setLoading(false);
+    };
 
-      return () => {
-        unsubscribeUser();
-        unsubscribeOrders();
-      };
+    const init = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) { router.push('/profil/login'); return; }
+      setUser(currentUser);
+      loadUserData(currentUser.id);
+    };
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) { router.push('/profil/login'); return; }
+      setUser(session.user);
+      loadUserData(session.user.id);
     });
-
-    return () => unsubscribeAuth();
+    return () => { subscription.unsubscribe(); };
   }, [router]);
 
   // --- HANDLERS ---
   const handleLogout = async () => {
-    await signOut(auth);
-
+    await supabase.auth.signOut();
     router.push('/profil/login');
   };
 
@@ -177,7 +178,7 @@ export default function ProfilePage() {
     if (!newName.trim() || isSaving || !user) return;
     setIsSaving(true);
     try {
-      await sbUpdateDoc('users', user.uid, { name: newName.trim() });
+      await sbUpdateDoc('users', user.id, { name: newName.trim() });
       setIsEditingName(false);
     } catch {
       toast.error("Gagal memperbarui nama");
@@ -239,7 +240,7 @@ export default function ProfilePage() {
         newAddresses = [...addresses, newAddr];
       }
 
-      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
+      await sbUpdateDoc('users', user.id, { addresses: newAddresses });
       setShowForm(false);
       setForm(EMPTY_FORM);
       setEditingId(null);
@@ -259,7 +260,7 @@ export default function ProfilePage() {
       if (wasDefault && newAddresses.length > 0) {
         newAddresses[0] = { ...newAddresses[0], isDefault: true };
       }
-      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
+      await sbUpdateDoc('users', user.id, { addresses: newAddresses });
       toast.success("Alamat dihapus");
     } catch {
       toast.error("Gagal menghapus alamat");
@@ -272,7 +273,7 @@ export default function ProfilePage() {
     if (!user) return;
     const newAddresses = addresses.map(a => ({ ...a, isDefault: a.id === addrId }));
     try {
-      await sbUpdateDoc('users', user.uid, { addresses: newAddresses });
+      await sbUpdateDoc('users', user.id, { addresses: newAddresses });
       toast.success("Alamat utama diperbarui");
     } catch {
       toast.error("Gagal mengubah alamat utama");

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { auth, collection, db, doc, onAuthStateChanged, onSnapshot, orderBy, query, ref, signOut, storage, where } from '@/lib/firebase';
 import {
   Bell,
   ChevronDown,
@@ -73,7 +72,8 @@ export default function BuyerHeaderActions() {
   }, []);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user;
       if (!u) {
         setUid(null);
         setIsAnonymous(false);
@@ -81,41 +81,75 @@ export default function BuyerHeaderActions() {
         setPhotoUrl('');
         return;
       }
-      setUid(u.uid);
-      setIsAnonymous(!!u.isAnonymous);
-      setPhotoUrl(u.photoURL || '');
-      setDisplayName(u.displayName || '');
+      setUid(u.id);
+      setIsAnonymous(!!(u as any).is_anonymous);
+      setPhotoUrl(u.user_metadata?.avatar_url || '');
+      setDisplayName(u.user_metadata?.full_name || u.email?.split('@')[0] || '');
     });
-    return () => unsubAuth();
+
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      if (u) {
+        setUid(u.id);
+        setIsAnonymous(!!(u as any).is_anonymous);
+        setPhotoUrl(u.user_metadata?.avatar_url || '');
+        setDisplayName(u.user_metadata?.full_name || u.email?.split('@')[0] || '');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!uid) return;
-    if (isAnonymous) return;
+    if (!uid || isAnonymous) return;
 
-    const unsubProfile = onSnapshot(doc(db, 'users', uid), (snap) => {
-      const data = snap.data() as Partial<{ name: string }> | undefined;
-      if (data?.name) setDisplayName(data.name);
-    });
-
-    return () => unsubProfile();
+    supabase
+      .from('users')
+      .select('full_name, avatar_url')
+      .eq('id', uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.full_name) setDisplayName(data.full_name);
+        if (data?.avatar_url) setPhotoUrl(data.avatar_url);
+      });
   }, [uid, isAnonymous]);
 
   useEffect(() => {
-    if (!uid) return;
-    const q = query(collection(db, 'orders'), where('userId', '==', uid), orderBy('createdAt', 'desc'));
-    const unsubOrders = onSnapshot(
-      q,
-      (snap) => {
-        const rows: OrderRow[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-        const active = rows.filter((o) => ['PENDING', 'MENUNGGU', 'DIPROSES', 'DIKIRIM'].includes(String(o.status || '').toUpperCase()));
-        setActiveOrders(active.slice(0, 12));
-      },
-      () => {
+    if (!uid) {
+      setActiveOrders([]);
+      return;
+    }
+
+    const fetchOrders = async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error || !data) {
         setActiveOrders([]);
-      },
-    );
-    return () => unsubOrders();
+        return;
+      }
+
+      const rows: OrderRow[] = data.map((d: any) => {
+        const raw = d.raw_data || {};
+        return {
+          id: d.id,
+          orderId: d.order_id || raw.orderId || d.id,
+          status: d.status || raw.status || '',
+          total: Number(d.total ?? raw.total ?? 0),
+          createdAt: d.created_at ? { toDate: () => new Date(d.created_at) } : undefined,
+        };
+      });
+
+      const active = rows.filter((o) =>
+        ['PENDING', 'MENUNGGU', 'DIPROSES', 'DIKIRIM'].includes(String(o.status || '').toUpperCase())
+      );
+      setActiveOrders(active.slice(0, 12));
+    };
+
+    fetchOrders();
   }, [uid]);
 
   const activeCount = activeOrders.length;
@@ -193,7 +227,7 @@ export default function BuyerHeaderActions() {
                   <Settings size={16} /> Pengaturan
                 </Link>
                 <button
-                  onClick={() => auth.signOut()}
+                  onClick={() => supabase.auth.signOut()}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 text-sm font-medium transition-colors mt-2"
                 >
                   <LogOut size={16} /> Keluar

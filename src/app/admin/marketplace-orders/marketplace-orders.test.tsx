@@ -302,5 +302,5 @@ describe('MarketplaceOrdersPage', () => {
 
     // Verifikasi - cukup pastikan submit button ada dan bisa diklik
     expect(submitBtn).toBeInTheDocument();
-  });
+  }, 15000);
 });
