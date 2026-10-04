@@ -263,13 +263,23 @@ export function buildWritePayload(table: string, data: any, opts?: { isInsert?: 
 
 export async function sbGetDoc(table: string, id: string, useAdmin = true): Promise<{ exists: () => boolean; data: () => any; id: string }> {
   const client = useAdmin ? supabaseAdmin : supabase;
-  let query = client.from(table).select('*');
   if (table === 'orders') {
-    query = query.or(`id.eq.${id},order_id.eq.${id}`) as any;
-  } else {
-    query = query.eq('id', id) as any;
+    // 1. Coba cari berdasarkan primary key `id` langsung (memakai indeks B-tree, sangat cepat).
+    const { data: byId } = await client.from('orders').select('*').eq('id', id).maybeSingle();
+    if (byId) {
+      const row = normalizeRow(byId, table);
+      return { exists: () => true, data: () => row, id: byId.id || id };
+    }
+    // 2. Fallback: jika id yang dipass adalah nomor order (order_id / SO-xxx).
+    const { data: byOrderId, error } = await client.from('orders').select('*').eq('order_id', id).maybeSingle();
+    if (error || !byOrderId) {
+      return { exists: () => false, data: () => ({}), id };
+    }
+    const row = normalizeRow(byOrderId, table);
+    return { exists: () => true, data: () => row, id: byOrderId.id || id };
   }
-  const { data, error } = await query.maybeSingle();
+
+  const { data, error } = await client.from(table).select('*').eq('id', id).maybeSingle();
   if (error || !data) {
     return { exists: () => false, data: () => ({}), id };
   }
