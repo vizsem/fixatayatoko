@@ -2102,30 +2102,6 @@ export default function CashierPOS() {
               </div>
 
               <div className="p-5 bg-white border-t space-y-4">
-                {/* Pilihan Gudang Pengambilan Barang */}
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-black text-slate-700 uppercase flex items-center gap-1.5">
-                      <Package size={13} className="text-emerald-600" />
-                      Gudang Pengambilan Stok
-                    </label>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                      {selectedWarehouse === 'auto' ? 'Otomatis Waterfall' : 'Gudang Terpilih'}
-                    </span>
-                  </div>
-                  <select
-                    value={selectedWarehouse}
-                    onChange={(e) => setSelectedWarehouse(e.target.value)}
-                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
-                  >
-                    <option value="auto">⚡ Otomatis (Prioritas Toko / Gudang Utama)</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        🏢 {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                   {['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'].map(m => (
@@ -2718,6 +2694,32 @@ export default function CashierPOS() {
                   {scanMode === 'direct'
                     ? '⚡ Scan kamera langsung tambah ke keranjang tanpa jeda'
                     : '🔍 Scan kamera akan tampilkan nama produk dahulu sebelum masuk keranjang'}
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* ── Gudang Pengambilan Stok ── */}
+              <div>
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Package size={13} className="text-emerald-600" />
+                  Gudang Pengambilan Stok
+                </p>
+                <select
+                  value={selectedWarehouse}
+                  onChange={(e) => setSelectedWarehouse(e.target.value)}
+                  className="w-full text-sm font-bold text-slate-800 bg-gray-50 border border-slate-200 rounded-2xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                >
+                  <option value="auto">⚡ Otomatis (Prioritas Toko / Gudang Utama)</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      🏢 {w.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-2 text-center">
+                  {selectedWarehouse === 'auto' ? '⚡ Stok diambil otomatis sesuai prioritas waterfall' : `🏢 Stok selalu diambil dari gudang terpilih`}
                 </p>
               </div>
 
