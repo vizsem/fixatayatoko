@@ -53,6 +53,10 @@ export async function getSalesOrders(filters?: { status?: string; customerId?: s
           unitPrice: Number(it.price || it.unitPrice || 0),
           product: { name: it.name || it.productName || 'Produk' },
         })),
+        paymentMethod: o.payment || raw.paymentMethod || 'TUNAI',
+        deliveryMethod: o.delivery || raw.deliveryMethod || 'Ambil di Toko',
+        deliveryAddress: raw.deliveryAddress || raw.address || null,
+        notes: raw.notes || null,
         invoice: {
           status: o.status === 'SELESAI' ? 'PAID' : 'UNPAID',
           amountPaid: o.status === 'SELESAI' ? totalAmount : 0,
