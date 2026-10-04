@@ -262,6 +262,7 @@ export default function ReportsDashboard() {
             <ReportLink title="Promo" desc="Efektivitas kupon." icon={Gift} href="/admin/reports/promotions" color="text-rose-600" bg="bg-rose-50" hoverBorder="group-hover:border-rose-200" />
             <ReportLink title="Pajak (STP Cortex)" desc="Rekap PPN & PPh Final." icon={Receipt} href="/admin/reports/tax" color="text-indigo-600" bg="bg-indigo-50" hoverBorder="group-hover:border-indigo-200" />
             <ReportLink title="Kinerja Kasir" desc="Omzet & selisih shift." icon={Users} href="/admin/reports/cashier" color="text-purple-600" bg="bg-purple-50" hoverBorder="group-hover:border-purple-200" />
+            <ReportLink title="Hutang & Piutang" desc="Monitoring debt & pelunasan." icon={CreditCard} href="/admin/reports/hutang" color="text-rose-600" bg="bg-rose-50" hoverBorder="group-hover:border-rose-200" />
           </div>
         </>
       )}

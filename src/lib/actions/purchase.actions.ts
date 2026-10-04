@@ -873,4 +873,80 @@ export async function getPurchaseStatsByProductId(productId: string) {
   }
 }
 
+/**
+ * Lunasi tagihan hutang PO (Pembayaran Hutang Tempo).
+ * Mengubah paymentStatus menjadi 'LUNAS', memperbarui metode pembayaran,
+ * dan mencatat pengeluaran modal di buku besar kas/modal secara otomatis.
+ */
+export async function payPurchaseDebt(
+  id: string,
+  paymentMethod: string = 'CASH',
+  notes?: string
+): Promise<PurchaseActionResult> {
+  await requireAdmin();
+  try {
+    const { data: p, error: fetchErr } = await supabaseAdmin
+      .from('purchases')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !p) return { success: false, error: 'Purchase Order tidak ditemukan' };
+
+    const raw = p.raw_data || {};
+    const currentStatus = raw.paymentStatus || p.payment_status || 'LUNAS';
+    if (currentStatus === 'LUNAS') {
+      return { success: false, error: 'Tagihan PO ini sudah berstatus LUNAS' };
+    }
+
+    const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0);
+    const supplierName = raw.supplierName || raw.supplier?.name || 'Supplier';
+
+    const updatedRaw = {
+      ...raw,
+      paymentStatus: 'LUNAS',
+      paymentMethod: paymentMethod || raw.paymentMethod || 'CASH',
+      paidAt: new Date().toISOString(),
+      notes: notes
+        ? (raw.notes ? `${raw.notes}\n[Pelunasan]: ${notes}` : `[Pelunasan]: ${notes}`)
+        : raw.notes,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('purchases')
+      .update({
+        payment_status: 'LUNAS',
+        payment_method: paymentMethod || raw.paymentMethod || 'CASH',
+        raw_data: updatedRaw,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    // Catat mutasi modal pengeluaran pelunasan hutang
+    const peringatanModal = await catatMutasiModalPO({
+      poId: id,
+      total: totalAmount,
+      paymentStatus: 'LUNAS',
+      paymentMethod: paymentMethod || 'CASH',
+      label: `Pelunasan Hutang PO ${raw.poNumber || id.slice(0, 8)} - ${supplierName}`,
+      itemCount: (raw.items || []).length,
+    });
+
+    revalidatePath('/admin/purchases');
+    revalidatePath('/admin/reports/finance');
+    revalidatePath('/admin/capital');
+
+    if (peringatanModal) {
+      return { success: true, warning: peringatanModal, data: { id, ...updatedRaw } };
+    }
+    return { success: true, data: { id, ...updatedRaw } };
+  } catch (error: any) {
+    console.error('Failed to pay purchase debt:', error);
+    return { success: false, error: error?.message || 'Gagal melunasi hutang PO' };
+  }
+}
+
 

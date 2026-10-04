@@ -174,6 +174,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Promosi', href: '/admin/reports/promotions', icon: Star },
         { name: 'Pelanggan', href: '/admin/reports/customers', icon: Users },
         { name: 'Laporan Pajak', href: '/admin/reports/tax', icon: Receipt },
+        { name: 'Hutang & Piutang', href: '/admin/reports/hutang', icon: CreditCard },
       ]
     },
     {

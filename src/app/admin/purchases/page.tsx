@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
-  updatePurchaseStatus, deletePurchaseOrder, cancelPurchaseOrder
+  updatePurchaseStatus, deletePurchaseOrder, cancelPurchaseOrder,
+  payPurchaseDebt
 } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getProducts } from '@/lib/actions/product.actions';
@@ -78,6 +79,10 @@ export default function AdminPurchases() {
   const [modalOpen, setModalOpen] = useState(false);
   const [receiveModal, setReceiveModal] = useState<PO | null>(null);
   const [detailModal, setDetailModal] = useState<PO | null>(null);
+  const [selectedPayable, setSelectedPayable] = useState<PO | null>(null);
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [payNotes, setPayNotes] = useState('');
+  const [paying, setPaying] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -281,6 +286,31 @@ export default function AdminPurchases() {
     setSaving(false);
   };
 
+  const handlePayDebt = async () => {
+    if (!selectedPayable) return;
+    setPaying(true);
+    try {
+      const res = await payPurchaseDebt(selectedPayable.id, payMethod, payNotes);
+      if (res.success) {
+        if (res.warning) {
+          notify.admin.warning(res.warning);
+        } else {
+          notify.success(`Hutang PO ${selectedPayable.poNumber} berhasil dilunasi!`);
+        }
+        setSelectedPayable(null);
+        setPayNotes('');
+        await load();
+        await loadMeta();
+      } else {
+        notify.error(res.error || 'Gagal melunasi hutang');
+      }
+    } catch (err: any) {
+      notify.error(err?.message || 'Terjadi kesalahan sistem');
+    } finally {
+      setPaying(false);
+    }
+  };
+
   const exportExcel = () => {
     const rows = filtered.map(p => ({
       'No. PO': p.poNumber,
@@ -470,6 +500,14 @@ export default function AdminPurchases() {
                       >
                         <Printer size={12} /> Cetak
                       </Link>
+                      {po.paymentStatus === 'HUTANG' && po.status !== 'CANCELLED' && (
+                        <button
+                          onClick={() => { setSelectedPayable(po); setPayMethod('CASH'); setPayNotes(''); }}
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
+                        >
+                          <CheckCircle2 size={12} /> Lunasi
+                        </button>
+                      )}
                       {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
                         <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
                           className="px-3 py-1.5 bg-green-100 text-green-700 rounded-xl text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
@@ -548,6 +586,15 @@ export default function AdminPurchases() {
                           >
                             <Printer size={13} /> Cetak
                           </Link>
+                          {po.paymentStatus === 'HUTANG' && po.status !== 'CANCELLED' && (
+                            <button
+                              onClick={() => { setSelectedPayable(po); setPayMethod('CASH'); setPayNotes(''); }}
+                              className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
+                              title="Lunasi Tagihan Hutang PO Ini"
+                            >
+                              <CheckCircle2 size={13} /> Lunasi
+                            </button>
+                          )}
                           {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
                             <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
                               className="px-2.5 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm"
