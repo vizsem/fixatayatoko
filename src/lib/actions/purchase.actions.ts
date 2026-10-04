@@ -883,8 +883,8 @@ export async function payPurchaseDebt(
   paymentMethod: string = 'CASH',
   notes?: string
 ): Promise<PurchaseActionResult> {
-  await requireAdmin();
   try {
+    await requireStaff();
     const { data: p, error: fetchErr } = await supabaseAdmin
       .from('purchases')
       .select('*')
@@ -936,6 +936,7 @@ export async function payPurchaseDebt(
     });
 
     revalidatePath('/admin/purchases');
+    revalidatePath('/admin/reports/hutang');
     revalidatePath('/admin/reports/finance');
     revalidatePath('/admin/capital');
 
@@ -948,5 +949,111 @@ export async function payPurchaseDebt(
     return { success: false, error: error?.message || 'Gagal melunasi hutang PO' };
   }
 }
+
+/**
+ * Lunasi beberapa tagihan hutang PO sekaligus (Pelunasan Masal).
+ */
+export async function payBulkPurchaseDebt(
+  ids: string[],
+  paymentMethod: string = 'CASH',
+  notes?: string
+): Promise<{ success: boolean; updatedCount: number; errors: string[]; warnings: string[] }> {
+  try {
+    await requireStaff();
+  } catch (error: any) {
+    return { success: false, updatedCount: 0, errors: [error?.message || 'Akses ditolak'], warnings: [] };
+  }
+
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  let updatedCount = 0;
+
+  for (const id of ids) {
+    try {
+      const res = await payPurchaseDebt(id, paymentMethod, notes);
+      if (res.success) {
+        updatedCount++;
+        if (res.warning) {
+          warnings.push(res.warning);
+        }
+      } else if (res.error && res.error !== 'Tagihan PO ini sudah berstatus LUNAS') {
+        errors.push(`PO ${id.slice(0, 8)}: ${res.error}`);
+      }
+    } catch (err: any) {
+      errors.push(`PO ${id.slice(0, 8)}: ${err?.message || 'Gagal melunasi'}`);
+    }
+  }
+
+  revalidatePath('/admin/purchases');
+  revalidatePath('/admin/reports/hutang');
+  revalidatePath('/admin/reports/finance');
+  revalidatePath('/admin/capital');
+
+  return {
+    success: updatedCount > 0,
+    updatedCount,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Ambil beberapa Purchase Order berdasarkan array ID (untuk Cetak Masal).
+ */
+export async function getPurchaseOrdersByIds(ids: string[]) {
+  await requireStaff();
+  if (!ids || ids.length === 0) return [];
+  try {
+    const { data: rows, error } = await supabaseAdmin
+      .from('purchases')
+      .select('*')
+      .in('id', ids);
+
+    if (error || !rows) return [];
+
+    return rows.map((p: any) => {
+      const raw = p.raw_data || {};
+      const items = (raw.items || []).map((item: any, idx: number) => {
+        const qty = Number(item.quantity ?? 1);
+        const price = Number(item.purchasePrice ?? item.unitPrice ?? 0);
+        const total = Number(item.totalPrice ?? (qty * price));
+        return {
+          id: item.id || `item_${idx}`,
+          productId: item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : undefined),
+          name: item.name || item.productName || 'Produk',
+          quantity: qty,
+          unitPrice: price,
+          totalPrice: total,
+          unit: item.unit || 'PCS'
+        };
+      });
+
+      return {
+        id: p.id,
+        poNumber: raw.poNumber || raw.invoiceNumber || `PO-${p.id.slice(0, 8).toUpperCase()}`,
+        status: normalizeStatus(raw.status || p.status),
+        warehouseId: raw.warehouseId || 'gudang-utama',
+        warehouseName: raw.warehouseName || 'Gudang Utama',
+        totalAmount: Number(p.total ?? raw.total ?? raw.totalAmount ?? 0),
+        notes: raw.notes || null,
+        createdAt: parseDate(raw.createdAt || p.created_at),
+        paymentStatus: raw.paymentStatus || p.payment_status || 'LUNAS',
+        paymentMethod: raw.paymentMethod || p.payment_method || 'CASH',
+        dueDate: raw.dueDate || null,
+        supplier: {
+          name: raw.supplierName || 'Supplier Umum',
+          phone: raw.supplierPhone || raw.supplier?.phone,
+          address: raw.supplierAddress || raw.supplier?.address,
+          contactPerson: raw.supplierContact || raw.supplier?.contactPerson,
+        },
+        items,
+      };
+    });
+  } catch (error) {
+    console.error('Failed to get purchases by ids:', error);
+    return [];
+  }
+}
+
 
 

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createPurchaseOrder, receivePurchaseOrder } from '@/lib/actions/purchase.actions';
+import {
+  createPurchaseOrder, receivePurchaseOrder,
+  payPurchaseDebt, payBulkPurchaseDebt
+} from '@/lib/actions/purchase.actions';
 
 /**
  * Test ini mengunci dua perbaikan penting pada alur PO:
@@ -306,3 +309,68 @@ describe('createPurchaseOrder', () => {
     expect(insertKe('purchases')[0].payload.raw_data.status).toBe('APPROVED');
   });
 });
+
+describe('payPurchaseDebt', () => {
+  it('berhasil melunasi PO berstatus HUTANG dan mengubah paymentStatus menjadi LUNAS', async () => {
+    state.purchaseRow = {
+      id: 'po-hutang-1',
+      total: 500000,
+      payment_status: 'HUTANG',
+      raw_data: {
+        poNumber: 'PO-HUTANG-01',
+        paymentStatus: 'HUTANG',
+        paymentMethod: 'TEMPO',
+        supplierName: 'PT Sumber Berkah',
+        items: [{ id: 'item-1', name: 'Minyak Goreng', quantity: 10, unitPrice: 50000, totalPrice: 500000 }],
+      },
+    };
+
+    const hasil = await payPurchaseDebt('po-hutang-1', 'TRANSFER', 'Lunas via BCA');
+
+    expect(hasil.success).toBe(true);
+    const update = lastPurchaseUpdate();
+    expect(update).toBeDefined();
+    expect(update!.payload.payment_status).toBe('LUNAS');
+    expect(update!.payload.payment_method).toBe('TRANSFER');
+    expect(update!.payload.raw_data.paymentStatus).toBe('LUNAS');
+    expect(update!.payload.raw_data.notes).toContain('Lunas via BCA');
+  });
+
+  it('menolak pelunasan jika PO sudah berstatus LUNAS', async () => {
+    state.purchaseRow = {
+      id: 'po-lunas-1',
+      total: 300000,
+      payment_status: 'LUNAS',
+      raw_data: {
+        poNumber: 'PO-LUNAS-01',
+        paymentStatus: 'LUNAS',
+      },
+    };
+
+    const hasil = await payPurchaseDebt('po-lunas-1', 'CASH');
+
+    expect(hasil.success).toBe(false);
+    expect(hasil.error).toContain('sudah berstatus LUNAS');
+  });
+});
+
+describe('payBulkPurchaseDebt', () => {
+  it('berhasil memproses pelunasan beberapa PO sekaligus', async () => {
+    state.purchaseRow = {
+      id: 'po-bulk-1',
+      total: 250000,
+      payment_status: 'HUTANG',
+      raw_data: {
+        poNumber: 'PO-BULK-01',
+        paymentStatus: 'HUTANG',
+        supplierName: 'Supplier Maju',
+      },
+    };
+
+    const hasil = await payBulkPurchaseDebt(['po-bulk-1'], 'CASH', 'Pelunasan masal');
+
+    expect(hasil.success).toBe(true);
+    expect(hasil.updatedCount).toBe(1);
+  });
+});
+

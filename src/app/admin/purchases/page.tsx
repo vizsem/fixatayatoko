@@ -7,12 +7,13 @@ import notify from '@/lib/notify';
 import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
-  ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw
+  ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw,
+  CheckSquare, Square, DollarSign, AlertCircle, Loader2
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
   updatePurchaseStatus, deletePurchaseOrder, cancelPurchaseOrder,
-  payPurchaseDebt
+  payPurchaseDebt, payBulkPurchaseDebt
 } from '@/lib/actions/purchase.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getProducts } from '@/lib/actions/product.actions';
@@ -83,6 +84,11 @@ export default function AdminPurchases() {
   const [payMethod, setPayMethod] = useState('CASH');
   const [payNotes, setPayNotes] = useState('');
   const [paying, setPaying] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkPayModalOpen, setBulkPayModalOpen] = useState(false);
+  const [bulkPayMethod, setBulkPayMethod] = useState('CASH');
+  const [bulkPayNotes, setBulkPayNotes] = useState('');
+  const [bulkPaying, setBulkPaying] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -325,6 +331,64 @@ export default function AdminPurchases() {
     XLSX.writeFile(wb, `PO_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const toggleSelectPO = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filtered.length && filtered.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(p => p.id));
+    }
+  };
+
+  const isAllSelected = filtered.length > 0 && selectedIds.length === filtered.length;
+  const selectedPOs = useMemo(() => pos.filter(p => selectedIds.includes(p.id)), [pos, selectedIds]);
+  const selectedTotalAmount = useMemo(() => selectedPOs.reduce((sum, p) => sum + p.totalAmount, 0), [selectedPOs]);
+  const selectedHutangPOs = useMemo(() => selectedPOs.filter(p => p.paymentStatus === 'HUTANG' && p.status !== 'CANCELLED'), [selectedPOs]);
+  const selectedHutangTotal = useMemo(() => selectedHutangPOs.reduce((sum, p) => sum + p.totalAmount, 0), [selectedHutangPOs]);
+
+  const handleBulkPay = async () => {
+    if (selectedHutangPOs.length === 0) {
+      notify.error('Tidak ada PO berstatus HUTANG di antara pilihan Anda');
+      return;
+    }
+    setBulkPaying(true);
+    try {
+      const res = await payBulkPurchaseDebt(
+        selectedHutangPOs.map(p => p.id),
+        bulkPayMethod,
+        bulkPayNotes || undefined
+      );
+      if (res.success) {
+        notify.success(`Berhasil melunasi ${res.updatedCount} PO!`);
+        if (res.warnings && res.warnings.length > 0) {
+          res.warnings.forEach(w => notify.admin.warning(w));
+        }
+        setBulkPayModalOpen(false);
+        setBulkPayNotes('');
+        setSelectedIds([]);
+        await load();
+        await loadMeta();
+      } else {
+        notify.error(res.errors?.[0] || 'Gagal melunasi PO');
+      }
+    } catch (err: any) {
+      notify.error(err?.message || 'Terjadi kesalahan sistem');
+    } finally {
+      setBulkPaying(false);
+    }
+  };
+
+  const handleBulkPrint = () => {
+    if (selectedIds.length === 0) {
+      notify.error('Pilih minimal satu PO untuk dicetak');
+      return;
+    }
+    window.open(`/admin/purchases/print?ids=${selectedIds.join(',')}`, '_blank');
+  };
+
   return (
     <>
       <Toaster />
@@ -456,9 +520,17 @@ export default function AdminPurchases() {
             {/* Mobile Card List (< md) */}
             <div className="divide-y divide-gray-100 md:hidden">
               {filtered.map(po => (
-                <div key={po.id} className="p-4 space-y-3">
+                <div key={po.id} className={`p-4 space-y-3 transition-colors ${selectedIds.includes(po.id) ? 'bg-emerald-50/50' : ''}`}>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(po.id)}
+                        onChange={() => toggleSelectPO(po.id)}
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                      />
+                      <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
+                    </div>
                     <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${STATUS_COLOR[po.status]}`}>
                       {STATUS_LABEL[po.status] || po.status}
                     </span>
@@ -525,6 +597,15 @@ export default function AdminPurchases() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="w-10 px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                        title={isAllSelected ? "Batalkan semua pilihan" : "Pilih semua PO di halaman ini"}
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">No. PO</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status PO</th>
@@ -536,7 +617,20 @@ export default function AdminPurchases() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map(po => (
-                    <tr key={po.id} className="hover:bg-gray-50 transition-colors group">
+                    <tr
+                      key={po.id}
+                      className={`hover:bg-gray-50 transition-colors group ${
+                        selectedIds.includes(po.id) ? 'bg-emerald-50/40' : ''
+                      }`}
+                    >
+                      <td className="w-10 px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(po.id)}
+                          onChange={() => toggleSelectPO(po.id)}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
                       </td>
@@ -971,6 +1065,20 @@ export default function AdminPurchases() {
             </div>
 
             <div className="flex flex-wrap gap-2 mt-6">
+              {detailModal.paymentStatus === 'HUTANG' && detailModal.status !== 'CANCELLED' && (
+                <button
+                  onClick={() => {
+                    const p = detailModal;
+                    setDetailModal(null);
+                    setSelectedPayable(p);
+                    setPayMethod('CASH');
+                    setPayNotes('');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <CheckCircle2 size={16} /> Lunasi Hutang PO Ini
+                </button>
+              )}
               <Link
                 href={`/admin/purchases/print/${detailModal.id}`}
                 className="flex-1 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black flex items-center justify-center gap-2 shadow-sm transition-all"
@@ -1002,6 +1110,225 @@ export default function AdminPurchases() {
           </div>
         </div>
       )}
+
+      {/* ===== MODAL PELUNASAN SINGLE PO ===== */}
+      {selectedPayable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-black text-gray-900 text-lg">Pelunasan Hutang PO</h3>
+                <p className="text-xs text-gray-500 font-mono mt-0.5">{selectedPayable.poNumber}</p>
+              </div>
+              <button
+                onClick={() => setSelectedPayable(null)}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                aria-label="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Total Tagihan Hutang</span>
+                <span className="text-xs font-bold text-gray-700 truncate max-w-[160px] text-right">{selectedPayable.supplier.name}</span>
+              </div>
+              <p className="text-2xl font-black text-red-700">Rp{selectedPayable.totalAmount.toLocaleString('id-ID')}</p>
+              {selectedPayable.dueDate && (
+                <p className="text-xs text-red-600 font-medium mt-1">
+                  Jatuh Tempo: {new Date(selectedPayable.dueDate).toLocaleDateString('id-ID')}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                  Metode Pembayaran
+                </label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {['CASH', 'TRANSFER', 'QRIS', 'GIRO', 'KREDIT'].map((m) => (
+                    <option key={m} value={m}>{PAYMENT_METHOD_LABEL[m] || m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                  Catatan Pelunasan (Opsional)
+                </label>
+                <textarea
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Contoh: Transfer via BCA, No. ref 123456..."
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setSelectedPayable(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handlePayDebt}
+                disabled={paying}
+                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {paying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                {paying ? 'Memproses...' : 'Konfirmasi Pelunasan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL PELUNASAN MASAL ===== */}
+      {bulkPayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-black text-gray-900 text-lg">Pelunasan Masal PO</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedHutangPOs.length} dari {selectedIds.length} PO terpilih berstatus HUTANG
+                </p>
+              </div>
+              <button
+                onClick={() => setBulkPayModalOpen(false)}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                aria-label="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4">
+              <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">Total Pembayaran Masal</p>
+              <p className="text-2xl font-black text-emerald-800">Rp{selectedHutangTotal.toLocaleString('id-ID')}</p>
+              <p className="text-xs text-emerald-600 mt-1">
+                Akan memperbarui {selectedHutangPOs.length} PO menjadi status LUNAS dan mencatat mutasi pengeluaran kas otomatis.
+              </p>
+            </div>
+
+            {/* Rincian PO yang akan dilunasi */}
+            <div className="mb-4 max-h-40 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-xl p-2 bg-gray-50/50">
+              {selectedHutangPOs.map(p => (
+                <div key={p.id} className="py-1.5 px-2 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-mono font-bold text-gray-800">{p.poNumber}</span>
+                    <span className="text-gray-500 ml-1.5">({p.supplier.name})</span>
+                  </div>
+                  <span className="font-bold text-gray-900">Rp{p.totalAmount.toLocaleString('id-ID')}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                  Metode Pembayaran
+                </label>
+                <select
+                  value={bulkPayMethod}
+                  onChange={(e) => setBulkPayMethod(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {['CASH', 'TRANSFER', 'QRIS', 'GIRO', 'KREDIT'].map((m) => (
+                    <option key={m} value={m}>{PAYMENT_METHOD_LABEL[m] || m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                  Catatan Pelunasan Masal (Opsional)
+                </label>
+                <textarea
+                  value={bulkPayNotes}
+                  onChange={(e) => setBulkPayNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Contoh: Pelunasan tagihan gabungan akhir bulan..."
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setBulkPayModalOpen(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleBulkPay}
+                disabled={bulkPaying || selectedHutangPOs.length === 0}
+                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {bulkPaying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                {bulkPaying ? 'Memproses...' : `Lunasi ${selectedHutangPOs.length} PO`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== FLOATING BULK ACTIONS TOOLBAR ===== */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-11/12 max-w-2xl bg-gray-900 text-white rounded-2xl shadow-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 border border-gray-700 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2.5">
+            <span className="bg-emerald-500 text-black text-xs font-black px-2.5 py-1 rounded-lg">
+              {selectedIds.length} PO
+            </span>
+            <div>
+              <p className="text-xs font-bold text-white leading-tight">PO Dipilih</p>
+              <p className="text-[11px] text-gray-400">Total: Rp{selectedTotalAmount.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedHutangPOs.length > 0 && (
+              <button
+                onClick={() => {
+                  setBulkPayMethod('CASH');
+                  setBulkPayNotes('');
+                  setBulkPayModalOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              >
+                <CheckCircle2 size={14} />
+                <span>Ubah Status Lunas ({selectedHutangPOs.length})</span>
+              </button>
+            )}
+            <button
+              onClick={handleBulkPrint}
+              className="bg-white text-gray-900 hover:bg-gray-100 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Cetak seluruh PO terpilih"
+            >
+              <Printer size={14} />
+              <span>Cetak Masal</span>
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800 transition-colors"
+              title="Batalkan Pilihan"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+
