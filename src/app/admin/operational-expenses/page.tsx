@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { OperationalExpense } from '@/lib/types';
-import { Plus, Search, Filter, Download, FileText } from 'lucide-react';
+import { Plus, Search, Download, FileText } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import * as XLSX from 'xlsx';
@@ -13,7 +12,7 @@ import * as Sentry from '@sentry/nextjs';
 // Components
 import { ExpensesSummary } from '@/components/admin/expenses/ExpensesSummary';
 import { ExpensesTable } from '@/components/admin/expenses/ExpensesTable';
-import { supabase } from '@/lib/supabase';
+import { getExpenses } from '@/lib/actions/expense.actions';
 
 import { sbDeleteDoc } from '@/lib/supabase-helpers';
 
@@ -30,12 +29,8 @@ export default function OperationalExpensesPage() {
     const fetchExpenses = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('operational_expenses')
-          .select('*')
-          .order('date', { ascending: false });
-        if (error) throw error;
-        setExpenses((data || []) as OperationalExpense[]);
+        const data = await getExpenses();
+        setExpenses(data as OperationalExpense[]);
       } catch (error) {
         Sentry.captureException(error);
         notify.error('Failed to load expenses');
@@ -49,8 +44,10 @@ export default function OperationalExpensesPage() {
   const filteredExpenses = useMemo(() => {
     return expenses.filter(expense => {
       const q = searchTerm.toLowerCase();
-      const matchesSearch = expense.description.toLowerCase().includes(q) || expense.category.toLowerCase().includes(q);
-      const matchesCategory = categoryFilter === 'Semua' || expense.category === categoryFilter;
+      const description = String(expense.description ?? '');
+      const category = String(expense.category ?? '');
+      const matchesSearch = description.toLowerCase().includes(q) || category.toLowerCase().includes(q);
+      const matchesCategory = categoryFilter === 'Semua' || category === categoryFilter;
       
       let matchesDate = true;
       if (dateFilter === 'bulan-ini' && expense.date) {
