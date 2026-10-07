@@ -11,6 +11,7 @@ interface CameraBarcodeScannerModalProps {
   title?: string;
   description?: string;
   allowManualInput?: boolean;
+  continuous?: boolean;
 }
 
 export default function CameraBarcodeScannerModal({
@@ -20,6 +21,7 @@ export default function CameraBarcodeScannerModal({
   title = 'Scan Barcode Kamera',
   description = 'Arahkan kamera ke barcode / QR code produk',
   allowManualInput = true,
+  continuous = false,
 }: CameraBarcodeScannerModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,15 @@ export default function CameraBarcodeScannerModal({
   const scannerRef = useRef<any>(null);
   const scannerContainerId = 'interactive-camera-barcode-reader';
   const isStoppingRef = useRef(false);
+  const isProcessingScanRef = useRef(false);
+  const lastScanRef = useRef<{ code: string; missedFrames: number } | null>(null);
+  const onScanRef = useRef(onScan);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onCloseRef.current = onClose;
+  }, [onScan, onClose]);
 
   // Stop scanner safely
   const stopScanner = useCallback(async () => {
@@ -54,9 +65,14 @@ export default function CameraBarcodeScannerModal({
 
   // Handle successful scan
   const handleSuccess = useCallback((decodedText: string) => {
-    if (!decodedText || scannedSuccess) return;
+    if (!decodedText || isProcessingScanRef.current) return;
     const cleanCode = decodedText.trim();
     if (!cleanCode) return;
+    const lastScan = lastScanRef.current;
+    if (lastScan?.code === cleanCode) return;
+
+    isProcessingScanRef.current = true;
+    lastScanRef.current = { code: cleanCode, missedFrames: 0 };
 
     setScannedSuccess(cleanCode);
 
@@ -70,13 +86,26 @@ export default function CameraBarcodeScannerModal({
       }
     }
 
-    // Give visual confirmation for 250ms then trigger onScan & close
+    // Give visual confirmation before processing the barcode.
     setTimeout(async () => {
-      await stopScanner();
-      onScan(cleanCode);
-      onClose();
+      try {
+        if (!continuous) await stopScanner();
+        await onScanRef.current(cleanCode);
+      } catch (err) {
+        console.error('Barcode processing failed:', err);
+      } finally {
+        if (continuous) {
+          setTimeout(() => {
+            setScannedSuccess(null);
+            isProcessingScanRef.current = false;
+          }, 500);
+        } else {
+          await stopScanner();
+          onCloseRef.current();
+        }
+      }
     }, 250);
-  }, [scannedSuccess, onScan, onClose, stopScanner]);
+  }, [continuous, stopScanner]);
 
   // Start scanner
   const startScanner = useCallback(async (cameraIndex = 0) => {
@@ -153,7 +182,11 @@ export default function CameraBarcodeScannerModal({
           handleSuccess(decodedText);
         },
         () => {
-          // Frame error (normal during camera stream without barcode)
+          const lastScan = lastScanRef.current;
+          if (!isProcessingScanRef.current && lastScan) {
+            lastScan.missedFrames += 1;
+            if (lastScan.missedFrames >= 6) lastScanRef.current = null;
+          }
         }
       );
 
@@ -199,6 +232,8 @@ export default function CameraBarcodeScannerModal({
       setScannedSuccess(null);
       setShowManualInput(false);
       setManualCode('');
+      isProcessingScanRef.current = false;
+      lastScanRef.current = null;
       // Small delay to allow modal DOM animation to mount #scannerContainerId
       const timer = setTimeout(() => {
         startScanner(0);

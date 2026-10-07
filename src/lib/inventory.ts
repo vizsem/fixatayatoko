@@ -316,6 +316,7 @@ export const addStock = async (params: {
   batchNumber?: string
   expiryDate?: Date
   reference?: string
+  inventoryReference?: string
   notes?: string
   incomingPrice?: number // Harga beli masuk untuk menghitung AVG Modal
   source?: InventorySource // Asal mutasi; default 'PURCHASE' (perilaku lama)
@@ -417,7 +418,7 @@ export const addStock = async (params: {
       quantity: amount,
       prevStock: currentStock,
       nextStock: newStock,
-      referenceId: reference,
+      referenceId: params.inventoryReference || reference,
       note: notes || 'Penambahan stok',
       toWarehouseId: warehouseId,
       warehouseId,

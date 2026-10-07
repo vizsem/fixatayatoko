@@ -10,9 +10,8 @@ import {
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
-import { playScanBeep } from '@/lib/sound';
 import useProducts from '@/lib/hooks/useProducts';
-import { type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
+import { getLargestPurchaseUnit, getPurchaseUnitPrice, type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
 import { createPurchaseOrder, getPurchaseOrderById } from '@/lib/actions/purchase.actions';
 import { getCapitalBalance } from '@/lib/actions/capital.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
@@ -187,27 +186,26 @@ function AddPurchaseFormContent() {
   }, [liveProducts]);
 
   const addToCart = (product: NormalizedProduct) => {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) {
-      setCart(cart.map(item =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      // Tentukan unit default (prioritas: satuan beli/terbesar atau base unit)
-      const defaultUnit = product.units && product.units.length > 0 
-        ? product.units[0] 
-        : { code: product.unit || 'PCS', contains: 1 };
-      
-      setCart([...cart, {
+    const defaultUnit = getLargestPurchaseUnit(product.units, product.unit || 'PCS');
+    const basePrice = Number(product.purchasePrice || product.Modal || 0);
+    setCart((currentCart) => {
+      const existing = currentCart.find(item => item.id === product.id);
+      if (existing) {
+        return currentCart.map(item =>
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+
+      return [...currentCart, {
         id: product.id,
         name: product.name,
-        purchasePrice: product.purchasePrice || 0,
+        purchasePrice: getPurchaseUnitPrice(basePrice, defaultUnit),
         quantity: 1,
         unit: defaultUnit.code,
         conversion: defaultUnit.contains || 1,
         availableUnits: product.units || []
-      }]);
-    }
+      }];
+    });
     setSearchProduct('');
   };
 
@@ -229,10 +227,8 @@ function AddPurchaseFormContent() {
       }
       const p = { id: found.id, ...found.data() } as any;
       const normalized: NormalizedProduct = normalizeProduct(p.id, p);
-      playScanBeep();
       addToCart(normalized);
       notify.admin.success(`Produk ditambahkan: ${normalized.name}`);
-      setShowScanner(false);
     } catch {
       notify.admin.error('Gagal membaca barcode');
     }
@@ -299,7 +295,7 @@ function AddPurchaseFormContent() {
         createdById: 'admin',
         warehouseId: selectedWarehouse,
         notes: notes || undefined,
-        autoReceive: true, // Pembelian baru otomatis menambah stok fisik ke gudang
+        autoReceive: false, // Stok masuk hanya setelah barang benar-benar diterima.
         // WAJIB dikirim: tanpa dua field ini `createPurchaseOrder` memakai
         // default LUNAS + CASH, sehingga PO yang dibayar transfer atau tempo
         // tetap tercatat lunas tunai — kas berkurang dan hutang supplier tidak
@@ -326,7 +322,7 @@ function AddPurchaseFormContent() {
       if (warningStok) {
         notify.admin.warning(warningStok);
       } else {
-        notify.admin.success("Purchase Order berhasil disimpan & stok telah ditambahkan!");
+        notify.admin.success('Purchase Order tersimpan. Stok diperbarui saat barang diterima.');
       }
       router.push('/admin/purchases');
     } catch (err: any) {
@@ -435,8 +431,9 @@ function AddPurchaseFormContent() {
                 <CameraBarcodeScannerModal
                   isOpen={showScanner}
                   onClose={() => setShowScanner(false)}
+                  continuous
                   title="Scan Barcode Pembelian (PO)"
-                  description="Arahkan kamera ke barcode produk untuk masuk keranjang PO"
+                  description="Scan satu per satu; kamera tetap terbuka untuk produk berikutnya"
                   onScan={handleScan}
                 />
                 {/* Search Results Dropdown */}
@@ -504,11 +501,17 @@ function AddPurchaseFormContent() {
                         onChange={(e) => {
                           const newUnit = e.target.value;
                           const found = item.availableUnits?.find(u => u.code === newUnit);
-                          setCart(cart.map(c => c.id === item.id ? { 
-                            ...c, 
-                            unit: newUnit, 
-                            conversion: found?.contains || 1 
-                          } : c));
+                          setCart(currentCart => currentCart.map(c => {
+                            if (c.id !== item.id) return c;
+                            return {
+                              ...c,
+                              unit: newUnit,
+                              conversion: Number(found?.contains || 1),
+                              purchasePrice: found
+                                ? getPurchaseUnitPrice(c.purchasePrice / Number(c.conversion || 1), found)
+                                : c.purchasePrice,
+                            };
+                          }));
                         }}
                       >
                         {item.availableUnits && item.availableUnits.length > 0 ? (
@@ -592,11 +595,17 @@ function AddPurchaseFormContent() {
                             const newUnit = e.target.value;
                             const found = item.availableUnits?.find(u => u.code === newUnit);
                             // Update unit & conversion otomatis
-                            setCart(cart.map(c => c.id === item.id ? { 
-                              ...c, 
-                              unit: newUnit, 
-                              conversion: found?.contains || 1 
-                            } : c));
+                            setCart(currentCart => currentCart.map(c => {
+                              if (c.id !== item.id) return c;
+                              return {
+                                ...c,
+                                unit: newUnit,
+                                conversion: Number(found?.contains || 1),
+                                purchasePrice: found
+                                  ? getPurchaseUnitPrice(c.purchasePrice / Number(c.conversion || 1), found)
+                                  : c.purchasePrice,
+                              };
+                            }));
                           }}
                         >
                           {item.availableUnits && item.availableUnits.length > 0 ? (

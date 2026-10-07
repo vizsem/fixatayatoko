@@ -8,7 +8,7 @@ import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
   ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw,
-  CheckSquare, Square, DollarSign, AlertCircle, Loader2
+  CheckSquare, Square, DollarSign, AlertCircle, Loader2, Camera
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
@@ -19,6 +19,9 @@ import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getProducts } from '@/lib/actions/product.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import ProductSearchCombobox from '@/components/admin/ProductSearchCombobox';
+import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
+import { getLargestPurchaseUnit, getPurchaseUnitPrice } from '@/lib/normalize';
+import { sbGetDocs } from '@/lib/supabase-helpers';
 import * as XLSX from 'xlsx';
 
 type PO = {
@@ -32,13 +35,24 @@ type PO = {
   notes?: string | null;
   createdAt: Date;
   supplier: { name: string };
-  items: { id: string; quantity: number; unitPrice: number; totalPrice: number; product: { name: string; unit: string } }[];
+  items: {
+    id: string;
+    productId?: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    conversion?: number;
+    receivedQuantityBase?: number;
+    product: { name: string; unit: string };
+  }[];
+  pendingReceipt?: { warehouseId?: string; items: { itemId: string; quantityBase: number }[] } | null;
 };
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-600',
   PENDING_APPROVAL: 'bg-yellow-100 text-yellow-700',
   APPROVED: 'bg-blue-100 text-blue-700',
+  PARTIALLY_RECEIVED: 'bg-amber-100 text-amber-700',
   RECEIVED: 'bg-green-100 text-green-700',
   CANCELLED: 'bg-red-100 text-red-600',
 };
@@ -47,6 +61,7 @@ const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
   PENDING_APPROVAL: 'Menunggu Approval',
   APPROVED: 'Disetujui',
+  PARTIALLY_RECEIVED: 'Diterima Sebagian',
   RECEIVED: 'Diterima',
   CANCELLED: 'Dibatalkan',
 };
@@ -67,7 +82,7 @@ type POItem = {
   quantity: number;
   unitPrice: number;
   unit?: string;
-  availableUnits?: { code: string; contains?: number; price?: number }[];
+  availableUnits?: { code: string; contains?: number; price?: number; modal?: number; costPrice?: number }[];
 };
 
 export default function AdminPurchases() {
@@ -104,7 +119,10 @@ export default function AdminPurchases() {
     dueDate: '',
   });
   const [items, setItems] = useState<POItem[]>([{ productId: '', quantity: 1, unitPrice: 0, unit: 'PCS', availableUnits: [] }]);
-  const [receiveForm, setReceiveForm] = useState({ warehouseId: '', batchNumber: '', expiryDate: '' });
+  const [receiveForm, setReceiveForm] = useState({
+    warehouseId: '', batchNumber: '', expiryDate: '', receivedQuantities: {} as Record<string, number>,
+  });
+  const [receiveScannerOpen, setReceiveScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -169,10 +187,12 @@ export default function AdminPurchases() {
       const defaultPrice = product?.purchasePrice || product?.costPrice || product?.cost_price || product?.price || item.unitPrice || 0;
       const baseUnit = (product?.unit || product?.Satuan || 'PCS').toUpperCase();
 
-      let availableUnits: { code: string; contains?: number; price?: number }[] = [];
+      let availableUnits: { code: string; contains?: number; price?: number; modal?: number; costPrice?: number }[] = [];
       if (Array.isArray(product?.units) && product.units.length > 0) {
         // Use configured multi-unit array from product
-        availableUnits = product.units.map((u: any) => ({ code: u.code, contains: u.contains, price: u.price }));
+        availableUnits = product.units.map((u: any) => ({
+          code: u.code, contains: u.contains, price: u.price, modal: u.modal, costPrice: u.costPrice,
+        }));
       } else {
         // Fallback: always show a full common unit list so buyer can choose freely
         const COMMON_UNITS = ['PCS', 'DUS', 'KARTON', 'SLOP', 'PAK', 'BAL', 'POUCH', 'BANTAL', 'KG', 'LITER', 'LUSIN'];
@@ -185,13 +205,14 @@ export default function AdminPurchases() {
         }));
       }
 
-      const selectedUnit = availableUnits[0]?.code || baseUnit;
+      const selectedUnit = getLargestPurchaseUnit(availableUnits, baseUnit);
+      const basePrice = Number(product?.purchasePrice || product?.costPrice || product?.cost_price || product?.price || item.unitPrice || 0);
 
       return {
         ...item,
         productId,
-        unitPrice: defaultPrice,
-        unit: selectedUnit,
+        unitPrice: getPurchaseUnitPrice(basePrice, selectedUnit),
+        unit: selectedUnit.code,
         availableUnits,
       };
     }));
@@ -250,24 +271,108 @@ export default function AdminPurchases() {
 
   const handleReceive = async () => {
     if (!receiveModal || !receiveForm.warehouseId) { notify.error('Pilih gudang tujuan'); return; }
+    const receivedItems = Object.entries(receiveForm.receivedQuantities)
+      .filter(([, quantity]) => Number(quantity) > 0)
+      .map(([itemId, quantity]) => {
+        const item = receiveModal.items.find((candidate) => candidate.id === itemId);
+        return { itemId, quantityBase: Number(quantity) * Number(item?.conversion || 1) };
+      });
+    if (!receiveModal.pendingReceipt && receivedItems.length === 0) {
+      notify.error('Scan atau masukkan jumlah barang yang diterima');
+      return;
+    }
     setSaving(true);
     const result = await receivePurchaseOrder(
       receiveModal.id,
       receiveForm.warehouseId,
       receiveForm.batchNumber || undefined,
       receiveForm.expiryDate || undefined,
+      receivedItems,
     );
     if (result.success) {
-      notify.success('Barang berhasil diterima & stok diperbarui (FEFO)');
+      notify.success(result.partial
+        ? 'Penerimaan sebagian tersimpan. Sisa barang dapat diterima nanti.'
+        : 'Barang berhasil diterima & stok diperbarui (FEFO)');
       setReceiveModal(null);
-      setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' });
+      setReceiveScannerOpen(false);
+      setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '', receivedQuantities: {} });
       // Muat ulang produk juga, supaya stok di form PO berikutnya tidak basi.
       await load();
       await loadMeta();
     } else {
       notify.error(result.error || 'Gagal menerima PO');
+      if ('pendingReceipt' in result && result.pendingReceipt && receiveModal) {
+        const pendingReceipt = result.pendingReceipt as NonNullable<PO['pendingReceipt']>;
+        setReceiveScannerOpen(false);
+        setReceiveModal((current) => current ? { ...current, pendingReceipt } : current);
+        setReceiveForm((current) => ({
+          ...current,
+          warehouseId: pendingReceipt.warehouseId || current.warehouseId,
+          receivedQuantities: Object.fromEntries(
+            pendingReceipt.items.map((pendingItem) => {
+              const item = receiveModal.items.find((candidate) => candidate.id === pendingItem.itemId);
+              return [pendingItem.itemId, pendingItem.quantityBase / Number(item?.conversion || 1)];
+            })
+          ),
+        }));
+      }
     }
     setSaving(false);
+  };
+
+  const handleReceiveScan = async (code: string) => {
+    if (!receiveModal || receiveModal.pendingReceipt) return;
+    try {
+      const result = await sbGetDocs({
+        table: 'products',
+        where: [{ field: 'barcode', op: '==', val: code }],
+        limit: 1,
+      });
+      const productId = result.docs[0]?.id;
+      if (!productId) {
+        notify.error('Barcode produk tidak ditemukan');
+        return;
+      }
+
+      const item = receiveModal.items.find((candidate) => {
+        if (candidate.productId !== productId) return false;
+        const orderedBase = Number(candidate.quantity || 0) * Number(candidate.conversion || 1);
+        const alreadyReceived = Number(candidate.receivedQuantityBase || 0);
+        const currentReceiptBase = Number(receiveForm.receivedQuantities[candidate.id] || 0) * Number(candidate.conversion || 1);
+        return alreadyReceived + currentReceiptBase < orderedBase;
+      });
+      if (!item) {
+        notify.error('Produk tidak ada di PO atau jumlah pesanannya sudah terpenuhi');
+        return;
+      }
+
+      setReceiveForm((current) => ({
+        ...current,
+        receivedQuantitiesBase: {
+          ...current.receivedQuantities,
+          [item.id]: Number(current.receivedQuantities[item.id] || 0) + 1,
+        },
+      }));
+      notify.success(`Barang diterima: ${item.product.name}`);
+    } catch {
+      notify.error('Gagal memeriksa barcode produk');
+    }
+  };
+
+  const openReceiveModal = (po: PO) => {
+    setReceiveModal(po);
+    setReceiveScannerOpen(false);
+    setReceiveForm({
+      warehouseId: po.pendingReceipt?.warehouseId || '',
+      batchNumber: '',
+      expiryDate: '',
+      receivedQuantities: Object.fromEntries(
+        (po.pendingReceipt?.items || []).map((pendingItem) => {
+          const orderItem = po.items.find((item) => item.id === pendingItem.itemId);
+          return [pendingItem.itemId, pendingItem.quantityBase / Number(orderItem?.conversion || 1)];
+        })
+      ),
+    });
   };
 
   const handleCancelPO = async (poId: string, poNumber: string) => {
@@ -405,9 +510,12 @@ export default function AdminPurchases() {
             <button onClick={exportExcel} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm">
               <Download size={15} /> Export
             </button>
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm">
-              <Plus size={16} /> Buat PO
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm">
+              <Plus size={16} /> PO Manual
             </button>
+            <Link href="/admin/purchases/add" className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm">
+              <Camera size={16} /> PO Scan
+            </Link>
           </div>
         </div>
 
@@ -498,8 +606,8 @@ export default function AdminPurchases() {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-          {['DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED'].map(st => (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+          {['DRAFT', 'APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'].map(st => (
             <div key={st} className={`rounded-xl p-3 ${STATUS_COLOR[st]} border border-opacity-20`}>
               <p className="text-xs font-bold">{STATUS_LABEL[st]}</p>
               <p className="text-xl font-black">{pos.filter(p => p.status === st).length}</p>
@@ -581,7 +689,7 @@ export default function AdminPurchases() {
                         </button>
                       )}
                       {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
-                        <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
+                        <button onClick={() => openReceiveModal(po)}
                           className="px-3 py-1.5 bg-green-100 text-green-700 rounded-xl text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm">
                           <Truck size={12} /> Terima
                         </button>
@@ -690,7 +798,7 @@ export default function AdminPurchases() {
                             </button>
                           )}
                           {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
-                            <button onClick={() => { setReceiveModal(po); setReceiveForm({ warehouseId: '', batchNumber: '', expiryDate: '' }); }}
+                            <button onClick={() => openReceiveModal(po)}
                               className="px-2.5 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors flex items-center gap-1 shadow-sm"
                               title="Terima Barang ke Gudang">
                               <Truck size={12} /> Terima
@@ -752,9 +860,10 @@ export default function AdminPurchases() {
                           onChange={e => {
                             const newUnit = e.target.value;
                             const found = item.availableUnits?.find(u => u.code === newUnit);
+                            const currentConversion = Number(item.availableUnits?.find(u => u.code === item.unit)?.contains || 1);
                             updateItem(idx, 'unit', newUnit);
-                            if (found && found.price) {
-                              updateItem(idx, 'unitPrice', found.price);
+                            if (found) {
+                              updateItem(idx, 'unitPrice', getPurchaseUnitPrice(item.unitPrice / currentConversion, found));
                             }
                           }}
                           className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white sm:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold uppercase"
@@ -967,6 +1076,72 @@ export default function AdminPurchases() {
                   {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
+              <div className="rounded-xl border border-gray-200 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Jumlah diterima</p>
+                    <p className="text-xs text-gray-500">Setiap scan dihitung sebagai 1 {receiveModal.items[0]?.product.unit || 'unit'} PO.</p>
+                  </div>
+                  {!receiveModal.pendingReceipt && (
+                    <button
+                      type="button"
+                      onClick={() => setReceiveScannerOpen(true)}
+                      className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                    >
+                      <Camera size={15} /> Scan
+                    </button>
+                  )}
+                </div>
+                {receiveModal.pendingReceipt && (
+                  <p className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                    Penerimaan sebelumnya belum selesai. Konfirmasi ini akan melanjutkannya dengan aman.
+                  </p>
+                )}
+                <div className="max-h-56 space-y-2 overflow-y-auto">
+                  {receiveModal.items.map((item) => {
+                    const orderedBase = Number(item.quantity || 0) * Number(item.conversion || 1);
+                    const priorBase = Number(item.receivedQuantityBase || 0);
+                    const conversion = Number(item.conversion || 1);
+                    const remainingUnits = Math.max(0, Number(item.quantity || 0) - priorBase / conversion);
+                    const currentUnits = Number(receiveForm.receivedQuantities[item.id] || 0);
+                    return (
+                      <label key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-bold text-gray-900">{item.product.name}</span>
+                          <span className="block text-xs text-gray-500">
+                            Pesan {item.quantity} {item.product.unit} · diterima {priorBase / conversion} {item.product.unit}
+                          </span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={remainingUnits}
+                          step="1"
+                          value={currentUnits}
+                          disabled={Boolean(receiveModal.pendingReceipt)}
+                          onChange={(event) => {
+                            const value = Math.max(0, Math.min(remainingUnits, Math.floor(Number(event.target.value) || 0)));
+                            setReceiveForm((current) => ({
+                              ...current,
+                              receivedQuantities: { ...current.receivedQuantities, [item.id]: value },
+                            }));
+                          }}
+                          className="w-20 rounded-lg border border-gray-200 bg-white px-2 py-2 text-center text-sm font-bold disabled:bg-gray-100"
+                          aria-label={`Jumlah diterima ${item.product.name}`}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <CameraBarcodeScannerModal
+                  isOpen={receiveScannerOpen}
+                  onClose={() => setReceiveScannerOpen(false)}
+                  continuous
+                  title="Scan Barang Diterima"
+                  description="Satu barcode dihitung sebagai satu satuan PO"
+                  onScan={handleReceiveScan}
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">No. Batch (opsional)</label>
                 <input
@@ -996,7 +1171,7 @@ export default function AdminPurchases() {
             <div className="flex gap-3 mt-5">
               <button onClick={() => setReceiveModal(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
               <button onClick={handleReceive} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
-                {saving ? 'Memproses...' : 'Konfirmasi Terima'}
+                {saving ? 'Memproses...' : 'Simpan Penerimaan'}
               </button>
             </div>
           </div>

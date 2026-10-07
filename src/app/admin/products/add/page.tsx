@@ -229,6 +229,15 @@ export default function AddProductPage() {
         if (uploadResult.success && uploadResult.url) {
           imageUrl = uploadResult.url;
         }
+      } else if (imageUrl.trim()) {
+        const fd = new FormData();
+        fd.append('url', imageUrl.trim());
+        fd.append('folder', 'products');
+        const uploadResult = await uploadImageAction(fd);
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error(uploadResult.error || 'Gagal mengunduh foto dari URL');
+        }
+        imageUrl = uploadResult.url;
       }
 
       const pricingStrategy: PricingStrategy =

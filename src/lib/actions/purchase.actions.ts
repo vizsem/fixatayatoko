@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { requireAdmin, requireStaff } from '@/lib/actions/session';
 
 import { revalidatePath } from 'next/cache'
@@ -36,6 +37,7 @@ function normalizeStatus(status?: string): string {
   if (s === 'DIBATALKAN' || s === 'CANCELLED') return 'CANCELLED';
   if (s === 'MENUNGGU' || s === 'PENDING' || s === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
   if (s === 'APPROVED' || s === 'DISETUJUI') return 'APPROVED';
+  if (s === 'PARTIALLY_RECEIVED') return 'PARTIALLY_RECEIVED';
   if (s === 'DRAFT') return 'DRAFT';
   return s;
 }
@@ -75,12 +77,15 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         const qty = Number(item.quantity ?? 1);
         const price = Number(item.purchasePrice ?? item.unitPrice ?? 0);
         const total = Number(item.totalPrice ?? (qty * price));
+        const itemId = item.id || `item_${idx}`;
         return {
-          id: item.id || `item_${idx}`,
+          id: itemId,
           productId: item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : undefined),
           quantity: qty,
           unitPrice: price,
           totalPrice: total,
+          conversion: Number(item.conversion || 1),
+          receivedQuantityBase: Number(raw.receivedQuantitiesBase?.[itemId] || 0),
           product: {
             name: item.name || item.productName || 'Produk',
             unit: item.unit || 'PCS'
@@ -109,6 +114,8 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         },
         items,
         supplierId: raw.supplierId || null,
+        receivedQuantitiesBase: raw.receivedQuantitiesBase || {},
+        pendingReceipt: raw.pendingReceipt || null,
       };
     });
 
@@ -359,20 +366,16 @@ export async function createPurchaseOrder(data: {
   }
 }
 
-/**
- * Terima PO: tambahkan stok, lalu tandai PO `DITERIMA`.
- *
- * URUTAN INI PENTING — dulu urutannya terbalik (status diubah lebih dulu, baru
- * addStock dipanggil). Kalau addStock gagal, PO sudah berstatus "DITERIMA"
- * padahal stok tidak masuk, dan percobaan ulang ditolak dengan "PO sudah
- * diterima sebelumnya" — stoknya hilang tanpa bisa disusulkan. Sekarang status
- * hanya berubah SETELAH semua stok berhasil masuk.
- *
- * Supaya aman diklik berulang (mis. gagal separuh jalan, koneksi putus, tombol
- * terklik dua kali), penambahan stok dijaga idempoten lewat `inventory_logs`:
- * kalau sudah ada log MASUK untuk PO + produk yang sama, item itu dilewati.
- */
-export async function receivePurchaseOrder(poId: string, warehouseId: string, batchNumber?: string, expiryDate?: string) {
+type ReceivedPurchaseItemInput = { itemId: string; quantityBase: number; productId?: string };
+
+/** Terima jumlah aktual per baris PO; jumlah tersimpan dalam satuan dasar produk. */
+export async function receivePurchaseOrder(
+  poId: string,
+  warehouseId: string,
+  batchNumber?: string,
+  expiryDate?: string,
+  receivedItems?: ReceivedPurchaseItemInput[],
+) {
   await requireStaff();
   try {
     const { data: p, error: fetchErr } = await supabaseAdmin.from('purchases').select('*').eq('id', poId).single();
@@ -380,64 +383,170 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
 
     const raw = p.raw_data || {};
     const norm = normalizeStatus(raw.status || p.status);
-    if (norm === 'RECEIVED') {
+    if (norm === 'RECEIVED' && !raw.pendingReceipt) {
       return { success: false, error: 'PO sudah diterima sebelumnya' };
     }
 
-    const targetWarehouse = warehouseId || raw.warehouseId || 'gudang-utama';
     const poRef = raw.poNumber || poId;
-    const gagal: string[] = [];
+    const orderItems = (raw.items || []).map((item: any, index: number) => ({
+      ...item,
+      itemId: String(item.id || `item_${index}`),
+      productId: item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null),
+      conversion: Math.max(1, Number(item.conversion || 1)),
+      orderedBase: Number(item.quantity || 1) * Math.max(1, Number(item.conversion || 1)),
+    }));
+    const receivedQuantitiesBase: Record<string, number> = { ...(raw.receivedQuantitiesBase || {}) };
+    const targetWarehouse = raw.pendingReceipt?.warehouseId || warehouseId || raw.warehouseId || 'gudang-utama';
 
-    // Tambah stok ke produk & catat log inventory via supabaseAdmin
-    for (const item of (raw.items || [])) {
-      const prodId = item.productId || item.product_id || (item.id && !item.id.startsWith('item_') ? item.id : null);
-      if (!prodId) continue;
-
-      // Idempotensi: jangan tambah dua kali untuk PO + produk yang sama.
-      const { data: logAda } = await supabaseAdmin
-        .from('inventory_logs')
-        .select('id')
-        .eq('reference_id', poRef)
-        .eq('product_id', prodId)
-        .eq('type', 'MASUK')
-        .limit(1);
-
-      if (logAda && logAda.length > 0) continue;
-
-      const qty = Number(item.quantity || 1);
-      const conversion = Number(item.conversion || 1);
-      const baseStockToAdd = qty * conversion;
-
-      try {
-        await addStock({
-          productId: prodId,
-          amount: baseStockToAdd,
-          warehouseId: targetWarehouse,
-          batchNumber: batchNumber || `${poRef}-${prodId.slice(-4)}`,
-          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-          reference: poRef,
-          notes: `Penerimaan PO (${qty} ${item.unit || 'PCS'}): ${poRef}`,
-          incomingPrice: conversion ? (item.unitPrice / conversion) : item.unitPrice,
-        });
-      } catch (e: any) {
-        console.error(`addStock gagal saat menerima PO ${poRef} (${prodId}):`, e);
-        gagal.push(`${item.name || prodId} (${e?.message || 'gagal'})`);
+    if (!raw.pendingReceipt) {
+      for (const item of orderItems) {
+        if (!item.productId || receivedQuantitiesBase[item.itemId] !== undefined) continue;
+        const { data: legacyLog } = await supabaseAdmin.from('inventory_logs')
+          .select('id')
+          .eq('reference_id', poRef)
+          .eq('product_id', item.productId)
+          .eq('type', 'MASUK')
+          .limit(1);
+        if (legacyLog?.length) receivedQuantitiesBase[item.itemId] = item.orderedBase;
       }
     }
 
-    if (gagal.length > 0) {
-      // Status SENGAJA tidak diubah: PO tetap "Disetujui" sehingga tombol "Terima"
-      // masih muncul dan stok bisa disusulkan. Item yang sudah berhasil tidak akan
-      // ditambahkan dua kali karena guard idempotensi di atas.
+    let pendingReceipt = raw.pendingReceipt;
+    if (!pendingReceipt) {
+      const requestById = new Map<string, number>();
+      if (receivedItems === undefined) {
+        for (const item of orderItems) {
+          const remaining = item.orderedBase - Number(receivedQuantitiesBase[item.itemId] || 0);
+          if (remaining > 0) requestById.set(item.itemId, remaining);
+        }
+      } else {
+        for (const item of receivedItems) {
+          const quantityBase = Number(item.quantityBase);
+          if (!item.itemId || !Number.isInteger(quantityBase) || quantityBase <= 0 || requestById.has(item.itemId)) {
+            return { success: false, error: 'Jumlah penerimaan tidak valid' };
+          }
+          requestById.set(item.itemId, quantityBase);
+        }
+      }
+
+      const items = [...requestById].map(([itemId, quantityBase]) => {
+        const orderItem = orderItems.find((item: any) => item.itemId === itemId);
+        if (!orderItem?.productId) throw new Error('Baris produk PO tidak valid');
+        const alreadyReceived = Number(receivedQuantitiesBase[itemId] || 0);
+        if (quantityBase > orderItem.orderedBase - alreadyReceived) {
+          throw new Error(`Jumlah diterima melebihi sisa pesanan untuk ${orderItem.name || orderItem.productId}`);
+        }
+        return { itemId, productId: orderItem.productId, quantityBase };
+      });
+
+      if (items.length === 0) {
+        const alreadyComplete = orderItems.every((item: any) =>
+          Number(receivedQuantitiesBase[item.itemId] || 0) >= item.orderedBase
+        );
+        if (!alreadyComplete) return { success: false, error: 'Masukkan jumlah barang yang diterima' };
+        raw.receivedQuantitiesBase = receivedQuantitiesBase;
+        raw.status = 'DITERIMA';
+        raw.receivedAt = new Date().toISOString();
+        raw.pendingReceipt = null;
+        const { error: finalizeErr } = await supabaseAdmin.from('purchases').update({
+          raw_data: raw,
+          updated_at: new Date().toISOString(),
+        }).eq('id', poId);
+        if (finalizeErr) return { success: false, error: `Gagal menyimpan status penerimaan: ${finalizeErr.message}` };
+        revalidatePath('/admin/purchases');
+        return { success: true, partial: false };
+      }
+
+      pendingReceipt = {
+        id: randomUUID(),
+        warehouseId: targetWarehouse,
+        batchNumber: batchNumber || null,
+        expiryDate: expiryDate || null,
+        items,
+        completedItemIds: [],
+      };
+      raw.pendingReceipt = pendingReceipt;
+      const { error: pendingErr } = await supabaseAdmin.from('purchases').update({
+        raw_data: raw,
+        updated_at: new Date().toISOString(),
+      }).eq('id', poId);
+      if (pendingErr) return { success: false, error: `Gagal menyiapkan penerimaan: ${pendingErr.message}` };
+    }
+
+    const gagal: string[] = [];
+    const completedItemIds = new Set<string>(pendingReceipt.completedItemIds || []);
+    for (const receiptItem of pendingReceipt.items as ReceivedPurchaseItemInput[]) {
+      if (completedItemIds.has(receiptItem.itemId)) continue;
+      const orderItem = orderItems.find((item: any) => item.itemId === receiptItem.itemId);
+      if (!orderItem) {
+        gagal.push(`Baris PO ${receiptItem.itemId} tidak ditemukan`);
+        continue;
+      }
+      const productId = receiptItem.productId || orderItem.productId;
+      if (!productId) {
+        gagal.push(`Produk untuk baris PO ${receiptItem.itemId} tidak ditemukan`);
+        continue;
+      }
+
+      const inventoryReference = `${poRef}:REC:${pendingReceipt.id}:${receiptItem.itemId}`;
+      try {
+        const { data: logAda } = await supabaseAdmin.from('inventory_logs')
+          .select('id')
+          .eq('reference_id', inventoryReference)
+          .eq('product_id', productId)
+          .eq('type', 'MASUK')
+          .limit(1);
+
+        if (!logAda?.length) {
+          const conversion = Number(orderItem.conversion || 1);
+          await addStock({
+            productId,
+            amount: receiptItem.quantityBase,
+            warehouseId: pendingReceipt.warehouseId || targetWarehouse,
+            batchNumber: pendingReceipt.batchNumber || `${poRef}-${pendingReceipt.id.slice(0, 6)}-${productId.slice(-4)}`,
+            expiryDate: pendingReceipt.expiryDate ? new Date(pendingReceipt.expiryDate) : undefined,
+            reference: poRef,
+            inventoryReference,
+            notes: `Penerimaan PO (${receiptItem.quantityBase} satuan dasar): ${poRef}`,
+            incomingPrice: conversion ? (Number(orderItem.unitPrice || 0) / conversion) : Number(orderItem.unitPrice || 0),
+          });
+        }
+
+        completedItemIds.add(receiptItem.itemId);
+        pendingReceipt.completedItemIds = [...completedItemIds];
+        raw.pendingReceipt = pendingReceipt;
+        const { error: progressErr } = await supabaseAdmin.from('purchases').update({
+          raw_data: raw,
+          updated_at: new Date().toISOString(),
+        }).eq('id', poId);
+        if (progressErr) throw progressErr;
+      } catch (error: any) {
+        console.error(`Gagal menerima PO ${poRef} (${productId}):`, error);
+        gagal.push(`${orderItem.name || productId} (${error?.message || 'gagal'})`);
+      }
+    }
+
+    if (gagal.length > 0 || completedItemIds.size < pendingReceipt.items.length) {
       return {
         success: false,
-        error: `Stok gagal ditambahkan untuk ${gagal.length} item: ${gagal.join('; ')}. PO belum ditandai diterima — klik "Terima" lagi untuk mencoba item yang gagal.`,
+        error: `Penerimaan belum selesai: ${gagal.join('; ') || 'sebagian item masih diproses'}. Tekan terima lagi untuk melanjutkan tanpa menggandakan stok.`,
+        pendingReceipt,
       };
     }
 
-    raw.status = 'DITERIMA';
-    raw.receivedAt = new Date().toISOString();
-    raw.warehouseId = targetWarehouse;
+    for (const receiptItem of pendingReceipt.items as ReceivedPurchaseItemInput[]) {
+      receivedQuantitiesBase[receiptItem.itemId] =
+        Number(receivedQuantitiesBase[receiptItem.itemId] || 0) + receiptItem.quantityBase;
+    }
+    const partial = orderItems.some((item: any) =>
+      Number(receivedQuantitiesBase[item.itemId] || 0) < item.orderedBase
+    );
+    raw.receivedQuantitiesBase = receivedQuantitiesBase;
+    raw.status = partial ? 'PARTIALLY_RECEIVED' : 'DITERIMA';
+    raw.lastReceivedAt = new Date().toISOString();
+    if (!partial) raw.receivedAt = raw.lastReceivedAt;
+    raw.warehouseId = pendingReceipt.warehouseId || targetWarehouse;
+    raw.pendingReceipt = null;
 
     const { error: updateErr } = await supabaseAdmin.from('purchases').update({
       raw_data: raw,
@@ -445,18 +554,17 @@ export async function receivePurchaseOrder(poId: string, warehouseId: string, ba
     }).eq('id', poId);
 
     if (updateErr) {
-      // Stok sudah masuk, jadi ini bukan kegagalan total. Klik "Terima" sekali lagi
-      // akan menyelesaikan status tanpa menambah stok dua kali.
       return {
         success: false,
-        error: `Stok sudah ditambahkan, tetapi status PO gagal disimpan (${updateErr.message}). Klik "Terima" sekali lagi untuk menyelesaikan.`,
+        error: `Stok sudah ditambahkan, tetapi status penerimaan gagal disimpan (${updateErr.message}). Tekan terima lagi untuk menyelesaikan.`,
+        pendingReceipt,
       };
     }
 
     revalidatePath('/admin/purchases');
     revalidatePath('/admin/inventory');
     revalidatePath('/admin/products');
-    return { success: true };
+    return { success: true, partial };
   } catch (error: any) {
     console.error('Failed to receive PO:', error);
     return { success: false, error: error?.message || 'Gagal menerima purchase order' };
@@ -487,6 +595,15 @@ export async function updatePurchaseStatus(id: string, status: string) {
 export async function deletePurchaseOrder(id: string) {
   await requireAdmin();
   try {
+    const { data: po, error: fetchError } = await supabaseAdmin.from('purchases').select('*').eq('id', id).single();
+    if (fetchError || !po) return { success: false, error: 'PO tidak ditemukan' };
+    const raw = po.raw_data || {};
+    const status = normalizeStatus(raw.status || po.status);
+    const hasReceivedStock = Object.values(raw.receivedQuantitiesBase || {}).some((quantity: any) => Number(quantity) > 0);
+    if (status === 'RECEIVED' || status === 'PARTIALLY_RECEIVED' || raw.pendingReceipt || hasReceivedStock) {
+      return { success: false, error: 'PO yang sudah memiliki penerimaan tidak dapat dihapus. Batalkan PO untuk mengembalikan stok.' };
+    }
+
     const { error } = await supabaseAdmin.from('purchases').delete().eq('id', id);
     if (error) throw error;
     revalidatePath('/admin/purchases');
@@ -522,6 +639,10 @@ export async function updatePurchaseOrder(
 
     const raw = oldData.raw_data || {};
     const normStatus = normalizeStatus(raw.status || oldData.status);
+    if (normStatus === 'RECEIVED' || normStatus === 'PARTIALLY_RECEIVED' || raw.pendingReceipt ||
+      Object.values(raw.receivedQuantitiesBase || {}).some((quantity: any) => Number(quantity) > 0)) {
+      return { success: false, error: 'PO yang sudah memiliki penerimaan tidak dapat diedit. Batalkan PO dan buat PO baru.' };
+    }
 
     const oldItems = raw.items || [];
     const oldWarehouseId = raw.warehouseId || 'gudang-utama';
@@ -694,17 +815,27 @@ export async function cancelPurchaseOrder(id: string) {
     if (normStatus === 'CANCELLED') {
       return { success: false, error: 'PO sudah dibatalkan sebelumnya' };
     }
+    if (raw.pendingReceipt) {
+      return { success: false, error: 'Selesaikan atau ulangi penerimaan yang tertunda sebelum membatalkan PO.' };
+    }
 
-    // Jika PO sudah RECEIVED, kembalikan (kurangi) stok barang yang pernah masuk
-    if (normStatus === 'RECEIVED') {
+    // Jika seluruh atau sebagian PO sudah diterima, kembalikan hanya stok yang benar-benar masuk.
+    if (normStatus === 'RECEIVED' || normStatus === 'PARTIALLY_RECEIVED') {
       const oldItems = raw.items || [];
       const warehouseId = raw.warehouseId || 'gudang-utama';
+      const receivedByItem = raw.receivedQuantitiesBase || {};
 
-      for (const item of oldItems) {
-        const qty = Number(item.quantity || 1) * Number(item.conversion || 1);
+      for (const [index, item] of oldItems.entries()) {
+        const itemId = String(item.id || `item_${index}`);
+        const qty = Object.keys(receivedByItem).length > 0
+          ? Number(receivedByItem[itemId] || 0)
+          : normStatus === 'RECEIVED'
+            ? Number(item.quantity || 1) * Number(item.conversion || 1)
+            : 0;
+        if (qty <= 0) continue;
         try {
           await deductStockFEFO({
-            productId: item.productId,
+            productId: item.productId || item.product_id,
             amount: qty,
             warehouseId,
             reference: id,

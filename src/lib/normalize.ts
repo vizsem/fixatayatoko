@@ -2,9 +2,24 @@ export type UnitOption = {
   code: string;
   contains?: number;
   price?: number;
+  modal?: number;
+  costPrice?: number;
   minQty?: number;
   label?: string;
 };
+
+export function getLargestPurchaseUnit(units?: UnitOption[], baseUnit = 'PCS'): UnitOption {
+  if (!units?.length) return { code: baseUnit, contains: 1 };
+  return units.reduce((largest, candidate) =>
+    Number(candidate.contains || 1) > Number(largest.contains || 1) ? candidate : largest
+  );
+}
+
+export function getPurchaseUnitPrice(basePrice: number, unit: UnitOption): number {
+  const configuredCost = Number(unit.modal ?? unit.costPrice);
+  if (Number.isFinite(configuredCost) && configuredCost > 0) return configuredCost;
+  return Number(basePrice || 0) * Number(unit.contains || 1);
+}
 
 export type NormalizedProduct = {
   id: string;
@@ -52,6 +67,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
             code: toUpper(code),
             contains: typeof item.contains === 'number' ? item.contains : getNum(item.contains, undefined as unknown as number),
             price: typeof item.price === 'number' ? item.price : getNum(item.price, undefined as unknown as number),
+            modal: typeof item.modal === 'number' ? item.modal : getNum(item.modal, undefined as unknown as number),
+            costPrice: typeof item.costPrice === 'number' ? item.costPrice : getNum(item.costPrice, undefined as unknown as number),
             minQty: typeof item.minQty === 'number' ? item.minQty : getNum(item.minQty, undefined as unknown as number),
             label: getStr(item.label, ''),
           } as UnitOption;

@@ -530,6 +530,17 @@ export default function EditProductPage() {
           setIsSubmitting(false);
           return;
         }
+      } else if (finalImageUrl.trim()) {
+        const fd = new FormData();
+        fd.append('url', finalImageUrl.trim());
+        fd.append('folder', 'products');
+        const uploadResult = await uploadImageAction(fd);
+        if (!uploadResult.success || !uploadResult.url) {
+          toast.error(uploadResult.error || 'Gagal mengunduh foto dari URL');
+          setIsSubmitting(false);
+          return;
+        }
+        finalImageUrl = uploadResult.url;
       }
 
       // 3. Update Logic
