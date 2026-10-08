@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { requireAdmin, requireStaff } from '@/lib/actions/session';
+import { getPurchaseHistoryPrices } from '@/lib/purchase-price-history';
 
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -1002,6 +1003,24 @@ export async function getPurchaseStatsByProductId(productId: string) {
       suppliers: [] as PurchaseSupplierHistory[],
     };
   }
+}
+
+export async function getPurchasePriceHistory(
+  productId: string,
+  unitCode: string,
+  baseUnitCode: string,
+  unitContains: number,
+) {
+  await requireAdmin();
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('purchases')
+    .select('created_at, status, raw_data')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return getPurchaseHistoryPrices(rows || [], productId, unitCode, baseUnitCode, unitContains);
 }
 
 /**

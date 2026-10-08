@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
@@ -12,7 +12,7 @@ import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import useProducts from '@/lib/hooks/useProducts';
 import { getLargestPurchaseUnit, getPurchaseUnitPrice, type NormalizedProduct, type UnitOption, normalizeProduct } from '@/lib/normalize';
-import { createPurchaseOrder, getPurchaseOrderById } from '@/lib/actions/purchase.actions';
+import { createPurchaseOrder, getPurchaseOrderById, getPurchasePriceHistory } from '@/lib/actions/purchase.actions';
 import { getCapitalBalance } from '@/lib/actions/capital.actions';
 import { getSuppliers } from '@/lib/actions/supplier.actions';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
@@ -56,6 +56,11 @@ function AddPurchaseFormContent() {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showScanner, setShowScanner] = useState(false);
+  const [purchasePriceMode, setPurchasePriceMode] = useState<'LATEST' | 'CHEAPEST'>('LATEST');
+  const [pendingHistoryLookups, setPendingHistoryLookups] = useState(0);
+  const pendingHistoryLookupsRef = useRef(0);
+  const historyPriceCacheRef = useRef(new Map<string, { latestPrice: number; cheapestPrice: number }>());
+  const historyPriceRequestRef = useRef(new Map<string, number>());
 
   /**
    * Saldo modal dari server, ditampilkan di kartu ringkasan supaya pengguna
@@ -188,9 +193,12 @@ function AddPurchaseFormContent() {
   const addToCart = (product: NormalizedProduct) => {
     const defaultUnit = getLargestPurchaseUnit(product.units, product.unit || 'PCS');
     const basePrice = Number(product.purchasePrice || product.Modal || 0);
+    const existing = cart.find(item => item.id === product.id);
+    const targetUnitCode = existing?.unit || defaultUnit.code;
+    const targetUnit = product.units?.find(unit => unit.code.toUpperCase() === targetUnitCode.toUpperCase()) || defaultUnit;
+
     setCart((currentCart) => {
-      const existing = currentCart.find(item => item.id === product.id);
-      if (existing) {
+      if (currentCart.some(item => item.id === product.id)) {
         return currentCart.map(item =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -206,7 +214,97 @@ function AddPurchaseFormContent() {
         availableUnits: product.units || []
       }];
     });
+
+    void applyPurchaseHistoryPrice(
+      product,
+      targetUnitCode,
+      Number(targetUnit.contains || 1),
+      purchasePriceMode,
+    );
+
     setSearchProduct('');
+  };
+
+  const applyPurchaseHistoryPrice = async (
+    product: NormalizedProduct,
+    unitCode: string,
+    unitContains: number,
+    mode: 'LATEST' | 'CHEAPEST',
+  ) => {
+    const cacheKey = `${product.id}:${unitCode.toUpperCase()}:${unitContains}`;
+    const applyPrice = (history: { latestPrice: number; cheapestPrice: number }) => {
+      const historyPrice = mode === 'CHEAPEST' ? history.cheapestPrice : history.latestPrice;
+      if (historyPrice <= 0) {
+        notify.admin.warning('Belum ada riwayat harga untuk satuan ini; harga Modal produk tetap digunakan.');
+        return;
+      }
+
+      setCart((currentCart) => currentCart.map(item =>
+        item.id === product.id && item.unit.toUpperCase() === unitCode.toUpperCase()
+          ? { ...item, purchasePrice: historyPrice }
+          : item
+      ));
+    };
+
+    const cachedHistory = historyPriceCacheRef.current.get(cacheKey);
+    if (cachedHistory) {
+      applyPrice(cachedHistory);
+      return;
+    }
+
+    const requestId = (historyPriceRequestRef.current.get(product.id) || 0) + 1;
+    historyPriceRequestRef.current.set(product.id, requestId);
+    pendingHistoryLookupsRef.current += 1;
+    setPendingHistoryLookups(pendingHistoryLookupsRef.current);
+
+    try {
+      const history = await getPurchasePriceHistory(
+        product.id,
+        unitCode,
+        product.unit || 'PCS',
+        unitContains,
+      );
+      historyPriceCacheRef.current.set(cacheKey, history);
+      if (historyPriceRequestRef.current.get(product.id) === requestId) applyPrice(history);
+    } catch (error) {
+      console.warn('Gagal memuat harga pembelian dari riwayat:', error);
+      notify.admin.warning('Riwayat harga belum bisa dimuat; harga Modal produk tetap digunakan.');
+    } finally {
+      pendingHistoryLookupsRef.current = Math.max(0, pendingHistoryLookupsRef.current - 1);
+      setPendingHistoryLookups(pendingHistoryLookupsRef.current);
+    }
+  };
+
+  const changePurchasePriceMode = (mode: 'LATEST' | 'CHEAPEST') => {
+    setPurchasePriceMode(mode);
+    cart.forEach((item) => {
+      const product = products.find((candidate) => candidate.id === item.id);
+      if (!product) return;
+      const unit = product.units?.find((candidate) => candidate.code.toUpperCase() === item.unit.toUpperCase());
+      void applyPurchaseHistoryPrice(product, item.unit, Number(unit?.contains || item.conversion || 1), mode);
+    });
+  };
+
+  const changeCartUnit = (itemId: string, newUnitCode: string) => {
+    const currentItem = cart.find((item) => item.id === itemId);
+    if (!currentItem) return;
+    const unit = currentItem.availableUnits?.find((candidate) => candidate.code === newUnitCode);
+    if (!unit) return;
+
+    setCart((currentCart) => currentCart.map((item) => item.id !== itemId ? item : ({
+      ...item,
+      unit: newUnitCode,
+      conversion: Number(unit.contains || 1),
+      purchasePrice: getPurchaseUnitPrice(
+        item.purchasePrice / Number(item.conversion || 1),
+        unit,
+      ),
+    })));
+
+    const product = products.find((candidate) => candidate.id === itemId);
+    if (product) {
+      void applyPurchaseHistoryPrice(product, newUnitCode, Number(unit.contains || 1), purchasePriceMode);
+    }
   };
 
   const handleScan = async (code: string) => {
@@ -247,6 +345,10 @@ function AddPurchaseFormContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingHistoryLookupsRef.current > 0) {
+      notify.admin.error('Tunggu sampai harga riwayat selesai dimuat sebelum menyimpan PO.');
+      return;
+    }
     if (cart.length === 0 || !selectedSupplier || !selectedWarehouse) {
       notify.admin.error("Mohon lengkapi data supplier, gudang, dan produk.");
       return;
@@ -409,6 +511,27 @@ function AddPurchaseFormContent() {
               begitu kartu lebih pendek dari daftar hasil (mis. saat keranjang kosong). */}
           <div className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm">
             <div className="p-4 sm:p-8 border-b border-gray-50">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-gray-600">Harga acuan pembelian</span>
+                <div className="inline-flex rounded-xl bg-gray-100 p-1" role="group" aria-label="Pilih harga riwayat pembelian">
+                  <button
+                    type="button"
+                    onClick={() => changePurchasePriceMode('LATEST')}
+                    aria-pressed={purchasePriceMode === 'LATEST'}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold ${purchasePriceMode === 'LATEST' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
+                  >
+                    Terakhir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changePurchasePriceMode('CHEAPEST')}
+                    aria-pressed={purchasePriceMode === 'CHEAPEST'}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold ${purchasePriceMode === 'CHEAPEST' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
+                  >
+                    Termurah
+                  </button>
+                </div>
+              </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 <input
@@ -498,21 +621,7 @@ function AddPurchaseFormContent() {
                         name={`unit-${item.id}`}
                         className="w-full bg-white p-3 rounded-xl text-sm font-black text-center outline-none ring-1 ring-gray-100 focus:ring-black uppercase"
                         value={item.unit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value;
-                          const found = item.availableUnits?.find(u => u.code === newUnit);
-                          setCart(currentCart => currentCart.map(c => {
-                            if (c.id !== item.id) return c;
-                            return {
-                              ...c,
-                              unit: newUnit,
-                              conversion: Number(found?.contains || 1),
-                              purchasePrice: found
-                                ? getPurchaseUnitPrice(c.purchasePrice / Number(c.conversion || 1), found)
-                                : c.purchasePrice,
-                            };
-                          }));
-                        }}
+                        onChange={(e) => changeCartUnit(item.id, e.target.value)}
                       >
                         {item.availableUnits && item.availableUnits.length > 0 ? (
                           item.availableUnits.map(u => (
@@ -591,22 +700,7 @@ function AddPurchaseFormContent() {
                           name={`unit-desktop-${item.id}`}
                           className="bg-gray-50 p-2 rounded-lg text-xs font-black text-center outline-none uppercase"
                           value={item.unit}
-                          onChange={(e) => {
-                            const newUnit = e.target.value;
-                            const found = item.availableUnits?.find(u => u.code === newUnit);
-                            // Update unit & conversion otomatis
-                            setCart(currentCart => currentCart.map(c => {
-                              if (c.id !== item.id) return c;
-                              return {
-                                ...c,
-                                unit: newUnit,
-                                conversion: Number(found?.contains || 1),
-                                purchasePrice: found
-                                  ? getPurchaseUnitPrice(c.purchasePrice / Number(c.conversion || 1), found)
-                                  : c.purchasePrice,
-                              };
-                            }));
-                          }}
+                          onChange={(e) => changeCartUnit(item.id, e.target.value)}
                         >
                           {item.availableUnits && item.availableUnits.length > 0 ? (
                             item.availableUnits.map(u => (
@@ -750,10 +844,10 @@ function AddPurchaseFormContent() {
             </div>
 
             <button
-              disabled={loading}
+              disabled={loading || pendingHistoryLookups > 0}
               className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all hidden lg:flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
-              <Save size={18} /> {loading ? 'Saving Order...' : 'Post Purchase Order'}
+              <Save size={18} /> {loading ? 'Saving Order...' : pendingHistoryLookups > 0 ? 'Memuat Harga...' : 'Post Purchase Order'}
             </button>
           </div>
 
@@ -783,10 +877,10 @@ function AddPurchaseFormContent() {
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || pendingHistoryLookups > 0}
               className="flex-1 bg-blue-600 hover:bg-blue-700 py-3.5 rounded-2xl text-xs font-black uppercase tracking-[0.15em] text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
             >
-              {loading ? 'Menyimpan...' : 'Post Purchase Order'}
+              {loading ? 'Menyimpan...' : pendingHistoryLookups > 0 ? 'Memuat Harga...' : 'Post Purchase Order'}
             </button>
           </div>
         </div>

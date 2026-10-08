@@ -108,7 +108,7 @@ export default function CameraBarcodeScannerModal({
   }, [continuous, stopScanner]);
 
   // Start scanner
-  const startScanner = useCallback(async (cameraIndex = 0) => {
+  const startScanner = useCallback(async (cameraIndex = 0, preferRearCamera = true) => {
     setLoading(true);
     setError(null);
     setScannedSuccess(null);
@@ -169,10 +169,20 @@ export default function CameraBarcodeScannerModal({
         aspectRatio: 1.0,
       };
 
-      // Select camera: environment (belakang) or selected index
+      // Prefer the rear camera on phones; camera enumeration order is device-specific.
+      const rearCameraIndex = availableCameras.findIndex((camera) =>
+        /back|rear|environment|belakang/i.test(camera.label)
+      );
+      const selectedCameraIndex = preferRearCamera && rearCameraIndex >= 0
+        ? rearCameraIndex
+        : cameraIndex;
+
       let cameraConfig: any = { facingMode: 'environment' };
-      if (availableCameras.length > 0 && availableCameras[cameraIndex]?.id) {
-        cameraConfig = availableCameras[cameraIndex].id;
+      if (availableCameras[selectedCameraIndex]?.id && (!preferRearCamera || rearCameraIndex >= 0)) {
+        cameraConfig = availableCameras[selectedCameraIndex].id;
+      }
+      if (preferRearCamera && rearCameraIndex >= 0) {
+        setCurrentCameraIndex(rearCameraIndex);
       }
 
       await scanner.start(
@@ -216,7 +226,7 @@ export default function CameraBarcodeScannerModal({
     if (cameras.length <= 1) return;
     const nextIndex = (currentCameraIndex + 1) % cameras.length;
     setCurrentCameraIndex(nextIndex);
-    startScanner(nextIndex);
+    startScanner(nextIndex, false);
   };
 
   // Manual submit
@@ -251,7 +261,7 @@ export default function CameraBarcodeScannerModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md bg-neutral-900 text-white rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+      <div className="relative w-full max-w-md max-h-[calc(100dvh-1.5rem)] bg-neutral-900 text-white rounded-3xl overflow-y-auto shadow-2xl border border-white/10 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10 bg-neutral-900/90">
           <div className="flex items-center gap-2.5">
@@ -288,7 +298,7 @@ export default function CameraBarcodeScannerModal({
         </div>
 
         {/* Viewport Area */}
-        <div className="relative w-full aspect-square bg-black flex items-center justify-center overflow-hidden">
+        <div className="relative w-full aspect-square max-h-[55dvh] bg-black flex items-center justify-center overflow-hidden">
           {/* Container for Html5Qrcode video */}
           <div
             id={scannerContainerId}
