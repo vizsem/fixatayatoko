@@ -16,7 +16,9 @@ export type ProductQueryOptions = {
 }
 
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { addStock } from '@/lib/inventory';
+import { addInventoryLog, addStock, type InventoryLogData } from '@/lib/inventory';
+import { sbInsertDoc } from '@/lib/supabase-helpers';
+import { findPricesBelowTarget } from '@/lib/pricing-review';
 
 /**
  * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
@@ -292,9 +294,16 @@ export async function saveEditedProduct(id: string, payload: {
   description: string
   is_active: boolean
   raw_data: any
+  stockLogs?: Array<InventoryLogData & {
+    change: number;
+    previousStock: number;
+    newStock: number;
+    warehouseName?: string;
+    adminEmail?: string;
+  }>
 }) {
-  await requireAdmin();
   try {
+    const identity = await requireAdmin();
     const now = new Date().toISOString();
     const { error } = await supabaseAdmin.from('products').upsert({
       id,
@@ -331,11 +340,35 @@ export async function saveEditedProduct(id: string, payload: {
       }
     }
 
+    let warning: string | undefined;
+    for (const log of payload.stockLogs || []) {
+      try {
+        const trustedLog = { ...log, adminEmail: identity.email || 'admin' };
+        await sbInsertDoc('stock_logs', trustedLog);
+        await addInventoryLog({
+          productId: trustedLog.productId,
+          productName: trustedLog.productName,
+          type: trustedLog.change > 0 ? 'MASUK' : 'KELUAR',
+          amount: Math.abs(Number(trustedLog.change || 0)),
+          adminId: identity.email || 'admin',
+          source: trustedLog.type,
+          note: `Edit ${trustedLog.type}. Prev: ${trustedLog.previousStock}, New: ${trustedLog.newStock}`,
+          prevStock: trustedLog.previousStock,
+          nextStock: trustedLog.newStock,
+          fromWarehouseId: trustedLog.change < 0 ? trustedLog.warehouseId : undefined,
+          toWarehouseId: trustedLog.change > 0 ? trustedLog.warehouseId : undefined,
+        });
+      } catch (error) {
+        console.error('Failed to write product stock audit log:', error);
+        warning = 'Produk tersimpan, tetapi sebagian log perubahan stok gagal dicatat.';
+      }
+    }
+
     revalidatePath('/admin/products');
     revalidatePath('/admin/inventory');
     revalidatePath(`/admin/products/edit/${id}`);
     revalidatePath(`/produk/${id}`);
-    return { success: true };
+    return { success: true, warning };
   } catch (error: any) {
     console.error('Failed to save edited product:', error);
     return { success: false, error: error?.message || 'Gagal menyimpan produk' };
@@ -1096,6 +1129,123 @@ export interface BulkMarginOptions {
   targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS' | string;
 }
 
+export async function applyPriceRecommendations(
+  productIds: string[],
+): Promise<{ success: boolean; updated: number; adjustedUnits: number; skipped: number; failed: number; error?: string }> {
+  const identity = await requireAdmin();
+  if (!productIds.length) return { success: true, updated: 0, adjustedUnits: 0, skipped: 0, failed: 0 };
+
+  const now = new Date().toISOString();
+  let updated = 0;
+  let adjustedUnits = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const productId of productIds) {
+    try {
+      const { data: product, error: fetchError } = await supabaseAdmin
+        .from('products')
+        .select('id,name,category,unit,price,cost_price,raw_data')
+        .eq('id', productId)
+        .single();
+
+      if (fetchError || !product) {
+        skipped++;
+        continue;
+      }
+
+      const raw = product.raw_data || {};
+      const unit = String(product.unit || raw.unit || raw.Satuan || 'PCS').toUpperCase();
+      const costPrice = Number(product.cost_price ?? raw.Modal ?? raw.purchasePrice ?? 0);
+      const priceEcer = Number(product.price ?? raw.Ecer ?? raw.price ?? 0);
+      const units = Array.isArray(raw.units) ? raw.units : [];
+      const findings = findPricesBelowTarget({
+        name: product.name || raw.Nama || raw.name || '',
+        category: product.category || raw.Kategori || raw.category || 'UMUM',
+        unit,
+        costPrice,
+        priceEcer,
+        units,
+        pricingStrategy: raw.pricingStrategy,
+      });
+
+      if (findings.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const findingByUnit = new Map(findings.map((finding) => [finding.unitCode, finding]));
+      const updatedUnits = units.map((unitOption: Record<string, any>) => {
+        const code = String(unitOption.code || unitOption.unit || '').trim().toUpperCase();
+        const finding = findingByUnit.get(code);
+        if (!finding || Number(unitOption.minQty || 0) > 1) return unitOption;
+        return { ...unitOption, code, price: Math.max(Number(unitOption.price || 0), finding.recommendedPrice) };
+      });
+
+      const baseFinding = findingByUnit.get(unit);
+      const newBasePrice = baseFinding
+        ? Math.max(priceEcer, baseFinding.recommendedPrice)
+        : priceEcer;
+      const hasBaseUnit = updatedUnits.some((unitOption: Record<string, any>) =>
+        String(unitOption.code || unitOption.unit || '').trim().toUpperCase() === unit &&
+        Number(unitOption.minQty || 0) <= 1
+      );
+      if (baseFinding && !hasBaseUnit) {
+        updatedUnits.unshift({ code: unit, contains: 1, price: newBasePrice });
+      }
+
+      const updatedRaw: Record<string, any> = {
+        ...raw,
+        units: updatedUnits,
+        updatedAt: now,
+      };
+      if (baseFinding) {
+        updatedRaw.Ecer = newBasePrice;
+        updatedRaw.price = newBasePrice;
+        updatedRaw.priceEcer = newBasePrice;
+      }
+
+      const updatePayload: Record<string, any> = {
+        raw_data: updatedRaw,
+        updated_at: now,
+      };
+      if (baseFinding) updatePayload.price = newBasePrice;
+
+      const { error: updateError } = await supabaseAdmin
+        .from('products')
+        .update(updatePayload)
+        .eq('id', productId);
+      if (updateError) throw updateError;
+
+      try {
+        await supabaseAdmin.from('product_cost_logs').insert({
+          productId,
+          productName: product.name || raw.Nama || raw.name || 'Produk',
+          oldCost: costPrice,
+          newCost: costPrice,
+          oldPrice: priceEcer,
+          newPrice: newBasePrice,
+          adminEmail: identity.email || 'admin',
+          changeDate: now,
+          notes: `Penyesuaian harga ke target margin (${findings.length} satuan)`,
+        });
+      } catch (logError) {
+        console.warn('Gagal mencatat log rekomendasi harga:', logError);
+      }
+
+      updated++;
+      adjustedUnits += findings.length;
+    } catch (error) {
+      console.error(`Gagal menerapkan rekomendasi harga untuk ${productId}:`, error);
+      failed++;
+    }
+  }
+
+  revalidatePath('/admin/products/pricing-hpp');
+  revalidatePath('/admin/products');
+  return { success: failed === 0, updated, adjustedUnits, skipped, failed, ...(failed > 0 ? { error: `${failed} produk gagal diperbarui` } : {}) };
+}
+
 /**
  * Update harga jual berdasarkan target margin (% atau Nominal Rp) dari HPP.
  * Bisa memilih set untuk:
@@ -1137,7 +1287,8 @@ export async function bulkUpdateTargetMargin(
       // Cek apakah harga ecer/satuan utama juga harus diubah
       const shouldUpdateBasePrice = targetUnitMode === 'BASE_ONLY' || targetUnitMode === 'ALL_UNITS' || targetUnitMode === baseUnit;
 
-      let newBasePrice = Number(prod.price || existingRaw.price || cost);
+      const currentBasePrice = Number(prod.price || existingRaw.price || cost);
+      let newBasePrice = currentBasePrice;
       if (shouldUpdateBasePrice) {
         if (marginType === 'NOMINAL') {
           newBasePrice = cost + marginValue;

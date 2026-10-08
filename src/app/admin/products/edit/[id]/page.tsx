@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { addInventoryLog } from '@/lib/inventory';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Tag, Truck, Save, Layers, Trash2,
@@ -79,6 +78,7 @@ export default function EditProductPage() {
   const [newKategoriInput, setNewKategoriInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const originalImageUrlRef = useRef('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Purchase Stats State (PO Avg HPP & Supplier)
@@ -339,6 +339,7 @@ export default function EditProductPage() {
       }));
 
       const initialImg = data.Link_Foto || data.URL_Produk || data.image_url || data.imageUrl || data.image || '';
+      originalImageUrlRef.current = String(initialImg).trim();
       if (initialImg) {
         setImagePreview(initialImg);
       }
@@ -530,7 +531,7 @@ export default function EditProductPage() {
           setIsSubmitting(false);
           return;
         }
-      } else if (finalImageUrl.trim()) {
+      } else if (finalImageUrl.trim() && finalImageUrl.trim() !== originalImageUrlRef.current) {
         const fd = new FormData();
         fd.append('url', finalImageUrl.trim());
         fd.append('folder', 'products');
@@ -701,6 +702,7 @@ export default function EditProductPage() {
         description: formData.Deskripsi || '',
         is_active: Number(formData.Status) === 1,
         raw_data: updatePayload,
+        stockLogs: logEntries,
       });
 
       if (!saveRes.success) {
@@ -714,29 +716,9 @@ export default function EditProductPage() {
         console.warn('Firestore sync skipped or failed:', fsErr);
       }
 
-      // Write Logs
-      if (logEntries.length > 0) {
-        const logPromises = logEntries.map(log => sbInsertDoc('stock_logs', log));
-        await Promise.all(logPromises);
-        
-        const invLogPromises = logEntries.map(log => addInventoryLog({
-          productId: log.productId,
-          productName: log.productName,
-          type: log.change > 0 ? 'MASUK' : 'KELUAR',
-          amount: Math.abs(log.change),
-          adminId: log.adminEmail || 'system',
-          source: stockReason as any,
-          note: `Edit ${stockReason}. Prev: ${log.previousStock}, New: ${log.newStock}`,
-          prevStock: log.previousStock,
-          nextStock: log.newStock,
-          fromWarehouseId: log.change < 0 ? log.warehouseId : undefined,
-          toWarehouseId: log.change > 0 ? log.warehouseId : undefined,
-        }));
-        await Promise.all(invLogPromises);
-      }
-
       toast.dismiss(loadingToast);
       toast.success('Produk berhasil diperbarui!');
+      if (saveRes.warning) toast(saveRes.warning, { duration: 6000 });
       router.push('/admin/products');
     } catch (err: any) {
       console.error(err);

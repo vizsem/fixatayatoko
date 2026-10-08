@@ -56,8 +56,8 @@ export async function getDebtReport(): Promise<DebtSummary> {
   // 1. Hutang ke supplier: PO yang belum lunas
   const { data: purchaseRows } = await supabaseAdmin
     .from('purchases')
-    .select('*')
-    .or('payment_status.eq.HUTANG,payment_status.is.null')
+    .select('id,total,payment_status,payment_method,created_at,raw_data')
+    .or('payment_status.eq.HUTANG,payment_status.is.null,raw_data->>paymentStatus.eq.HUTANG,raw_data->>paymentStatus.eq.BELUM_LUNAS')
     .order('created_at', { ascending: false })
 
   const supplierDebts: SupplierDebt[] = (purchaseRows || [])

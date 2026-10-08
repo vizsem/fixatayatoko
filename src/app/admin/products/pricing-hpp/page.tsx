@@ -16,6 +16,8 @@ import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
+import { findPricesBelowTarget } from '@/lib/pricing-review';
+import type { PricingStrategy } from '@/lib/normalize';
 import {
   updateProductPrice,
   getAllProductsAvgHpp,
@@ -25,6 +27,7 @@ import {
   toggleLockProductHpp,
   syncAvgPoToActiveHpp,
   resetAvgFromCurrentStock,
+  applyPriceRecommendations,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -43,6 +46,7 @@ interface ProductItem {
   category: string;
   unit: string;
   units: ProductUnitItem[];
+    pricingStrategy?: PricingStrategy;
   isHppLocked: boolean;
   customHpp?: number;
   stock: number;
@@ -92,7 +96,7 @@ export default function PricingHPPPage() {
   // Filter States
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE'>('ALL');
+  const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('name');
 
   // Multi-select States
@@ -100,6 +104,7 @@ export default function PricingHPPPage() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [skipLockedHpp, setSkipLockedHpp] = useState(true); // Default true: Lindungi produk yang sudah diset manual!
   const [showMarginModal, setShowMarginModal] = useState(false);
+  const [showPriceReviewModal, setShowPriceReviewModal] = useState(false);
   const [marginType, setMarginType] = useState<'PERCENT' | 'NOMINAL'>('PERCENT');
   const [targetMarginValue, setTargetMarginValue] = useState<number>(20);
   const [marginUnitTarget, setMarginUnitTarget] = useState<string>('BASE_ONLY');
@@ -214,6 +219,7 @@ export default function PricingHPPPage() {
           category: p.category || raw.Kategori || 'UMUM',
           unit: baseUnit,
           units: unitsList,
+          pricingStrategy: raw.pricingStrategy as PricingStrategy | undefined,
           isHppLocked,
           customHpp: typeof raw.customHpp === 'number' ? raw.customHpp : cost,
           stock: stk,
@@ -300,6 +306,15 @@ export default function PricingHPPPage() {
     };
   }, [products, avgHppMap]);
 
+  const priceReviewByProduct = useMemo(() => new Map(
+    products.map((product) => [product.id, findPricesBelowTarget(product)])
+  ), [products]);
+
+  const productsNeedingPriceReview = useMemo(
+    () => products.filter((product) => (priceReviewByProduct.get(product.id)?.length || 0) > 0).length,
+    [products, priceReviewByProduct]
+  );
+
   // Filtered & Sorted Products
   const filteredProducts = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -313,7 +328,7 @@ export default function PricingHPPPage() {
         else if (marginFilter === 'SLIM') matchMargin = p.marginPct >= 8 && p.marginPct < 20;
         else if (marginFilter === 'CRITICAL') matchMargin = p.marginPct > 0 && p.marginPct < 8;
         else if (marginFilter === 'NEGATIVE') matchMargin = p.marginPct <= 0;
-
+        else if (marginFilter === 'NEEDS_REVIEW') matchMargin = (priceReviewByProduct.get(p.id)?.length || 0) > 0;
         return matchSearch && matchCat && matchMargin;
       })
       .sort((a, b) => {
@@ -329,7 +344,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, marginFilter, sortBy, avgHppMap]);
+  }, [products, search, selectedCategory, marginFilter, sortBy, avgHppMap, priceReviewByProduct]);
 
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
@@ -453,7 +468,39 @@ export default function PricingHPPPage() {
       notify.error('Pilih minimal 1 produk terlebih dahulu');
       return;
     }
+    if (marginFilter === 'NEEDS_REVIEW') {
+      setShowPriceReviewModal(true);
+      return;
+    }
     setShowMarginModal(true);
+  };
+
+  const handleApplyPriceRecommendations = () => {
+    const productIds = selectedPriceReviewProducts.map((product) => product.id);
+    if (productIds.length === 0) {
+      notify.error('Pilih minimal 1 produk yang perlu penyesuaian harga.');
+      return;
+    }
+
+    setShowPriceReviewModal(false);
+    startResetTransition(async () => {
+      try {
+        const result = await applyPriceRecommendations(productIds);
+        if (!result.success && result.updated === 0) throw new Error(result.error || 'Gagal menerapkan rekomendasi');
+
+        if (result.updated > 0) {
+          notify.success(`Harga diperbarui untuk ${result.updated} produk dan ${result.adjustedUnits} satuan.`);
+        } else {
+          notify.success('Harga produk sudah sesuai target; tidak ada perubahan.');
+        }
+        if (result.failed > 0) notify.error(`${result.failed} produk gagal diperbarui. Periksa log untuk detail.`);
+
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (error: any) {
+        notify.error(error.message || 'Gagal menerapkan rekomendasi harga');
+      }
+    });
   };
 
   const handleConfirmTargetMargin = () => {
@@ -735,6 +782,13 @@ export default function PricingHPPPage() {
   };
 
   const selectedCount = selectedIds.size;
+  const selectedPriceReviewProducts = products.filter((product) =>
+    selectedIds.has(product.id) && (priceReviewByProduct.get(product.id)?.length || 0) > 0
+  );
+  const selectedPriceReviewUnitCount = selectedPriceReviewProducts.reduce(
+    (total, product) => total + (priceReviewByProduct.get(product.id)?.length || 0),
+    0,
+  );
 
   return (
     <div className="p-4 md:p-8 bg-[#F8FAFC]">
@@ -896,7 +950,10 @@ export default function PricingHPPPage() {
 
                 <select
                   value={marginFilter}
-                  onChange={e => setMarginFilter(e.target.value as any)}
+                  onChange={e => {
+                    setMarginFilter(e.target.value as typeof marginFilter);
+                    setSelectedIds(new Set());
+                  }}
                   className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="ALL">Semua Margin</option>
@@ -904,6 +961,7 @@ export default function PricingHPPPage() {
                   <option value="SLIM">🟡 Margin Sedang (8 - 19%)</option>
                   <option value="CRITICAL">🟠 Margin Tipis (1 - 7%)</option>
                   <option value="NEGATIVE">🔴 Margin Nol / Rugi (≤ 0%)</option>
+                  <option value="NEEDS_REVIEW">Perlu penyesuaian harga ({productsNeedingPriceReview})</option>
                 </select>
 
                 <select
@@ -977,7 +1035,7 @@ export default function PricingHPPPage() {
                     className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400"
                   >
                     <TrendingUp size={13} />
-                    Set Margin
+                    {marginFilter === 'NEEDS_REVIEW' ? 'Terapkan Rekomendasi' : 'Set Margin'}
                   </button>
                   <button
                     onClick={handleSetDivideHpp}
@@ -1063,6 +1121,8 @@ export default function PricingHPPPage() {
                         const avgDiff = avg ? avg.avgCost - p.costPrice : null;
                         const hasDrift = avg && avg.avgCost > 0 && Math.abs(avgDiff!) > 100;
                         const isSelected = selectedIds.has(p.id);
+                        const priceReview = priceReviewByProduct.get(p.id) || [];
+                        const reviewByUnit = new Map(priceReview.map((finding) => [finding.unitCode, finding]));
 
                         return (
                           <tr
@@ -1100,6 +1160,15 @@ export default function PricingHPPPage() {
                                       <Lock size={10} />
                                     </span>
                                   )}
+                                  {priceReview.length > 0 && (
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-700 shrink-0"
+                                      title={priceReview.map((finding) => `${finding.unitCode}: Rp${finding.currentPrice.toLocaleString('id-ID')} → target Rp${finding.recommendedPrice.toLocaleString('id-ID')}`).join(' · ')}
+                                    >
+                                      <AlertTriangle size={10} />
+                                      Perlu naik ({priceReview.length})
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 text-slate-400 font-mono text-[10px]">
                                   <span>SKU: {p.sku}</span>
@@ -1120,15 +1189,20 @@ export default function PricingHPPPage() {
                               <div className="flex flex-wrap gap-1 mt-1 justify-center max-w-[210px] mx-auto">
                                 {p.units.map(u => {
                                   const isBase = u.code === p.unit;
+                                  const review = reviewByUnit.get(u.code);
                                   return (
                                     <span
                                       key={u.code}
                                       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black ${
-                                        isBase
+                                        review
+                                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                          : isBase
                                           ? 'bg-slate-100 text-slate-700 border border-slate-200'
                                           : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                       }`}
-                                      title={`${u.code} (isi ${u.contains} ${p.unit}) · Harga Jual: Rp ${(u.price || 0).toLocaleString('id-ID')}`}
+                                      title={review
+                                        ? `${u.code}: harga Rp${review.currentPrice.toLocaleString('id-ID')} di bawah target Rp${review.recommendedPrice.toLocaleString('id-ID')}`
+                                        : `${u.code} (isi ${u.contains} ${p.unit}) · Harga Jual: Rp ${(u.price || 0).toLocaleString('id-ID')}`}
                                     >
                                       <span>{u.code}{u.contains > 1 ? `×${u.contains}` : ''}</span>
                                       <span className="text-slate-300">|</span>
@@ -1294,7 +1368,7 @@ export default function PricingHPPPage() {
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all"
                       >
                         <TrendingUp size={13} />
-                        Set Margin
+                        {marginFilter === 'NEEDS_REVIEW' ? 'Terapkan Rekomendasi' : 'Set Margin'}
                       </button>
                       <button
                         onClick={handleSetDivideHpp}
@@ -1881,6 +1955,62 @@ export default function PricingHPPPage() {
                     Ya, Restart AVG HPP ({selectedWithAvg.length})
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPriceReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-rose-50 text-rose-700 rounded-xl shrink-0">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Terapkan Rekomendasi Harga</h3>
+                <p className="mt-1 text-xs text-slate-600">
+                  {selectedPriceReviewProducts.length} produk · {selectedPriceReviewUnitCount} satuan perlu penyesuaian
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {selectedPriceReviewProducts.map((product) => (
+                <div key={product.id} className="rounded-xl border border-slate-200 p-3">
+                  <p className="text-xs font-black text-slate-900">{product.name}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-rose-700">
+                    {(priceReviewByProduct.get(product.id) || []).map((finding) => (
+                      <span key={finding.unitCode}>
+                        {finding.unitCode}: Rp{finding.currentPrice.toLocaleString('id-ID')} → Rp{finding.recommendedPrice.toLocaleString('id-ID')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-semibold text-emerald-900">
+              Hanya harga satuan yang masih di bawah target yang dinaikkan. Harga yang sudah sesuai dan harga grosir bertingkat tidak diubah.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPriceReviewModal(false)}
+                disabled={isResetting}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-black disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyPriceRecommendations}
+                disabled={isResetting || selectedPriceReviewProducts.length === 0}
+                className="px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-black disabled:opacity-50"
+              >
+                {isResetting ? 'Memproses...' : 'Naikkan Harga'}
               </button>
             </div>
           </div>
