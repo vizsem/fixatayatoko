@@ -39,6 +39,38 @@ export default function UnfoundBarcodeModal({
       .slice(0, 8);
   }, [searchQuery, products]);
 
+  // Satuan tambahan yang terdaftar pada produk terpilih
+  const availableProductUnits = useMemo(() => {
+    if (!selectedProduct) return [];
+    const baseCode = String(selectedProduct.unit || 'PCS').trim().toUpperCase();
+    const list: { code: string; contains?: number; barcode?: string; label?: string }[] = [];
+    if (Array.isArray(selectedProduct.units)) {
+      for (const u of selectedProduct.units) {
+        const c = String(u.code || '').trim().toUpperCase();
+        if (c && c !== baseCode && !list.some((item) => item.code === c)) {
+          list.push({
+            code: c,
+            contains: u.contains,
+            barcode: u.barcode,
+            label: u.label,
+          });
+        }
+      }
+    }
+    return list;
+  }, [selectedProduct]);
+
+  const handleSelectProduct = (p: NormalizedProduct) => {
+    setSelectedProduct(p);
+    const baseCode = String(p.unit || 'PCS').trim().toUpperCase();
+    const extraUnits = (p.units || []).filter(u => String(u.code || '').trim().toUpperCase() !== baseCode);
+    if (extraUnits.length > 0) {
+      setSelectedUnitCode(String(extraUnits[0].code).trim().toUpperCase());
+    } else {
+      setSelectedUnitCode('');
+    }
+  };
+
   // Handle navigate to Add New Product
   const handleCreateNewProduct = () => {
     onClose();
@@ -49,6 +81,11 @@ export default function UnfoundBarcodeModal({
   const handleAttachBarcode = async () => {
     if (!selectedProduct) {
       notify.admin.error('Silakan pilih produk terlebih dahulu');
+      return;
+    }
+
+    if (targetType === 'unit' && !selectedUnitCode) {
+      notify.admin.error('Silakan pilih salah satu satuan yang terdaftar');
       return;
     }
 
@@ -191,10 +228,7 @@ export default function UnfoundBarcodeModal({
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedProduct(p);
-                          setSelectedUnitCode(p.unit || 'PCS');
-                        }}
+                        onClick={() => handleSelectProduct(p)}
                         className="w-full p-2.5 text-left rounded-xl hover:bg-blue-50/60 border border-transparent hover:border-blue-200 flex items-center justify-between transition-all group"
                       >
                         <div className="flex items-center gap-2.5">
@@ -258,7 +292,12 @@ export default function UnfoundBarcodeModal({
 
                       <button
                         type="button"
-                        onClick={() => setTargetType('unit')}
+                        onClick={() => {
+                          setTargetType('unit');
+                          if (availableProductUnits.length > 0 && !selectedUnitCode) {
+                            setSelectedUnitCode(availableProductUnits[0].code);
+                          }
+                        }}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           targetType === 'unit'
                             ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100'
@@ -266,7 +305,11 @@ export default function UnfoundBarcodeModal({
                         }`}
                       >
                         <p className="text-xs font-black text-gray-900">Barcode Satuan</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Misal BOX / RENCENG</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {availableProductUnits.length > 0
+                            ? `${availableProductUnits.length} satuan terdaftar`
+                            : 'Belum ada satuan tambahan'}
+                        </p>
                       </button>
                     </div>
                   </div>
@@ -275,22 +318,39 @@ export default function UnfoundBarcodeModal({
                   {targetType === 'unit' && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-black uppercase text-gray-400">Pilih Satuan:</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {['BOX', 'CTN', 'RENCENG', 'PACK', 'LUSIN'].map((u) => (
-                          <button
-                            key={u}
-                            type="button"
-                            onClick={() => setSelectedUnitCode(u)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                              selectedUnitCode === u
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {u}
-                          </button>
-                        ))}
-                      </div>
+                      {availableProductUnits.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableProductUnits.map((u) => {
+                            const isSelected = selectedUnitCode === u.code;
+                            return (
+                              <button
+                                key={u.code}
+                                type="button"
+                                onClick={() => setSelectedUnitCode(u.code)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                <span>{u.code}</span>
+                                {u.contains && u.contains > 1 && (
+                                  <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
+                                    (isi {u.contains})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                          <p className="font-bold">Produk ini belum memiliki satuan tambahan (grosir) yang didaftarkan.</p>
+                          <p className="text-[11px] text-amber-700 mt-1">
+                            Pilih <b>Barcode Utama</b> di atas, atau daftarkan satuan grosir terlebih dahulu di menu <b>Edit Produk</b>.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
