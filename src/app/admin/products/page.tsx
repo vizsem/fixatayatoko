@@ -16,7 +16,7 @@ import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare, Printer, Square, Archive, RotateCcw, Copy
+  CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -953,6 +953,11 @@ export default function AdminProducts() {
                         }`}>
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
+                        {p.parentId ? (
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+                            Varian
+                          </span>
+                        ) : null}
                       </div>
                       <h3 className="font-black text-gray-900 text-sm uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
@@ -1016,6 +1021,13 @@ export default function AdminProducts() {
                         title="Edit Item"
                       >
                         <Edit size={16} />
+                      </Link>
+                      <Link 
+                        href={`/admin/products/add?parent_id=${p.id}&parent_name=${encodeURIComponent(p.name)}`}
+                        className="w-10 h-10 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-sm"
+                        title="Tambah Varian"
+                      >
+                        <Layers size={16} />
                       </Link>
                       <button 
                         onClick={() => handleArchive(p, p.isActive !== false)} 
@@ -1094,6 +1106,11 @@ export default function AdminProducts() {
                             }`}>
                               {p.isActive === false ? 'Arsip' : 'Aktif'}
                             </span>
+                            {p.parentId ? (
+                              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700" title={`Parent: ${p.parentId}`}>
+                                Varian
+                              </span>
+                            ) : null}
                           </div>
                           <h3 className="font-black text-gray-900 text-sm leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
                           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
@@ -1180,6 +1197,13 @@ export default function AdminProducts() {
                           title="Edit"
                         >
                           <Edit size={14} />
+                        </Link>
+                        <Link 
+                          href={`/admin/products/add?parent_id=${p.id}&parent_name=${encodeURIComponent(p.name)}`} 
+                          className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm"
+                          title="Tambah Varian"
+                        >
+                          <Layers size={14} />
                         </Link>
                         <button 
                           onClick={() => handleDuplicate(p)} 

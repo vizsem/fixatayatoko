@@ -27,6 +27,7 @@ export type NormalizedProduct = {
   name: string;
   sku: string;
   barcode?: string;
+  parentId?: string;
   category: string;
   warehouseId: string;
   stock: number;
@@ -92,6 +93,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
     id,
     name: getStr(raw.name ?? raw.Nama),
     sku: getStr(raw.sku ?? raw.ID),
+    barcode: getStr(raw.barcode ?? raw.Barcode ?? (raw.raw_data as Record<string, unknown> | undefined)?.Barcode),
+    parentId: getStr(raw.parentId ?? raw.parent_id ?? raw.Parent_ID ?? (raw.raw_data as Record<string, unknown> | undefined)?.Parent_ID),
     category: getStr(raw.category ?? raw.Kategori),
     warehouseId: getStr(raw.warehouseId),
     stock: getNum(raw.stock ?? raw.Stok),

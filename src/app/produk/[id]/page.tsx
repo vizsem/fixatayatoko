@@ -1,4 +1,4 @@
-import ProductDetailClient, { Product, RelatedProduct, PromoProduct, Review } from './ProductDetailClient';
+import ProductDetailClient, { Product, RelatedProduct, PromoProduct, Review, ProductVariant } from './ProductDetailClient';
 import { Metadata } from 'next';
 import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
@@ -97,6 +97,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   let relatedProducts: RelatedProduct[] = [];
   let promoProducts: PromoProduct[] = [];
   let reviews: Review[] = [];
+  let variants: ProductVariant[] = [];
 
   try {
     const { data: prod } = await supabase
@@ -130,6 +131,64 @@ export default async function ProductDetailPage({ params }: PageProps) {
         description: prod.description || raw.description || raw.Deskripsi || '',
         units: raw.units || [],
       };
+
+      // Fetch Product Variants (if this product is a parent or a child variant)
+      try {
+        const rawPId = raw.Parent_ID || (prod as any).parent_id || raw.parentId;
+        const parentId = rawPId ? String(rawPId).trim() : null;
+        const rootParentId = parentId || prod.id;
+
+        // 1. Fetch children of rootParentId
+        const { data: childVariantsData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('raw_data->>Parent_ID', rootParentId)
+          .eq('is_active', true);
+
+        // 2. If current product is a child, fetch root parent doc
+        let rootParentData: any = null;
+        if (parentId) {
+          const { data: parentDoc } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', rootParentId)
+            .maybeSingle();
+          if (parentDoc && parentDoc.is_active !== false) {
+            rootParentData = parentDoc;
+          }
+        } else {
+          rootParentData = prod;
+        }
+
+        const allFamilyRows: any[] = [];
+        if (rootParentData) {
+          allFamilyRows.push(rootParentData);
+        }
+        if (childVariantsData && childVariantsData.length > 0) {
+          for (const c of childVariantsData) {
+            if (!allFamilyRows.some((x) => x.id === c.id)) {
+              allFamilyRows.push(c);
+            }
+          }
+        }
+
+        if (allFamilyRows.length > 1) {
+          variants = allFamilyRows.map((v: any) => {
+            const vRaw = v.raw_data || {};
+            return {
+              id: v.id,
+              name: v.name || vRaw.name || vRaw.Nama || v.id,
+              price: Number(v.price ?? vRaw.price ?? vRaw.Ecer ?? 0),
+              stock: Number(v.stock ?? vRaw.stock ?? vRaw.Stok ?? 0),
+              image: v.image_url || vRaw.imageUrl || vRaw.Link_Foto || vRaw.image || '',
+              unit: v.unit || vRaw.unit || vRaw.Satuan || 'PCS',
+              isCurrent: v.id === id,
+            };
+          });
+        }
+      } catch (variantErr) {
+        console.error('Error fetching variants:', variantErr);
+      }
 
       // Fetch active products for recommendations and promo items
       const { data: allActiveData } = await supabase
@@ -296,6 +355,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
         initialRelatedProducts={JSON.parse(JSON.stringify(relatedProducts))}
         initialPromoProducts={JSON.parse(JSON.stringify(promoProducts))}
         initialReviews={JSON.parse(JSON.stringify(reviews))}
+        initialVariants={JSON.parse(JSON.stringify(variants))}
       />
     </>
   );

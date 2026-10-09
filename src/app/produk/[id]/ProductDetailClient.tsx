@@ -83,21 +83,34 @@ type CartItem = {
   addedAt?: string;
 };
 
+export type ProductVariant = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  image?: string;
+  unit?: string;
+  isCurrent?: boolean;
+};
+
 interface ProductDetailClientProps {
   initialProduct: Product | null;
   initialRelatedProducts: RelatedProduct[];
   initialPromoProducts?: PromoProduct[];
   initialReviews: Review[];
+  initialVariants?: ProductVariant[];
 }
 
 export default function ProductDetailClient({ 
   initialProduct, 
   initialRelatedProducts, 
   initialPromoProducts = [],
-  initialReviews 
+  initialReviews,
+  initialVariants = []
 }: ProductDetailClientProps) {
   const router = useRouter();
   const [product] = useState<Product | null>(initialProduct);
+  const [variants] = useState<ProductVariant[]>(initialVariants);
   const [relatedProducts] = useState<RelatedProduct[]>(initialRelatedProducts);
   const [promoProducts] = useState<PromoProduct[]>(initialPromoProducts);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
@@ -380,6 +393,86 @@ export default function ProductDetailClient({
                 {isOutOfStock && <span className="text-red-500 font-bold ml-2">• Sedang Kosong</span>}
               </p>
             </div>
+
+            {/* VARIANT PICKER */}
+            {variants && variants.length > 1 && (
+              <div className="bg-slate-50/90 border border-slate-200/90 p-4 md:p-5 rounded-3xl">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-violet-600" />
+                    Pilihan Varian ({variants.length})
+                  </span>
+                  <span className="text-[11px] font-bold text-violet-600">
+                    Pilih opsi produk
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {variants.map((v) => {
+                    const isSelected = v.id === product.id;
+                    const isVOutOfStock = v.stock <= 0;
+                    return (
+                      <Link
+                        key={v.id}
+                        href={`/produk/${v.id}`}
+                        className={`group p-2.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-500/20 ring-2 ring-violet-400/40'
+                            : isVOutOfStock
+                            ? 'bg-white/60 border-slate-200 text-slate-400 opacity-60 hover:opacity-100'
+                            : 'bg-white border-slate-200 hover:border-violet-300 hover:bg-violet-50/30 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {v.image ? (
+                            <img
+                              src={v.image}
+                              alt={v.name}
+                              className={`w-7 h-7 rounded-lg object-cover shrink-0 border ${
+                                isSelected ? 'border-white/40' : 'border-slate-100'
+                              }`}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png';
+                              }}
+                            />
+                          ) : (
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-400'
+                            }`}>
+                              <Package size={14} />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-black truncate leading-tight ${isSelected ? 'text-white' : 'text-slate-800'}`}>
+                              {v.name}
+                            </p>
+                            <p className={`text-[10px] font-bold ${
+                              isSelected
+                                ? 'text-violet-200'
+                                : isVOutOfStock
+                                ? 'text-red-400'
+                                : 'text-slate-400'
+                            }`}>
+                              {isVOutOfStock ? 'Stok Habis' : `Stok: ${v.stock}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-dashed border-current/20">
+                          <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-emerald-600'}`}>
+                            Rp{v.price.toLocaleString('id-ID')}
+                          </span>
+                          {isSelected && (
+                            <span className="text-[10px] font-black uppercase px-1.5 py-0.5 bg-white/20 rounded-md">
+                              Dipilih
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* PRICE CARD */}
             <div className={`rounded-3xl p-5 md:p-6 border transition-all duration-500 ${isWholesaleEligible ? 'bg-gradient-to-br from-orange-500 to-orange-600 border-orange-600 shadow-xl shadow-orange-500/20' : 'bg-white border-slate-200 shadow-sm'}`}>

@@ -81,14 +81,22 @@ export default function AddProductPage() {
   const [scanUnitBarcodeIdx, setScanUnitBarcodeIdx] = useState<number>(-1);
 
 
-  // Auto-fill barcode dari query param (misal dari scanner "Buat Produk Baru")
+  // Auto-fill barcode dan parent_id dari query param
+  const [parentName, setParentName] = useState('');
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const initialBarcode = params.get('barcode');
+      const parentId = params.get('parent_id');
+      const pName = params.get('parent_name') || '';
       if (initialBarcode) {
         setFormData(prev => ({ ...prev, Barcode: initialBarcode, ID: prev.ID || initialBarcode }));
         notify.admin.info(`Barcode terisi: ${initialBarcode}`);
+      }
+      if (parentId) {
+        setFormData(prev => ({ ...prev, Parent_ID: parentId }));
+        setParentName(decodeURIComponent(pName));
+        notify.admin.info(`Mode Varian: produk induk ${pName || parentId}`);
       }
     }
   }, []);
@@ -331,8 +339,12 @@ export default function AddProductPage() {
               <ChevronLeft size={18} />
             </Link>
             <div>
-              <h1 className="text-base sm:text-xl font-black uppercase tracking-tighter">Tambah Produk</h1>
-              <p className="text-xs text-gray-400 font-black uppercase tracking-widest hidden sm:block">Database Inventaris Ataya</p>
+              <h1 className="text-base sm:text-xl font-black uppercase tracking-tighter">
+                {formData.Parent_ID ? 'Tambah Varian' : 'Tambah Produk'}
+              </h1>
+              <p className="text-xs text-gray-400 font-black uppercase tracking-widest hidden sm:block">
+                {formData.Parent_ID ? `Varian dari: ${parentName || formData.Parent_ID}` : 'Database Inventaris Ataya'}
+              </p>
             </div>
           </div>
           {/* Quick save for mobile */}
@@ -349,6 +361,33 @@ export default function AddProductPage() {
         {errorMsg && (
           <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-xs font-black uppercase animate-bounce">
             <AlertCircle size={18} /> {errorMsg}
+          </div>
+        )}
+
+        {/* BANNER MODE VARIAN */}
+        {formData.Parent_ID && (
+          <div className="mb-4 p-4 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-2xl flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+              <Layers size={18} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black text-violet-800 uppercase tracking-wider">Mode Tambah Varian</p>
+              <p className="text-xs font-bold text-violet-600 mt-0.5">
+                Produk ini akan menjadi varian dari{' '}
+                <a href={`/admin/products/edit/${formData.Parent_ID}`} className="underline hover:text-violet-900">
+                  {parentName || formData.Parent_ID}
+                </a>
+              </p>
+              <p className="text-[10px] font-bold text-violet-400 mt-1">Isi nama varian spesifik, contoh: &quot;Kaos Polos - Merah L&quot;</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setFormData(prev => ({ ...prev, Parent_ID: '' })); setParentName(''); }}
+              className="text-violet-400 hover:text-violet-700 transition-colors"
+              title="Hapus mode varian"
+            >
+              <X size={16} />
+            </button>
           </div>
         )}
 
