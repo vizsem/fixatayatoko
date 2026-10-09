@@ -190,8 +190,10 @@ function AddPurchaseFormContent() {
     };
   }, [liveProducts]);
 
-  const addToCart = (product: NormalizedProduct) => {
-    const defaultUnit = getLargestPurchaseUnit(product.units, product.unit || 'PCS');
+  const addToCart = (product: NormalizedProduct, preferredUnitCode?: string) => {
+    const defaultUnit = preferredUnitCode
+      ? (product.units?.find(u => u.code.toUpperCase() === preferredUnitCode.toUpperCase()) ?? getLargestPurchaseUnit(product.units, product.unit || 'PCS'))
+      : getLargestPurchaseUnit(product.units, product.unit || 'PCS');
     const basePrice = Number(product.purchasePrice || product.Modal || 0);
     const existing = cart.find(item => item.id === product.id);
     const targetUnitCode = existing?.unit || defaultUnit.code;
@@ -224,6 +226,7 @@ function AddPurchaseFormContent() {
 
     setSearchProduct('');
   };
+
 
   const applyPurchaseHistoryPrice = async (
     product: NormalizedProduct,
@@ -309,28 +312,62 @@ function AddPurchaseFormContent() {
 
   const handleScan = async (code: string) => {
     try {
-      // Dibaca langsung dari Supabase, bukan lewat API bergaya Firestore.
-      // `resolveQueryField` memetakan `Barcode`/`barcode` ke kolom `barcode`
-      // yang SAMA, jadi satu kueri sudah cukup — kode lama menembak dua kueri
-      // ke kolom yang sama.
-      const snap = await sbGetDocs({
+      // Cari produk berdasarkan barcode utama ATAU barcode per satuan (di raw_data->units[].barcode)
+      // Kueri 1: barcode utama
+      let found: { id: string; data: () => Record<string, unknown> } | undefined;
+      const snapMain = await sbGetDocs({
         table: 'products',
         where: [{ field: 'barcode', op: '==', val: code }],
         limit: 1,
       });
-      const found = snap.docs[0];
+      if (snapMain.docs[0]) {
+        found = snapMain.docs[0];
+      }
+
+      // Kueri 2: barcode dalam raw_data->units (jika tidak ditemukan di kueri 1)
+      if (!found) {
+        const { data: unitRows } = await supabase
+          .from('products')
+          .select('id, raw_data')
+          .filter('raw_data->units', 'not.is', null)
+          .limit(500); // cap agar tidak terlalu banyak
+        if (unitRows) {
+          for (const row of unitRows) {
+            const rawUnits = (row.raw_data as Record<string, unknown>)?.units;
+            if (Array.isArray(rawUnits)) {
+              const hasMatch = rawUnits.some((u: Record<string, unknown>) => u?.barcode === code);
+              if (hasMatch) {
+                // Ambil full data produk
+                const snapById = await sbGetDocs({ table: 'products', where: [{ field: 'id', op: '==', val: row.id }], limit: 1 });
+                found = snapById.docs[0];
+                break;
+              }
+            }
+          }
+        }
+      }
+
       if (!found) {
         notify.admin.error('Barcode tidak ditemukan');
         return;
       }
-      const p = { id: found.id, ...found.data() } as any;
-      const normalized: NormalizedProduct = normalizeProduct(p.id, p);
-      addToCart(normalized);
-      notify.admin.success(`Produk ditambahkan: ${normalized.name}`);
+      const p = { id: found.id, ...found.data() } as Record<string, unknown>;
+      const normalized: NormalizedProduct = normalizeProduct(p.id as string, p);
+
+      // Jika barcode cocok dengan satuan tertentu, pilih satuan itu
+      const unitMatch = normalized.units?.find(u => u.barcode === code);
+      if (unitMatch) {
+        addToCart(normalized, unitMatch.code);
+        notify.admin.success(`Produk ditambahkan: ${normalized.name} (${unitMatch.code})`);
+      } else {
+        addToCart(normalized);
+        notify.admin.success(`Produk ditambahkan: ${normalized.name}`);
+      }
     } catch {
       notify.admin.error('Gagal membaca barcode');
     }
   };
+
 
 
   const removeFromCart = (id: string) => setCart(cart.filter(item => item.id !== id));

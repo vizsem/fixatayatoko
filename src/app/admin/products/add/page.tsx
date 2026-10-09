@@ -77,6 +77,9 @@ export default function AddProductPage() {
   const [pricingRoundingStep, setPricingRoundingStep] = useState<number>(100);
 
   const [scannerReady, setScannerReady] = useState(false);
+  // -1 = scanner untuk barcode produk utama, >= 0 = scanner untuk barcode satuan ke-idx
+  const [scanUnitBarcodeIdx, setScanUnitBarcodeIdx] = useState<number>(-1);
+
 
   // Auto-fill barcode dari query param (misal dari scanner "Buat Produk Baru")
   useEffect(() => {
@@ -204,6 +207,7 @@ export default function AddProductPage() {
             unitEntry.minQty = typeof u.minQty === 'number' ? u.minQty : Number(u.minQty);
           }
           if (u.label) unitEntry.label = String(u.label);
+          if (u.barcode) unitEntry.barcode = String(u.barcode).trim();
           return unitEntry;
         })
         .filter(Boolean) as UnitOption[];
@@ -213,8 +217,15 @@ export default function AddProductPage() {
         ? basePriceFromUnits
         : Number(formData.Ecer || 0);
 
+      const foundBaseUnit = cleanedUnits.find(u => u.code === baseUnit);
       const ensuredBase = [
-        { code: baseUnit, contains: 1, price: nextEcer, label: '' },
+        {
+          code: baseUnit,
+          contains: 1,
+          price: nextEcer,
+          label: foundBaseUnit?.label || '',
+          ...(foundBaseUnit?.barcode ? { barcode: foundBaseUnit.barcode } : {}),
+        },
         ...cleanedUnits.filter((u) => u.code !== baseUnit),
       ];
 
@@ -454,12 +465,22 @@ export default function AddProductPage() {
                 </div>
                 <CameraBarcodeScannerModal
                   isOpen={scannerReady}
-                  onClose={() => setScannerReady(false)}
-                  title="Scan Barcode Produk"
-                  description="Arahkan kamera ke barcode / QR code produk"
+                  onClose={() => { setScannerReady(false); setScanUnitBarcodeIdx(-1); }}
+                  title={scanUnitBarcodeIdx >= 0 ? `Scan Barcode ${units[scanUnitBarcodeIdx]?.code || 'Satuan'}` : 'Scan Barcode Produk'}
+                  description={scanUnitBarcodeIdx >= 0 ? `Arahkan kamera ke barcode kemasan ${units[scanUnitBarcodeIdx]?.code || ''}` : 'Arahkan kamera ke barcode / QR code produk'}
                   onScan={(code) => {
-                    setFormData(prev => ({ ...prev, Barcode: code }));
-                    notify.admin.success(`Barcode berhasil dipindai: ${code}`);
+                    if (scanUnitBarcodeIdx >= 0) {
+                      setUnits(prev => {
+                        const next = [...prev];
+                        next[scanUnitBarcodeIdx] = { ...next[scanUnitBarcodeIdx], barcode: code };
+                        return next;
+                      });
+                      notify.admin.success(`Barcode ${units[scanUnitBarcodeIdx]?.code} dipindai: ${code}`);
+                      setScanUnitBarcodeIdx(-1);
+                    } else {
+                      setFormData(prev => ({ ...prev, Barcode: code }));
+                      notify.admin.success(`Barcode berhasil dipindai: ${code}`);
+                    }
                   }}
                 />
               </div>
@@ -829,6 +850,33 @@ export default function AddProductPage() {
                           setUnits(next);
                         }}
                       />
+                    </div>
+
+                    {/* BARCODE PER SATUAN */}
+                    <div className="flex items-center gap-2 pb-2 border-b border-dashed border-gray-200">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1"><Barcode size={10} /> Barcode {code}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setScanUnitBarcodeIdx(idx); setScannerReady(true); }}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          >
+                            <Camera size={10} /> Scan
+                          </button>
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full bg-white p-2 rounded-xl text-xs font-mono text-gray-700 outline-none border border-gray-200 focus:border-blue-400"
+                          placeholder={`Barcode ${code}...`}
+                          value={current.barcode || ''}
+                          onChange={(e) => {
+                            const next = [...units];
+                            next[idx] = { ...current, barcode: e.target.value || undefined };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">

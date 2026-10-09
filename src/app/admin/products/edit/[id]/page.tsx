@@ -36,6 +36,7 @@ type UnitOption = {
   price?: number;
   minQty?: number;
   label?: string;
+  barcode?: string;
   prices?: ChannelPrices;
 };
 
@@ -154,6 +155,8 @@ export default function EditProductPage() {
   const [costHistory, setCostHistory] = useState<any[]>([]);
   const [stockReason, setStockReason] = useState<'MANUAL' | 'OPNAME' | 'TRANSFER'>('MANUAL');
   const [scannerReady, setScannerReady] = useState(false);
+  // -1 = scanner untuk barcode produk utama, >= 0 = scanner untuk barcode satuan ke-idx
+  const [scanUnitBarcodeIdx, setScanUnitBarcodeIdx] = useState<number>(-1);
 
   // === GLOBAL BARCODE SCANNER LISTENER ===
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
@@ -565,6 +568,7 @@ export default function EditProductPage() {
           }
           if (u.minQty !== undefined) unitEntry.minQty = Number(u.minQty);
           if (u.label) unitEntry.label = String(u.label);
+          if (u.barcode) unitEntry.barcode = String(u.barcode).trim();
           return unitEntry;
         })
         .filter(Boolean) as UnitOption[];
@@ -584,6 +588,9 @@ export default function EditProductPage() {
       const foundBaseUnit = cleanedUnits.find(u => u.code === baseUnit);
       if (foundBaseUnit?.prices) {
         baseUnitEntry.prices = foundBaseUnit.prices;
+      }
+      if (foundBaseUnit?.barcode) {
+        baseUnitEntry.barcode = foundBaseUnit.barcode;
       }
 
       const ensuredBase = [
@@ -933,12 +940,22 @@ export default function EditProductPage() {
                 </div>
                 <CameraBarcodeScannerModal
                   isOpen={scannerReady}
-                  onClose={() => setScannerReady(false)}
-                  title="Scan Barcode Produk"
-                  description="Arahkan kamera ke barcode / QR code produk"
+                  onClose={() => { setScannerReady(false); setScanUnitBarcodeIdx(-1); }}
+                  title={scanUnitBarcodeIdx >= 0 ? `Scan Barcode ${units[scanUnitBarcodeIdx]?.code || 'Satuan'}` : 'Scan Barcode Produk'}
+                  description={scanUnitBarcodeIdx >= 0 ? `Arahkan kamera ke barcode kemasan ${units[scanUnitBarcodeIdx]?.code || ''}` : 'Arahkan kamera ke barcode / QR code produk'}
                   onScan={(code) => {
-                    setFormData(prev => ({ ...prev, Barcode: code }));
-                    toast.success(`Barcode dipindai: ${code}`);
+                    if (scanUnitBarcodeIdx >= 0) {
+                      setUnits(prev => {
+                        const next = [...prev];
+                        next[scanUnitBarcodeIdx] = { ...next[scanUnitBarcodeIdx], barcode: code };
+                        return next;
+                      });
+                      toast.success(`Barcode ${units[scanUnitBarcodeIdx]?.code} dipindai: ${code}`);
+                    } else {
+                      setFormData(prev => ({ ...prev, Barcode: code }));
+                      toast.success(`Barcode dipindai: ${code}`);
+                    }
+                    setScanUnitBarcodeIdx(-1);
                   }}
                 />
               </div>
@@ -1568,6 +1585,31 @@ export default function EditProductPage() {
                         />
                       </div>
                     </div>
+
+                     {/* BARCODE PER SATUAN */}
+                     <div>
+                       <label className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center justify-between">
+                         <span className="flex items-center gap-1"><Barcode size={10} /> Barcode {code}</span>
+                         <button
+                           type="button"
+                           onClick={() => { setScanUnitBarcodeIdx(idx); setScannerReady(true); }}
+                           className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                         >
+                           <Camera size={10} /> Scan
+                         </button>
+                       </label>
+                       <input
+                         type="text"
+                         className="w-full bg-white p-2.5 rounded-xl text-xs font-mono text-slate-700 outline-none border border-slate-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                         placeholder={`Barcode kemasan ${code}...`}
+                         value={current.barcode || ''}
+                         onChange={(e) => {
+                           const next = [...units];
+                           next[idx] = { ...current, barcode: e.target.value || undefined };
+                           setUnits(next);
+                         }}
+                       />
+                     </div>
 
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between gap-2">

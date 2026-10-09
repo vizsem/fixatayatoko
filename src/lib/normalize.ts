@@ -6,6 +6,7 @@ export type UnitOption = {
   costPrice?: number;
   minQty?: number;
   label?: string;
+  barcode?: string;
 };
 
 export function getLargestPurchaseUnit(units?: UnitOption[], baseUnit = 'PCS'): UnitOption {
@@ -71,6 +72,7 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
             costPrice: typeof item.costPrice === 'number' ? item.costPrice : getNum(item.costPrice, undefined as unknown as number),
             minQty: typeof item.minQty === 'number' ? item.minQty : getNum(item.minQty, undefined as unknown as number),
             label: getStr(item.label, ''),
+            barcode: getStr(item.barcode ?? item.Barcode ?? '', '').trim() || undefined,
           } as UnitOption;
         })
         .filter(Boolean) as UnitOption[];

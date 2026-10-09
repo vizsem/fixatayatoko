@@ -12,6 +12,7 @@ export interface UnitOption {
     contains: number;
     label?: string;
     price?: number;
+    barcode?: string;
 }
 
 export interface Product {
