@@ -11,7 +11,7 @@ import {
   Printer, Truck, Calendar, CreditCard,
   Package, Store, CheckCircle2, Clock, AlertCircle,
   History, Receipt, Edit, Save, X, Trash2,
-  RefreshCw
+  RefreshCw, Lock
 } from 'lucide-react';
 
 interface PurchaseItem { id: string; name: string; purchasePrice: number; quantity: number; unit: string; }
@@ -31,6 +31,11 @@ export default function PurchaseDetail() {
 
   const handleEditClick = () => {
     if (!purchase) return;
+    const s = (purchase.status || '').toUpperCase();
+    if (s === 'RECEIVED' || s === 'DITERIMA' || s === 'PARTIALLY_RECEIVED' || s === 'CANCELLED' || s === 'DIBATALKAN') {
+      toast.error('PO yang sudah diterima atau dibatalkan tidak dapat diedit.');
+      return;
+    }
     setEditForm(JSON.parse(JSON.stringify(purchase)));
     
     let date = new Date();
@@ -224,12 +229,21 @@ export default function PurchaseDetail() {
           >
             <RefreshCw size={16} /> Order Lagi
           </button>
-          <button
-            onClick={handleEditClick}
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"
-          >
-            <Edit size={16} /> Edit
-          </button>
+          {(!purchase.status || (purchase.status !== 'RECEIVED' && purchase.status !== 'DITERIMA' && purchase.status !== 'PARTIALLY_RECEIVED' && purchase.status !== 'CANCELLED' && purchase.status !== 'DIBATALKAN')) ? (
+            <button
+              onClick={handleEditClick}
+              className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all"
+            >
+              <Edit size={16} /> Edit
+            </button>
+          ) : (
+            <span
+              title="PO yang sudah diterima atau dibatalkan tidak dapat diedit langsung"
+              className="bg-gray-100 text-gray-400 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-1.5 cursor-not-allowed select-none opacity-70"
+            >
+              <Lock size={15} /> Edit
+            </span>
+          )}
           <button
             onClick={() => router.push(`/admin/purchases/print/${purchase.id}`)}
             className="bg-black text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md"

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronLeft, Search, Plus, Trash2, Save,
   Package, Store, Truck, Calculator,
-  Info, Camera
+  Info, Camera, AlertTriangle, Lock, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
@@ -27,7 +27,7 @@ interface CartItem {
   purchasePrice: number; 
   quantity: number; 
   unit: string; 
-  conversion: number;
+  conversion: number; 
   availableUnits?: UnitOption[]; 
 }
 
@@ -56,6 +56,16 @@ function EditPurchaseFormContent() {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showScanner, setShowScanner] = useState(false);
+
+  // Status Lock
+  const rawStatus = (oldPurchaseData?.status || '').toUpperCase();
+  const isReceived = rawStatus === 'DITERIMA' || rawStatus === 'RECEIVED' || rawStatus === 'PARTIALLY_RECEIVED';
+  const isCancelled = rawStatus === 'DIBATALKAN' || rawStatus === 'CANCELLED';
+  const hasReceipts = Boolean(
+    oldPurchaseData?.pendingReceipt ||
+    (oldPurchaseData?.receivedQuantitiesBase && Object.values(oldPurchaseData.receivedQuantitiesBase).some((q: any) => Number(q) > 0))
+  );
+  const isLocked = isReceived || isCancelled || hasReceipts;
 
 
   useEffect(() => {
@@ -194,6 +204,14 @@ function EditPurchaseFormContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) {
+      notify.admin.error(
+        isCancelled
+          ? 'PO yang sudah dibatalkan tidak dapat diedit.'
+          : 'PO yang sudah memiliki penerimaan tidak dapat diedit. Silakan batalkan PO untuk mengembalikan stok.'
+      );
+      return;
+    }
     if (cart.length === 0 || !selectedSupplier || !selectedWarehouse) {
       notify.admin.error("Mohon lengkapi data supplier, gudang, dan produk.");
       return;
@@ -307,10 +325,48 @@ function EditPurchaseFormContent() {
         </div>
       </div>
 
+      {/* Lock Banner jika PO sudah diterima atau dibatalkan */}
+      {isLocked && (
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <h2 className="font-bold text-sm text-amber-950 flex items-center gap-2">
+                Purchase Order Terkunci (Status: {oldPurchaseData?.status || 'DITERIMA'})
+              </h2>
+              <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                {isCancelled
+                  ? 'PO ini telah dibatalkan dan tidak dapat diedit lagi.'
+                  : 'Barang pada PO ini sudah memiliki riwayat penerimaan di gudang. Untuk melindungi keakuratan kartu stok dan jurnal modal, rincian produk tidak dapat diubah langsung.'}
+              </p>
+              <p className="text-[11px] text-amber-700 font-medium mt-1">
+                💡 Untuk merevisi barang/harga: silakan <strong>Batalkan PO</strong> di daftar pembelian untuk menarik kembali stok, atau gunakan <strong>Pesan Ulang</strong> untuk membuat PO baru dengan data yang disesuaikan.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <Link
+              href="/admin/purchases"
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-xs font-bold text-gray-700 hover:bg-amber-100 transition-colors text-center"
+            >
+              Kembali ke Daftar PO
+            </Link>
+            <Link
+              href={`/admin/purchases/add?duplicateFrom=${id}`}
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors text-center shadow-sm flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw size={13} /> Pesan Ulang
+            </Link>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         {/* LEFT: FORM INPUT */}
-        <div className="lg:col-span-2 space-y-6">
+        <fieldset disabled={isLocked} className={`lg:col-span-2 space-y-6 ${isLocked ? 'opacity-80 pointer-events-none' : ''}`}>
 
           {/* 1. Supplier & Warehouse */}
           <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -589,7 +645,7 @@ function EditPurchaseFormContent() {
               </div>
             )}
           </div>
-        </div>
+        </fieldset>
 
         {/* RIGHT: SUMMARY & ACTIONS */}
         <div className="space-y-6">
@@ -609,7 +665,8 @@ function EditPurchaseFormContent() {
                   id="shipping-cost"
                   name="shipping-cost"
                   type="number"
-                  className="bg-white/10 w-24 p-2 rounded-lg text-right outline-none focus:bg-white/20 transition-all"
+                  disabled={isLocked}
+                  className="bg-white/10 w-24 p-2 rounded-lg text-right outline-none focus:bg-white/20 transition-all disabled:opacity-50"
                   value={shippingCost}
                   onChange={(e) => setShippingCost(Number(e.target.value))}
                 />
@@ -625,15 +682,17 @@ function EditPurchaseFormContent() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
+                  disabled={isLocked}
                   onClick={() => setPaymentStatus('LUNAS')}
-                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-60 ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
                 >
                   Paid
                 </button>
                 <button
                   type="button"
+                  disabled={isLocked}
                   onClick={() => setPaymentStatus('HUTANG')}
-                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-60 ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
                 >
                   Debt
                 </button>
@@ -642,7 +701,8 @@ function EditPurchaseFormContent() {
               <select
                 id="payment-method"
                 name="payment-method"
-                className="w-full bg-white/5 p-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none"
+                disabled={isLocked}
+                className="w-full bg-white/5 p-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none disabled:opacity-60"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
@@ -657,12 +717,30 @@ function EditPurchaseFormContent() {
               </select>
             </div>
 
-            <button
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              <Save size={18} /> {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </button>
+            {isLocked ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full bg-white/10 text-gray-400 py-4 rounded-2xl text-xs font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 cursor-not-allowed select-none border border-white/10"
+                >
+                  <Lock size={16} /> Terkunci ({isCancelled ? 'Dibatalkan' : 'Sudah Diterima'})
+                </button>
+                <Link
+                  href={`/admin/purchases/add?duplicateFrom=${id}`}
+                  className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl text-xs font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 text-white shadow-lg shadow-blue-900/40 text-center"
+                >
+                  <RefreshCw size={15} /> Pesan Ulang PO Ini
+                </Link>
+              </div>
+            ) : (
+              <button
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                <Save size={18} /> {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            )}
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
@@ -672,7 +750,8 @@ function EditPurchaseFormContent() {
             <textarea
               id="purchase-notes"
               name="purchase-notes"
-              className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none h-32 resize-none"
+              disabled={isLocked}
+              className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none h-32 resize-none disabled:opacity-60"
               placeholder="Tambahkan instruksi pengiriman atau catatan nota..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

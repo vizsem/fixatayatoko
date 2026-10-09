@@ -8,7 +8,7 @@ import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
   ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw,
-  CheckSquare, Square, DollarSign, AlertCircle, Loader2, Camera
+  CheckSquare, Square, DollarSign, AlertCircle, Loader2, Camera, Lock
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
@@ -84,6 +84,14 @@ type POItem = {
   unit?: string;
   availableUnits?: { code: string; contains?: number; price?: number; modal?: number; costPrice?: number }[];
 };
+
+function isPoEditable(po: PO): boolean {
+  const s = (po.status || '').toUpperCase();
+  if (s === 'RECEIVED' || s === 'DITERIMA' || s === 'PARTIALLY_RECEIVED' || s === 'CANCELLED' || s === 'DIBATALKAN') return false;
+  if (po.pendingReceipt) return false;
+  if (po.items?.some(it => (it.receivedQuantityBase || 0) > 0)) return false;
+  return true;
+}
 
 export default function AdminPurchases() {
   const [loading, setLoading] = useState(true);
@@ -1275,13 +1283,35 @@ export default function AdminPurchases() {
               >
                 Pesan Ulang
               </Link>
-              <Link
-                href={`/admin/purchases/edit/${detailModal.id}`}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                Edit PO
-              </Link>
+              {isPoEditable(detailModal) ? (
+                <Link
+                  href={`/admin/purchases/edit/${detailModal.id}`}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+                >
+                  Edit PO
+                </Link>
+              ) : (
+                <span
+                  title={
+                    detailModal.status === 'CANCELLED'
+                      ? 'PO sudah dibatalkan'
+                      : 'PO yang sudah diterima tidak dapat diedit langsung. Silakan batalkan PO atau pesan ulang.'
+                  }
+                  className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-400 text-sm font-bold flex items-center justify-center gap-1.5 cursor-not-allowed select-none opacity-70"
+                >
+                  <Lock size={15} /> Edit PO
+                </span>
+              )}
             </div>
+
+            {!isPoEditable(detailModal) && detailModal.status !== 'CANCELLED' && (
+              <div className="mt-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/60 p-2.5 rounded-xl flex items-start gap-2">
+                <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  PO ini berstatus <strong>{STATUS_LABEL[detailModal.status] || detailModal.status}</strong> dan barang sudah masuk ke gudang. Untuk merevisi, silakan klik <strong>Batalkan PO</strong> (stok otomatis ditarik kembali) lalu buat PO baru atau gunakan <strong>Pesan Ulang</strong>.
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
