@@ -12,9 +12,7 @@ import * as Sentry from '@sentry/nextjs';
 // Components
 import { ExpensesSummary } from '@/components/admin/expenses/ExpensesSummary';
 import { ExpensesTable } from '@/components/admin/expenses/ExpensesTable';
-import { getExpenses } from '@/lib/actions/expense.actions';
-
-import { sbDeleteDoc } from '@/lib/supabase-helpers';
+import { getExpenses, deleteExpense } from '@/lib/actions/expense.actions';
 
 export default function OperationalExpensesPage() {
   const [expenses, setExpenses] = useState<OperationalExpense[]>([]);
@@ -64,7 +62,8 @@ export default function OperationalExpensesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this record?')) return;
     try {
-      await sbDeleteDoc('operational_expenses', id);
+      const res = await deleteExpense(id);
+      if (!res.success) throw new Error(res.error);
       setExpenses(prev => prev.filter(item => item.id !== id));
       notify.success('Expense deleted');
     } catch (error) {

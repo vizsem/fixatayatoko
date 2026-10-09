@@ -68,6 +68,7 @@ export async function createExpense(data: {
   amount: number
   description?: string
   date: Date
+  proofOfPayment?: string
 }) {
   // Menulis pengeluaran memengaruhi laporan keuangan -> perlu peran admin.
   // Ini juga sejalan dengan policy RLS: `operational_expenses` tidak ada di
@@ -80,21 +81,79 @@ export async function createExpense(data: {
       amount: Number(data.amount),
       description: data.description || '',
       date: data.date.toISOString(),
+      proofOfPayment: data.proofOfPayment || null,
       createdAt: new Date().toISOString(),
     };
 
-    await supabaseAdmin.from('operational_expenses').insert({
+    const { error } = await supabaseAdmin.from('operational_expenses').insert({
       id,
       raw_data,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
 
+    if (error) {
+      console.error('Failed to insert expense:', error);
+      return { success: false, error: error.message };
+    }
+
     revalidatePath('/admin/operational-expenses');
     return { success: true, data: { id, ...data } };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create expense:', error);
-    return { success: false, error: 'Gagal menyimpan pengeluaran' };
+    return { success: false, error: error?.message || 'Gagal menyimpan pengeluaran' };
+  }
+}
+
+export async function updateExpense(
+  id: string,
+  data: {
+    category: string
+    amount: number
+    description?: string
+    date: Date
+    proofOfPayment?: string
+  }
+) {
+  await requireAdmin();
+  try {
+    const { data: existing, error: getErr } = await supabaseAdmin
+      .from('operational_expenses')
+      .select('raw_data')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (getErr) throw getErr;
+
+    const existingRaw = (existing?.raw_data || {}) as Record<string, any>;
+    const raw_data = {
+      ...existingRaw,
+      category: data.category,
+      amount: Number(data.amount),
+      description: data.description || '',
+      date: data.date.toISOString(),
+      proofOfPayment: data.proofOfPayment ?? existingRaw.proofOfPayment ?? null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const { error } = await supabaseAdmin
+      .from('operational_expenses')
+      .update({
+        raw_data,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to update expense:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/admin/operational-expenses');
+    return { success: true, data: { id, ...data } };
+  } catch (error: any) {
+    console.error('Failed to update expense:', error);
+    return { success: false, error: error?.message || 'Gagal memperbarui pengeluaran' };
   }
 }
 

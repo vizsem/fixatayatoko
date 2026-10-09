@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
-import { supabase } from '@/lib/supabase';
-
+import { createExpense } from '@/lib/actions/expense.actions';
+import { uploadImageAction } from '@/lib/actions/upload.actions';
 
 export default function AddOperationalExpensePage() {
   const router = useRouter();
@@ -38,41 +38,39 @@ export default function AddOperationalExpensePage() {
 
       // Upload file if exists
       if (file) {
-        const filePath = `operational_expenses_proofs/${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('operational_expenses_proofs')
-          .upload(filePath, file);
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('operational_expenses_proofs')
-            .getPublicUrl(filePath);
-          proofUrl = publicUrl;
-        } else {
-          console.warn('Storage upload warning:', uploadError.message);
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('folder', 'expenses');
+          const uploadRes = await uploadImageAction(fd);
+          if (uploadRes.success && uploadRes.url) {
+            proofUrl = uploadRes.url;
+          } else {
+            console.warn('Storage upload warning:', uploadRes.error);
+          }
+        } catch (uploadErr) {
+          console.warn('File upload exception:', uploadErr);
         }
       }
 
-      // Add document to Supabase
-      const { error: insertError } = await supabase.from('operational_expenses').insert({
+      // Add expense via Server Action
+      const res = await createExpense({
         category,
         amount: Number(amount),
-        date: new Date(date).toISOString(),
+        date: new Date(date),
         description,
-        proofOfPayment: proofUrl || null,
-        recordedBy: (await supabase.auth.getUser()).data.user?.id || 'unknown',
-        createdAt: new Date().toISOString()
+        proofOfPayment: proofUrl || undefined,
       });
 
-      if (insertError) {
-        throw insertError;
+      if (!res.success) {
+        throw new Error(res.error || 'Gagal menyimpan data pengeluaran');
       }
 
       notify.success('Pengeluaran berhasil dicatat');
       router.push('/admin/operational-expenses');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding expense:', error);
-      notify.error('Gagal menyimpan data pengeluaran');
+      notify.error(error?.message || 'Gagal menyimpan data pengeluaran');
     } finally {
       setLoading(false);
     }

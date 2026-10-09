@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
-import { supabase } from '@/lib/supabase';
-
-import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { updateExpense } from '@/lib/actions/expense.actions';
+import { uploadImageAction } from '@/lib/actions/upload.actions';
+import { sbGetDoc } from '@/lib/supabase-helpers';
 
 export default function EditOperationalExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -72,37 +72,43 @@ export default function EditOperationalExpensePage({ params }: { params: Promise
 
     setSaving(true);
     try {
-      let proofUrl = currentProofUrl;
+      let proofUrl = currentProofUrl || '';
 
       // Upload new file if selected
       if (file) {
-        const filePath = `operational_expenses_proofs/${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('operational_expenses_proofs')
-          .upload(filePath, file);
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('operational_expenses_proofs')
-          .getPublicUrl(filePath);
-        proofUrl = publicUrl;
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('folder', 'expenses');
+          const uploadRes = await uploadImageAction(fd);
+          if (uploadRes.success && uploadRes.url) {
+            proofUrl = uploadRes.url;
+          } else {
+            console.warn('Storage upload warning:', uploadRes.error);
+          }
+        } catch (uploadErr) {
+          console.warn('File upload exception:', uploadErr);
+        }
       }
 
-      // Update document
-      await sbUpdateDoc('operational_expenses', id, {
+      // Update document via server action
+      const res = await updateExpense(id, {
         category,
         amount: Number(amount),
-        date: new Date(date).toISOString(),
+        date: new Date(date),
         description,
-        proofOfPayment: proofUrl,
-        updatedAt: new Date().toISOString()
+        proofOfPayment: proofUrl || undefined,
       });
+
+      if (!res.success) {
+        throw new Error(res.error || 'Gagal memperbarui data pengeluaran');
+      }
 
       notify.success('Pengeluaran berhasil diperbarui');
       router.push('/admin/operational-expenses');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating expense:', error);
-      notify.error('Gagal memperbarui data pengeluaran');
+      notify.error(error?.message || 'Gagal memperbarui data pengeluaran');
     } finally {
       setSaving(false);
     }
