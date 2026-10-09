@@ -23,6 +23,51 @@ import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsert
 
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 
+function UnitModalCalculator({
+  contains,
+  baseModal,
+  onBaseModalChange,
+}: {
+  contains: number;
+  baseModal: number;
+  onBaseModalChange: (newBase: number) => void;
+}) {
+  const [valStr, setValStr] = useState(() => (baseModal && contains ? String(Math.round(baseModal * contains)) : ''));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setValStr(baseModal && contains ? String(Math.round(baseModal * contains)) : '');
+    }
+  }, [baseModal, contains, isFocused]);
+
+  return (
+    <input
+      type="number"
+      placeholder="Nominal modal..."
+      className="w-32 bg-amber-50/80 p-2.5 rounded-xl text-xs font-black text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
+      value={valStr}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => {
+        setIsFocused(false);
+        setValStr(baseModal && contains ? String(Math.round(baseModal * contains)) : '');
+      }}
+      onChange={(e) => {
+        const str = e.target.value;
+        setValStr(str);
+        if (str === '') {
+          onBaseModalChange(0);
+        } else {
+          const val = Number(str);
+          if (!isNaN(val) && contains > 0) {
+            onBaseModalChange(Number((val / contains).toFixed(4)));
+          }
+        }
+      }}
+    />
+  );
+}
+
 type ChannelPrices = {
   offline?: number;
   website?: number;
@@ -260,25 +305,53 @@ export default function EditProductPage() {
     return availableModalUnits.find(u => u.code === activeModalUnitCode) || availableModalUnits[0];
   }, [availableModalUnits, activeModalUnitCode]);
 
-  // Nilai modal yang ditampilkan pada input sesuai satuan yang dipilih
-  const displayModalValue = useMemo(() => {
-    if (!formData.Modal) return '';
-    const ratio = activeModalUnitObj?.contains || 1;
-    return ratio > 1 ? Math.round(formData.Modal * ratio) : formData.Modal;
-  }, [formData.Modal, activeModalUnitObj]);
+  const [modalInputStr, setModalInputStr] = useState<string>('');
+  const [isModalInputFocused, setIsModalInputFocused] = useState<boolean>(false);
+
+  // Sync modalInputStr saat tidak sedang fokus mengetik
+  useEffect(() => {
+    if (!isModalInputFocused) {
+      const ratio = activeModalUnitObj?.contains || 1;
+      const currentModal = Number(formData.Modal || 0);
+      if (currentModal > 0) {
+        setModalInputStr(String(Math.round(currentModal * ratio)));
+      } else {
+        setModalInputStr('');
+      }
+    }
+  }, [formData.Modal, activeModalUnitObj, isModalInputFocused]);
 
   const handleModalInputChange = (valStr: string) => {
-    const val = valStr === '' ? 0 : Number(valStr);
+    setModalInputStr(valStr);
     const ratio = activeModalUnitObj?.contains || 1;
-    const baseModal = ratio > 1 ? Math.round(val / ratio) : val;
-    setFormData(prev => ({
-      ...prev,
-      Modal: baseModal,
-      Satuan_Modal: activeModalUnitCode
-    }));
+    if (valStr.trim() === '') {
+      setFormData(prev => ({
+        ...prev,
+        Modal: 0,
+        Satuan_Modal: activeModalUnitCode
+      }));
+      return;
+    }
+    const val = Number(valStr);
+    if (!isNaN(val)) {
+      const baseModal = ratio > 1 ? Number((val / ratio).toFixed(4)) : val;
+      setFormData(prev => ({
+        ...prev,
+        Modal: baseModal,
+        Satuan_Modal: activeModalUnitCode
+      }));
+    }
   };
 
   const handleModalUnitChange = (newCode: string) => {
+    const newObj = availableModalUnits.find(u => u.code === newCode);
+    const ratio = newObj?.contains || 1;
+    const currentModal = Number(formData.Modal || 0);
+    if (currentModal > 0) {
+      setModalInputStr(String(Math.round(currentModal * ratio)));
+    } else {
+      setModalInputStr('');
+    }
     setFormData(prev => ({
       ...prev,
       Satuan_Modal: newCode
@@ -1391,8 +1464,19 @@ export default function EditProductPage() {
                     required 
                     type="number" 
                     className="w-full p-3.5 bg-transparent border-none font-black text-sm outline-none" 
-                    value={displayModalValue}
+                    value={modalInputStr}
                     placeholder="0"
+                    onFocus={() => setIsModalInputFocused(true)}
+                    onBlur={() => {
+                      setIsModalInputFocused(false);
+                      const ratio = activeModalUnitObj?.contains || 1;
+                      const currentModal = Number(formData.Modal || 0);
+                      if (currentModal > 0) {
+                        setModalInputStr(String(Math.round(currentModal * ratio)));
+                      } else {
+                        setModalInputStr('');
+                      }
+                    }}
                     onChange={e => handleModalInputChange(e.target.value)} 
                   />
                   <select 
@@ -1407,7 +1491,7 @@ export default function EditProductPage() {
                 </div>
                 {activeModalUnitObj.contains > 1 ? (
                   <p className="text-[11px] font-bold text-orange-600 ml-1 mt-1">
-                    ≈ Rp {Number(formData.Modal || 0).toLocaleString('id-ID')} / {baseUnitCode} (dibagi isi {activeModalUnitObj.contains})
+                    ≈ Rp {Math.round(Number(formData.Modal || 0)).toLocaleString('id-ID')} / {baseUnitCode} (dibagi isi {activeModalUnitObj.contains})
                   </p>
                 ) : (
                   <p className="text-[11px] font-medium text-slate-400 ml-1 mt-1">
@@ -1818,22 +1902,10 @@ export default function EditProductPage() {
                             <span className="text-xs font-black text-amber-700 uppercase">Modal / {code || 'Satuan'}</span>
                             <span className="text-[10px] font-bold text-slate-400">Total modal 1 {code || 'satuan'}</span>
                           </div>
-                          <input
-                            type="number"
-                            placeholder="Nominal modal..."
-                            className="w-32 bg-amber-50/80 p-2.5 rounded-xl text-xs font-black text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
-                            value={formData.Modal && contains ? Math.round(formData.Modal * contains) : ''}
-                            onChange={(e) => {
-                              const inputValStr = e.target.value;
-                              if (inputValStr === '') {
-                                setFormData(prev => ({ ...prev, Modal: 0 }));
-                                return;
-                              }
-                              const val = Number(inputValStr);
-                              const c = contains && contains > 0 ? contains : 1;
-                              const perPcsModal = Math.round(val / c);
-                              setFormData(prev => ({ ...prev, Modal: perPcsModal }));
-                            }}
+                          <UnitModalCalculator
+                            contains={contains && contains > 0 ? contains : 1}
+                            baseModal={Number(formData.Modal || 0)}
+                            onBaseModalChange={(newBase) => setFormData(prev => ({ ...prev, Modal: newBase }))}
                           />
                         </div>
                       )}
