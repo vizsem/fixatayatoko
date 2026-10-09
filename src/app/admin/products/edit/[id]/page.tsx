@@ -230,6 +230,61 @@ export default function EditProductPage() {
     applyRecommendedEcer(pricingRec.recommendedPrice);
   }, [pricingMode, pricingRec, formData.Ecer, formData.Satuan]);
 
+  // Satuan yang tersedia untuk input Harga Modal (Satuan Utama + Satuan Jual terdaftar)
+  const baseUnitCode = String(formData.Satuan || 'PCS').trim().toUpperCase();
+  const availableModalUnits = useMemo(() => {
+    const list: { code: string; contains: number; label: string }[] = [
+      { code: baseUnitCode, contains: 1, label: `${baseUnitCode} (Utama)` }
+    ];
+    for (const u of units) {
+      const code = String(u.code || '').trim().toUpperCase();
+      if (code && code !== baseUnitCode && !list.some(x => x.code === code)) {
+        const contains = Number(u.contains || 0);
+        list.push({
+          code,
+          contains: contains > 0 ? contains : 1,
+          label: `${code} ${contains > 1 ? `(Isi ${contains} ${baseUnitCode})` : ''}`.trim()
+        });
+      }
+    }
+    return list;
+  }, [baseUnitCode, units]);
+
+  const activeModalUnitCode = useMemo(() => {
+    const cur = String(formData.Satuan_Modal || '').trim().toUpperCase();
+    if (availableModalUnits.some(u => u.code === cur)) return cur;
+    return baseUnitCode;
+  }, [formData.Satuan_Modal, availableModalUnits, baseUnitCode]);
+
+  const activeModalUnitObj = useMemo(() => {
+    return availableModalUnits.find(u => u.code === activeModalUnitCode) || availableModalUnits[0];
+  }, [availableModalUnits, activeModalUnitCode]);
+
+  // Nilai modal yang ditampilkan pada input sesuai satuan yang dipilih
+  const displayModalValue = useMemo(() => {
+    if (!formData.Modal) return '';
+    const ratio = activeModalUnitObj?.contains || 1;
+    return ratio > 1 ? Math.round(formData.Modal * ratio) : formData.Modal;
+  }, [formData.Modal, activeModalUnitObj]);
+
+  const handleModalInputChange = (valStr: string) => {
+    const val = valStr === '' ? 0 : Number(valStr);
+    const ratio = activeModalUnitObj?.contains || 1;
+    const baseModal = ratio > 1 ? Math.round(val / ratio) : val;
+    setFormData(prev => ({
+      ...prev,
+      Modal: baseModal,
+      Satuan_Modal: activeModalUnitCode
+    }));
+  };
+
+  const handleModalUnitChange = (newCode: string) => {
+    setFormData(prev => ({
+      ...prev,
+      Satuan_Modal: newCode
+    }));
+  };
+
   // Fetch Tax Settings from Firebase
   useEffect(() => {
     sbGetDoc('settings', 'system').then(snap => {
@@ -1323,25 +1378,42 @@ export default function EditProductPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Harga Modal / Satuan Utama</label>
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-xs font-black uppercase text-slate-400 block">Harga Modal / Satuan</label>
+                  {activeModalUnitObj.contains > 1 && (
+                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
+                      Isi {activeModalUnitObj.contains} {baseUnitCode}
+                    </span>
+                  )}
+                </div>
                 <div className="flex bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500">
                   <input 
                     required 
                     type="number" 
                     className="w-full p-3.5 bg-transparent border-none font-black text-sm outline-none" 
-                    value={formData.Modal} 
-                    onChange={e => setFormData({ ...formData, Modal: Number(e.target.value) })} 
+                    value={displayModalValue}
+                    placeholder="0"
+                    onChange={e => handleModalInputChange(e.target.value)} 
                   />
                   <select 
-                    className="bg-slate-200 border-none font-bold text-slate-700 px-3 text-xs outline-none"
-                    value={formData.Satuan_Modal || SATUAN_DEFAULT}
-                    onChange={e => setFormData({ ...formData, Satuan_Modal: e.target.value })}
+                    className="bg-slate-200 border-none font-bold text-slate-700 px-3 text-xs outline-none cursor-pointer"
+                    value={activeModalUnitCode}
+                    onChange={e => handleModalUnitChange(e.target.value)}
                   >
-                    {SATUAN_LIST.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
+                    {availableModalUnits.map(s => (
+                      <option key={s.code} value={s.code}>{s.label}</option>
                     ))}
                   </select>
                 </div>
+                {activeModalUnitObj.contains > 1 ? (
+                  <p className="text-[11px] font-bold text-orange-600 ml-1 mt-1">
+                    ≈ Rp {Number(formData.Modal || 0).toLocaleString('id-ID')} / {baseUnitCode} (dibagi isi {activeModalUnitObj.contains})
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-medium text-slate-400 ml-1 mt-1">
+                    Modal dasar per {baseUnitCode}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
