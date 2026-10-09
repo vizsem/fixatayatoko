@@ -97,6 +97,12 @@ export default function AdminMobileNav() {
 
   if (!pathname.startsWith('/admin')) return null;
 
+  // Sembunyikan bottom nav di halaman formulir produk agar tidak menimpa tombol Simpan / Aksi
+  const isFormPage = 
+    pathname.startsWith('/admin/products/add') || 
+    pathname.startsWith('/admin/products/edit');
+  if (isFormPage) return null;
+
   const handleOpenMarketplace = () => {
     triggerHaptic(20);
     setActiveModal('marketplace');
