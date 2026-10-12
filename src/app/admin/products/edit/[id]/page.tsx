@@ -637,6 +637,13 @@ export default function EditProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    if (!form.checkValidity()) {
+      form.querySelector<HTMLElement>(':invalid')?.focus();
+      toast.error('Mohon lengkapi semua kolom wajib sebelum menyimpan.');
+      return;
+    }
+
     setIsSubmitting(true);
     const loadingToast = toast.loading("Menyimpan perubahan...");
 
@@ -963,7 +970,7 @@ export default function EditProductPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form noValidate onSubmit={handleSubmit} className="space-y-6">
 
           {/* BAGIAN 1: IDENTITAS BARANG */}
           <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
@@ -1387,7 +1394,7 @@ export default function EditProductPage() {
                           const code = String(u.code || '').trim().toUpperCase();
                           if (!code) return;
                           const contains = Number(u.contains || (code === baseUnitName ? 1 : 0));
-                          if (contains <= 1 || code === baseUnitName) return;
+                          if (!Number.isFinite(contains) || contains <= 0 || code === baseUnitName) return;
 
                           breakdownList.push({
                             code,
@@ -1405,24 +1412,27 @@ export default function EditProductPage() {
                               Rincian Avg Modal Per Satuan:
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {breakdownList.map((ub) => (
-                                <div
-                                  key={ub.code}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 border border-emerald-300/80 rounded-xl text-xs font-black text-emerald-950 shadow-2xs"
-                                >
-                                  <span className="text-emerald-700 font-extrabold">
-                                    1 {ub.code} ({ub.contains} {formData.Satuan || 'Pcs'}):
-                                  </span>
-                                  <span className="text-emerald-900 font-black">
-                                    Rp {ub.avgCost.toLocaleString('id-ID')}
-                                  </span>
-                                  {ub.latestPrice > 0 && ub.latestPrice !== ub.avgCost && (
-                                    <span className="text-[10px] text-slate-500 font-medium">
-                                      (PO Terakhir: Rp {ub.latestPrice.toLocaleString('id-ID')})
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                              {breakdownList.map((ub) => {
+                                const perBaseUnit = Math.round(ub.avgCost / ub.contains);
+                                return (
+                                  <div
+                                    key={ub.code}
+                                    className="min-w-[170px] rounded-xl border border-emerald-300/80 bg-white/90 px-3 py-2 shadow-2xs"
+                                  >
+                                    <div className="text-[11px] font-black text-slate-500 pt-2 border-t border-slate-200">
+                                      {ub.code} - Rp {ub.avgCost.toLocaleString('id-ID')}
+                                      <span className="text-[10px] font-bold text-slate-400 block">
+                                        Isi {ub.contains} {baseUnitName} ( Rp {perBaseUnit.toLocaleString('id-ID')} /{baseUnitName} )
+                                      </span>
+                                    </div>
+                                    {ub.latestPrice > 0 && ub.latestPrice !== ub.avgCost && (
+                                      <div className="mt-1 text-[10px] text-slate-500 font-medium">
+                                        PO Terakhir: Rp {ub.latestPrice.toLocaleString('id-ID')}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

@@ -1123,6 +1123,13 @@ export default function PricingHPPPage() {
                         const isSelected = selectedIds.has(p.id);
                         const priceReview = priceReviewByProduct.get(p.id) || [];
                         const reviewByUnit = new Map(priceReview.map((finding) => [finding.unitCode, finding]));
+                        const otherUnitCosts = p.units
+                          .filter((unit) =>
+                            unit.code !== p.unit &&
+                            Number.isFinite(unit.contains) &&
+                            unit.contains > 1
+                          )
+                          .sort((a, b) => a.contains - b.contains);
 
                         return (
                           <tr
@@ -1218,6 +1225,16 @@ export default function PricingHPPPage() {
                             {/* Modal HPP Aktif & Lock Status */}
                             <td className="py-4 px-4 text-right">
                               <p className="font-black text-slate-900 text-sm">Rp {p.costPrice.toLocaleString('id-ID')}</p>
+                              {otherUnitCosts.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                  {otherUnitCosts.map((unit) => (
+                                    <p key={unit.code} className="text-[10px] font-bold text-slate-500">
+                                      {unit.code} (isi {unit.contains} {p.unit}): Rp{' '}
+                                      {(p.costPrice * unit.contains).toLocaleString('id-ID')}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                               <div className="flex items-center justify-end gap-1 mt-0.5">
                                 {p.isHppLocked ? (
                                   <span

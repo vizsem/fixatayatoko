@@ -21,8 +21,6 @@ interface CartTableProps {
   onRemove: (id: string) => void;
 }
 
-const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];
-
 export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdateUnit, onRemove }: CartTableProps) => {
   if (cart.length === 0) {
     return (
@@ -41,7 +39,7 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
               <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Produk & Satuan</th>
               <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest">Harga / Satuan</th>
               <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
-              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Setara PCS</th>
+              <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Setara Satuan Dasar</th>
               <th className="px-4 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Subtotal</th>
               <th className="px-4 py-2.5"></th>
             </tr>
@@ -49,24 +47,27 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
           <tbody className="divide-y divide-gray-50">
             {cart.map((item) => {
               const currentUnitCode = item.unit?.toUpperCase() || '';
-              const isCtnSelected = CTN_ALIASES.includes(currentUnitCode);
-
-              // Find the CTN unit definition (for conversion)
-              const ctnUnit = item.units?.find((u: any) =>
-                CTN_ALIASES.includes(u.code?.toUpperCase())
+              const selectedUnit = item.units?.find((u: any) =>
+                u.code?.toUpperCase() === currentUnitCode
               );
-              const containsPerUnit = isCtnSelected && ctnUnit
-                ? Number(ctnUnit.contains || 1)
-                : 1;
 
-              // Total base-PCS this order line represents
-              const totalPcs = item.quantity * containsPerUnit;
+              // Conversion is defined by the product's configured unit, whatever its code.
+              const configuredContains = Number(selectedUnit?.contains || 1);
+              const containsPerUnit = Number.isFinite(configuredContains) && configuredContains > 0
+                ? configuredContains
+                : 1;
+              const baseUnitCode = item.units?.find((u: any) =>
+                Number(u.contains || 0) === 1
+              )?.code?.toUpperCase() || 'PCS';
+
+              // Total base units this order line represents
+              const totalBaseUnits = item.quantity * containsPerUnit;
 
               // Stock in selected unit
-              const stockInUnit = isCtnSelected && containsPerUnit > 1
+              const stockInUnit = containsPerUnit > 1
                 ? Math.floor(item.stock / containsPerUnit)
                 : item.stock;
-              const stockIsLow = item.stock <= 0 || (isCtnSelected && stockInUnit <= 0);
+              const stockIsLow = item.stock <= 0 || stockInUnit <= 0;
 
               // All available unit options for this product
               const unitOptions: { code: string; label: string; price?: number }[] = [];
@@ -101,16 +102,16 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                       <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg ${
                         stockIsLow ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'
                       }`}>
-                        Stok: {stockInUnit} {isCtnSelected ? item.unit : 'pcs'}
-                        {isCtnSelected && containsPerUnit > 1 && (
-                          <span className="font-normal text-blue-400"> ({item.stock} pcs)</span>
+                        Stok: {stockInUnit} {containsPerUnit > 1 ? currentUnitCode : baseUnitCode}
+                        {containsPerUnit > 1 && (
+                          <span className="font-normal text-blue-400"> ({item.stock} {baseUnitCode})</span>
                         )}
                       </span>
 
                       {/* Conversion info */}
-                      {ctnUnit && containsPerUnit > 1 && (
+                      {selectedUnit && containsPerUnit > 1 && (
                         <span className="text-[10px] font-semibold text-gray-300 uppercase">
-                          1 {ctnUnit.code?.toUpperCase()} = {containsPerUnit} pcs
+                          1 {currentUnitCode} = {containsPerUnit} {baseUnitCode}
                         </span>
                       )}
                     </div>
@@ -166,8 +167,8 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
                   <td className="px-4 py-3 text-center">
                     {containsPerUnit > 1 ? (
                       <div>
-                        <span className="text-xs font-black text-indigo-600">{totalPcs}</span>
-                        <div className="text-[10px] text-gray-400">pcs</div>
+                        <span className="text-xs font-black text-indigo-600">{totalBaseUnits}</span>
+                        <div className="text-[10px] text-gray-400">{baseUnitCode}</div>
                       </div>
                     ) : (
                       <span className="text-xs font-black text-gray-300">—</span>
