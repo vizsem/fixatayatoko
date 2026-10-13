@@ -336,23 +336,38 @@ export const addStock = async (params: {
     if (fetchErr || !product) throw new Error(`Produk tidak ditemukan: ${productId}`);
 
     const raw = product.raw_data || {};
-    const currentStock = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
+    // ── [Guard 1] Sanitasi stok negatif (data korup) ──────────────────────────
+    // Stok negatif merusak rumus WAC karena menghasilkan pembagi negatif/nol.
+    // Contoh: currentStock=-5, incomingQty=10 → AVG=(−5×lama+10×baru)/5 ← salah.
+    // Kita clamp ke 0 agar WAC reset ke harga PO terbaru (perilaku benar saat stok habis).
+    const currentStockRaw = Number(product.stock ?? raw.stock ?? raw.Stok ?? 0);
+    const currentStock = Math.max(0, currentStockRaw); // clamp negatif → 0
     const currentCost = Number(product.cost_price ?? raw.Modal ?? 0);
-    const newStock = currentStock + amount;
+    const newStock = currentStockRaw + amount; // gunakan nilai asli untuk stok akhir
 
-    const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStock }) };
+    const stockByWarehouse = { ...(raw.stockByWarehouse || { 'gudang-utama': currentStockRaw }) };
     const curWhStock = Number(stockByWarehouse[warehouseId] ?? 0);
     stockByWarehouse[warehouseId] = curWhStock + amount;
 
-    // Kalkulasi AVG Modal (Moving Average Cost) jika incomingPrice tersedia
+    // ── [Guard 2] Cek apakah HPP produk dikunci manual oleh admin (isHppLocked) ──
+    // Jika dikunci, WAC TIDAK boleh menimpa cost_price.
+    // Contoh berbahaya: admin set HPP=5000 manual (locked), PO masuk harga beli=3000
+    //   → tanpa guard: HPP berubah ke ~4000 (avg), merusak kalkulasi margin admin.
+    // Stok dan FIFO layers tetap diperbarui normal.
+    const isHppLocked = Boolean(raw.isHppLocked);
+
+    // ── [Guard 3] Kalkulasi AVG Modal (WAC) hanya jika harga masuk valid & HPP tidak dikunci ──
+    // incomingPrice=0 atau undefined jangan dipakai untuk reset HPP (Guard 3).
     let newCostPrice = currentCost;
-    if (incomingPrice !== undefined && incomingPrice >= 0) {
+    const hasValidIncomingPrice = incomingPrice !== undefined && incomingPrice > 0;
+    if (hasValidIncomingPrice && !isHppLocked) {
       newCostPrice = computeAverageCost(currentStock, currentCost, amount, incomingPrice, 1);
     }
 
     // Sinkronkan modal/HPP ke seluruh unit (Satuan Lainnya) jika ada
+    // Jika HPP dikunci, unit prices juga tidak disentuh.
     let updatedUnits = raw.units;
-    if (Array.isArray(updatedUnits)) {
+    if (Array.isArray(updatedUnits) && !isHppLocked) {
       updatedUnits = updatedUnits.map((u: any) => {
         const contains = Number(u.contains || (u.code === (raw.Satuan || raw.unit || 'PCS') ? 1 : 1));
         return {
@@ -366,8 +381,9 @@ export const addStock = async (params: {
     const now = new Date().toISOString();
 
     // ── FIFO: catat batch masuk sebagai lapisan persediaan ──
-    const layerCostPerPcs =
-      incomingPrice !== undefined && incomingPrice >= 0 ? incomingPrice : newCostPrice;
+    // Layer selalu dicatat dengan harga beli aktual (bukan HPP avg),
+    // agar COGS per-batch tetap akurat meskipun HPP dikunci.
+    const layerCostPerPcs = hasValidIncomingPrice ? incomingPrice : newCostPrice;
     const existingLayers: InventoryLayer[] = (Array.isArray(raw.inventoryLayers)
       ? raw.inventoryLayers
       : []
@@ -392,7 +408,7 @@ export const addStock = async (params: {
       ...raw,
       stock: newStock,
       stockByWarehouse,
-      Modal: newCostPrice,
+      Modal: newCostPrice,          // tetap currentCost jika locked
       units: updatedUnits,
       inventoryLayers,
       updatedAt: now,
@@ -402,6 +418,7 @@ export const addStock = async (params: {
       .from('products')
       .update({
         stock: newStock,
+        // Jika HPP dikunci: cost_price TIDAK diubah (kirim nilai lama)
         cost_price: newCostPrice,
         raw_data: updatedRaw,
         updated_at: now,
