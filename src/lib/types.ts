@@ -313,14 +313,29 @@ export interface ProductItem {
     unit?: string;
 }
 
+export interface PurchasePaymentRecord {
+    id: string;
+    date: string;
+    amount: number;
+    paymentMethod: string;
+    referenceNo?: string;
+    notes?: string;
+    recordedBy?: string;
+    recordedAt?: string;
+}
+
 export interface Purchase {
     id: string;
     supplierName: string;
     supplierId?: string;
     total: number;
     paidAmount?: number;
-    status: 'MENUNGGU' | 'DITERIMA' | 'DIBATALKAN';
-    paymentStatus: 'LUNAS' | 'HUTANG';
+    remainingAmount?: number;
+    status: 'MENUNGGU' | 'DITERIMA' | 'DIBATALKAN' | string;
+    paymentStatus: 'LUNAS' | 'HUTANG' | 'SEBAGIAN' | 'PARTIAL' | string;
+    paymentMethod?: string;
+    paymentHistory?: PurchasePaymentRecord[];
+    dueDate?: string | null;
     items: ProductItem[];
     warehouseId?: string;
     warehouseName?: string;

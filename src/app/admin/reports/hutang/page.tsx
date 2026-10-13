@@ -348,7 +348,11 @@ export default function HutangReportPage() {
                                   <AlertTriangle size={10} /> JATUH TEMPO
                                 </span>
                               )}
-                              {!d.isOverdue && (
+                              {(d.paymentStatus === 'SEBAGIAN' || d.paymentStatus === 'PARTIAL' || ((d.paidAmount || 0) > 0 && (d.paidAmount || 0) < d.totalAmount)) ? (
+                                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">
+                                  SEBAGIAN
+                                </span>
+                              ) : !d.isOverdue && (
                                 <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">
                                   BELUM LUNAS
                                 </span>
@@ -372,10 +376,15 @@ export default function HutangReportPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col items-end gap-1">
                             <span className="text-base font-black text-gray-900">
-                              {fmtCurrency(d.totalAmount)}
+                              {fmtCurrency(d.remainingAmount ?? d.totalAmount)}
                             </span>
+                            {d.paidAmount && d.paidAmount > 0 ? (
+                              <span className="text-[11px] text-gray-400">
+                                Total: {fmtCurrency(d.totalAmount)} (Terbayar: {fmtCurrency(d.paidAmount)})
+                              </span>
+                            ) : null}
                             <div className="flex gap-2">
                               <Link
                                 href={`/admin/purchases`}
@@ -497,8 +506,13 @@ export default function HutangReportPage() {
             </div>
 
             <div className="bg-red-50 rounded-2xl p-4 mb-5">
-              <p className="text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Total yang akan dibayar</p>
-              <p className="text-2xl font-black text-red-700">{fmtCurrency(payModal.totalAmount)}</p>
+              <p className="text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Sisa Hutang Yang Akan Dilunasi</p>
+              <p className="text-2xl font-black text-red-700">{fmtCurrency(payModal.remainingAmount ?? payModal.totalAmount)}</p>
+              {payModal.paidAmount && payModal.paidAmount > 0 ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  Total PO: {fmtCurrency(payModal.totalAmount)} • Sudah Terbayar: {fmtCurrency(payModal.paidAmount)}
+                </p>
+              ) : null}
               {payModal.dueDate && (
                 <p className={`text-xs mt-1 font-semibold ${payModal.isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
                   Jatuh Tempo: {fmtDate(payModal.dueDate)}

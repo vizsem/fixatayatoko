@@ -90,6 +90,8 @@ export type POUntukRekonsiliasi = {
   paymentMethod: string;
   /** Nominal PO. */
   total: number;
+  /** Nominal yang sudah dibayar (bila ada). */
+  paidAmount?: number;
 };
 
 /** Baris hasil perbandingan yang ditampilkan ke pengguna. */
@@ -110,9 +112,16 @@ export type BarisRekonsiliasi = {
 /** Uang yang seharusnya sudah keluar untuk sebuah PO. */
 export function kebutuhanModalPO(po: {
   total: number;
+  paidAmount?: number | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
 }): number {
+  const status = String(po.paymentStatus ?? '').trim().toUpperCase();
+  if (status === 'HUTANG' || status === 'BELUM_LUNAS') return 0;
+  if (status === 'SEBAGIAN' || status === 'PARTIAL') {
+    const paid = Number(po.paidAmount ?? 0);
+    return Number.isFinite(paid) && paid > 0 ? paid : 0;
+  }
   if (!pembayaranKeluarUang(po.paymentStatus, po.paymentMethod)) return 0;
   const total = Number(po.total);
   return Number.isFinite(total) && total > 0 ? total : 0;
@@ -233,6 +242,8 @@ export function petakanPOUntukRekonsiliasi(
   const raw = (row?.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {}) as Record<string, any>;
   const total = Number(row?.total ?? raw.total ?? raw.totalAmount ?? 0);
   const id = String(row?.id ?? '');
+  const rawPaid = raw.paidAmount ?? (raw.paymentStatus === 'LUNAS' ? total : 0);
+  const paidAmount = Number(rawPaid);
 
   return {
     id,
@@ -244,6 +255,7 @@ export function petakanPOUntukRekonsiliasi(
     paymentStatus: String(raw.paymentStatus || 'LUNAS').toUpperCase(),
     paymentMethod: String(raw.paymentMethod || 'CASH').toUpperCase(),
     total: Number.isFinite(total) ? total : 0,
+    paidAmount: Number.isFinite(paidAmount) ? paidAmount : 0,
   };
 }
 

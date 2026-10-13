@@ -97,6 +97,30 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
       const status = normalizeStatus(raw.status || p.status);
       const poNumber = raw.poNumber || raw.invoiceNumber || raw.invoiceNo || `PO-${p.id.slice(0, 8).toUpperCase()}`;
       const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0);
+      let paymentStatus = String(raw.paymentStatus || p.payment_status || 'LUNAS').toUpperCase();
+      const paymentHistory = Array.isArray(raw.paymentHistory) ? raw.paymentHistory : [];
+
+      let paidAmount = 0;
+      if (raw.paidAmount !== undefined && raw.paidAmount !== null) {
+        paidAmount = Number(raw.paidAmount);
+      } else if (paymentHistory.length > 0) {
+        paidAmount = paymentHistory.reduce((sum: number, h: any) => sum + Number(h.amount || 0), 0);
+      } else if (paymentStatus === 'LUNAS') {
+        paidAmount = totalAmount;
+      } else {
+        paidAmount = 0;
+      }
+
+      if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
+      const remainingAmount = Math.max(0, totalAmount - paidAmount);
+
+      if (totalAmount > 0) {
+        if (paidAmount >= totalAmount) {
+          paymentStatus = 'LUNAS';
+        } else if (paidAmount > 0) {
+          paymentStatus = 'SEBAGIAN';
+        }
+      }
 
       return {
         id: p.id,
@@ -105,10 +129,13 @@ export async function getPurchaseOrders(filters?: { status?: string; supplierId?
         warehouseId: raw.warehouseId || null,
         warehouseName: raw.warehouseName || null,
         totalAmount,
+        paidAmount,
+        remainingAmount,
         notes: raw.notes || null,
         createdAt: parseDate(raw.createdAt || p.created_at),
-        paymentStatus: raw.paymentStatus || p.payment_status || 'LUNAS',
+        paymentStatus,
         paymentMethod: raw.paymentMethod || p.payment_method || 'CASH',
+        paymentHistory,
         dueDate: raw.dueDate || null,
         supplier: {
           name: raw.supplierName || 'Supplier Umum'
@@ -158,20 +185,58 @@ export async function getPurchaseOrderById(id: string) {
       };
     });
 
+    const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0);
+    let paymentStatus = String(raw.paymentStatus || p.payment_status || 'LUNAS').toUpperCase();
+    const paymentHistory = Array.isArray(raw.paymentHistory) ? raw.paymentHistory : [];
+
+    let paidAmount = 0;
+    if (raw.paidAmount !== undefined && raw.paidAmount !== null) {
+      paidAmount = Number(raw.paidAmount);
+    } else if (paymentHistory.length > 0) {
+      paidAmount = paymentHistory.reduce((sum: number, h: any) => sum + Number(h.amount || 0), 0);
+    } else if (paymentStatus === 'LUNAS') {
+      paidAmount = totalAmount;
+    } else {
+      paidAmount = 0;
+    }
+
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
+    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+
+    if (totalAmount > 0) {
+      if (paidAmount >= totalAmount) {
+        paymentStatus = 'LUNAS';
+      } else if (paidAmount > 0) {
+        paymentStatus = 'SEBAGIAN';
+      }
+    }
+
     return {
       id: p.id,
       poNumber: raw.poNumber || raw.invoiceNumber || `PO-${p.id.slice(0, 8).toUpperCase()}`,
       status: normalizeStatus(raw.status || p.status),
       warehouseId: raw.warehouseId || 'gudang-utama',
       warehouseName: raw.warehouseName || 'Gudang Utama',
-      totalAmount: Number(p.total ?? raw.total ?? raw.totalAmount ?? 0),
+      totalAmount,
+      paidAmount,
+      remainingAmount,
+      paymentStatus,
+      paymentMethod: raw.paymentMethod || p.payment_method || 'CASH',
+      paymentHistory,
+      dueDate: raw.dueDate || null,
       notes: raw.notes || null,
       createdAt: parseDate(raw.createdAt || p.created_at),
       supplier: {
         name: raw.supplierName || 'Supplier Umum'
       },
       items,
-      raw_data: raw,
+      raw_data: {
+        ...raw,
+        paidAmount,
+        remainingAmount,
+        paymentStatus,
+        paymentHistory,
+      },
     };
   } catch {
     return null;
@@ -187,8 +252,10 @@ export async function createPurchaseOrder(data: {
   warehouseId?: string
   batchNumber?: string
   expiryDate?: string
-  paymentStatus?: 'LUNAS' | 'HUTANG' | string
+  paymentStatus?: 'LUNAS' | 'HUTANG' | 'SEBAGIAN' | string
   paymentMethod?: string
+  paidAmount?: number
+  paymentNotes?: string
   dueDate?: string
 }): Promise<PurchaseActionResult> {
   await requireAdmin();
@@ -197,8 +264,32 @@ export async function createPurchaseOrder(data: {
     const poNumber = `PO-${Date.now()}`;
     const id = `po_${Date.now()}`;
     const targetWarehouse = data.warehouseId || 'gudang-utama';
-    const paymentStatus = data.paymentStatus || 'LUNAS';
+    let paymentStatus = String(data.paymentStatus || 'LUNAS').toUpperCase();
     const paymentMethod = data.paymentMethod || 'CASH';
+
+    let paidAmount = 0;
+    if (paymentStatus === 'SEBAGIAN' || (data.paidAmount !== undefined && data.paidAmount > 0 && data.paidAmount < totalAmount)) {
+      paidAmount = Math.min(totalAmount, Math.max(0, Number(data.paidAmount || 0)));
+      paymentStatus = paidAmount >= totalAmount ? 'LUNAS' : (paidAmount > 0 ? 'SEBAGIAN' : 'HUTANG');
+    } else if (paymentStatus === 'HUTANG') {
+      paidAmount = 0;
+    } else {
+      paidAmount = totalAmount;
+      paymentStatus = 'LUNAS';
+    }
+
+    const remainingAmount = Math.max(0, totalAmount - paidAmount);
+    const paymentHistory = paidAmount > 0 ? [
+      {
+        id: randomUUID(),
+        date: new Date().toISOString(),
+        amount: paidAmount,
+        paymentMethod,
+        notes: data.paymentNotes || (paymentStatus === 'LUNAS' ? 'Pembayaran Lunas Saat PO Dibuat' : 'Uang Muka (DP) Saat PO Dibuat'),
+        recordedBy: data.createdById || 'Admin',
+        recordedAt: new Date().toISOString(),
+      }
+    ] : [];
 
     // Cari supplier name
     let supplierName = 'Supplier';
@@ -256,6 +347,9 @@ export async function createPurchaseOrder(data: {
       status,
       paymentStatus,
       paymentMethod,
+      paidAmount,
+      remainingAmount,
+      paymentHistory,
       dueDate: data.dueDate || undefined,
       total: totalAmount,
       subtotal: totalAmount,
@@ -288,6 +382,7 @@ export async function createPurchaseOrder(data: {
     const peringatanModal = await catatMutasiModalPO({
       poId: id,
       total: totalAmount,
+      paidAmount,
       paymentStatus,
       paymentMethod,
       label: supplierName,
@@ -1024,14 +1119,16 @@ export async function getPurchasePriceHistory(
 }
 
 /**
- * Lunasi tagihan hutang PO (Pembayaran Hutang Tempo).
- * Mengubah paymentStatus menjadi 'LUNAS', memperbarui metode pembayaran,
- * dan mencatat pengeluaran modal di buku besar kas/modal secara otomatis.
+ * Lunasi atau bayar sebagian tagihan hutang PO (Pembayaran Hutang Tempo / Cicilan).
+ * Jika `amount` tidak disertakan atau melebihi sisa hutang, akan melunasi seluruh sisa tagihan.
+ * Jika `amount` kurang dari sisa tagihan, status menjadi 'SEBAGIAN'.
+ * Mencatat pengeluaran modal di buku besar kas/modal secara otomatis sesuai nominal yang dibayar.
  */
 export async function payPurchaseDebt(
   id: string,
   paymentMethod: string = 'CASH',
-  notes?: string
+  notes?: string,
+  amount?: number
 ): Promise<PurchaseActionResult> {
   try {
     await requireStaff();
@@ -1044,22 +1141,51 @@ export async function payPurchaseDebt(
     if (fetchErr || !p) return { success: false, error: 'Purchase Order tidak ditemukan' };
 
     const raw = p.raw_data || {};
-    const currentStatus = raw.paymentStatus || p.payment_status || 'LUNAS';
-    if (currentStatus === 'LUNAS') {
+    const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0);
+    const existingPaid = Number(raw.paidAmount ?? (raw.paymentStatus === 'LUNAS' ? totalAmount : 0));
+    const currentRemaining = Math.max(0, totalAmount - existingPaid);
+
+    if (currentRemaining <= 0 || raw.paymentStatus === 'LUNAS') {
       return { success: false, error: 'Tagihan PO ini sudah berstatus LUNAS' };
     }
 
-    const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0);
+    // Tentukan nominal pembayaran kali ini
+    const payAmount = (typeof amount === 'number' && amount > 0)
+      ? Math.min(amount, currentRemaining)
+      : currentRemaining;
+
+    const newPaidAmount = existingPaid + payAmount;
+    const isLunas = newPaidAmount >= totalAmount;
+    const newStatus = isLunas ? 'LUNAS' : 'SEBAGIAN';
     const supplierName = raw.supplierName || raw.supplier?.name || 'Supplier';
+
+    const paymentEntry = {
+      id: randomUUID(),
+      date: new Date().toISOString(),
+      amount: payAmount,
+      paymentMethod: paymentMethod || 'CASH',
+      notes: notes || (isLunas ? 'Pelunasan Hutang' : 'Pembayaran Sebagian / Cicilan'),
+      recordedAt: new Date().toISOString(),
+    };
+
+    const existingHistory = Array.isArray(raw.paymentHistory) ? raw.paymentHistory : [];
+    const paymentHistory = [...existingHistory, paymentEntry];
+
+    const notePrefix = isLunas ? '[Pelunasan]' : '[Cicilan]';
+    const paymentNoteText = notes
+      ? `${notePrefix} Rp ${payAmount.toLocaleString('id-ID')} (${notes})`
+      : `${notePrefix} Rp ${payAmount.toLocaleString('id-ID')}`;
 
     const updatedRaw = {
       ...raw,
-      paymentStatus: 'LUNAS',
+      paymentStatus: newStatus,
+      paidAmount: newPaidAmount,
+      remainingAmount: Math.max(0, totalAmount - newPaidAmount),
+      paymentHistory,
       paymentMethod: paymentMethod || raw.paymentMethod || 'CASH',
-      paidAt: new Date().toISOString(),
-      notes: notes
-        ? (raw.notes ? `${raw.notes}\n[Pelunasan]: ${notes}` : `[Pelunasan]: ${notes}`)
-        : raw.notes,
+      paidAt: isLunas ? new Date().toISOString() : raw.paidAt,
+      lastPaymentAt: new Date().toISOString(),
+      notes: raw.notes ? `${raw.notes}\n${paymentNoteText}` : paymentNoteText,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1067,19 +1193,26 @@ export async function payPurchaseDebt(
       .from('purchases')
       .update({
         raw_data: updatedRaw,
+        payment_status: newStatus,
+        payment_method: paymentMethod || raw.paymentMethod || 'CASH',
         updated_at: new Date().toISOString()
       })
       .eq('id', id);
 
     if (updateErr) throw updateErr;
 
-    // Catat mutasi modal pengeluaran pelunasan hutang
+    // Catat mutasi modal pengeluaran pelunasan / cicilan hutang
+    const labelMutasi = isLunas
+      ? `Pelunasan Hutang PO ${raw.poNumber || id.slice(0, 8)} - ${supplierName}`
+      : `Cicilan Hutang PO ${raw.poNumber || id.slice(0, 8)} - ${supplierName} (Rp ${payAmount.toLocaleString('id-ID')})`;
+
     const peringatanModal = await catatMutasiModalPO({
       poId: id,
       total: totalAmount,
-      paymentStatus: 'LUNAS',
+      paidAmount: newPaidAmount,
+      paymentStatus: newStatus,
       paymentMethod: paymentMethod || 'CASH',
-      label: `Pelunasan Hutang PO ${raw.poNumber || id.slice(0, 8)} - ${supplierName}`,
+      label: labelMutasi,
       itemCount: (raw.items || []).length,
     });
 
@@ -1094,7 +1227,7 @@ export async function payPurchaseDebt(
     return { success: true, data: { id, ...updatedRaw } };
   } catch (error: any) {
     console.error('Failed to pay purchase debt:', error);
-    return { success: false, error: error?.message || 'Gagal melunasi hutang PO' };
+    return { success: false, error: error?.message || 'Gagal memproses pembayaran PO' };
   }
 }
 

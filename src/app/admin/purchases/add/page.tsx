@@ -52,6 +52,8 @@ function AddPurchaseFormContent() {
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('LUNAS');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [dpAmount, setDpAmount] = useState<number>(0);
+  const [dueDate, setDueDate] = useState<string>('');
   const [shippingCost, setShippingCost] = useState(0);
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -402,7 +404,17 @@ function AddPurchaseFormContent() {
       // pembelian tunai SELALU ditolak "Saldo Modal Tidak Cukup" walaupun halaman
       // Modal menunjukkan saldo besar. Pembacaan di browser juga bergantung pada
       // sesi, jadi bisa gagal tanpa pesan error apa pun.
-      if (paymentStatus === 'LUNAS' && paymentMethod === 'CASH') {
+      if (paymentStatus === 'SEBAGIAN') {
+        if (!dpAmount || dpAmount <= 0) {
+          throw new Error('Masukkan nominal DP yang valid untuk pembayaran sebagian.');
+        }
+        if (dpAmount >= total) {
+          throw new Error('Nominal DP tidak boleh sama dengan atau melebihi total pesanan. Pilih status Lunas jika dibayar penuh.');
+        }
+      }
+
+      const uangKeluarSaatBuat = paymentStatus === 'LUNAS' ? total : (paymentStatus === 'SEBAGIAN' ? dpAmount : 0);
+      if (uangKeluarSaatBuat > 0 && paymentMethod === 'CASH') {
         const saldoRes = await getCapitalBalance();
         if (!saldoRes.success) {
           throw new Error(`Gagal memeriksa saldo modal: ${saldoRes.error}`);
@@ -411,41 +423,32 @@ function AddPurchaseFormContent() {
         const currentCapital = saldoRes.data.balance;
         setCapitalBalance(currentCapital);
 
-        if (total > currentCapital) {
-          const kurang = total - currentCapital;
+        if (uangKeluarSaatBuat > currentCapital) {
+          const kurang = uangKeluarSaatBuat - currentCapital;
           throw new Error(
             `Saldo modal tidak cukup. Tersedia Rp${currentCapital.toLocaleString('id-ID')}, ` +
-              `butuh Rp${total.toLocaleString('id-ID')} (kurang Rp${kurang.toLocaleString('id-ID')}). ` +
-              `Pilih pembayaran HUTANG/TEMPO, atau tambah modal di halaman Modal.`
+              `butuh Rp${uangKeluarSaatBuat.toLocaleString('id-ID')} (kurang Rp${kurang.toLocaleString('id-ID')}). ` +
+              `Kurangi nominal DP, pilih pembayaran HUTANG/TEMPO, atau tambah modal di halaman Modal.`
           );
         }
       }
 
       // 1. Simpan ke Supabase (Primary Database) & langsung tambahkan stok ke Gudang & Inventory Log
-      //
-      // Seluruh penulisan data (baris PO, stok, log inventory, DAN mutasi modal)
-      // terjadi di dalam Server Action ini. Dulu ada blok `writeBatch` di sini
-      // yang mencoba menyalin PO + menarik modal dari peramban; blok itu menulis
-      // baris `purchases` KEDUA (duplikat) dan SELALU gagal dengan senyap
-      // (try/catch hanya `console.warn`), sehingga pembelian tunai tidak pernah
-      // mengurangi saldo modal. Sudah dihapus — jangan dikembalikan.
       const purchaseRes = await createPurchaseOrder({
         supplierId: selectedSupplier,
         createdById: 'admin',
         warehouseId: selectedWarehouse,
         notes: notes || undefined,
-        autoReceive: false, // Stok masuk hanya setelah barang benar-benar diterima.
-        // WAJIB dikirim: tanpa dua field ini `createPurchaseOrder` memakai
-        // default LUNAS + CASH, sehingga PO yang dibayar transfer atau tempo
-        // tetap tercatat lunas tunai — kas berkurang dan hutang supplier tidak
-        // pernah muncul. Nilainya juga dipakai untuk cek saldo modal di atas.
+        autoReceive: false,
         paymentStatus,
         paymentMethod,
+        paidAmount: uangKeluarSaatBuat,
+        dueDate: dueDate || undefined,
         items: cart.map(item => ({
           productId: item.id,
-          quantity: item.quantity,          // qty asli (misal 1 Dus) — backend yang konversi
-          unitPrice: item.purchasePrice,    // harga beli per satuan (misal 83000/Dus) — backend yang konversi
-          unit: item.unit,                  // satuan beli (Dus, Karton, dll)
+          quantity: item.quantity,
+          unitPrice: item.purchasePrice,
+          unit: item.unit,
         })),
       });
 
@@ -835,49 +838,118 @@ function AddPurchaseFormContent() {
             )}
 
             {capitalBalance !== null &&
-              paymentStatus === 'LUNAS' &&
-              paymentMethod === 'CASH' &&
-              total > capitalBalance && (
+              ((paymentStatus === 'LUNAS' && total > capitalBalance) ||
+               (paymentStatus === 'SEBAGIAN' && dpAmount > capitalBalance)) &&
+              paymentMethod === 'CASH' && (
                 <p className="text-[10px] font-bold text-amber-400 leading-relaxed -mt-2">
-                  Saldo modal kurang Rp {(total - capitalBalance).toLocaleString('id-ID')}. Ubah pembayaran ke
+                  Saldo modal kurang Rp {(((paymentStatus === 'LUNAS' ? total : dpAmount)) - capitalBalance).toLocaleString('id-ID')}. Ubah pembayaran ke
                   HUTANG/TEMPO, atau tambah modal di halaman Modal.
                 </p>
               )}
 
             <div className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPaymentStatus('LUNAS')}
-                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-400'}`}
-                >
-                  Paid
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentStatus('HUTANG')}
-                  className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-400'}`}
-                >
-                  Debt
-                </button>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                  Status Pembayaran
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentStatus('LUNAS')}
+                    className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${paymentStatus === 'LUNAS' ? 'bg-green-500 text-white shadow-lg shadow-green-900/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                  >
+                    Lunas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatus('SEBAGIAN');
+                      if (!dpAmount) setDpAmount(Math.round(total * 0.3));
+                    }}
+                    className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${paymentStatus === 'SEBAGIAN' ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                  >
+                    DP / Cicil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentStatus('HUTANG')}
+                    className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${paymentStatus === 'HUTANG' ? 'bg-red-500 text-white shadow-lg shadow-red-900/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                  >
+                    Hutang
+                  </button>
+                </div>
               </div>
 
-              <select
-                id="payment-method"
-                name="payment-method"
-                className="w-full bg-white/5 p-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="CASH">CASH / TUNAI</option>
-                <option value="TRANSFER">TRANSFER BANK</option>
-                <option value="TEMPO">TEMPO / NET TERMS</option>
-                <option value="DP">DP + PELUNASAN</option>
-                <option value="GIRO">GIRO / CEK</option>
-                <option value="QRIS">QRIS / TRANSFER INSTAN</option>
-                <option value="KREDIT">KREDIT SUPPLIER</option>
-                <option value="KONSINYASI">KONSINYASI</option>
-              </select>
+              {/* Input DP jika status SEBAGIAN */}
+              {paymentStatus === 'SEBAGIAN' && (
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Uang Muka (DP)</span>
+                    <span className="text-[10px] font-bold text-amber-400">Sisa: Rp{Math.max(0, total - (dpAmount || 0)).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={total}
+                      value={dpAmount || ''}
+                      onChange={(e) => setDpAmount(Number(e.target.value) || 0)}
+                      placeholder="Masukkan nominal DP"
+                      className="w-full bg-black/30 border border-white/10 pl-9 pr-3 py-2.5 rounded-xl text-xs font-bold text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex gap-1.5 pt-1">
+                    {[0.2, 0.3, 0.5].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDpAmount(Math.round(total * pct))}
+                        className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-gray-300 transition"
+                      >
+                        {pct * 100}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Input Jatuh Tempo jika HUTANG atau SEBAGIAN */}
+              {(paymentStatus === 'HUTANG' || paymentStatus === 'SEBAGIAN') && (
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                    Tanggal Jatuh Tempo {paymentStatus === 'SEBAGIAN' ? 'Sisa Hutang' : 'Pelunasan'}
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-bold text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                  Metode Pembayaran {paymentStatus === 'SEBAGIAN' ? 'DP' : ''}
+                </label>
+                <select
+                  id="payment-method"
+                  name="payment-method"
+                  className="w-full bg-white/5 p-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none text-white"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  <option value="CASH" className="bg-gray-900">CASH / TUNAI</option>
+                  <option value="TRANSFER" className="bg-gray-900">TRANSFER BANK</option>
+                  <option value="TEMPO" className="bg-gray-900">TEMPO / NET TERMS</option>
+                  <option value="DP" className="bg-gray-900">DP + PELUNASAN</option>
+                  <option value="GIRO" className="bg-gray-900">GIRO / CEK</option>
+                  <option value="QRIS" className="bg-gray-900">QRIS / TRANSFER INSTAN</option>
+                  <option value="KREDIT" className="bg-gray-900">KREDIT SUPPLIER</option>
+                  <option value="KONSINYASI" className="bg-gray-900">KONSINYASI</option>
+                </select>
+              </div>
             </div>
 
             <button

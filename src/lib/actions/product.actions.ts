@@ -1811,3 +1811,350 @@ export async function resetAvgFromCurrentStock(
     return { success: false, updated: 0, skipped: 0, error: err.message };
   }
 }
+
+// ==========================================
+// PENGELOLAAN VARIAN PRODUK (MODERN & CEPAT)
+// ==========================================
+
+export interface ProductVariantItem {
+  id: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  price: number;
+  costPrice: number;
+  wholesalePrice: number;
+  stock: number;
+  unit: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+/**
+ * Mengambil semua varian turunan dari produk induk berdasarkan Parent_ID
+ */
+export async function getProductVariantsAction(parentId: string): Promise<{
+  success: boolean;
+  variants?: ProductVariantItem[];
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    if (!parentId) return { success: false, error: 'Parent ID harus diisi' };
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .select('id, name, sku, barcode, price, cost_price, stock, unit, image_url, is_active, raw_data, created_at')
+      .eq('raw_data->>Parent_ID', parentId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const variants: ProductVariantItem[] = (data || []).map((p: any) => {
+      const raw = p.raw_data || {};
+      const stock = Number(p.stock ?? raw.Stok ?? raw.stock ?? 0);
+      const price = Number(p.price ?? raw.Ecer ?? raw.price ?? 0);
+      const costPrice = Number(p.cost_price ?? raw.Modal ?? raw.purchasePrice ?? 0);
+      const wholesalePrice = Number(raw.Grosir ?? raw.wholesalePrice ?? raw.Harga_Grosir ?? price);
+      const isArchived = raw.isActive === false || raw.Status === 1 || raw.status === 'ARCHIVED';
+      const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchived;
+
+      return {
+        id: p.id,
+        name: p.name || raw.Nama || raw.name || 'Varian',
+        sku: p.sku || raw.ID || raw.sku || p.id,
+        barcode: p.barcode || raw.Barcode || raw.barcode || '',
+        price,
+        costPrice,
+        wholesalePrice,
+        stock,
+        unit: p.unit || raw.Satuan || raw.unit || 'PCS',
+        imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image || '',
+        isActive,
+        createdAt: p.created_at,
+      };
+    });
+
+    return { success: true, variants };
+  } catch (err: any) {
+    console.error('getProductVariantsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal memuat varian' };
+  }
+}
+
+/**
+ * Tambah varian secara satuan atau massal (batch) dengan pewarisan otomatis dari produk induk
+ */
+export async function batchAddVariantsAction(payload: {
+  parentId: string;
+  variants: Array<{
+    name: string;
+    sku?: string;
+    barcode?: string;
+    costPrice?: number;
+    sellPrice?: number;
+    wholesalePrice?: number;
+    stock?: number;
+    imageUrl?: string;
+  }>;
+}): Promise<{
+  success: boolean;
+  insertedCount?: number;
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    const { parentId, variants } = payload;
+    if (!parentId) return { success: false, error: 'Parent ID tidak valid' };
+    if (!variants || variants.length === 0) return { success: false, error: 'Daftar varian kosong' };
+
+    // 1. Ambil data produk induk sebagai template inherit
+    const { data: parentProduct, error: pErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', parentId)
+      .single();
+
+    if (pErr || !parentProduct) {
+      return { success: false, error: `Produk induk dengan ID ${parentId} tidak ditemukan` };
+    }
+
+    const parentRaw = (parentProduct.raw_data && typeof parentProduct.raw_data === 'object')
+      ? parentProduct.raw_data
+      : {};
+
+    const parentName = (parentProduct.name || parentRaw.Nama || parentRaw.name || 'Produk').trim();
+    const parentCategory = (parentProduct.category || parentRaw.Kategori || parentRaw.category || '').trim();
+    const parentBrand = (parentRaw.Brand || '').trim();
+    const parentDesc = (parentProduct.description || parentRaw.Deskripsi || parentRaw.description || '').trim();
+    const parentUnit = (parentProduct.unit || parentRaw.Satuan || parentRaw.unit || 'PCS').trim().toUpperCase();
+    const parentWarehouseId = parentRaw.warehouseId || 'gudang-utama';
+    const parentSupplier = parentRaw.Supplier || parentRaw.supplierName || '';
+    const parentSupplierWa = parentRaw.No_WA_Supplier || '';
+    const parentImage = parentProduct.image_url || parentRaw.imageUrl || parentRaw.Link_Foto || parentRaw.image || '';
+    const parentBaseCost = Number(parentProduct.cost_price ?? parentRaw.Modal ?? 0);
+    const parentBaseSell = Number(parentProduct.price ?? parentRaw.Ecer ?? 0);
+    const parentBaseWholesale = Number(parentRaw.Grosir ?? parentRaw.wholesalePrice ?? parentBaseSell);
+    const parentSku = (parentProduct.sku || parentRaw.ID || parentProduct.id).trim();
+
+    const now = new Date().toISOString();
+    const rowsToInsert: any[] = [];
+
+    // Ambil daftar SKU yang sudah ada untuk mencegah benturan SKU
+    const { data: existingSkusData } = await supabaseAdmin
+      .from('products')
+      .select('sku');
+    const existingSkus = new Set((existingSkusData || []).map(x => String(x.sku || '').toUpperCase()));
+
+    for (let i = 0; i < variants.length; i++) {
+      const v = variants[i];
+      const rawVariantName = (v.name || '').trim();
+      if (!rawVariantName) continue;
+
+      // Nama produk varian: jika sudah diawali nama induk, pertahankan; jika belum, format: `Nama Induk - Varian`
+      const displayName = rawVariantName.toLowerCase().startsWith(parentName.toLowerCase())
+        ? rawVariantName.toUpperCase()
+        : `${parentName} - ${rawVariantName}`.toUpperCase();
+
+      // Buat SKU yang unik
+      let cleanSuffix = rawVariantName
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 8);
+      if (!cleanSuffix) cleanSuffix = `VAR${i + 1}`;
+
+      let skuCandidate = (v.sku || `${parentSku}-${cleanSuffix}`).trim().toUpperCase();
+      let attempts = 0;
+      while (existingSkus.has(skuCandidate)) {
+        attempts++;
+        skuCandidate = `${parentSku}-${cleanSuffix}-${attempts}`;
+      }
+      existingSkus.add(skuCandidate);
+
+      const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${i}`;
+      const stock = Number(v.stock ?? 0);
+      const costPrice = Number(v.costPrice !== undefined ? v.costPrice : parentBaseCost);
+      const sellPrice = Number(v.sellPrice !== undefined ? v.sellPrice : parentBaseSell);
+      const wholesalePrice = Number(v.wholesalePrice !== undefined ? v.wholesalePrice : parentBaseWholesale);
+      const barcode = (v.barcode || '').trim();
+      const variantImage = v.imageUrl || parentImage;
+
+      const raw_data = {
+        ...parentRaw,
+        ID: skuCandidate,
+        Barcode: barcode,
+        Parent_ID: parentId,
+        Nama: displayName,
+        name: displayName,
+        Kategori: parentCategory,
+        category: parentCategory,
+        Brand: parentBrand,
+        Deskripsi: parentDesc,
+        description: parentDesc,
+        Satuan: parentUnit,
+        Satuan_Modal: parentRaw.Satuan_Modal || parentUnit,
+        unit: parentUnit,
+        Stok: stock,
+        stock: stock,
+        stockByWarehouse: { [parentWarehouseId]: stock },
+        Min_Stok: Number(parentRaw.Min_Stok ?? parentRaw.minStock ?? 5),
+        minStock: Number(parentRaw.Min_Stok ?? parentRaw.minStock ?? 5),
+        Modal: costPrice,
+        purchasePrice: costPrice,
+        Ecer: sellPrice,
+        price: sellPrice,
+        priceEcer: sellPrice,
+        Grosir: wholesalePrice,
+        wholesalePrice: wholesalePrice,
+        priceGrosir: wholesalePrice,
+        warehouseId: parentWarehouseId,
+        Supplier: parentSupplier,
+        supplierName: parentSupplier,
+        No_WA_Supplier: parentSupplierWa,
+        imageUrl: variantImage,
+        image: variantImage,
+        Link_Foto: variantImage,
+        isActive: true,
+        Status: 0,
+        status: 'ACTIVE',
+        units: [{ code: parentUnit, contains: 1, price: sellPrice, label: '' }],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      rowsToInsert.push({
+        id,
+        name: displayName,
+        sku: skuCandidate,
+        barcode: barcode || null,
+        description: parentDesc || null,
+        price: sellPrice,
+        cost_price: costPrice,
+        category: parentCategory || null,
+        unit: parentUnit,
+        stock,
+        image_url: variantImage || null,
+        is_active: true,
+        raw_data,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
+    if (rowsToInsert.length === 0) {
+      return { success: false, error: 'Tidak ada varian valid yang bisa disimpan' };
+    }
+
+    const { error: insertErr } = await supabaseAdmin
+      .from('products')
+      .insert(rowsToInsert);
+
+    if (insertErr) throw insertErr;
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${parentId}`);
+    revalidatePath(`/produk/${parentId}`);
+    revalidatePath('/admin/inventory');
+
+    return { success: true, insertedCount: rowsToInsert.length };
+  } catch (err: any) {
+    console.error('batchAddVariantsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menyimpan varian produk' };
+  }
+}
+
+/**
+ * Quick inline update untuk varian produk (harga ecer, modal, grosir, stok)
+ */
+export async function quickUpdateVariantAction(
+  variantId: string,
+  updates: {
+    name?: string;
+    stock?: number;
+    price?: number;
+    costPrice?: number;
+    wholesalePrice?: number;
+    barcode?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    if (!variantId) return { success: false, error: 'Variant ID harus diisi' };
+
+    const { data: existing, error: fErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', variantId)
+      .single();
+
+    if (fErr || !existing) return { success: false, error: 'Produk varian tidak ditemukan' };
+
+    const now = new Date().toISOString();
+    const raw = (existing.raw_data && typeof existing.raw_data === 'object') ? existing.raw_data : {};
+
+    const updatedRaw = { ...raw, updatedAt: now };
+    const payload: any = { updated_at: now };
+
+    if (updates.name !== undefined) {
+      const trimmed = updates.name.trim().toUpperCase();
+      updatedRaw.Nama = trimmed;
+      updatedRaw.name = trimmed;
+      payload.name = trimmed;
+    }
+    if (updates.stock !== undefined) {
+      const stockNum = Number(updates.stock);
+      updatedRaw.Stok = stockNum;
+      updatedRaw.stock = stockNum;
+      const whId = raw.warehouseId || 'gudang-utama';
+      updatedRaw.stockByWarehouse = { ...(raw.stockByWarehouse || {}), [whId]: stockNum };
+      payload.stock = stockNum;
+    }
+    if (updates.price !== undefined) {
+      const priceNum = Number(updates.price);
+      updatedRaw.Ecer = priceNum;
+      updatedRaw.price = priceNum;
+      updatedRaw.priceEcer = priceNum;
+      payload.price = priceNum;
+    }
+    if (updates.costPrice !== undefined) {
+      const costNum = Number(updates.costPrice);
+      updatedRaw.Modal = costNum;
+      updatedRaw.purchasePrice = costNum;
+      payload.cost_price = costNum;
+    }
+    if (updates.wholesalePrice !== undefined) {
+      const wsNum = Number(updates.wholesalePrice);
+      updatedRaw.Grosir = wsNum;
+      updatedRaw.wholesalePrice = wsNum;
+      updatedRaw.priceGrosir = wsNum;
+    }
+    if (updates.barcode !== undefined) {
+      const bc = updates.barcode.trim();
+      updatedRaw.Barcode = bc;
+      payload.barcode = bc || null;
+    }
+
+    payload.raw_data = updatedRaw;
+
+    const { error: uErr } = await supabaseAdmin
+      .from('products')
+      .update(payload)
+      .eq('id', variantId);
+
+    if (uErr) throw uErr;
+
+    const parentId = raw.Parent_ID || '';
+    revalidatePath('/admin/products');
+    if (parentId) {
+      revalidatePath(`/admin/products/edit/${parentId}`);
+      revalidatePath(`/produk/${parentId}`);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('quickUpdateVariantAction error:', err);
+    return { success: false, error: err?.message || 'Gagal mengupdate varian' };
+  }
+}
+

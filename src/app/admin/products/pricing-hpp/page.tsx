@@ -1224,30 +1224,46 @@ export default function PricingHPPPage() {
 
                             {/* Modal HPP Aktif & Lock Status */}
                             <td className="py-4 px-4 text-right">
-                              <p className="font-black text-slate-900 text-sm">Rp {p.costPrice.toLocaleString('id-ID')}</p>
-                              {otherUnitCosts.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                  {otherUnitCosts.map((unit) => (
-                                    <p key={unit.code} className="text-[10px] font-bold text-slate-500">
-                                      {unit.code} (isi {unit.contains} {p.unit}): Rp{' '}
-                                      {(p.costPrice * unit.contains).toLocaleString('id-ID')}
-                                    </p>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="flex items-center justify-end gap-1 mt-0.5">
-                                {p.isHppLocked ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {p.isHppLocked && (
                                   <span
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
                                     title="HPP diset manual & terkunci. Tidak akan hilang saat Restart AVG"
                                   >
                                     <Lock size={9} />
                                     Terkunci
                                   </span>
-                                ) : (
-                                  <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
                                 )}
+                                <div className="flex items-baseline gap-1">
+                                  <span className="font-black text-slate-900 text-sm">
+                                    Rp {p.costPrice.toLocaleString('id-ID')}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
+                                </div>
                               </div>
+
+                              {otherUnitCosts.length > 0 && (
+                                <div className="mt-1.5 flex flex-col items-end gap-1">
+                                  {otherUnitCosts.map((unit) => (
+                                    <div
+                                      key={unit.code}
+                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] transition-colors hover:bg-slate-100/80"
+                                      title={`Estimasi Modal per ${unit.code} (isi ${unit.contains} ${p.unit})`}
+                                    >
+                                      <span className="font-black text-slate-600 uppercase">
+                                        {unit.code}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-slate-400 bg-white px-1 py-0.2 rounded border border-slate-200/70 leading-none">
+                                        isi {unit.contains}
+                                      </span>
+                                      <span className="text-slate-300 font-bold">·</span>
+                                      <span className="font-black text-slate-800">
+                                        Rp {(p.costPrice * unit.contains).toLocaleString('id-ID')}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </td>
 
                             {/* AVG HPP dari PO */}

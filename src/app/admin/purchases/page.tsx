@@ -8,7 +8,7 @@ import { SATUAN_LIST } from '@/lib/constants/satuan';
 import {
   ShoppingBag, Plus, Package, Search, X, CheckCircle2, XCircle,
   ChevronRight, Download, Filter, Truck, ClipboardList, Printer, RotateCcw,
-  CheckSquare, Square, DollarSign, AlertCircle, Loader2, Camera, Lock
+  CheckSquare, Square, DollarSign, AlertCircle, Loader2, Camera, Lock, Clock
 } from 'lucide-react';
 import {
   getPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
@@ -24,17 +24,30 @@ import { getLargestPurchaseUnit, getPurchaseUnitPrice } from '@/lib/normalize';
 import { sbGetDocs } from '@/lib/supabase-helpers';
 import * as XLSX from 'xlsx';
 
+type PaymentRecord = {
+  id: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  notes?: string;
+  recordedBy?: string;
+  recordedAt?: string;
+};
+
 type PO = {
   id: string;
   poNumber: string;
   status: string;
   totalAmount: number;
+  paidAmount?: number;
+  remainingAmount?: number;
   paymentStatus?: string;
   paymentMethod?: string;
   dueDate?: string | null;
   notes?: string | null;
   createdAt: Date;
   supplier: { name: string };
+  paymentHistory?: PaymentRecord[];
   items: {
     id: string;
     productId?: string;
@@ -106,6 +119,8 @@ export default function AdminPurchases() {
   const [selectedPayable, setSelectedPayable] = useState<PO | null>(null);
   const [payMethod, setPayMethod] = useState('CASH');
   const [payNotes, setPayNotes] = useState('');
+  const [payAmountInput, setPayAmountInput] = useState('');
+  const [payMode, setPayMode] = useState<'PARTIAL' | 'FULL'>('PARTIAL');
   const [paying, setPaying] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkPayModalOpen, setBulkPayModalOpen] = useState(false);
@@ -405,23 +420,49 @@ export default function AdminPurchases() {
     setSaving(false);
   };
 
+  const openPayModal = (po: PO) => {
+    setSelectedPayable(po);
+    const total = po.totalAmount;
+    const paid = po.paidAmount || (po.paymentStatus === 'LUNAS' ? total : 0);
+    const sisa = po.remainingAmount ?? Math.max(0, total - paid);
+    setPayMethod('CASH');
+    setPayNotes('');
+    setPayMode(sisa > 0 ? 'PARTIAL' : 'FULL');
+    setPayAmountInput(sisa > 0 ? sisa.toString() : total.toString());
+  };
+
   const handlePayDebt = async () => {
     if (!selectedPayable) return;
+    const total = selectedPayable.totalAmount;
+    const paid = selectedPayable.paidAmount || (selectedPayable.paymentStatus === 'LUNAS' ? total : 0);
+    const sisa = selectedPayable.remainingAmount ?? Math.max(0, total - paid);
+    const nominal = payMode === 'FULL' ? sisa : Number(payAmountInput);
+
+    if (isNaN(nominal) || nominal <= 0) {
+      notify.error('Masukkan nominal pembayaran yang valid');
+      return;
+    }
+    if (nominal > sisa) {
+      notify.error(`Nominal pembayaran melebihi sisa hutang (Maks: Rp ${sisa.toLocaleString('id-ID')})`);
+      return;
+    }
+
     setPaying(true);
     try {
-      const res = await payPurchaseDebt(selectedPayable.id, payMethod, payNotes);
+      const res = await payPurchaseDebt(selectedPayable.id, payMethod, payNotes, nominal);
       if (res.success) {
         if (res.warning) {
           notify.admin.warning(res.warning);
         } else {
-          notify.success(`Hutang PO ${selectedPayable.poNumber} berhasil dilunasi!`);
+          notify.success(`Pembayaran PO ${selectedPayable.poNumber} sebesar Rp ${nominal.toLocaleString('id-ID')} berhasil dicatat!`);
         }
         setSelectedPayable(null);
         setPayNotes('');
+        setPayAmountInput('');
         await load();
         await loadMeta();
       } else {
-        notify.error(res.error || 'Gagal melunasi hutang');
+        notify.error(res.error || 'Gagal memproses pembayaran');
       }
     } catch (err: any) {
       notify.error(err?.message || 'Terjadi kesalahan sistem');
@@ -576,9 +617,10 @@ export default function AdminPurchases() {
                   onChange={e => setPaymentStatusFilter(e.target.value)}
                   className="w-full px-3 py-2 text-xs font-bold border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700"
                 >
-                  <option value="all">⚖️ Status Bayar</option>
-                  <option value="LUNAS">LUNAS</option>
-                  <option value="HUTANG">HUTANG / TEMPO</option>
+                  <option value="all">⚖️ Semua Status Bayar</option>
+                  <option value="LUNAS">🟢 LUNAS</option>
+                  <option value="SEBAGIAN">🟡 DIBAYAR SEBAGIAN</option>
+                  <option value="HUTANG">🔴 BELUM BAYAR / HUTANG</option>
                 </select>
               </div>
 
@@ -661,17 +703,37 @@ export default function AdminPurchases() {
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 uppercase">
                       {po.paymentMethod || 'CASH'}
                     </span>
-                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-md ${
-                      po.paymentStatus === 'HUTANG' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-md border ${
+                      po.paymentStatus === 'HUTANG'
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : (po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL')
+                          ? 'bg-amber-50 text-amber-800 border-amber-300'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}>
-                      {po.paymentStatus || 'LUNAS'}
+                      {po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' ? 'SEBAGIAN' : (po.paymentStatus || 'LUNAS')}
                     </span>
-                    {po.dueDate && po.paymentStatus === 'HUTANG' && (
+                    {po.dueDate && po.paymentStatus !== 'LUNAS' && (
                       <span className="text-[10px] text-red-600 font-semibold">
                         Tempo: {new Date(po.dueDate).toLocaleDateString('id-ID')}
                       </span>
                     )}
                   </div>
+
+                  {/* Progress pembayaran jika sebagian */}
+                  {(po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' || ((po.paidAmount || 0) > 0 && (po.paidAmount || 0) < po.totalAmount)) && (
+                    <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-2.5 text-xs">
+                      <div className="flex justify-between items-center mb-1 text-[11px]">
+                        <span className="text-gray-600 font-bold">Terbayar: <strong className="text-emerald-700">Rp{(po.paidAmount || 0).toLocaleString('id-ID')}</strong></span>
+                        <span className="text-amber-800 font-black">Sisa: Rp{(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="w-full bg-amber-200/50 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-emerald-500 h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, Math.round(((po.paidAmount || 0) / (po.totalAmount || 1)) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <div>
@@ -688,12 +750,12 @@ export default function AdminPurchases() {
                       >
                         <Printer size={12} /> Cetak
                       </Link>
-                      {po.paymentStatus === 'HUTANG' && po.status !== 'CANCELLED' && (
+                      {po.paymentStatus !== 'LUNAS' && po.status !== 'CANCELLED' && (
                         <button
-                          onClick={() => { setSelectedPayable(po); setPayMethod('CASH'); setPayNotes(''); }}
+                          onClick={() => openPayModal(po)}
                           className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
                         >
-                          <CheckCircle2 size={12} /> Lunasi
+                          <DollarSign size={12} /> {po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' ? 'Cicil / Lunasi' : 'Bayar / Cicil'}
                         </button>
                       )}
                       {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
@@ -760,18 +822,36 @@ export default function AdminPurchases() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-xs text-gray-800 uppercase">
                               {po.paymentMethod || 'CASH'}
                             </span>
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-black uppercase ${
-                              po.paymentStatus === 'HUTANG' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                              po.paymentStatus === 'HUTANG'
+                                ? 'bg-red-100 text-red-700 border-red-200'
+                                : (po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL')
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-green-100 text-green-700 border-green-200'
                             }`}>
-                              {po.paymentStatus || 'LUNAS'}
+                              {po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' ? 'SEBAGIAN' : (po.paymentStatus || 'LUNAS')}
                             </span>
                           </div>
-                          {po.dueDate && po.paymentStatus === 'HUTANG' && (
+                          {(po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' || ((po.paidAmount || 0) > 0 && (po.paidAmount || 0) < po.totalAmount)) && (
+                            <div className="w-36 text-[10px]">
+                              <div className="flex justify-between text-gray-500 font-semibold mb-0.5">
+                                <span>Bayar: Rp{(po.paidAmount || 0).toLocaleString('id-ID')}</span>
+                                <span className="text-amber-800 font-bold">Sisa: Rp{(po.remainingAmount ?? (po.totalAmount - (po.paidAmount || 0))).toLocaleString('id-ID')}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+                                <div
+                                  className="bg-emerald-500 h-full rounded-full"
+                                  style={{ width: `${Math.min(100, Math.round(((po.paidAmount || 0) / (po.totalAmount || 1)) * 100))}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {po.dueDate && po.paymentStatus !== 'LUNAS' && (
                             <span className="text-[10px] text-red-500 font-medium">
                               Tempo: {new Date(po.dueDate).toLocaleDateString('id-ID')}
                             </span>
@@ -796,13 +876,13 @@ export default function AdminPurchases() {
                           >
                             <Printer size={13} /> Cetak
                           </Link>
-                          {po.paymentStatus === 'HUTANG' && po.status !== 'CANCELLED' && (
+                          {po.paymentStatus !== 'LUNAS' && po.status !== 'CANCELLED' && (
                             <button
-                              onClick={() => { setSelectedPayable(po); setPayMethod('CASH'); setPayNotes(''); }}
+                              onClick={() => openPayModal(po)}
                               className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
-                              title="Lunasi Tagihan Hutang PO Ini"
+                              title="Bayar / Cicil Tagihan PO Ini"
                             >
-                              <CheckCircle2 size={13} /> Lunasi
+                              <DollarSign size={13} /> {po.paymentStatus === 'SEBAGIAN' || po.paymentStatus === 'PARTIAL' ? 'Cicil / Lunasi' : 'Bayar / Lunasi'}
                             </button>
                           )}
                           {po.status !== 'RECEIVED' && po.status !== 'CANCELLED' && (
@@ -1247,19 +1327,63 @@ export default function AdminPurchases() {
               </table>
             </div>
 
+            {/* Rincian Status Pembayaran & Riwayat */}
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5 mb-4 space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="text-gray-500 uppercase">Ringkasan Pembayaran</span>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase ${
+                  detailModal.paymentStatus === 'HUTANG'
+                    ? 'bg-red-100 text-red-700'
+                    : (detailModal.paymentStatus === 'SEBAGIAN' || detailModal.paymentStatus === 'PARTIAL')
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-green-100 text-green-700'
+                }`}>
+                  {detailModal.paymentStatus || 'LUNAS'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-200/60 text-xs">
+                <div>
+                  <span className="text-[10px] text-gray-500 block">Total PO</span>
+                  <strong className="text-gray-900">Rp{detailModal.totalAmount.toLocaleString('id-ID')}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-emerald-600 block">Terbayar</span>
+                  <strong className="text-emerald-700">Rp{(detailModal.paidAmount || (detailModal.paymentStatus === 'LUNAS' ? detailModal.totalAmount : 0)).toLocaleString('id-ID')}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-red-600 block">Sisa Hutang</span>
+                  <strong className="text-red-700">Rp{(detailModal.remainingAmount ?? Math.max(0, detailModal.totalAmount - (detailModal.paidAmount || 0))).toLocaleString('id-ID')}</strong>
+                </div>
+              </div>
+              {detailModal.paymentHistory && detailModal.paymentHistory.length > 0 && (
+                <div className="pt-2 border-t border-gray-200/60">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Riwayat Pembayaran ({detailModal.paymentHistory.length}x):</span>
+                  <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                    {detailModal.paymentHistory.map((h, i) => (
+                      <div key={h.id || i} className="bg-white border border-gray-100 rounded-lg p-1.5 text-[11px] flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-gray-800">Rp{Number(h.amount || 0).toLocaleString('id-ID')}</span>
+                          <span className="text-[10px] text-gray-500 ml-1.5">{h.paymentMethod} • {h.date ? new Date(h.date).toLocaleDateString('id-ID') : '-'}</span>
+                        </div>
+                        {h.notes && <span className="text-[10px] text-gray-500 italic truncate max-w-[140px]">{h.notes}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-2 mt-6">
-              {detailModal.paymentStatus === 'HUTANG' && detailModal.status !== 'CANCELLED' && (
+              {detailModal.paymentStatus !== 'LUNAS' && detailModal.status !== 'CANCELLED' && (
                 <button
                   onClick={() => {
                     const p = detailModal;
                     setDetailModal(null);
-                    setSelectedPayable(p);
-                    setPayMethod('CASH');
-                    setPayNotes('');
+                    openPayModal(p);
                   }}
                   className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
-                  <CheckCircle2 size={16} /> Lunasi Hutang PO Ini
+                  <DollarSign size={16} /> Bayar / Cicil Tagihan PO Ini
                 </button>
               )}
               <Link
@@ -1316,86 +1440,240 @@ export default function AdminPurchases() {
         </div>
       )}
 
-      {/* ===== MODAL PELUNASAN SINGLE PO ===== */}
-      {selectedPayable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-black text-gray-900 text-lg">Pelunasan Hutang PO</h3>
-                <p className="text-xs text-gray-500 font-mono mt-0.5">{selectedPayable.poNumber}</p>
-              </div>
-              <button
-                onClick={() => setSelectedPayable(null)}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-                aria-label="Tutup"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {/* ===== MODAL PEMBAYARAN / CICILAN SINGLE PO ===== */}
+      {selectedPayable && (() => {
+        const total = selectedPayable.totalAmount;
+        const paid = selectedPayable.paidAmount || (selectedPayable.paymentStatus === 'LUNAS' ? total : 0);
+        const sisa = selectedPayable.remainingAmount ?? Math.max(0, total - paid);
+        const nominalInput = payMode === 'FULL' ? sisa : Number(payAmountInput || 0);
+        const sisaSetelahBayar = Math.max(0, sisa - (isNaN(nominalInput) ? 0 : nominalInput));
+        const statusSetelah = sisaSetelahBayar === 0 ? 'LUNAS' : 'SEBAGIAN';
 
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4">
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Total Tagihan Hutang</span>
-                <span className="text-xs font-bold text-gray-700 truncate max-w-[160px] text-right">{selectedPayable.supplier.name}</span>
-              </div>
-              <p className="text-2xl font-black text-red-700">Rp{selectedPayable.totalAmount.toLocaleString('id-ID')}</p>
-              {selectedPayable.dueDate && (
-                <p className="text-xs text-red-600 font-medium mt-1">
-                  Jatuh Tempo: {new Date(selectedPayable.dueDate).toLocaleDateString('id-ID')}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
-                  Metode Pembayaran
-                </label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 animate-in fade-in zoom-in-95 duration-150 my-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-black text-gray-900 text-lg flex items-center gap-2">
+                    <DollarSign size={20} className="text-emerald-600" />
+                    Pembayaran / Cicilan PO
+                  </h3>
+                  <p className="text-xs text-gray-500 font-mono mt-0.5">{selectedPayable.poNumber} • {selectedPayable.supplier.name}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedPayable(null)}
+                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                  aria-label="Tutup"
                 >
-                  {['CASH', 'TRANSFER', 'QRIS', 'GIRO', 'KREDIT'].map((m) => (
-                    <option key={m} value={m}>{PAYMENT_METHOD_LABEL[m] || m}</option>
-                  ))}
-                </select>
+                  <X size={18} />
+                </button>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
-                  Catatan Pelunasan (Opsional)
-                </label>
-                <textarea
-                  value={payNotes}
-                  onChange={(e) => setPayNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Contoh: Transfer via BCA, No. ref 123456..."
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                />
-              </div>
-            </div>
+              {/* Status & Ringkasan Hutang */}
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl p-4 mb-4">
+                <div className="grid grid-cols-3 gap-2 text-center pb-3 border-b border-amber-200/60">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total PO</span>
+                    <p className="text-sm font-black text-gray-900 mt-0.5">Rp{total.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Sudah Dibayar</span>
+                    <p className="text-sm font-black text-emerald-700 mt-0.5">Rp{paid.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block">Sisa Hutang</span>
+                    <p className="text-sm font-black text-red-700 mt-0.5">Rp{sisa.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setSelectedPayable(null)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handlePayDebt}
-                disabled={paying}
-                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {paying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                {paying ? 'Memproses...' : 'Konfirmasi Pelunasan'}
-              </button>
+                <div className="mt-3">
+                  <div className="flex justify-between items-center text-[11px] font-bold text-gray-600 mb-1">
+                    <span>Progress Pelunasan</span>
+                    <span className="text-amber-800">{Math.min(100, Math.round((paid / (total || 1)) * 100))}%</span>
+                  </div>
+                  <div className="w-full bg-amber-200/60 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.round((paid / (total || 1)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {selectedPayable.dueDate && (
+                  <p className="text-xs text-amber-800 font-semibold mt-2.5 flex items-center gap-1">
+                    <Clock size={12} className="text-amber-600" />
+                    Jatuh Tempo: {new Date(selectedPayable.dueDate).toLocaleDateString('id-ID')}
+                  </p>
+                )}
+              </div>
+
+              {/* Pilihan Mode Pembayaran */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                    Jenis Pembayaran
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayMode('PARTIAL');
+                        if (!payAmountInput || Number(payAmountInput) === sisa) {
+                          setPayAmountInput(Math.round(sisa * 0.5).toString());
+                        }
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border ${
+                        payMode === 'PARTIAL'
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-md shadow-amber-200'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <DollarSign size={14} /> Bayar Sebagian (Cicil)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayMode('FULL');
+                        setPayAmountInput(sisa.toString());
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border ${
+                        payMode === 'FULL'
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-md shadow-emerald-200'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <CheckCircle2 size={14} /> Lunasi Sisa (100%)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input Nominal jika Bayar Sebagian */}
+                {payMode === 'PARTIAL' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Nominal Yang Dibayarkan
+                      </label>
+                      <span className="text-[11px] font-bold text-gray-500">Maks: Rp{sisa.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400 text-sm">Rp</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={sisa}
+                        value={payAmountInput}
+                        onChange={(e) => setPayAmountInput(e.target.value)}
+                        placeholder="Contoh: 1000000"
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Preset buttons */}
+                    <div className="flex gap-1.5 mt-2">
+                      {[0.25, 0.5, 0.75].map((pct) => {
+                        const val = Math.round(sisa * pct);
+                        return (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => setPayAmountInput(val.toString())}
+                            className="flex-1 py-1 px-2 text-[10px] font-bold rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 transition"
+                          >
+                            {pct * 100}%
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setPayAmountInput(sisa.toString())}
+                        className="flex-1 py-1 px-2 text-[10px] font-bold rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                      >
+                        100%
+                      </button>
+                    </div>
+
+                    {/* Preview status baru */}
+                    <div className="mt-2 text-xs bg-gray-50 rounded-xl p-2.5 border border-gray-200/80 flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Sisa tagihan setelah pembayaran:</span>
+                      <strong className={`font-black ${sisaSetelahBayar === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        Rp{sisaSetelahBayar.toLocaleString('id-ID')} ({statusSetelah})
+                      </strong>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                    Metode Pembayaran
+                  </label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {['CASH', 'TRANSFER', 'QRIS', 'GIRO', 'KREDIT'].map((m) => (
+                      <option key={m} value={m}>{PAYMENT_METHOD_LABEL[m] || m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                    Catatan / Nomor Referensi Transfer
+                  </label>
+                  <textarea
+                    value={payNotes}
+                    onChange={(e) => setPayNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Contoh: Transfer BCA Ref #88123 (Termin ke-2)..."
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  />
+                </div>
+
+                {/* Riwayat Pembayaran Sebelumnya */}
+                {selectedPayable.paymentHistory && selectedPayable.paymentHistory.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                      Riwayat Pembayaran Sebelumnya ({selectedPayable.paymentHistory.length}x)
+                    </label>
+                    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                      {selectedPayable.paymentHistory.map((hist, idx) => (
+                        <div key={hist.id || idx} className="bg-gray-50 border border-gray-100 rounded-xl p-2 text-xs flex justify-between items-center">
+                          <div>
+                            <span className="font-bold text-gray-800 block">Rp{Number(hist.amount || 0).toLocaleString('id-ID')}</span>
+                            <span className="text-[10px] text-gray-500">{hist.paymentMethod} • {hist.date ? new Date(hist.date).toLocaleDateString('id-ID') : '-'} {hist.notes ? `• ${hist.notes}` : ''}</span>
+                          </div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                            Berhasil
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setSelectedPayable(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handlePayDebt}
+                  disabled={paying || (payMode === 'PARTIAL' && (Number(payAmountInput || 0) <= 0 || Number(payAmountInput || 0) > sisa))}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {paying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                  {paying ? 'Memproses...' : `Konfirmasi Bayar Rp${nominalInput > 0 ? nominalInput.toLocaleString('id-ID') : '0'}`}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ===== MODAL PELUNASAN MASAL ===== */}
       {bulkPayModalOpen && (

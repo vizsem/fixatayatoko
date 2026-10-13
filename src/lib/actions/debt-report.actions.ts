@@ -10,6 +10,9 @@ export type SupplierDebt = {
   supplierName: string
   supplierId?: string
   totalAmount: number
+  paidAmount?: number
+  remainingAmount?: number
+  paymentStatus?: string
   paymentMethod: string
   dueDate?: string | null
   createdAt: string
@@ -45,7 +48,7 @@ export type DebtSummary = {
 
 /**
  * Ambil semua data hutang:
- * - Hutang ke supplier (PO dengan paymentStatus = HUTANG)
+ * - Hutang ke supplier (PO dengan paymentStatus = HUTANG atau SEBAGIAN)
  * - Piutang dari pelanggan (Orders dengan status = BELUM_LUNAS)
  */
 export async function getDebtReport(): Promise<DebtSummary> {
@@ -53,29 +56,39 @@ export async function getDebtReport(): Promise<DebtSummary> {
 
   const now = new Date()
 
-  // 1. Hutang ke supplier: PO yang belum lunas
+  // 1. Hutang ke supplier: PO yang belum lunas (HUTANG atau SEBAGIAN)
   const { data: purchaseRows } = await supabaseAdmin
     .from('purchases')
     .select('id,total,payment_status,payment_method,created_at,raw_data')
-    .or('payment_status.eq.HUTANG,payment_status.is.null,raw_data->>paymentStatus.eq.HUTANG,raw_data->>paymentStatus.eq.BELUM_LUNAS')
+    .or('payment_status.eq.HUTANG,payment_status.eq.SEBAGIAN,payment_status.eq.PARTIAL,payment_status.is.null,raw_data->>paymentStatus.eq.HUTANG,raw_data->>paymentStatus.eq.SEBAGIAN,raw_data->>paymentStatus.eq.PARTIAL,raw_data->>paymentStatus.eq.BELUM_LUNAS')
     .order('created_at', { ascending: false })
 
   const supplierDebts: SupplierDebt[] = (purchaseRows || [])
     .filter((p: any) => {
       const raw = p.raw_data || {}
-      const ps = raw.paymentStatus || p.payment_status || 'LUNAS'
-      return ps === 'HUTANG' || ps === 'BELUM_LUNAS'
+      const ps = String(raw.paymentStatus || p.payment_status || 'LUNAS').toUpperCase()
+      return ps === 'HUTANG' || ps === 'SEBAGIAN' || ps === 'PARTIAL' || ps === 'BELUM_LUNAS'
     })
     .map((p: any) => {
       const raw = p.raw_data || {}
       const dueDate = raw.dueDate || null
       const isOverdue = dueDate ? new Date(dueDate) < now : false
+      const totalAmount = Number(p.total ?? raw.total ?? raw.totalAmount ?? 0)
+      const rawPaid = Number(raw.paidAmount ?? 0)
+      const paidAmount = Number.isFinite(rawPaid) ? rawPaid : 0
+      const remainingAmount = Number.isFinite(raw.remainingAmount)
+        ? Number(raw.remainingAmount)
+        : Math.max(0, totalAmount - paidAmount)
+
       return {
         id: p.id,
         poNumber: raw.poNumber || raw.invoiceNumber || `PO-${p.id.slice(0, 8).toUpperCase()}`,
         supplierName: raw.supplierName || raw.supplier?.name || 'Supplier',
         supplierId: raw.supplierId || null,
-        totalAmount: Number(p.total ?? raw.total ?? raw.totalAmount ?? 0),
+        totalAmount,
+        paidAmount,
+        remainingAmount,
+        paymentStatus: String(raw.paymentStatus || p.payment_status || 'HUTANG').toUpperCase(),
         paymentMethod: raw.paymentMethod || p.payment_method || 'HUTANG',
         dueDate,
         createdAt: p.created_at || raw.createdAt || new Date().toISOString(),
@@ -85,6 +98,7 @@ export async function getDebtReport(): Promise<DebtSummary> {
         isOverdue,
       }
     })
+    .filter((d) => (d.remainingAmount ?? d.totalAmount) > 0)
 
   // 2. Piutang dari pelanggan: Orders BELUM_LUNAS
   const { data: orderRows } = await supabaseAdmin
@@ -113,7 +127,7 @@ export async function getDebtReport(): Promise<DebtSummary> {
     }
   })
 
-  const totalSupplierDebt = supplierDebts.reduce((s, d) => s + d.totalAmount, 0)
+  const totalSupplierDebt = supplierDebts.reduce((s, d) => s + (d.remainingAmount ?? d.totalAmount), 0)
   const totalCustomerDebt = customerDebts.reduce((s, d) => s + d.totalAmount, 0)
   const overdueSupplierCount = supplierDebts.filter((d) => d.isOverdue).length
   const overdueCustomerCount = customerDebts.filter((d) => d.isOverdue).length

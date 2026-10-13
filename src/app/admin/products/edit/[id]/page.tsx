@@ -12,6 +12,7 @@ import imageCompression from 'browser-image-compression';
 import { toast } from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
+import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import { supabase } from '@/lib/supabase';
@@ -154,6 +155,7 @@ export default function EditProductPage() {
   });
 
   const isInitialLoadedRef = useRef(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
 
   const [formData, setFormData] = useState({
     ID: '',
@@ -937,6 +939,7 @@ export default function EditProductPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div></div>;
 
   return (
+    <>
     <div className="p-3 sm:p-4 md:p-6 bg-slate-50/70 text-slate-800 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
 
@@ -953,13 +956,14 @@ export default function EditProductPage() {
           </div>
           <div className="flex items-center gap-2">
             {/* Tombol Tambah Varian */}
-            <a
-              href={`/admin/products/add?parent_id=${id}&parent_name=${encodeURIComponent(formData.Nama || '')}`}
+            <button
+              type="button"
+              onClick={() => setShowVariantModal(true)}
               className="px-3 py-2 bg-violet-600 text-white rounded-xl text-xs font-black uppercase hover:bg-violet-700 transition-all hidden sm:flex items-center gap-1.5"
-              title="Buat produk baru sebagai varian dari produk ini"
+              title="Kelola & Tambah Varian"
             >
-              <Plus size={13} /> Varian
-            </a>
+              <Layers size={13} /> Kelola Varian
+            </button>
             <button
               type="button"
               onClick={() => router.push('/admin/products')}
@@ -1726,13 +1730,14 @@ export default function EditProductPage() {
                   <p className="text-[11px] font-bold text-slate-400 mt-0.5">Kelola turunan varian (warna, ukuran, rasa) dari produk ini</p>
                 </div>
               </div>
-              <a
-                href={`/admin/products/add?parent_id=${id}&parent_name=${encodeURIComponent(formData.Nama)}`}
+              <button
+                type="button"
+                onClick={() => setShowVariantModal(true)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black hover:bg-violet-700 transition-all shadow-sm shadow-violet-200"
               >
-                <Plus size={14} />
-                Tambah Varian
-              </a>
+                <Layers size={14} />
+                Kelola Varian
+              </button>
             </div>
 
             {childVariants.length > 0 ? (
@@ -2188,5 +2193,25 @@ export default function EditProductPage() {
         </form>
       </div>
     </div>
+
+    {showVariantModal && (
+      <QuickVariantModal
+        isOpen={showVariantModal}
+        product={{
+          id,
+          name: formData.Nama || '',
+          sku: formData.ID || id,
+          barcode: formData.Barcode,
+          category: formData.Kategori,
+          unit: formData.Satuan,
+          costPrice: formData.Modal,
+          priceEcer: formData.Ecer,
+          stock: formData.Stok,
+        }}
+        onClose={() => setShowVariantModal(false)}
+        onSuccess={() => fetchVariants()}
+      />
+    )}
+    </>
   );
 }

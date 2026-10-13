@@ -230,17 +230,22 @@ export async function rekonsiliasiMutasiModal(params: {
 export async function catatMutasiModalPO(params: {
   poId: string;
   total: number;
+  paidAmount?: number;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   label: string;
   itemCount?: number;
   dibatalkan?: boolean;
 }): Promise<string | null> {
+  const status = String(params.paymentStatus ?? '').trim().toUpperCase();
+  const isSebagian = status === 'SEBAGIAN' || status === 'PARTIAL';
   const diharapkan = params.dibatalkan
     ? 0
-    : pembayaranKeluarUang(params.paymentStatus, params.paymentMethod)
-      ? Number(params.total) || 0
-      : 0;
+    : isSebagian
+      ? (Number(params.paidAmount) || 0)
+      : pembayaranKeluarUang(params.paymentStatus, params.paymentMethod)
+        ? Number(params.total) || 0
+        : 0;
 
   const hasil = await rekonsiliasiMutasiModal({
     referenceId: params.poId,

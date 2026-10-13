@@ -22,6 +22,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
+import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import { playScanBeep } from '@/lib/sound';
 
 
@@ -341,6 +342,7 @@ export default function AdminProducts() {
   }, [searchTerm]);
 
   const [selectedProductRestock, setSelectedProductRestock] = useState<ProductRow | null>(null);
+  const [selectedProductVariants, setSelectedProductVariants] = useState<ProductRow | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -1022,13 +1024,13 @@ export default function AdminProducts() {
                       >
                         <Edit size={16} />
                       </Link>
-                      <Link 
-                        href={`/admin/products/add?parent_id=${p.id}&parent_name=${encodeURIComponent(p.name)}`}
+                      <button 
+                        onClick={() => setSelectedProductVariants(p)}
                         className="w-10 h-10 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-sm"
-                        title="Tambah Varian"
+                        title="Kelola & Tambah Varian"
                       >
                         <Layers size={16} />
-                      </Link>
+                      </button>
                       <button 
                         onClick={() => handleArchive(p, p.isActive !== false)} 
                         className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
@@ -1198,13 +1200,13 @@ export default function AdminProducts() {
                         >
                           <Edit size={14} />
                         </Link>
-                        <Link 
-                          href={`/admin/products/add?parent_id=${p.id}&parent_name=${encodeURIComponent(p.name)}`} 
+                        <button 
+                          onClick={() => setSelectedProductVariants(p)} 
                           className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm"
-                          title="Tambah Varian"
+                          title="Kelola & Tambah Varian"
                         >
                           <Layers size={14} />
-                        </Link>
+                        </button>
                         <button 
                           onClick={() => handleDuplicate(p)} 
                           disabled={duplicatingId === p.id}
@@ -1261,6 +1263,13 @@ export default function AdminProducts() {
       </div>
 
       {selectedProductRestock && <RestockModal product={selectedProductRestock} isOpen={!!selectedProductRestock} onClose={() => setSelectedProductRestock(null)} />}
+      {selectedProductVariants && (
+        <QuickVariantModal 
+          product={selectedProductVariants} 
+          isOpen={!!selectedProductVariants} 
+          onClose={() => setSelectedProductVariants(null)} 
+        />
+      )}
 
       {/* MODAL LIVE PROGRESS BULK ACTION */}
       {bulkProgress.isOpen && (
