@@ -47,6 +47,8 @@ type SaleItem = {
   channel: string;
   customerName: string;
   status: string;
+  adminFee?: number;
+  feeMode?: 'AUTO' | 'MANUAL';
 };
 
 export type ProductProfitItem = {
@@ -169,11 +171,26 @@ export default function SalesReport() {
         const ch = (order.channel || raw.channel || raw.transactionType || 'OFFLINE').toUpperCase();
         const custName = order.customerName || raw.customerName || 'Pelanggan';
 
-        // Biaya admin marketplace untuk order ini (jika ada)
-        let orderAdminFee = Number(raw.biayaAdmin ?? order.biayaAdmin ?? 0);
-        if (!orderAdminFee && (ch === 'SHOPEE' || ch === 'TIKTOK')) {
+        // ── Perhitungan Biaya Admin Marketplace (2 Skema: OTOMATIS & MANUAL) ──
+        // MANUAL: Nilai harga yang diinput admin/kasir sudah BERSIH (settlement marketplace), fee = 0.
+        // AUTO:   Harga jual bruto marketplace, sistem memotong biaya admin.
+        const feeMode = String(raw.hargaMode || order.hargaMode || '').toUpperCase();
+        let orderAdminFee = 0;
+
+        if (feeMode === 'MANUAL') {
+          // Skema Manual: input sudah bersih, fee = 0
+          orderAdminFee = 0;
+        } else if (raw.biayaAdmin !== undefined && raw.biayaAdmin !== null) {
+          orderAdminFee = Number(raw.biayaAdmin);
+        } else if (order.biayaAdmin !== undefined && order.biayaAdmin !== null) {
+          orderAdminFee = Number(order.biayaAdmin);
+        } else if (feeMode === 'AUTO') {
+          // Skema Otomatis: jika biayaAdmin belum tersimpan, hitung dari tarif channel
           const totalOrder = Number(order.total || raw.total || 0);
-          orderAdminFee = ch === 'SHOPEE' ? totalOrder * 0.065 : totalOrder * 0.045;
+          orderAdminFee = ch === 'SHOPEE' ? totalOrder * 0.065 : ch === 'TIKTOK' ? totalOrder * 0.045 : 0;
+        } else {
+          // Fallback order lama: gunakan jika tercatat di biayaAdmin, selain itu 0
+          orderAdminFee = Number(raw.biayaAdmin ?? order.biayaAdmin ?? 0);
         }
 
         const items = order.items || raw.items || [];
@@ -189,21 +206,6 @@ export default function SalesReport() {
           const pid = String(item.id || item.productId || item.raw_data?.productId || '').trim();
           const pName = String(item.name || item.productName || 'Tanpa Nama').trim();
 
-          // Catat untuk tab Riwayat Transaksi
-          salesList.push({
-            id: orderDoc.id,
-            soNumber: orderIdDisplay,
-            date: created.toISOString(),
-            productName: pName,
-            productId: pid,
-            quantity: itQty,
-            total: itRevenue,
-            paymentMethod: pm,
-            channel: ch,
-            customerName: custName,
-            status: rawStatus,
-          });
-
           // Cari produk di master
           const prod = productsMap.get(pid) || (item.barcode ? productsMap.get(String(item.barcode).trim()) : undefined);
 
@@ -217,6 +219,23 @@ export default function SalesReport() {
           const itemHpp = hitung.hpp;
           const itemFee = orderSubtotal > 0 && orderAdminFee > 0 ? (orderAdminFee * hitung.pendapatan) / orderSubtotal : 0;
           const itemProfit = hitung.pendapatan - itemHpp - itemFee;
+
+          // Catat untuk tab Riwayat Transaksi
+          salesList.push({
+            id: orderDoc.id,
+            soNumber: orderIdDisplay,
+            date: created.toISOString(),
+            productName: pName,
+            productId: pid,
+            quantity: itQty,
+            total: itRevenue,
+            paymentMethod: pm,
+            channel: ch,
+            customerName: custName,
+            status: rawStatus,
+            adminFee: Math.round(itemFee),
+            feeMode: feeMode === 'MANUAL' ? 'MANUAL' : feeMode === 'AUTO' || orderAdminFee > 0 ? 'AUTO' : undefined,
+          });
 
           // Agregasi ke Product Profitability Map
           const aggKey = pid || pName;
@@ -438,6 +457,8 @@ export default function SalesReport() {
         Kuantitas: sale.quantity,
         Total: sale.total,
         Channel: sale.channel,
+        'Skema Marketplace': sale.feeMode === 'MANUAL' ? 'Manual (Bersih)' : sale.feeMode === 'AUTO' ? 'Otomatis' : '-',
+        'Biaya Admin': sale.adminFee || 0,
         'Metode Bayar': sale.paymentMethod,
         Pelanggan: sale.customerName,
       }));
@@ -1131,6 +1152,7 @@ export default function SalesReport() {
                   <th className="py-3 px-4">Tanggal</th>
                   <th className="py-3 px-4">Produk</th>
                   <th className="py-3 px-4 text-center">Channel</th>
+                  <th className="py-3 px-4 text-center">Skema / Fee</th>
                   <th className="py-3 px-4 text-center">Qty</th>
                   <th className="py-3 px-4 text-right">Total</th>
                   <th className="py-3 px-4 text-center">Metode Bayar</th>
@@ -1140,7 +1162,7 @@ export default function SalesReport() {
               <tbody className="divide-y divide-slate-100 text-xs">
                 {paginatedSales.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold">
+                    <td colSpan={9} className="py-12 text-center text-slate-400 font-semibold">
                       Belum ada transaksi pada periode ini.
                     </td>
                   </tr>
@@ -1166,6 +1188,19 @@ export default function SalesReport() {
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                           {sale.channel}
                         </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {sale.feeMode === 'MANUAL' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title="Skema Manual: Input sudah harga bersih">
+                            Manual (Rp 0)
+                          </span>
+                        ) : (sale.adminFee || 0) > 0 ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Skema Otomatis: Dipotong biaya admin">
+                            Otomatis (-Rp {(sale.adminFee || 0).toLocaleString('id-ID')})
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-center font-bold text-slate-800">{sale.quantity}</td>
                       <td className="py-3.5 px-4 text-right font-black text-emerald-600">
