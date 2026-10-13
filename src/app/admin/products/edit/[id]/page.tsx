@@ -695,16 +695,24 @@ export default function EditProductPage() {
           return;
         }
       } else if (finalImageUrl.trim() && finalImageUrl.trim() !== originalImageUrlRef.current) {
-        const fd = new FormData();
-        fd.append('url', finalImageUrl.trim());
-        fd.append('folder', 'products');
-        const uploadResult = await uploadImageAction(fd);
-        if (!uploadResult.success || !uploadResult.url) {
-          toast.error(uploadResult.error || 'Gagal mengunduh foto dari URL');
-          setIsSubmitting(false);
-          return;
+        try {
+          const fd = new FormData();
+          fd.append('url', finalImageUrl.trim());
+          fd.append('folder', 'products');
+          const uploadResult = await uploadImageAction(fd);
+          if (uploadResult.success && uploadResult.url) {
+            finalImageUrl = uploadResult.url;
+          } else {
+            // Jika unduhan otomatis diblokir oleh server pemilik foto (misal Tokopedia CDN 403 / anti-hotlink),
+            // tetap gunakan URL langsung yang diinput pengguna agar produk berhasil disimpan!
+            console.warn('Gagal mengunduh foto untuk re-host, menggunakan URL langsung:', uploadResult.error);
+            toast('Foto disimpan dengan link langsung (server foto membatasi unduhan otomatis)', { icon: 'ℹ️' });
+            finalImageUrl = finalImageUrl.trim();
+          }
+        } catch (err: any) {
+          console.warn('Gagal memproses URL foto, menggunakan link langsung:', err);
+          finalImageUrl = finalImageUrl.trim();
         }
-        finalImageUrl = uploadResult.url;
       }
 
       // 3. Update Logic

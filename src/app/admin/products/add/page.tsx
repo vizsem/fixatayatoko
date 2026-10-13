@@ -378,14 +378,20 @@ export default function AddProductPage() {
           imageUrl = uploadResult.url;
         }
       } else if (imageUrl.trim()) {
-        const fd = new FormData();
-        fd.append('url', imageUrl.trim());
-        fd.append('folder', 'products');
-        const uploadResult = await uploadImageAction(fd);
-        if (!uploadResult.success || !uploadResult.url) {
-          throw new Error(uploadResult.error || 'Gagal mengunduh foto dari URL');
+        try {
+          const fd = new FormData();
+          fd.append('url', imageUrl.trim());
+          fd.append('folder', 'products');
+          const uploadResult = await uploadImageAction(fd);
+          if (uploadResult.success && uploadResult.url) {
+            imageUrl = uploadResult.url;
+          } else {
+            console.warn('Gagal mengunduh foto untuk re-host, menggunakan URL langsung:', uploadResult.error);
+            imageUrl = imageUrl.trim();
+          }
+        } catch {
+          imageUrl = imageUrl.trim();
         }
-        imageUrl = uploadResult.url;
       }
 
       const pricingStrategy: PricingStrategy =

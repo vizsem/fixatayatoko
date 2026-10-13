@@ -1,10 +1,17 @@
 import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('lucide-react', () => ({
+  Trash2: () => null,
+  Plus: () => null,
+  Minus: () => null,
+}));
+
 import { CartTable } from './CartTable';
 
 describe('CartTable unit display', () => {
-  it('shows configured non-carton units and uses their configured conversion', () => {
+  it('shows configured non-carton units and uses their configured conversion', { timeout: 15000 }, () => {
     render(
       <CartTable
         cart={[

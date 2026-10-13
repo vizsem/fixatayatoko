@@ -70,8 +70,31 @@ async function downloadImage(urlValue: string): Promise<{ buffer: Buffer; conten
     }
   }
 
-  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
-  if (!response.ok) throw new Error(`Gagal mengunduh foto (HTTP ${response.status})`)
+  const fetchHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Referer': url.origin + '/',
+  }
+
+  const MAX_RETRIES = 3
+  let response: Response | null = null
+  let lastError: string = ''
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(10_000),
+        headers: fetchHeaders,
+      })
+      if (response.ok) break
+      lastError = `HTTP ${response.status}`
+    } catch (err: any) {
+      lastError = err.message || 'Timeout'
+      response = null
+    }
+    if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 1000 * attempt))
+  }
+  if (!response || !response.ok) throw new Error(`Gagal mengunduh foto (${lastError})`)
 
   const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
   if (!IMAGE_TYPES[contentType]) throw new Error('URL tidak mengarah ke format gambar yang didukung')
