@@ -10,6 +10,9 @@ interface CartItem {
   unit: string;
   stock: number; // total base-unit (PCS) stock
   units?: any[];
+  isCustomPrice?: boolean;
+  defaultPrice?: number;
+  lastInputtedPrice?: number;
 }
 
 interface CartTableProps {
@@ -119,19 +122,52 @@ export const CartTable = ({ cart, onUpdateQty, onSetQty, onUpdatePrice, onUpdate
 
                   {/* ── Kolom: Harga per Satuan ── */}
                   <td className="px-4 py-3">
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] font-semibold text-gray-400">Rp</span>
                         <input
                           type="number"
+                          min={0}
                           value={item.price}
                           onChange={(e) => onUpdatePrice(item.id, Number(e.target.value))}
-                          className="w-24 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-xs font-black outline-none focus:ring-1 focus:ring-orange-400"
+                          className="w-28 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-xs font-black outline-none focus:ring-1 focus:ring-orange-400"
                         />
                       </div>
-                      <span className="text-[10px] text-gray-400 font-semibold pl-1">
-                        per {currentUnitCode}
-                      </span>
+                      <div className="flex flex-col gap-0.5 pl-1">
+                        <span className="text-[10px] text-gray-400 font-semibold">
+                          per {currentUnitCode}
+                        </span>
+
+                        {/* Rekomendasi nominal terakhir yang diinput */}
+                        {typeof item.lastInputtedPrice === 'number' && item.lastInputtedPrice > 0 && (
+                          item.price === item.lastInputtedPrice ? (
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                              <span className="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded w-fit">
+                                ✨ Sesuai input terakhir
+                              </span>
+                              {typeof item.defaultPrice === 'number' && item.defaultPrice > 0 && item.defaultPrice !== item.price && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdatePrice(item.id, item.defaultPrice!)}
+                                  className="text-[9px] font-bold text-gray-400 hover:text-blue-600 underline text-left w-fit"
+                                  title={`Kembalikan ke harga bawaan produk: Rp ${item.defaultPrice.toLocaleString('id-ID')}`}
+                                >
+                                  (Reset: Rp {item.defaultPrice.toLocaleString('id-ID')})
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onUpdatePrice(item.id, item.lastInputtedPrice!)}
+                              className="inline-flex items-center gap-1 text-[9px] font-black text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded transition-all text-left w-fit mt-0.5"
+                              title="Klik untuk menggunakan nominal harga yang terakhir kali Anda input"
+                            >
+                              <span>💡 Pakai terakhir: Rp {item.lastInputtedPrice.toLocaleString('id-ID')}</span>
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </td>
 

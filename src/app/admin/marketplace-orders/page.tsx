@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import notify from '@/lib/notify';
 import { createMarketplaceOrder } from '@/lib/actions/sales.actions';
@@ -43,6 +43,38 @@ interface CartItem {
   unit: string;
   stock: number;
   units?: any[];
+  isCustomPrice?: boolean;
+  defaultPrice?: number;
+  lastInputtedPrice?: number;
+}
+
+function getMktLastPriceKey(channel: string, productId: string, unit: string): string {
+  return `mkt_last_price_${(channel || 'shopee').toLowerCase()}_${productId}_${(unit || 'pcs').toUpperCase()}`;
+}
+
+function getMktLastPrice(channel: string, productId: string, unit: string): number | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const val = localStorage.getItem(getMktLastPriceKey(channel, productId, unit));
+    if (val !== null) {
+      const num = Number(val);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+function saveMktLastPrice(channel: string, productId: string, unit: string, price: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (Number.isFinite(price) && price > 0) {
+      localStorage.setItem(getMktLastPriceKey(channel, productId, unit), String(price));
+    }
+  } catch {
+    // ignore
+  }
 }
 
 function getProductPriceForUnit(p: Product, channel: 'SHOPEE' | 'TIKTOK', unitCode: string): number {
@@ -152,8 +184,11 @@ export default function MarketplaceOrdersPage() {
 
     let unsubscribe: (() => void) | undefined;
     (async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-        checkAuth();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        // Hanya arahkan jika sesi benar-benar hilang / logout
+        if (event === 'SIGNED_OUT' || !session) {
+          router.push('/profil/login');
+        }
       });
       unsubscribe = () => subscription.unsubscribe();
     })();
@@ -196,16 +231,33 @@ export default function MarketplaceOrdersPage() {
     if (data) setWarehouses(data as WarehouseOption[]);
   };
 
-  // Auto-sync cart prices when channel changes
+  // Lacak perubahan channel agar auto-sync hanya berjalan saat channel marketplace berganti
+  const prevChannelRef = useRef<Channel>(channel);
+
   useEffect(() => {
+    if (prevChannelRef.current === channel) return;
+    prevChannelRef.current = channel;
+
     if (cart.length === 0) return;
     setCart(prev => prev.map(item => {
       const p = products.find(prod => prod.id === item.id);
       if (!p) return item;
-      const newPrice = getProductPriceForUnit(p, channel, item.unit);
-      return { ...item, price: newPrice, stock: p.stock || 0 };
+      const defaultPrice = getProductPriceForUnit(p, channel, item.unit);
+      const lastPrice = getMktLastPrice(channel, item.id, item.unit);
+
+      // Jika user sudah pernah custom harga dan ada harga terakhir untuk channel ini, utamakan harga terakhir
+      const priceToUse = lastPrice ?? (item.isCustomPrice ? item.price : defaultPrice);
+
+      return {
+        ...item,
+        price: priceToUse,
+        defaultPrice,
+        lastInputtedPrice: lastPrice,
+        isCustomPrice: Boolean(lastPrice ? lastPrice !== defaultPrice : item.isCustomPrice),
+        stock: p.stock || 0
+      };
     }));
-  }, [channel, products]);
+  }, [channel, products, cart.length]);
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return [];
@@ -217,7 +269,11 @@ export default function MarketplaceOrdersPage() {
 
   const handleAddToCart = (p: Product) => {
     const initialUnit = p.unit || 'Pcs';
-    const price = getProductPriceForUnit(p, channel, initialUnit);
+    const defaultPrice = getProductPriceForUnit(p, channel, initialUnit);
+    const lastPrice = getMktLastPrice(channel, p.id, initialUnit);
+    // Utamakan harga rekomendasi yang terakhir kali diinput jika tersedia
+    const initialPrice = (typeof lastPrice === 'number' && lastPrice > 0) ? lastPrice : (defaultPrice || 0);
+
     setCart(prev => {
       const existing = prev.find(item => item.id === p.id);
       if (existing) {
@@ -227,7 +283,10 @@ export default function MarketplaceOrdersPage() {
       return [...prev, {
         id: p.id,
         name: p.name || '',
-        price: price || 0,
+        price: initialPrice,
+        defaultPrice: defaultPrice || 0,
+        lastInputtedPrice: lastPrice,
+        isCustomPrice: Boolean(lastPrice && lastPrice !== defaultPrice),
         quantity: 1,          // 1 unit of initialUnit
         unit: initialUnit,    // unit the quantity is expressed in
         stock: p.stock || 0,  // total base-unit stock for display
@@ -257,7 +316,19 @@ export default function MarketplaceOrdersPage() {
   };
 
   const updatePrice = (id: string, price: number) => {
-    setCart(prev => prev.map(item => item.id === id ? { ...item, price } : item));
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const validPrice = Math.max(0, price);
+        saveMktLastPrice(channel, item.id, item.unit, validPrice);
+        return {
+          ...item,
+          price: validPrice,
+          isCustomPrice: true,
+          lastInputtedPrice: validPrice
+        };
+      }
+      return item;
+    }));
   };
 
   const updateUnit = (id: string, unit: string) => {
@@ -265,9 +336,20 @@ export default function MarketplaceOrdersPage() {
       if (item.id !== id) return item;
       const p = products.find(prod => prod.id === id);
       if (!p) return { ...item, unit, quantity: 1 };
-      const newPrice = getProductPriceForUnit(p, channel, unit);
+      const defaultPrice = getProductPriceForUnit(p, channel, unit);
+      const lastPrice = getMktLastPrice(channel, id, unit);
+      const initialPrice = (typeof lastPrice === 'number' && lastPrice > 0) ? lastPrice : defaultPrice;
+
       // Reset quantity to 1 when unit changes to avoid confusion
-      return { ...item, unit, price: newPrice, quantity: 1 };
+      return {
+        ...item,
+        unit,
+        price: initialPrice,
+        defaultPrice,
+        lastInputtedPrice: lastPrice,
+        isCustomPrice: Boolean(lastPrice && lastPrice !== defaultPrice),
+        quantity: 1
+      };
     }));
   };
 
