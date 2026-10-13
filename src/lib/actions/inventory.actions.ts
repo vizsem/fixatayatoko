@@ -4,21 +4,29 @@ import { requireAdmin, requireStaff } from '@/lib/actions/session';
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase';
 
+const BATCH_COLS =
+  'id,name,sku,stock,cost_price,unit,is_active,created_at,updated_at,' +
+  'raw_stockByWarehouse:raw_data->stockByWarehouse,' +
+  'raw_expiredDate:raw_data->>expiredDate,' +
+  'raw_Expired:raw_data->>Expired,' +
+  'raw_costPrice:raw_data->>costPrice,' +
+  'raw_Modal:raw_data->>Modal,' +
+  'raw_units:raw_data->units';
+
 export async function getInventoryBatches(warehouseId?: string) {
   await requireStaff();
   try {
     const { data: products } = await supabaseAdmin
       .from('products')
-      .select('*')
+      .select(BATCH_COLS)
       .order('is_active', { ascending: false })
       .order('updated_at', { ascending: false });
     if (!products) return [];
 
     const batches: any[] = [];
     products.forEach((p: any) => {
-      const raw = p.raw_data || {};
-      const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
-      let stockByWarehouse = raw.stockByWarehouse;
+      const stock = Number(p.stock ?? 0);
+      let stockByWarehouse = p.raw_stockByWarehouse;
 
       if (!stockByWarehouse || typeof stockByWarehouse !== 'object' || Object.keys(stockByWarehouse).length === 0) {
         stockByWarehouse = { 'gudang-utama': stock };
@@ -30,13 +38,10 @@ export async function getInventoryBatches(warehouseId?: string) {
         }
       }
 
-      const isArchivedLegacy = 
-        raw.isActive === false || 
-        raw.isActive === 'false' || 
-        raw.Status === 1 || 
-        raw.Status === '1' || 
-        raw.status === 'ARCHIVED';
-      const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
+      const isActive = typeof p.is_active === 'boolean' ? p.is_active : true;
+      const cost = Number(p.cost_price ?? p.raw_costPrice ?? p.raw_Modal ?? 0);
+      const expDate = p.raw_expiredDate || p.raw_Expired ? new Date(p.raw_expiredDate || p.raw_Expired) : null;
+      const units = Array.isArray(p.raw_units) ? p.raw_units : undefined;
 
       Object.entries(stockByWarehouse).forEach(([whId, qty]: [string, any]) => {
         const qNum = Number(qty || 0);
@@ -46,17 +51,17 @@ export async function getInventoryBatches(warehouseId?: string) {
           id: `${p.id}-${whId}`,
           batchNumber: `BATCH-${p.sku || p.id.substring(0, 6).toUpperCase()}`,
           quantity: qNum,
-          incomingPrice: Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? 0),
-          expiryDate: raw.expiredDate || raw.Expired ? new Date(raw.expiredDate || raw.Expired) : null,
+          incomingPrice: cost,
+          expiryDate: expDate,
           createdAt: p.created_at ? new Date(p.created_at) : new Date(),
           warehouseId: whId,
           product: {
             id: p.id,
-            name: p.name || raw.name || raw.Nama || 'Produk',
-            sku: p.sku || raw.sku || raw.Barcode || p.id,
-            unit: (p.unit || raw.unit || 'pcs').toUpperCase(),
-            units: Array.isArray(raw.units) ? raw.units : undefined,
-            costPrice: Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? 0),
+            name: p.name || 'Produk',
+            sku: p.sku || p.id,
+            unit: (p.unit || 'pcs').toUpperCase(),
+            units,
+            costPrice: cost,
             isActive
           },
           warehouse: {
@@ -76,37 +81,26 @@ export async function getInventoryBatches(warehouseId?: string) {
 export async function getLowStockProducts(threshold: number = 10) {
   await requireStaff();
   try {
+    const LOW_STOCK_COLS = 'id,name,sku,stock,unit,is_active,category,raw_units:raw_data->units';
     const { data: products } = await supabaseAdmin
       .from('products')
-      .select('*')
+      .select(LOW_STOCK_COLS)
+      .lte('stock', threshold)
       .order('is_active', { ascending: false })
-      .order('updated_at', { ascending: false });
+      .order('stock', { ascending: true })
+      .limit(50);
     if (!products) return [];
 
-    return products
-      .map((p: any) => {
-        const raw = p.raw_data || {};
-        const stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
-        const isArchivedLegacy = 
-          raw.isActive === false || 
-          raw.isActive === 'false' || 
-          raw.Status === 1 || 
-          raw.Status === '1' || 
-          raw.status === 'ARCHIVED';
-        const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
-        return {
-          id: p.id,
-          name: p.name || raw.name || raw.Nama || 'Produk',
-          sku: p.sku || raw.sku || raw.Barcode || p.id,
-          category: { name: p.category || raw.category || 'Umum' },
-          stock,
-          unit: (p.unit || raw.unit || 'pcs').toUpperCase(),
-          units: Array.isArray(raw.units) ? raw.units : undefined,
-          isActive
-        };
-      })
-      .filter((p: any) => p.stock <= threshold)
-      .slice(0, 10);
+    return products.map((p: any) => ({
+      id: p.id,
+      name: p.name || 'Produk',
+      sku: p.sku || p.id,
+      category: { name: p.category || 'Umum' },
+      stock: Number(p.stock || 0),
+      unit: (p.unit || 'pcs').toUpperCase(),
+      units: Array.isArray(p.raw_units) ? p.raw_units : undefined,
+      isActive: p.is_active !== false
+    }));
   } catch (error) {
     console.error('Failed to fetch low stock:', error);
     return [];

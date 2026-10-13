@@ -9,7 +9,6 @@ import {
   DollarSign
 } from 'lucide-react';
 import { getInventoryBatches, getLowStockProducts, getInventoryMovements, adjustStock, getWarehouses } from '@/lib/actions/inventory.actions';
-import { getProducts } from '@/lib/actions/product.actions';
 import HppCalculatorModal from '@/components/admin/inventory/HppCalculatorModal';
 
 /** Compute stock expressed in each configured unit */
@@ -58,7 +57,6 @@ export default function AdminInventory() {
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [movements, setMovements] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
@@ -70,20 +68,54 @@ export default function AdminInventory() {
   const [quickAdjust, setQuickAdjust] = useState<{ batchId: string; value: string } | null>(null);
   const [hppModalOpen, setHppModalOpen] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  // Derive products directly from batches (saves redundant ~3-5MB getProducts fetch)
+  const products = useMemo(() => {
+    const map = new Map<string, any>();
+    batches.forEach((b: any) => {
+      const p = b.product;
+      if (!p || !p.id) return;
+      if (!map.has(p.id)) {
+        map.set(p.id, {
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          unit: p.unit,
+          units: p.units,
+          costPrice: p.costPrice || 0,
+          priceEcer: b.incomingPrice || p.costPrice || 0,
+          stock: 0,
+          isActive: p.isActive !== false,
+          stockByWarehouse: {},
+          raw_data: {
+            stockByWarehouse: {},
+            unit: p.unit,
+          },
+        });
+      }
+      const item = map.get(p.id);
+      item.stock += Number(b.quantity || 0);
+      item.stockByWarehouse[b.warehouseId] = Number(b.quantity || 0);
+      item.raw_data.stockByWarehouse[b.warehouseId] = Number(b.quantity || 0);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [batches]);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [b, ls, m, w, p] = await Promise.all([
+    const [b, ls, m, w] = await Promise.all([
       getInventoryBatches(),
       getLowStockProducts(10),
       getInventoryMovements({ limit: 100 }),
       getWarehouses(),
-      getProducts(),
     ]);
     setBatches(b);
     setLowStock(ls);
     setMovements(m);
     setWarehouses(w);
-    setProducts(p);
     setLoading(false);
   }, []);
 
@@ -102,6 +134,17 @@ export default function AdminInventory() {
       (statusFilter === 'inactive' && b.product?.isActive === false);
     return matchWarehouse && matchSearch && matchStatus;
   }), [batches, warehouseFilter, search, statusFilter]);
+
+  // Reset pagination when search / filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, warehouseFilter, statusFilter]);
+
+  const totalPages = Math.ceil(filteredBatches.length / itemsPerPage);
+  const paginatedBatches = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredBatches.slice(start, start + itemsPerPage);
+  }, [filteredBatches, currentPage, itemsPerPage]);
 
   const filteredLowStock = useMemo(() => lowStock.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -337,8 +380,8 @@ export default function AdminInventory() {
                       </tr></thead>
                       <tbody className="divide-y divide-gray-50">
                         {filteredBatches.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Tidak ada data batch</td></tr>
-                        ) : filteredBatches.map(b => {
+                          <tr><td colSpan={8} className="text-center py-8 text-gray-400 text-sm">Tidak ada data batch</td></tr>
+                        ) : paginatedBatches.map(b => {
                           const isExpiringSoon = b.expiryDate && msUntilExpiry(b.expiryDate) < EXPIRY_SOON_MS;
                           const isExpired = b.expiryDate && new Date(b.expiryDate) < new Date();
                           const isActive = b.product?.isActive !== false;
@@ -446,6 +489,54 @@ export default function AdminInventory() {
                         })}
                       </tbody>
                     </table>
+
+                    {/* Pagination Footer */}
+                    {totalPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-100 text-xs bg-gray-50/50">
+                        <div className="flex items-center gap-3 text-gray-600 font-medium">
+                          <span>
+                            Menampilkan {(currentPage - 1) * itemsPerPage + 1} -{' '}
+                            {Math.min(currentPage * itemsPerPage, filteredBatches.length)} dari {filteredBatches.length} batch
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-gray-400">| Per hal:</span>
+                            <select
+                              value={itemsPerPage}
+                              onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                              }}
+                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white font-bold text-gray-700"
+                            >
+                              <option value={25}>25</option>
+                              <option value={50}>50</option>
+                              <option value={100}>100</option>
+                              <option value={200}>200</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={currentPage <= 1}
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 disabled:opacity-40 hover:bg-gray-100 font-bold shadow-sm transition-all"
+                          >
+                            Prev
+                          </button>
+                          <span className="px-3 py-1.5 font-bold text-gray-800 bg-white border border-gray-200 rounded-lg shadow-sm">
+                            {currentPage} / {totalPages}
+                          </span>
+                          <button
+                            disabled={currentPage >= totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 disabled:opacity-40 hover:bg-gray-100 font-bold shadow-sm transition-all"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
