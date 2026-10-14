@@ -7,13 +7,14 @@ import {
   LayoutDashboard, CheckSquare, Square, ChevronRight, ChevronLeft,
   Clock, CheckCircle2, Trash2, RefreshCcw, Calendar,
   AlertTriangle, Ban, X, Loader2, Package, PrinterCheck,
-  Eye, ExternalLink, MessageSquare, CreditCard, MapPin
+  Eye, ExternalLink, MessageSquare, CreditCard, MapPin,
+  RotateCcw, Minus, Plus
 } from 'lucide-react';
 import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
-import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder } from '@/lib/actions/sales.actions';
+import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder, reorderSalesOrder } from '@/lib/actions/sales.actions';
 
 type Order = {
   id: string;
@@ -22,7 +23,7 @@ type Order = {
   totalAmount: number;
   createdAt: Date;
   customer: { name: string; phone?: string | null } | null;
-  items: { quantity: number; unitPrice: number; product: { name: string } | null }[];
+  items: { productId?: string; quantity: number; unitPrice: number; product: { name: string } | null }[];
   paymentMethod?: string;
   deliveryMethod?: string;
   deliveryAddress?: string | null;
@@ -49,12 +50,52 @@ export default function AdminOrders() {
   const [restockStock, setRestockStock] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // State Modal Pesan Ulang (Reorder)
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+  const [reorderSource, setReorderSource] = useState<Order | null>(null);
+  const [reorderQty, setReorderQty] = useState<Record<string, number>>({});
+  const [isReordering, setIsReordering] = useState(false);
+
   const loadOrders = useCallback(async () => {
     setLoading(true);
     const data = await getSalesOrders({ limit: 200 });
     setOrders(data as Order[]);
     setLoading(false);
   }, []);
+
+  const openReorderModal = (order: Order) => {
+    setReorderSource(order);
+    // Inisialisasi qty dari pesanan asal
+    const initQty: Record<string, number> = {};
+    order.items.forEach((it, idx) => {
+      const key = it.productId || String(idx);
+      initQty[key] = it.quantity;
+    });
+    setReorderQty(initQty);
+    setIsReorderModalOpen(true);
+  };
+
+  const handleConfirmReorder = async () => {
+    if (!reorderSource || isReordering) return;
+    setIsReordering(true);
+    const t = notify.admin.loading('Membuat pesanan ulang...');
+    const result = await reorderSalesOrder({
+      sourceOrderId: reorderSource.id,
+      quantities: reorderQty,
+      notes: `Pesan ulang dari ${reorderSource.soNumber}`,
+    });
+    notify.dismiss(t);
+    setIsReordering(false);
+    if (result.success && result.data) {
+      setIsReorderModalOpen(false);
+      setQuickViewOrder(null);
+      notify.admin.success(`Pesanan ulang ${result.data.soNumber} berhasil dibuat!`);
+      loadOrders();
+      router.push(`/admin/orders/${result.data.id}`);
+    } else {
+      notify.admin.error(result.error || 'Gagal membuat pesanan ulang');
+    }
+  };
 
   const handleBulkPrint = (mode: 'a4' | 'thermal' = 'a4') => {
     if (selectedOrders.length === 0) return;
@@ -487,6 +528,111 @@ export default function AdminOrders() {
         </div>
       )}
 
+      {/* Modal Pesan Ulang (Reorder) */}
+      {isReorderModalOpen && reorderSource && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center shrink-0">
+                <RotateCcw size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">Pesan Ulang</h3>
+                <p className="text-xs text-slate-400 font-medium truncate">
+                  Berdasarkan {reorderSource.soNumber} · {reorderSource.customer?.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsReorderModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Item list dengan edit qty */}
+            <div className="overflow-y-auto flex-1 space-y-2 mb-5 pr-1">
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Atur Jumlah Barang</p>
+              {reorderSource.items.map((it, idx) => {
+                const key = it.productId || String(idx);
+                const qty = reorderQty[key] ?? it.quantity;
+                return (
+                  <div key={key} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-black text-slate-800 truncate">{it.product?.name || 'Produk'}</p>
+                      <p className="text-[11px] font-mono text-slate-400">Rp {it.unitPrice.toLocaleString('id-ID')} / pcs</p>
+                    </div>
+                    {/* Qty stepper */}
+                    <div className="flex items-center gap-1.5 bg-white rounded-xl border border-slate-200 px-1.5 py-1">
+                      <button
+                        onClick={() => setReorderQty(prev => ({ ...prev, [key]: Math.max(0, (prev[key] ?? it.quantity) - 1) }))}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        value={qty}
+                        onChange={e => setReorderQty(prev => ({ ...prev, [key]: Math.max(0, Number(e.target.value)) }))}
+                        className="w-10 text-center text-xs font-black text-slate-900 outline-none bg-transparent"
+                      />
+                      <button
+                        onClick={() => setReorderQty(prev => ({ ...prev, [key]: (prev[key] ?? it.quantity) + 1 }))}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                    <div className="text-right w-20 shrink-0">
+                      <p className="text-xs font-black font-mono text-slate-900">
+                        Rp {(it.unitPrice * qty).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Total & aksi */}
+            <div className="border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold text-slate-500">Estimasi Total</span>
+                <span className="text-lg font-black font-mono text-slate-900">
+                  Rp {reorderSource.items.reduce((s, it, idx) => {
+                    const key = it.productId || String(idx);
+                    return s + it.unitPrice * (reorderQty[key] ?? it.quantity);
+                  }, 0).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsReorderModalOpen(false)}
+                  disabled={isReordering}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReorder}
+                  disabled={isReordering || reorderSource.items.every((it, idx) => (reorderQty[it.productId || String(idx)] ?? it.quantity) === 0)}
+                  className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-violet-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {isReordering ? (
+                    <><Loader2 size={14} className="animate-spin" /><span>Memproses...</span></>
+                  ) : (
+                    <><RotateCcw size={14} /><span>Buat Pesanan Baru</span></>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick View Order Modal (Instan 0 detik) */}
       {quickViewOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
@@ -628,7 +774,7 @@ export default function AdminOrders() {
 
             {/* Modal Footer Actions */}
             <div className="p-6 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => handlePrint(quickViewOrder.id, 'a4')}
@@ -644,6 +790,15 @@ export default function AdminOrders() {
                 >
                   <Receipt size={14} className="text-slate-500" />
                   <span>Struk Thermal</span>
+                </button>
+                {/* Tombol Pesan Ulang — muncul untuk semua status */}
+                <button
+                  type="button"
+                  onClick={() => openReorderModal(quickViewOrder)}
+                  className="px-3.5 py-2.5 bg-violet-50 border border-violet-200 hover:bg-violet-100 text-violet-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <RotateCcw size={14} />
+                  <span>Pesan Ulang</span>
                 </button>
               </div>
 

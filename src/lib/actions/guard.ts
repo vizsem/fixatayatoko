@@ -79,6 +79,14 @@ export type AuthorizeResult =
  * Pemetaan berdasarkan awalan email SENGAJA TIDAK dipakai: email bisa didaftarkan
  * sendiri, sehingga pola seperti `admin*@...` bukan bukti identitas.
  */
+interface CachedAuth {
+  identity: AdminIdentity;
+  expiresAt: number;
+}
+
+const authCache = new Map<string, CachedAuth>();
+const AUTH_CACHE_TTL_MS = 60_000; // 60 detik cache untuk mengurangi latency roundtrip ke Supabase
+
 export async function authorize(
   accessToken: string | null | undefined,
   level: AccessLevel = 'admin'
@@ -87,9 +95,20 @@ export async function authorize(
     return fail('UNAUTHENTICATED', 'Sesi tidak ditemukan. Silakan masuk ulang.');
   }
 
+  const now = Date.now();
+  const cached = authCache.get(accessToken);
+  if (cached && now < cached.expiresAt) {
+    const allowed = level === 'admin' ? isAdminRole(cached.identity.role) : isStaffOrAdmin(cached.identity.role);
+    if (!allowed) {
+      return fail('FORBIDDEN', 'Akun Anda tidak memiliki izin untuk tindakan ini.');
+    }
+    return { ok: true, identity: cached.identity };
+  }
+
   // Verifikasi tanda tangan token oleh Supabase (bukan sekadar mempercayai klien).
   const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
   if (error || !data?.user) {
+    authCache.delete(accessToken);
     return fail('UNAUTHENTICATED', 'Sesi tidak valid atau sudah kedaluwarsa. Silakan masuk ulang.');
   }
 
@@ -107,9 +126,6 @@ export async function authorize(
 
   // Sumber peran yang sah: `public.users.role` lebih dulu, lalu `app_metadata`
   // yang hanya bisa ditulis lewat service role.
-  // `user_metadata.role` SENGAJA TIDAK dipakai: pengguna dapat menulisnya sendiri
-  // lewat `PUT /auth/v1/user`, sehingga `user_metadata.role = 'admin'` akan
-  // melewati `requireAdmin()` pada SEMUA Server Action.
   const role =
     (row?.role as string | undefined) ||
     (user.app_metadata?.role as string | undefined) ||
@@ -123,9 +139,19 @@ export async function authorize(
     );
   }
 
+  const identity: AdminIdentity = { userId: user.id, email: user.email ?? null, role: role as string };
+
+  // Bersihkan cache jika terlalu besar untuk mencegah kebocoran memori
+  if (authCache.size > 500) {
+    authCache.forEach((v, k) => {
+      if (v.expiresAt <= now) authCache.delete(k);
+    });
+  }
+  authCache.set(accessToken, { identity, expiresAt: now + AUTH_CACHE_TTL_MS });
+
   return {
     ok: true,
-    identity: { userId: user.id, email: user.email ?? null, role: role as string },
+    identity,
   };
 }
 

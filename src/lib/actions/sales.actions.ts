@@ -2,7 +2,7 @@
 
 import { requireStaff } from '@/lib/actions/session';
 
-import { deductStockFEFO, addStock, addInventoryLog } from '../inventory'
+import { deductStockFEFO, addStock } from '../inventory'
 import { revalidatePath } from 'next/cache'
 
 type SalesItemInput = {
@@ -49,6 +49,7 @@ export async function getSalesOrders(filters?: { status?: string; customerId?: s
           phone: o.customer_phone || raw.phone || raw.customerPhone || null,
         },
         items: items.map((it: any) => ({
+          productId: it.productId || it.id || null,
           quantity: Number(it.quantity || it.qty || 1),
           unitPrice: Number(it.price || it.unitPrice || 0),
           product: { name: it.name || it.productName || 'Produk' },
@@ -185,6 +186,160 @@ export async function createSalesOrder(data: {
   }
 }
 
+/**
+ * Pesan Ulang — buat Sales Order baru berdasarkan item dari pesanan sebelumnya.
+ *
+ * Alurnya:
+ * 1. Ambil data pesanan asal (berisi items + info pelanggan + gudang).
+ * 2. Validasi: hanya item yang punya productId yang bisa di-reorder.
+ * 3. Deduct stok via FEFO persis seperti createSalesOrder.
+ * 4. Simpan SO baru dengan referensi ke pesanan asal (reorderedFromId).
+ * 5. Kembalikan id + soNumber SO baru agar UI bisa navigasi ke sana.
+ */
+export async function reorderSalesOrder(params: {
+  sourceOrderId: string;
+  /** Override qty per item (key = productId, value = qty baru). Jika kosong, pakai qty asli. */
+  quantities?: Record<string, number>;
+  notes?: string;
+  adminId?: string;
+}) {
+  await requireStaff();
+  try {
+    const { sourceOrderId, quantities = {}, notes, adminId = 'system' } = params;
+
+    // 1. Ambil pesanan asal
+    const { data: source, error: srcErr } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .or(`id.eq.${sourceOrderId},order_id.eq.${sourceOrderId}`)
+      .maybeSingle();
+
+    if (srcErr || !source) {
+      return { success: false, error: 'Pesanan asal tidak ditemukan' };
+    }
+
+    const raw = source.raw_data || {};
+    const sourceItems: any[] = Array.isArray(source.items) ? source.items : (raw.items || []);
+    const warehouseId: string = raw.warehouseId || source.warehouse_id || 'gudang-utama';
+
+    // 2. Bangun daftar item yang akan di-reorder
+    const reorderItems = sourceItems
+      .filter((it: any) => !!(it.productId || it.id))
+      .map((it: any) => {
+        const productId: string = it.productId || it.id;
+        const qty = quantities[productId] ?? Number(it.quantity || it.qty || 1);
+        return {
+          productId,
+          quantity: qty,
+          unitPrice: Number(it.price || it.unitPrice || 0),
+          name: it.name || it.productName || 'Produk',
+        };
+      })
+      .filter((it) => it.quantity > 0);
+
+    if (reorderItems.length === 0) {
+      return { success: false, error: 'Tidak ada item yang valid untuk dipesan ulang' };
+    }
+
+    // 3. Generate ID & nomor SO baru
+    const newId = `so_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newSoNumber = `SO-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Rekam HPP snapshot agar laba historis tidak berubah jika Modal produk diubah
+    const itemsDenganHpp = await lengkapiSnapshotHpp(
+      reorderItems.map((it) => ({ productId: it.productId, quantity: it.quantity, unitPrice: it.unitPrice }))
+    );
+
+    // 4. Deduct stok FEFO untuk setiap item — batalkan semua jika ada yang gagal
+    const sudahDipotong: { productId: string; quantity: number }[] = [];
+    const rollback = async () => {
+      for (const item of sudahDipotong) {
+        try {
+          await addStock({
+            productId: item.productId,
+            amount: item.quantity,
+            warehouseId,
+            reference: newSoNumber,
+            notes: `Rollback reorder ${newSoNumber} — gagal menyimpan`,
+            source: 'ORDER',
+          });
+        } catch (e) {
+          console.error(`Rollback stok gagal untuk ${item.productId}:`, e);
+        }
+      }
+    };
+
+    for (const item of reorderItems) {
+      const result = await deductStockFEFO({
+        productId: item.productId,
+        warehouseId,
+        amount: item.quantity,
+        reference: newSoNumber,
+        notes: `Reorder dari ${source.order_id || sourceOrderId}`,
+      });
+      if (!result.success) {
+        await rollback();
+        return {
+          success: false,
+          error: result.error || `Stok tidak cukup untuk produk: ${item.name}`,
+        };
+      }
+      sudahDipotong.push({ productId: item.productId, quantity: item.quantity });
+    }
+
+    const totalAmount = reorderItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
+
+    // 5. Simpan SO baru
+    const orderData = {
+      orderId: newSoNumber,
+      customerId: source.user_id || raw.customerId || '',
+      customerName: source.customer_name || raw.customerName || 'Pelanggan',
+      customerPhone: source.customer_phone || raw.customerPhone || null,
+      createdById: adminId,
+      notes: notes || `Pesan ulang dari ${source.order_id || sourceOrderId}`,
+      items: itemsDenganHpp,
+      total: totalAmount,
+      status: 'CONFIRMED',
+      warehouseId,
+      reorderedFromId: source.id,
+      reorderedFromSo: source.order_id || sourceOrderId,
+      createdAt: now,
+    };
+
+    const { error: insertErr } = await supabaseAdmin.from('orders').insert({
+      id: newId,
+      order_id: newSoNumber,
+      user_id: source.user_id || null,
+      customer_name: orderData.customerName,
+      customer_phone: orderData.customerPhone,
+      status: 'CONFIRMED',
+      total: totalAmount,
+      items: itemsDenganHpp,
+      raw_data: orderData,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (insertErr) {
+      await rollback();
+      throw insertErr;
+    }
+
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+
+    return {
+      success: true,
+      data: { id: newId, soNumber: newSoNumber, total: totalAmount },
+    };
+  } catch (err: any) {
+    console.error('reorderSalesOrder error:', err);
+    return { success: false, error: err.message || 'Gagal membuat pesanan ulang' };
+  }
+}
+
 export async function cancelSalesOrder(params: {
   orderId: string;
   restockStock?: boolean;
@@ -215,58 +370,36 @@ export async function cancelSalesOrder(params: {
     const items = order.items || raw.items || [];
     const warehouseId = raw.warehouseId || order.warehouse_id || 'gudang-utama';
 
-    // 1. Jika restockStock dipilih, kembalikan stok untuk setiap item ke tabel products
+    // 1. Jika restockStock dipilih, kembalikan stok untuk setiap item ke tabel products.
+    //    Gunakan addStock() — bukan update manual — agar raw_data (termasuk raw_data.stock,
+    //    raw_data.stockByWarehouse, dan inventoryLayers/FIFO) ikut diperbarui secara atomik.
+    //    Update manual sebelumnya hanya mengubah kolom `stock` & `stockByWarehouse` tapi
+    //    meninggalkan raw_data lama → deductStockFEFO membaca raw_data dan mendapat stok
+    //    yang tidak konsisten pada transaksi berikutnya.
     if (restockStock && Array.isArray(items) && items.length > 0) {
       for (const item of items) {
         const productId = item.productId || item.id;
         if (!productId) continue;
 
+        // baseQuantity dipakai oleh order marketplace; untuk SO kasir fallback ke quantity.
         const contains = Number(item.containsPerUnit || item.contains || 1);
         const qtyToReturn = Number(item.baseQuantity || (Number(item.quantity || 0) * contains));
 
         if (qtyToReturn <= 0) continue;
 
-        const { data: prod } = await supabaseAdmin
-          .from('products')
-          .select('stock, stockByWarehouse, name')
-          .eq('id', productId)
-          .maybeSingle();
-
-        if (prod) {
-          const currentTotalStock = Number(prod.stock || 0);
-          const stockByWarehouse = (prod.stockByWarehouse as Record<string, number>) || {};
-          const currentWarehouseStock = Number(stockByWarehouse[warehouseId] || 0);
-
-          const newTotalStock = currentTotalStock + qtyToReturn;
-          const newWarehouseStock = currentWarehouseStock + qtyToReturn;
-          const updatedStockByWarehouse = {
-            ...stockByWarehouse,
-            [warehouseId]: newWarehouseStock,
-          };
-
-          await supabaseAdmin
-            .from('products')
-            .update({
-              stock: newTotalStock,
-              stockByWarehouse: updatedStockByWarehouse,
-              updated_at: now,
-            })
-            .eq('id', productId);
-
-          await addInventoryLog({
+        try {
+          await addStock({
             productId,
-            productName: prod.name || item.name,
             amount: qtyToReturn,
-            quantity: qtyToReturn,
-            type: 'IN',
-            source: 'ORDER_CANCEL',
             warehouseId,
-            adminId,
-            referenceId: order.order_id || order.id,
+            reference: order.order_id || order.id,
             notes: `Pengembalian stok pembatalan pesanan #${order.order_id || order.id}${reason ? ` (${reason})` : ''}`,
-            prevStock: currentTotalStock,
-            nextStock: newTotalStock,
+            source: 'ORDER',
           });
+        } catch (stockErr: any) {
+          console.error(`Gagal mengembalikan stok untuk produk ${productId} saat batalkan pesanan:`, stockErr?.message || stockErr);
+          // Lanjutkan ke item berikutnya — jangan batalkan seluruh proses hanya karena
+          // satu produk gagal direstock (misalnya produk telah dihapus).
         }
       }
     }
