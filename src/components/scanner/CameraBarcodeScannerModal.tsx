@@ -98,7 +98,8 @@ export default function CameraBarcodeScannerModal({
           setTimeout(() => {
             setScannedSuccess(null);
             isProcessingScanRef.current = false;
-          }, 500);
+            lastScanRef.current = null;
+          }, 800);
         } else {
           await stopScanner();
           onCloseRef.current();

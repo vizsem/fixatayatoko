@@ -257,23 +257,18 @@ export default function StockReconciliationPage() {
       const timestamp = new Date().toISOString();
 
       await Promise.all(mismatchedItems.map(async (item) => {
-        const currentTotal = Number(item.systemStock || 0);
-        const currentWhStock = Number(
-          (item.product as any).stockByWarehouse?.[selectedWarehouse] ??
-          (selectedWarehouse === 'gudang-utama' ? currentTotal : 0)
-        );
-
-        const totalDiff = item.physicalStock - currentWhStock;
-        let newWarehouseStock = currentWhStock + totalDiff;
-        if (newWarehouseStock < 0) newWarehouseStock = 0;
+        const targetPhysicalStock = Math.max(0, item.physicalStock);
+        const totalDiff = item.difference;
+        const noteString = reconciliationNote || `Rekonsiliasi stok [${selectedWarehouse}]: selisih ${totalDiff > 0 ? '+' : ''}${totalDiff} ${item.product.unit || 'pcs'}`;
 
         await adjustStockTx({
           productId: item.product.id,
-          newStock: newWarehouseStock,
+          newStock: targetPhysicalStock,
           warehouseId: selectedWarehouse,
           adminId,
           source: 'RECONCILIATION',
-          note: reconciliationNote || `Rekonsiliasi stok [${selectedWarehouse}]: selisih ${totalDiff > 0 ? '+' : ''}${totalDiff} ${item.product.unit || 'pcs'}`,
+          note: noteString,
+          notes: noteString,
         });
 
         if (totalDiff !== 0) {
@@ -304,18 +299,32 @@ export default function StockReconciliationPage() {
         }
       }));
 
-      notify.admin.success(`Rekonsiliasi berhasil! ${mismatchedItems.length} produk disesuaikan.`);
+      notify.admin.success(`Rekonsiliasi berhasil! ${mismatchedItems.length} produk disesuaikan secara akurat.`);
 
-      // Reset after successful reconciliation
-      setReconciliationItems(prev => prev.map(item => ({
-        ...item,
-        systemStock: item.physicalStock,
-        physicalInputQty: item.physicalStock,
-        physicalInputUnit: item.product.unit || 'PCS',
-        difference: 0,
-        differenceValue: 0,
-        status: 'matched'
-      })));
+      // Reset dan update state lokal setelah rekonsiliasi berhasil
+      setReconciliationItems(prev => prev.map(item => {
+        const isModified = mismatchedItems.some(m => m.product.id === item.product.id);
+        if (!isModified) return item;
+
+        const updatedStockByWh = {
+          ...((item.product as any).stockByWarehouse || {}),
+          [selectedWarehouse]: item.physicalStock,
+        };
+
+        return {
+          ...item,
+          product: {
+            ...item.product,
+            stockByWarehouse: updatedStockByWh,
+          },
+          systemStock: item.physicalStock,
+          physicalInputQty: item.physicalStock,
+          physicalInputUnit: item.product.unit || 'PCS',
+          difference: 0,
+          differenceValue: 0,
+          status: 'matched' as const,
+        };
+      }));
 
       setReconciliationNote('');
       setShowConfirmModal(false);

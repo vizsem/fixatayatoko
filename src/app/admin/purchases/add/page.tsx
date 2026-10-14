@@ -19,6 +19,7 @@ import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { buildDuplicateCart } from '@/lib/purchase-duplicate';
 import { supabase } from '@/lib/supabase';
 import { sbGetDocs } from '@/lib/supabase-helpers';
+import { playScanBeep } from '@/lib/sound';
 interface Supplier { id: string; name: string; }
 interface Warehouse { id: string; name: string; }
 interface CartItem { 
@@ -57,6 +58,7 @@ function AddPurchaseFormContent() {
   const [shippingCost, setShippingCost] = useState(0);
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [purchasePriceMode, setPurchasePriceMode] = useState<'LATEST' | 'CHEAPEST'>('LATEST');
   const [pendingHistoryLookups, setPendingHistoryLookups] = useState(0);
@@ -192,7 +194,7 @@ function AddPurchaseFormContent() {
     };
   }, [liveProducts]);
 
-  const addToCart = (product: NormalizedProduct, preferredUnitCode?: string) => {
+  const addToCart = (product: NormalizedProduct, preferredUnitCode?: string, fromScan?: boolean) => {
     const defaultUnit = preferredUnitCode
       ? (product.units?.find(u => u.code.toUpperCase() === preferredUnitCode.toUpperCase()) ?? getLargestPurchaseUnit(product.units, product.unit || 'PCS'))
       : getLargestPurchaseUnit(product.units, product.unit || 'PCS');
@@ -200,6 +202,8 @@ function AddPurchaseFormContent() {
     const existing = cart.find(item => item.id === product.id);
     const targetUnitCode = existing?.unit || defaultUnit.code;
     const targetUnit = product.units?.find(unit => unit.code.toUpperCase() === targetUnitCode.toUpperCase()) || defaultUnit;
+
+    const newQty = existing ? existing.quantity + 1 : 1;
 
     setCart((currentCart) => {
       if (currentCart.some(item => item.id === product.id)) {
@@ -218,6 +222,22 @@ function AddPurchaseFormContent() {
         availableUnits: product.units || []
       }];
     });
+
+    // Audio & haptic feedback
+    playScanBeep();
+
+    // Visual highlight pada keranjang belanja
+    setHighlightedId(product.id);
+    setTimeout(() => {
+      setHighlightedId(prev => prev === product.id ? null : prev);
+    }, 1500);
+
+    // Feedback notifikasi yang jelas
+    if (existing) {
+      notify.admin.success(`Quantity bertambah: ${product.name} (${newQty} ${targetUnitCode})`);
+    } else {
+      notify.admin.success(`Masuk keranjang: ${product.name} (1 ${targetUnitCode})`);
+    }
 
     void applyPurchaseHistoryPrice(
       product,
@@ -314,57 +334,88 @@ function AddPurchaseFormContent() {
 
   const handleScan = async (code: string) => {
     try {
-      // Cari produk berdasarkan barcode utama ATAU barcode per satuan (di raw_data->units[].barcode)
-      // Kueri 1: barcode utama
-      let found: { id: string; data: () => Record<string, unknown> } | undefined;
-      const snapMain = await sbGetDocs({
-        table: 'products',
-        where: [{ field: 'barcode', op: '==', val: code }],
-        limit: 1,
-      });
-      if (snapMain.docs[0]) {
-        found = snapMain.docs[0];
+      const cleanCode = code.trim();
+      if (!cleanCode) return;
+
+      // 1. CARI CEPAT DI MEMORI LOKAL (`products`) - Instant 0ms!
+      let matchedProduct: NormalizedProduct | undefined;
+      let matchedUnitCode: string | undefined;
+
+      for (const p of products) {
+        if (
+          (p.barcode && p.barcode.toLowerCase() === cleanCode.toLowerCase()) ||
+          (p.sku && p.sku.toLowerCase() === cleanCode.toLowerCase()) ||
+          ((p as any).Barcode && String((p as any).Barcode).toLowerCase() === cleanCode.toLowerCase())
+        ) {
+          matchedProduct = p;
+          break;
+        }
+
+        const unitMatch = p.units?.find(u => u.barcode && u.barcode.toLowerCase() === cleanCode.toLowerCase());
+        if (unitMatch) {
+          matchedProduct = p;
+          matchedUnitCode = unitMatch.code;
+          break;
+        }
       }
 
-      // Kueri 2: barcode dalam raw_data->units (jika tidak ditemukan di kueri 1)
-      if (!found) {
-        const { data: unitRows } = await supabase
-          .from('products')
-          .select('id, raw_data')
-          .filter('raw_data->units', 'not.is', null)
-          .limit(500); // cap agar tidak terlalu banyak
-        if (unitRows) {
-          for (const row of unitRows) {
-            const rawUnits = (row.raw_data as Record<string, unknown>)?.units;
-            if (Array.isArray(rawUnits)) {
-              const hasMatch = rawUnits.some((u: Record<string, unknown>) => u?.barcode === code);
-              if (hasMatch) {
-                // Ambil full data produk
-                const snapById = await sbGetDocs({ table: 'products', where: [{ field: 'id', op: '==', val: row.id }], limit: 1 });
-                found = snapById.docs[0];
-                break;
+      // 2. Fallback query database jika belum ada di memori lokal
+      if (!matchedProduct) {
+        // Kueri 1: barcode utama
+        const snapMain = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'barcode', op: '==', val: cleanCode }],
+          limit: 1,
+        });
+        let foundDoc = snapMain.docs[0];
+
+        // Kueri 2: kolom sku
+        if (!foundDoc) {
+          const snapSku = await sbGetDocs({
+            table: 'products',
+            where: [{ field: 'sku', op: '==', val: cleanCode }],
+            limit: 1,
+          });
+          foundDoc = snapSku.docs[0];
+        }
+
+        // Kueri 3: barcode dalam units
+        if (!foundDoc) {
+          const { data: unitRows } = await supabase
+            .from('products')
+            .select('id, raw_data')
+            .filter('raw_data->units', 'not.is', null)
+            .limit(500);
+          if (unitRows) {
+            for (const row of unitRows) {
+              const rawUnits = (row.raw_data as Record<string, unknown>)?.units;
+              if (Array.isArray(rawUnits)) {
+                const hasMatch = rawUnits.some((u: Record<string, unknown>) => u?.barcode === cleanCode);
+                if (hasMatch) {
+                  const snapById = await sbGetDocs({ table: 'products', where: [{ field: 'id', op: '==', val: row.id }], limit: 1 });
+                  foundDoc = snapById.docs[0];
+                  break;
+                }
               }
             }
           }
         }
+
+        if (foundDoc) {
+          const pData = { id: foundDoc.id, ...foundDoc.data() } as Record<string, unknown>;
+          matchedProduct = normalizeProduct(pData.id as string, pData);
+          const unitMatch = matchedProduct.units?.find(u => u.barcode === cleanCode);
+          if (unitMatch) matchedUnitCode = unitMatch.code;
+        }
       }
 
-      if (!found) {
-        notify.admin.error('Barcode tidak ditemukan');
+      if (!matchedProduct) {
+        notify.admin.error(`Barcode "${cleanCode}" tidak ditemukan`);
         return;
       }
-      const p = { id: found.id, ...found.data() } as Record<string, unknown>;
-      const normalized: NormalizedProduct = normalizeProduct(p.id as string, p);
 
-      // Jika barcode cocok dengan satuan tertentu, pilih satuan itu
-      const unitMatch = normalized.units?.find(u => u.barcode === code);
-      if (unitMatch) {
-        addToCart(normalized, unitMatch.code);
-        notify.admin.success(`Produk ditambahkan: ${normalized.name} (${unitMatch.code})`);
-      } else {
-        addToCart(normalized);
-        notify.admin.success(`Produk ditambahkan: ${normalized.name}`);
-      }
+      // Masuk ke keranjang belanja & tambah quantity jika sudah ada
+      addToCart(matchedProduct, matchedUnitCode, true);
     } catch {
       notify.admin.error('Gagal membaca barcode');
     }
@@ -477,8 +528,10 @@ function AddPurchaseFormContent() {
 
   const filteredSearch = products.filter(p =>
     p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchProduct.toLowerCase())
-  ).slice(0, 5);
+    p.sku?.toLowerCase().includes(searchProduct.toLowerCase()) ||
+    p.barcode?.toLowerCase().includes(searchProduct.toLowerCase()) ||
+    p.units?.some(u => u.barcode && u.barcode.toLowerCase().includes(searchProduct.toLowerCase()))
+  ).slice(0, 8);
 
   if (isDuplicating) {
     return (
@@ -578,10 +631,18 @@ function AddPurchaseFormContent() {
                   id="product-search"
                   name="product-search"
                   type="text"
-                  className="w-full bg-gray-50 pl-12 pr-6 py-5 rounded-2xl text-xs font-bold outline-none"
-                  placeholder="Ketik Nama Produk atau Scan Barcode..."
+                  className="w-full bg-gray-50 pl-12 pr-28 py-5 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-black focus:bg-white transition-all"
+                  placeholder="Scan Barcode atau Ketik Nama Produk (Tekan Enter)..."
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const term = searchProduct.trim();
+                      if (!term) return;
+                      handleScan(term);
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -622,7 +683,14 @@ function AddPurchaseFormContent() {
             </div>
             <div className="md:hidden space-y-3 px-4 pb-4">
               {cart.map((item) => (
-                <div key={item.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+                <div
+                  key={item.id}
+                  className={`bg-white p-4 rounded-3xl border shadow-sm transition-all duration-300 ${
+                    highlightedId === item.id
+                      ? 'border-emerald-500 ring-2 ring-emerald-400 bg-emerald-50/40 scale-[1.01]'
+                      : 'border-gray-100'
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-black text-gray-900 uppercase tracking-tight line-clamp-2">{item.name}</p>
@@ -713,7 +781,12 @@ function AddPurchaseFormContent() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {cart.map((item) => (
-                    <tr key={item.id}>
+                    <tr
+                      key={item.id}
+                      className={`transition-colors duration-300 ${
+                        highlightedId === item.id ? 'bg-emerald-50/70 font-semibold' : ''
+                      }`}
+                    >
                       <td className="px-3 md:px-8 py-3 md:py-4">
                         <div className="flex flex-col">
                           <span className="text-xs font-black text-gray-800 uppercase">{item.name}</span>

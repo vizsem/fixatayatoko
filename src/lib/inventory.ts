@@ -556,27 +556,70 @@ export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
   if (!product) throw new Error('Product not found');
 
   const raw = product.raw_data || {};
-  const stockMap = { ...(raw.stockByWarehouse || {}) };
+  const currentTotal = Number(product.stock ?? raw.stock ?? 0);
   const warehouseId = params.warehouseId || 'gudang-utama';
-  const targetStock = params.newStock !== undefined ? params.newStock : (params.actualStock !== undefined ? params.actualStock : 0);
-  const prevWhStock = Number(stockMap[warehouseId] || 0);
+
+  // Normalisasi stockByWarehouse agar tidak kosong saat produk belum pernah di-split
+  let stockMap: Record<string, number> = {};
+  if (raw.stockByWarehouse && typeof raw.stockByWarehouse === 'object' && Object.keys(raw.stockByWarehouse).length > 0) {
+    Object.entries(raw.stockByWarehouse).forEach(([k, v]) => {
+      stockMap[k] = Number(v || 0);
+    });
+  } else {
+    stockMap = { 'gudang-utama': currentTotal };
+  }
+
+  // Ambil stok gudang sebelumnya yang akurat
+  const prevWhStock = Number(
+    stockMap[warehouseId] ?? (warehouseId === 'gudang-utama' ? currentTotal : 0)
+  );
+
+  const targetStock = params.newStock !== undefined
+    ? Number(params.newStock)
+    : (params.actualStock !== undefined ? Number(params.actualStock) : 0);
+
   const diff = targetStock - prevWhStock;
 
-  stockMap[warehouseId] = targetStock;
-  const prevTotal = Number(product.stock ?? raw.stock ?? 0);
-  const nextTotal = Math.max(0, prevTotal + diff);
+  // Set stok gudang yang disesuaikan
+  stockMap[warehouseId] = Math.max(0, targetStock);
+
+  // Total stok produk adalah akumulasi bersih dari seluruh gudang
+  const nextTotal = Object.values(stockMap).reduce((sum: number, q: number) => sum + Math.max(0, q), 0);
 
   const now = new Date().toISOString();
+
+  // Sinkronkan layer FIFO persediaan
+  let inventoryLayers = Array.isArray(raw.inventoryLayers) ? [...raw.inventoryLayers] : [];
+  const costPrice = Number(product.cost_price ?? raw.costPrice ?? raw.Modal ?? 0);
+
+  if (diff < 0) {
+    // Stok berkurang: konsumsi layer persediaan tertua (FIFO)
+    const { remaining } = consumeFifo(inventoryLayers, Math.abs(diff));
+    inventoryLayers = remaining;
+  } else if (diff > 0) {
+    // Stok bertambah: tambahkan layer persediaan baru dengan harga modal produk
+    inventoryLayers = pushLayer(inventoryLayers, {
+      qty: diff,
+      costPerPcs: costPrice,
+      ts: now,
+      warehouseId,
+      supplierName: 'RECONCILIATION',
+    });
+  }
+
   await supabaseAdmin.from('products').update({
     stock: nextTotal,
     raw_data: {
       ...raw,
       stock: nextTotal,
       stockByWarehouse: stockMap,
+      inventoryLayers,
       updatedAt: now,
     },
     updated_at: now,
   }).eq('id', params.productId);
+
+  const noteText = params.note || params.notes || (diff >= 0 ? 'Penyesuaian stok opname (Surplus)' : 'Penyesuaian stok opname (Defisit)');
 
   await addInventoryLog({
     productId: params.productId,
@@ -584,15 +627,15 @@ export const adjustStockTx = async (txOrParams: any, maybeParams?: any) => {
     type: diff < 0 ? 'KELUAR' : 'MASUK',
     amount: Math.abs(diff),
     quantity: diff,
-    prevStock: prevTotal,
+    prevStock: currentTotal,
     nextStock: nextTotal,
     warehouseId,
     adminId: params.adminId,
     source: params.source || 'OPNAME',
-    note: params.notes || 'Penyesuaian stok opname',
+    note: noteText,
   });
 
-  return { success: true, diff };
+  return { success: true, diff, newStock: nextTotal, newWhStock: targetStock };
 };
 
 export const deductStockBatch = async (
