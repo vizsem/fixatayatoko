@@ -14,6 +14,7 @@ import { sbUpdateDoc } from '@/lib/supabase-helpers';
 
 import { applyBulkPriceAdjustment, type BulkPricingMode } from '@/lib/channel-pricing-bulk';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
+import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
 type ChannelPricingState = {
@@ -48,6 +49,7 @@ type ImportRow = Partial<ExportRow> & Record<string, unknown>;
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showTikTokModal, setShowTikTokModal] = useState(false);
+  const [showShopeeModal, setShowShopeeModal] = useState(false);
   const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
   
   // Admin Fee Rates (in percentage)
@@ -458,6 +460,24 @@ export default function ChannelPricingPage() {
         return;
       }
 
+      // Check if this is a Shopee template
+      const isShopeeTemplate = keys.some(
+        (k) =>
+          k.includes('kode produk') ||
+          k.includes('kode variasi') ||
+          k.includes('nama variasi') ||
+          k.includes('sku induk') ||
+          k.includes('foto sampul') ||
+          k.includes('gambar sampul')
+      );
+
+      if (isShopeeTemplate) {
+        setShowShopeeModal(true);
+        notify.admin.success('Terdeteksi template Shopee! Membuka wizard import Shopee...', { id: toastId });
+        e.target.value = '';
+        return;
+      }
+
       // Group updates by product ID
       const updates: Record<string, Record<string, Record<string, { price: number }>>> = {};
 
@@ -628,6 +648,14 @@ export default function ChannelPricingPage() {
             <svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="white"/><text x="16" y="22" textAnchor="middle" fontSize="18" fill="black">♪</text></svg>
             Kalkulator TikTok
           </Link>
+          <button
+            type="button"
+            onClick={() => setShowShopeeModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#EE4D2D] hover:bg-[#d83f21] text-white rounded-xl shadow-sm transition-all text-xs font-black uppercase tracking-wider"
+          >
+            <Upload size={14} />
+            Import Shopee (2 Versi)
+          </button>
           <button
             type="button"
             onClick={() => setShowTikTokModal(true)}
@@ -886,6 +914,17 @@ export default function ChannelPricingPage() {
                   className="hidden"
                 />
               </label>
+              <button
+                type="button"
+                onClick={() => setShowShopeeModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#EE4D2D] hover:bg-[#d83f21] text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 100 100" fill="white">
+                  <circle cx="50" cy="50" r="46" fill="white" />
+                  <text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text>
+                </svg>
+                Import Shopee (2 Versi)
+              </button>
               <button
                 type="button"
                 onClick={() => setShowTikTokModal(true)}
@@ -1216,6 +1255,14 @@ export default function ChannelPricingPage() {
       <TikTokImportModal
         isOpen={showTikTokModal}
         onClose={() => setShowTikTokModal(false)}
+        onSuccess={() => {
+          // Handled by realtime hook
+        }}
+      />
+
+      <ShopeeImportModal
+        isOpen={showShopeeModal}
+        onClose={() => setShowShopeeModal(false)}
         onSuccess={() => {
           // Handled by realtime hook
         }}

@@ -24,6 +24,7 @@ import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScanner
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
+import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
 import { playScanBeep } from '@/lib/sound';
 
 
@@ -179,6 +180,7 @@ export default function AdminProducts() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showTikTokModal, setShowTikTokModal] = useState(false);
+  const [showShopeeModal, setShowShopeeModal] = useState(false);
   /* badge BARU di-nonaktifkan untuk menjaga kepatuhan lint */
 
   // Fungsi Toggle Select
@@ -745,6 +747,18 @@ export default function AdminProducts() {
             <Link href="/admin/purchases/import-supplier-prices" className="bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-blue-700 transition-all" title="Import Broadcast Supplier (Indogrosir, dll)"><UploadCloud size={12} /> Supplier</Link>
             <button
               type="button"
+              onClick={() => setShowShopeeModal(true)}
+              className="bg-[#EE4D2D] text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-[#d83f21] transition-all"
+              title="Import Shopee (2 Versi: Harga/Nama & URL Foto)"
+            >
+              <svg width="12" height="12" viewBox="0 0 100 100" fill="white">
+                <circle cx="50" cy="50" r="46" fill="white" />
+                <text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text>
+              </svg>
+              Shopee
+            </button>
+            <button
+              type="button"
               onClick={() => setShowTikTokModal(true)}
               className="bg-black text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-slate-800 transition-all"
               title="Import TikTok Shop (2 Versi: Harga/Nama & URL Foto)"
@@ -773,6 +787,17 @@ export default function AdminProducts() {
 
       {/* Mobile extra actions row */}
       <div className="sm:hidden flex gap-1.5 mb-3">
+        <button
+          type="button"
+          onClick={() => setShowShopeeModal(true)}
+          className="flex-1 bg-[#EE4D2D] text-white px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"
+        >
+          <svg width="12" height="12" viewBox="0 0 100 100" fill="white">
+            <circle cx="50" cy="50" r="46" fill="white" />
+            <text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text>
+          </svg>
+          Shopee
+        </button>
         <button
           type="button"
           onClick={() => setShowTikTokModal(true)}
@@ -1383,6 +1408,12 @@ export default function AdminProducts() {
       <TikTokImportModal
         isOpen={showTikTokModal}
         onClose={() => setShowTikTokModal(false)}
+      />
+
+      {/* Modal Shopee Import (2 Versi) */}
+      <ShopeeImportModal
+        isOpen={showShopeeModal}
+        onClose={() => setShowShopeeModal(false)}
       />
 
     </div>
