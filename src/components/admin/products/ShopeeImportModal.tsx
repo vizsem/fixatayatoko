@@ -158,12 +158,22 @@ export default function ShopeeImportModal({
         const cleanPName = cleanStr(p.name);
         if (cleanPName.length < 4) return false;
 
+        // DB name is substring of Shopee long name
         if (cleanRowName.includes(cleanPName)) return true;
 
+        // All significant words of DB name exist in Shopee name
         const pWords = cleanPName.split(' ').filter((w) => w.length > 2);
         if (pWords.length >= 2 && pWords.every((w) => cleanRowName.includes(w))) {
           return true;
         }
+
+        // Reverse: all significant words of V2/row name exist in DB name
+        // (handles case where V1 stored full Shopee title, V2 has shorter name)
+        const rowWords = cleanRowName.split(' ').filter((w) => w.length > 2);
+        if (rowWords.length >= 2 && rowWords.every((w) => cleanPName.includes(w))) {
+          return true;
+        }
+
         return false;
       });
 
@@ -416,6 +426,31 @@ export default function ShopeeImportModal({
       const now = new Date().toISOString();
       let updatedCount = 0;
       let createdCount = 0;
+
+      // Re-fetch products dari DB saat apply (bukan saat parse)
+      // Ini penting agar V2 bisa menemukan produk DRAFT yang baru dibuat oleh V1
+      setProgressText('Memuat ulang data produk terbaru dari database...');
+      const { data: freshDbRaw } = await supabase
+        .from('products')
+        .select('id, name, sku, barcode, category, unit, price, cost_price, stock, image_url, is_active, raw_data');
+      const freshDb = (freshDbRaw || []) as DbProduct[];
+
+      // Re-match baris yang belum cocok dengan data DB terbaru
+      if (isV1) {
+        for (let i = 0; i < v1Rows.length; i++) {
+          if (!v1Rows[i].matchedProduct) {
+            const fresh = findMatchingProduct(v1Rows[i], freshDb);
+            if (fresh) v1Rows[i] = { ...v1Rows[i], matchedProduct: fresh, isNewProduct: false };
+          }
+        }
+      } else {
+        for (let i = 0; i < v2Rows.length; i++) {
+          if (!v2Rows[i].matchedProduct) {
+            const fresh = findMatchingProduct(v2Rows[i], freshDb);
+            if (fresh) v2Rows[i] = { ...v2Rows[i], matchedProduct: fresh, isNewProduct: false };
+          }
+        }
+      }
 
       if (isV1) {
         const CHUNK_SIZE = 50;

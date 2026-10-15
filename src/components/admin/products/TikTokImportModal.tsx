@@ -85,7 +85,8 @@ export default function TikTokImportModal({
 
   // Options
   const [autoCreateNew, setAutoCreateNew] = useState(true);
-  const [autoActivate, setAutoActivate] = useState(true);
+  const [saveAsDraft, setSaveAsDraft] = useState(true);
+  const [autoActivate, setAutoActivate] = useState(false);
   const [updateDbName, setUpdateDbName] = useState(false);
 
   // Parsed Data
@@ -143,18 +144,27 @@ export default function TikTokImportModal({
       const exact = dbProducts.find((p) => cleanStr(p.name) === cleanRowName);
       if (exact) return exact;
 
-      // 3b. Containment: db product name inside TikTok long name
+      // 3b. Containment & keyword overlap
       const candidates = dbProducts.filter((p) => {
         const cleanPName = cleanStr(p.name);
         if (cleanPName.length < 4) return false;
 
+        // DB name is substring of TikTok long name
         if (cleanRowName.includes(cleanPName)) return true;
 
-        // Keyword overlap: all significant words of DB product name exist in TikTok name
+        // All significant words of DB name exist in TikTok name
         const pWords = cleanPName.split(' ').filter((w) => w.length > 2);
         if (pWords.length >= 2 && pWords.every((w) => cleanRowName.includes(w))) {
           return true;
         }
+
+        // Reverse: all significant words of V2/row name exist in DB name
+        // (handles case where V1 stored full TikTok title, V2 has shorter name)
+        const rowWords = cleanRowName.split(' ').filter((w) => w.length > 2);
+        if (rowWords.length >= 2 && rowWords.every((w) => cleanPName.includes(w))) {
+          return true;
+        }
+
         return false;
       });
 
@@ -343,6 +353,31 @@ export default function TikTokImportModal({
       let updatedCount = 0;
       let createdCount = 0;
 
+      // Re-fetch products dari DB saat apply (bukan saat parse)
+      // Ini penting agar V2 bisa menemukan produk DRAFT yang baru dibuat oleh V1
+      setProgressText('Memuat ulang data produk terbaru dari database...');
+      const { data: freshDbRaw } = await supabase
+        .from('products')
+        .select('id, name, sku, barcode, category, unit, price, cost_price, stock, image_url, is_active, raw_data');
+      const freshDb = (freshDbRaw || []) as DbProduct[];
+
+      // Re-match baris yang belum cocok dengan data DB terbaru
+      if (isV1) {
+        for (let i = 0; i < v1Rows.length; i++) {
+          if (!v1Rows[i].matchedProduct) {
+            const fresh = findMatchingProduct(v1Rows[i], freshDb);
+            if (fresh) v1Rows[i] = { ...v1Rows[i], matchedProduct: fresh, isNewProduct: false };
+          }
+        }
+      } else {
+        for (let i = 0; i < v2Rows.length; i++) {
+          if (!v2Rows[i].matchedProduct) {
+            const fresh = findMatchingProduct(v2Rows[i], freshDb);
+            if (fresh) v2Rows[i] = { ...v2Rows[i], matchedProduct: fresh, isNewProduct: false };
+          }
+        }
+      }
+
       if (isV1) {
         // Group by matched product id or create new
         const CHUNK_SIZE = 50;
@@ -392,10 +427,11 @@ export default function TikTokImportModal({
                 await supabase.from('products').update(updatePayload).eq('id', existing.id);
                 updatedCount++;
               } else if (autoCreateNew) {
-                // CREATE NEW PRODUCT
+                // CREATE NEW PRODUCT AS DRAFT OR ACTIVE
                 const newId = `prod_tt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
                 const unitKey = row.unitCode || 'PCS';
                 const productSku = row.sellerSku || row.skuId || row.tiktokId || `SKU-TT-${Date.now()}`;
+                const isItemActive = !saveAsDraft;
 
                 const rawData = {
                   name: row.name || 'Produk TikTok',
@@ -405,7 +441,10 @@ export default function TikTokImportModal({
                   price: row.price,
                   costPrice: 0,
                   stock: 0,
-                  isActive: true,
+                  isActive: isItemActive,
+                  Status: isItemActive ? 1 : 0,
+                  status: isItemActive ? 'ACTIVE' : 'DRAFT',
+                  isDraft: !isItemActive,
                   tiktokProductId: row.tiktokId,
                   tiktokSkuId: row.skuId,
                   channelPricing: {
@@ -426,7 +465,7 @@ export default function TikTokImportModal({
                   price: row.price,
                   cost_price: 0,
                   stock: 0,
-                  is_active: true,
+                  is_active: isItemActive,
                   raw_data: rawData,
                   created_at: now,
                   updated_at: now,
@@ -486,6 +525,7 @@ export default function TikTokImportModal({
                 const newId = `prod_tt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
                 const productSku = row.tiktokId ? `TT-${row.tiktokId}` : `SKU-TT-${Date.now()}`;
                 const allImages = [row.mainImage, ...row.extraImages].filter(Boolean);
+                const isItemActive = !saveAsDraft;
 
                 const rawData = {
                   name: row.name || 'Produk TikTok',
@@ -500,7 +540,10 @@ export default function TikTokImportModal({
                   image: row.mainImage,
                   Link_Foto: row.mainImage,
                   images: allImages,
-                  isActive: true,
+                  isActive: isItemActive,
+                  Status: isItemActive ? 1 : 0,
+                  status: isItemActive ? 'ACTIVE' : 'DRAFT',
+                  isDraft: !isItemActive,
                   tiktokProductId: row.tiktokId,
                   createdAt: now,
                   updatedAt: now,
@@ -516,7 +559,7 @@ export default function TikTokImportModal({
                   cost_price: 0,
                   stock: 0,
                   image_url: row.mainImage,
-                  is_active: true,
+                  is_active: isItemActive,
                   raw_data: rawData,
                   created_at: now,
                   updated_at: now,
@@ -534,8 +577,10 @@ export default function TikTokImportModal({
       }
 
       notify.admin.success(
-        `Sukses! ${updatedCount} produk diperbarui, ${createdCount} produk baru didaftarkan.`,
-        { id: toastId }
+        saveAsDraft && createdCount > 0
+          ? `Sukses! ${updatedCount} harga produk diperbarui, ${createdCount} produk baru tersimpan di DRAFT (Nonaktif) untuk dipilih.`
+          : `Sukses! ${updatedCount} produk diperbarui, ${createdCount} produk baru didaftarkan.`,
+        { id: toastId, duration: 5000 }
       );
 
       if (onSuccess) onSuccess();
@@ -739,6 +784,23 @@ export default function TikTokImportModal({
                   </span>
                 </label>
 
+                {autoCreateNew && (
+                  <label className="flex items-start gap-2.5 cursor-pointer bg-amber-50 p-2 rounded-xl border border-amber-200">
+                    <input
+                      type="checkbox"
+                      checked={saveAsDraft}
+                      onChange={(e) => setSaveAsDraft(e.target.checked)}
+                      className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="text-amber-900 font-bold leading-tight">
+                      Simpan sebagai DRAFT (Non-aktif)
+                      <span className="block text-[10px] text-amber-700 font-normal mt-0.5">
+                        Produk baru masuk ke tab Draft terlebih dahulu agar bisa ditinjau & dipilih sebelum diaktifkan.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -747,7 +809,7 @@ export default function TikTokImportModal({
                     className="mt-0.5 rounded text-black focus:ring-black"
                   />
                   <span className="text-slate-600 font-semibold leading-tight">
-                    Aktifkan produk jika sebelumnya nonaktif/diarsipkan
+                    Aktifkan produk jika sebelumnya nonaktif/diarsipkan (Default: Tidak)
                   </span>
                 </label>
 
@@ -837,7 +899,7 @@ export default function TikTokImportModal({
                           </span>
                         ) : autoCreateNew ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                            <Sparkles size={12} /> Buat Baru
+                            <Sparkles size={12} /> {saveAsDraft ? 'Draft Baru' : 'Buat Baru'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
@@ -865,11 +927,13 @@ export default function TikTokImportModal({
                           <div>
                             <span className="font-bold text-slate-800">{row.matchedProduct.name}</span>
                             <span className="block text-[10px] text-slate-400">
-                              ID: {row.matchedProduct.id} {row.matchedProduct.is_active === false && '(Nonaktif ➔ Akan diaktifkan)'}
+                              ID: {row.matchedProduct.id} {row.matchedProduct.is_active === false && '(Nonaktif)'}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Akan dibuat sebagai produk baru</span>
+                          <span className="text-amber-700 font-semibold italic">
+                            {saveAsDraft ? 'Masuk ke tab Draft (Non-aktif)' : 'Akan dibuat sebagai produk aktif'}
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -905,7 +969,7 @@ export default function TikTokImportModal({
                           </span>
                         ) : autoCreateNew ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                            <Sparkles size={12} /> Buat Baru
+                            <Sparkles size={12} /> {saveAsDraft ? 'Draft Baru' : 'Buat Baru'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
@@ -945,11 +1009,13 @@ export default function TikTokImportModal({
                           <div>
                             <span className="font-bold text-slate-800">{row.matchedProduct.name}</span>
                             <span className="block text-[10px] text-slate-400">
-                              ID: {row.matchedProduct.id} {row.matchedProduct.is_active === false && '(Nonaktif ➔ Akan diaktifkan)'}
+                              ID: {row.matchedProduct.id} {row.matchedProduct.is_active === false && '(Nonaktif)'}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Akan dibuat sebagai produk baru</span>
+                          <span className="text-amber-700 font-semibold italic">
+                            {saveAsDraft ? 'Masuk ke tab Draft (Non-aktif)' : 'Akan dibuat sebagai produk aktif'}
+                          </span>
                         )}
                       </td>
                     </tr>
