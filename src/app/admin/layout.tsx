@@ -10,7 +10,7 @@ import {
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
   Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
-  DollarSign, AlertTriangle, ClipboardCheck
+  DollarSign, AlertTriangle, ClipboardCheck, UploadCloud
 } from 'lucide-react';
 
 import AdminMobileHeader from '@/components/AdminMobileHeader';
@@ -133,6 +133,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       group: "Pembelian & Suplai", items: [
         { name: 'Pembelian (Purchases)', href: '/admin/purchases', icon: Receipt },
         { name: 'Supplier', href: '/admin/suppliers', icon: Truck },
+        { name: 'Import Harga Supplier', href: '/admin/purchases/import-supplier-prices', icon: UploadCloud },
       ]
     },
     {

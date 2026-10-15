@@ -16,7 +16,7 @@ import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers
+  CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -740,6 +740,7 @@ export default function AdminProducts() {
               <RefreshCw size={13} />
             </button>
             <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
+            <Link href="/admin/purchases/import-supplier-prices" className="bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-blue-700 transition-all" title="Import Broadcast Supplier (Indogrosir, dll)"><UploadCloud size={12} /> Supplier</Link>
             <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
             <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
           </div>
@@ -751,6 +752,7 @@ export default function AdminProducts() {
           >
             <RefreshCw size={13} />
           </button>
+          <Link href="/admin/purchases/import-supplier-prices" className="sm:hidden bg-blue-600 text-white p-2 rounded-lg transition-all shadow-sm" title="Import Supplier"><UploadCloud size={13} /></Link>
           {/* NEW SKU selalu tampil */}
           <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> <span className="hidden xs:inline">NEW</span> SKU</button>
         </div>
@@ -758,6 +760,7 @@ export default function AdminProducts() {
 
       {/* Mobile extra actions row */}
       <div className="sm:hidden flex gap-1.5 mb-3">
+        <Link href="/admin/purchases/import-supplier-prices" className="flex-1 bg-blue-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><UploadCloud size={11} /> Supplier</Link>
         <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
         <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
         <button onClick={downloadTemplate} className="flex-1 bg-white border border-gray-200 px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1"><FileSpreadsheet size={11} /> Template</button>
