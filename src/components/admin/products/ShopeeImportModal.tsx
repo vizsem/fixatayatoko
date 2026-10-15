@@ -83,7 +83,8 @@ export default function ShopeeImportModal({
 
   // Options
   const [autoCreateNew, setAutoCreateNew] = useState(true);
-  const [autoActivate, setAutoActivate] = useState(true);
+  const [saveAsDraft, setSaveAsDraft] = useState(true);
+  const [autoActivate, setAutoActivate] = useState(false);
   const [updateDbName, setUpdateDbName] = useState(false);
 
   // Parsed Data
@@ -466,6 +467,7 @@ export default function ShopeeImportModal({
                 const newId = `prod_sh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
                 const unitKey = row.unitCode || 'PCS';
                 const productSku = row.sku || row.skuInduk || row.kodeProduk || `SKU-SH-${Date.now()}`;
+                const isItemActive = !saveAsDraft;
 
                 const rawData = {
                   name: row.namaProduk || 'Produk Shopee',
@@ -475,7 +477,10 @@ export default function ShopeeImportModal({
                   price: row.harga,
                   costPrice: 0,
                   stock: row.stok || 0,
-                  isActive: true,
+                  isActive: isItemActive,
+                  Status: isItemActive ? 1 : 0,
+                  status: isItemActive ? 'ACTIVE' : 'DRAFT',
+                  isDraft: !isItemActive,
                   shopeeProductId: row.kodeProduk,
                   shopeeVariationId: row.kodeVariasi,
                   channelPricing: {
@@ -496,7 +501,7 @@ export default function ShopeeImportModal({
                   price: row.harga,
                   cost_price: 0,
                   stock: row.stok || 0,
-                  is_active: true,
+                  is_active: isItemActive,
                   raw_data: rawData,
                   created_at: now,
                   updated_at: now,
@@ -554,6 +559,7 @@ export default function ShopeeImportModal({
                 const newId = `prod_sh_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
                 const productSku = row.kodeProduk ? `SH-${row.kodeProduk}` : `SKU-SH-${Date.now()}`;
                 const allImages = [row.fotoSampul, ...row.fotoTambahan].filter(Boolean);
+                const isItemActive = !saveAsDraft;
 
                 const rawData = {
                   name: row.namaProduk || 'Produk Shopee',
@@ -568,7 +574,10 @@ export default function ShopeeImportModal({
                   image: row.fotoSampul,
                   Link_Foto: row.fotoSampul,
                   images: allImages,
-                  isActive: true,
+                  isActive: isItemActive,
+                  Status: isItemActive ? 1 : 0,
+                  status: isItemActive ? 'ACTIVE' : 'DRAFT',
+                  isDraft: !isItemActive,
                   shopeeProductId: row.kodeProduk,
                   createdAt: now,
                   updatedAt: now,
@@ -584,7 +593,7 @@ export default function ShopeeImportModal({
                   cost_price: 0,
                   stock: 0,
                   image_url: row.fotoSampul,
-                  is_active: true,
+                  is_active: isItemActive,
                   raw_data: rawData,
                   created_at: now,
                   updated_at: now,
@@ -602,8 +611,10 @@ export default function ShopeeImportModal({
       }
 
       notify.admin.success(
-        `Sukses! ${updatedCount} produk diperbarui, ${createdCount} produk baru didaftarkan.`,
-        { id: toastId }
+        saveAsDraft && createdCount > 0
+          ? `Sukses! ${updatedCount} harga produk diperbarui, ${createdCount} produk baru tersimpan di DRAFT (Nonaktif) untuk dipilih.`
+          : `Sukses! ${updatedCount} produk diperbarui, ${createdCount} produk baru didaftarkan.`,
+        { id: toastId, duration: 5000 }
       );
 
       if (onSuccess) onSuccess();
@@ -816,6 +827,23 @@ export default function ShopeeImportModal({
                   </span>
                 </label>
 
+                {autoCreateNew && (
+                  <label className="flex items-start gap-2.5 cursor-pointer bg-amber-50 p-2 rounded-xl border border-amber-200">
+                    <input
+                      type="checkbox"
+                      checked={saveAsDraft}
+                      onChange={(e) => setSaveAsDraft(e.target.checked)}
+                      className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="text-amber-900 font-bold leading-tight">
+                      Simpan sebagai DRAFT (Non-aktif)
+                      <span className="block text-[10px] text-amber-700 font-normal mt-0.5">
+                        Produk baru masuk ke tab Draft terlebih dahulu agar bisa ditinjau &amp; dipilih sebelum diaktifkan.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -824,7 +852,7 @@ export default function ShopeeImportModal({
                     className="mt-0.5 rounded text-[#EE4D2D] focus:ring-[#EE4D2D]"
                   />
                   <span className="text-slate-600 font-semibold leading-tight">
-                    Aktifkan produk jika sebelumnya nonaktif/diarsipkan
+                    Aktifkan produk jika sebelumnya nonaktif/diarsipkan (Default: Tidak)
                   </span>
                 </label>
 
@@ -869,7 +897,9 @@ export default function ShopeeImportModal({
             </div>
 
             <div className="text-right text-[11px] text-orange-100">
-              {isV1 ? 'Siap memperbarui harga channel Shopee' : 'Siap memperbarui foto produk Shopee'}
+              {newCount > 0 && saveAsDraft
+                ? `⚠️ ${newCount} produk baru → masuk DRAFT (nonaktif)`
+                : isV1 ? 'Siap memperbarui harga channel Shopee' : 'Siap memperbarui foto produk Shopee'}
             </div>
           </div>
         )}
@@ -914,7 +944,7 @@ export default function ShopeeImportModal({
                           </span>
                         ) : autoCreateNew ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                            <Sparkles size={12} /> Buat Baru
+                            <Sparkles size={12} /> {saveAsDraft ? 'Draft Baru' : 'Buat Baru'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
@@ -982,7 +1012,7 @@ export default function ShopeeImportModal({
                           </span>
                         ) : autoCreateNew ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                            <Sparkles size={12} /> Buat Baru
+                            <Sparkles size={12} /> {saveAsDraft ? 'Draft Baru' : 'Buat Baru'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
