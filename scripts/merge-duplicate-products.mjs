@@ -56,30 +56,32 @@ function cleanName(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function isSimilar(nameA, nameB) {
-  const a = cleanName(nameA);
-  const b = cleanName(nameB);
-  if (!a || !b || a.length < 4 || b.length < 4) return false;
-  if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
-  const wa = a.split(' ').filter(w => w.length > 2);
-  const wb = b.split(' ').filter(w => w.length > 2);
-  if (wa.length < 2 || wb.length < 2) return false;
-  const mAB = wa.filter(w => b.includes(w)).length / wa.length;
-  const mBA = wb.filter(w => a.includes(w)).length / wb.length;
-  return mAB >= 0.8 || mBA >= 0.8;
+function isSameProduct(pA, pB) {
+  const ttA = pA.raw_data?.tiktokProductId;
+  const ttB = pB.raw_data?.tiktokProductId;
+  if (ttA && ttB && String(ttA).trim() && String(ttB).trim() && String(ttA).trim() === String(ttB).trim()) return true;
+
+  const shA = pA.raw_data?.shopeeProductId;
+  const shB = pB.raw_data?.shopeeProductId;
+  if (shA && shB && String(shA).trim() && String(shB).trim() && String(shA).trim() === String(shB).trim()) return true;
+
+  const ca = cleanName(pA.name);
+  const cb = cleanName(pB.name);
+  if (ca && cb && ca.length >= 3 && ca === cb) return true;
+
+  return false;
 }
 
 function scoreProd(p) {
   let s = 0;
-  if (p.image_url) s += 10;
   const r = p.raw_data || {};
-  if (r.channelPricing?.tiktok) s += 5;
-  if (r.channelPricing?.shopee) s += 5;
-  if (r.priceTiktok) s += 3;
-  if (r.priceShopee) s += 3;
-  if (p.price > 0) s += 2;
-  if (p.is_active) s += 1;
+  if (p.price > 0 || r.price > 0) s += 20;
+  if (r.channelPricing?.tiktok) s += 15;
+  if (r.channelPricing?.shopee) s += 15;
+  if (p.image_url || r.image_url || r.imageUrl) s += 10;
+  if (r.priceTiktok) s += 5;
+  if (r.priceShopee) s += 5;
+  if (p.is_active) s += 3;
   return s;
 }
 
@@ -94,9 +96,12 @@ function mergeRawData(master, duplicates) {
         else m.channelPricing[ch] = { ...units, ...m.channelPricing[ch] };
       }
     }
-    if (!m.image_url && r.image_url) m.image_url = r.image_url;
-    if (!m.imageUrl && r.imageUrl) m.imageUrl = r.imageUrl;
-    if (!m.Link_Foto && r.Link_Foto) m.Link_Foto = r.Link_Foto;
+    if ((!m.price || m.price === 0) && (r.price || dup.price)) {
+      m.price = r.price || dup.price;
+    }
+    if (!m.image_url && (r.image_url || dup.image_url)) m.image_url = r.image_url || dup.image_url;
+    if (!m.imageUrl && (r.imageUrl || dup.image_url)) m.imageUrl = r.imageUrl || dup.image_url;
+    if (!m.Link_Foto && (r.Link_Foto || dup.image_url)) m.Link_Foto = r.Link_Foto || dup.image_url;
     if (!m.images && r.images) m.images = r.images;
     if (!m.tiktokProductId && r.tiktokProductId) m.tiktokProductId = r.tiktokProductId;
     if (!m.shopeeProductId && r.shopeeProductId) m.shopeeProductId = r.shopeeProductId;
@@ -112,8 +117,21 @@ async function main() {
   console.log(`  Mode: ${DRY_RUN ? '🔍 DRY-RUN (tidak ada perubahan)' : '⚠️  APPLY (merge & hapus duplikat!)'}`);
   console.log(`${'─'.repeat(65)}\n`);
 
-  console.log('📥 Mengambil semua produk...');
-  const products = await sbFetch('/products?select=id,name,sku,barcode,unit,price,cost_price,stock,image_url,is_active,raw_data,created_at&order=created_at.asc&limit=5000');
+  console.log('📥 Mengambil semua produk (dengan pagination)...');
+  const products = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const batch = await sbFetch(`/products?select=id,name,sku,barcode,unit,price,cost_price,stock,image_url,is_active,raw_data,created_at&order=created_at.asc`, {
+      headers: {
+        Range: `${from}-${from + pageSize - 1}`,
+      },
+    });
+    if (!batch || batch.length === 0) break;
+    products.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
   console.log(`   → ${products.length} produk ditemukan\n`);
 
   const visited = new Set();
@@ -125,7 +143,7 @@ async function main() {
     visited.add(products[i].id);
     for (let j = i + 1; j < products.length; j++) {
       if (visited.has(products[j].id)) continue;
-      if (isSimilar(products[i].name, products[j].name)) {
+      if (isSameProduct(products[i], products[j])) {
         group.push(products[j]);
         visited.add(products[j].id);
       }
@@ -164,11 +182,18 @@ async function main() {
     if (!DRY_RUN) {
       const mergedRaw = mergeRawData(master, dups);
       const payload = { raw_data: mergedRaw, updated_at: new Date().toISOString() };
-      if (!master.image_url) {
-        const withImg = dups.find(d => d.image_url);
-        if (withImg) payload.image_url = withImg.image_url;
+
+      const img = master.image_url || dups.find(d => d.image_url)?.image_url || mergedRaw.image_url;
+      if (img && img !== master.image_url) {
+        payload.image_url = img;
       }
-      if (!master.is_active && dups.some(d => d.is_active)) payload.is_active = true;
+      const prc = Number(master.price) > 0 ? master.price : (dups.find(d => Number(d.price) > 0)?.price || mergedRaw.price || 0);
+      if (prc && prc !== master.price) {
+        payload.price = prc;
+      }
+      if (!master.is_active && dups.some(d => d.is_active)) {
+        payload.is_active = true;
+      }
 
       await sbFetch(`/products?id=eq.${master.id}`, { method: 'PATCH', prefer: 'return=minimal', body: JSON.stringify(payload) });
 
@@ -176,7 +201,6 @@ async function main() {
         await sbFetch(`/products?id=eq.${dup.id}`, { method: 'DELETE', prefer: 'return=minimal' });
         totalDeleted++;
       }
-      console.log(`      ✅ Digabung, ${dups.length} duplikat dihapus`);
     }
   }
 

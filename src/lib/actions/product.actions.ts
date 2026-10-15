@@ -135,6 +135,19 @@ export async function getProducts(options?: ProductQueryOptions) {
       // Gunakan kolom is_active dari DB jika ada, fallback ke heuristik raw_data
       const isActive = typeof p.is_active === 'boolean' ? p.is_active : !isArchivedLegacy;
 
+      // Extract channel pricing
+      let channelPricing = raw.channelPricing || p.channel_pricing || undefined;
+      const baseUnitUpper = (p.unit || raw.unit || 'PCS').toString().toUpperCase();
+      if (!channelPricing && (raw.priceTiktok || raw.priceShopee)) {
+        channelPricing = {};
+        if (raw.priceTiktok) {
+          channelPricing.tiktok = { [baseUnitUpper]: { price: Number(raw.priceTiktok) } };
+        }
+        if (raw.priceShopee) {
+          channelPricing.shopee = { [baseUnitUpper]: { price: Number(raw.priceShopee) } };
+        }
+      }
+
       return {
         id: p.id,
         name: p.name || raw.name || raw.Nama || 'Produk',
@@ -162,7 +175,13 @@ export async function getProducts(options?: ProductQueryOptions) {
         createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
         updatedAt: p.updated_at ? new Date(p.updated_at).getTime() : Date.now(),
         expired_date: raw.expiredDate || raw.Expired || undefined,
-        batches: []
+        batches: [],
+        channelPricing,
+        priceTiktok: Number(raw.priceTiktok || channelPricing?.tiktok?.[baseUnitUpper]?.price || 0) || undefined,
+        priceShopee: Number(raw.priceShopee || channelPricing?.shopee?.[baseUnitUpper]?.price || 0) || undefined,
+        tiktokProductId: raw.tiktokProductId || p.tiktok_product_id || undefined,
+        shopeeProductId: raw.shopeeProductId || p.shopee_product_id || undefined,
+        raw_data: raw,
       };
     });
 

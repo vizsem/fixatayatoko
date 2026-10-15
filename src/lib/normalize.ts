@@ -44,6 +44,8 @@ export type NormalizedProduct = {
   createdAt?: number;
   minWholesaleQty?: number;
   Modal?: number;
+  channelPricing?: any;
+  raw_data?: any;
 };
 
 export function normalizeProduct(id: string, raw: Record<string, unknown>): NormalizedProduct {
@@ -114,6 +116,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
   result.units = parseUnits(rawUnits, unit, priceEcer, priceGrosir, minGrosir);
   result.minWholesaleQty = minGrosir;
   result.Modal = getNum(raw.purchasePrice ?? raw.Modal);
+  result.channelPricing = (raw as Record<string, unknown>).channelPricing;
+  result.raw_data = raw;
   return result;
 }
 

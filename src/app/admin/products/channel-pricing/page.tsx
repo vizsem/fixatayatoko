@@ -48,9 +48,28 @@ type ImportRow = Partial<ExportRow> & Record<string, unknown>;
 
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [showTikTokModal, setShowTikTokModal] = useState(false);
   const [showShopeeModal, setShowShopeeModal] = useState(false);
-  const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'draft'>('all');
+
+  const queryOptions = useMemo(() => {
+    const opts: {
+      orderByField?: 'name' | 'updatedAt' | 'sku' | 'createdAt';
+      orderDirection?: 'asc' | 'desc';
+      isActive?: boolean;
+      limit?: number;
+    } = {
+      orderByField: 'name',
+      orderDirection: 'asc',
+      limit: 5000,
+    };
+    if (statusFilter === 'active') opts.isActive = true;
+    if (statusFilter === 'draft') opts.isActive = false;
+    return opts;
+  }, [statusFilter]);
+
+  const { products: liveProducts, loading } = useProducts(queryOptions);
   
   // Admin Fee Rates (in percentage)
   const [adminFees, setAdminFees] = useState({
@@ -316,7 +335,9 @@ export default function ChannelPricingPage() {
         units.forEach((uc) => {
           if (next[p.id][uc]) return;
 
-          const legacy = (p.channelPricing || {}) as {
+          const rawData = (p as any).raw_data || {};
+          const cp = p.channelPricing || rawData.channelPricing || {};
+          const legacy = cp as {
             offline?: { price?: number };
             website?: { price?: number };
             shopee?: { price?: number };
@@ -325,10 +346,10 @@ export default function ChannelPricingPage() {
           const legacyState: ChannelPricingState = {
             offline: legacy?.offline?.price,
             website: legacy?.website?.price,
-            shopee: legacy?.shopee?.price,
-            tiktok: legacy?.tiktok?.price,
+            shopee: legacy?.shopee?.price || rawData.priceShopee || (p as any).priceShopee,
+            tiktok: legacy?.tiktok?.price || rawData.priceTiktok || (p as any).priceTiktok,
           };
-          const nested = (p.channelPricing || {}) as Record<string, UnitChannelPricing>;
+          const nested = cp as Record<string, UnitChannelPricing>;
           const fromNested: ChannelPricingState = {
             offline: nested?.offline?.[uc]?.price,
             website: nested?.website?.[uc]?.price,
@@ -336,13 +357,50 @@ export default function ChannelPricingPage() {
             tiktok: nested?.tiktok?.[uc]?.price,
           };
 
-          next[p.id][uc] = uc === baseUnit ? { ...legacyState, ...fromNested } : fromNested;
+          const combined = uc === baseUnit ? { ...legacyState, ...fromNested } : fromNested;
+          if (uc === baseUnit) {
+            if (combined.tiktok === undefined && (rawData.priceTiktok || (p as any).priceTiktok)) {
+              combined.tiktok = Number(rawData.priceTiktok || (p as any).priceTiktok);
+            }
+            if (combined.shopee === undefined && (rawData.priceShopee || (p as any).priceShopee)) {
+              combined.shopee = Number(rawData.priceShopee || (p as any).priceShopee);
+            }
+          }
+
+          next[p.id][uc] = combined;
         });
       });
 
       return next;
     });
   }, [liveProducts]);
+
+  const handleToggleActive = async (product: Product) => {
+    const nextActive = !product.isActive;
+    setTogglingId(product.id);
+    const toastId = notify.admin.loading(nextActive ? 'Mengaktifkan produk...' : 'Mengubah ke status draf...');
+    try {
+      await supabase.from('products').update({
+        is_active: nextActive,
+        updated_at: new Date().toISOString()
+      }).eq('id', product.id);
+
+      await sbUpdateDoc('products', product.id, {
+        isActive: nextActive,
+        is_active: nextActive,
+        Status: nextActive ? 0 : 1,
+        status: nextActive ? 'ACTIVE' : 'DRAFT',
+      });
+
+      product.isActive = nextActive;
+      notify.admin.success(nextActive ? 'Produk berhasil diaktifkan!' : 'Produk diubah menjadi draf.', { id: toastId });
+    } catch (err) {
+      console.error(err);
+      notify.admin.error('Gagal memperbarui status produk.', { id: toastId });
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -894,8 +952,8 @@ export default function ChannelPricingPage() {
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-6 flex items-center justify-between gap-4">
-           <div className="flex items-center gap-2">
+        <div className="px-6 pb-6 pt-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+           <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleExport}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
@@ -937,16 +995,54 @@ export default function ChannelPricingPage() {
               </button>
            </div>
            
-           <div className="flex items-center gap-2">
-             <span className="text-xs font-bold text-gray-500">Tampilkan:</span>
-             <select
-               value={itemsPerPage}
-               onChange={(e) => setItemsPerPage(Number(e.target.value))}
-               className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold outline-none"
-             >
-               <option value={200}>200</option>
-               <option value={500}>500</option>
-             </select>
+           <div className="flex flex-wrap items-center gap-4">
+             <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+               <button
+                 type="button"
+                 onClick={() => setStatusFilter('all')}
+                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                   statusFilter === 'all'
+                     ? 'bg-white text-gray-900 shadow-sm'
+                     : 'text-gray-500 hover:text-gray-900'
+                 }`}
+               >
+                 Semua Status ({liveProducts.length})
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setStatusFilter('active')}
+                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                   statusFilter === 'active'
+                     ? 'bg-emerald-600 text-white shadow-sm'
+                     : 'text-gray-500 hover:text-gray-900'
+                 }`}
+               >
+                 Aktif
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setStatusFilter('draft')}
+                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                   statusFilter === 'draft'
+                     ? 'bg-amber-500 text-white shadow-sm'
+                     : 'text-gray-500 hover:text-gray-900'
+                 }`}
+               >
+                 Draf / Nonaktif
+               </button>
+             </div>
+
+             <div className="flex items-center gap-2">
+               <span className="text-xs font-bold text-gray-500">Tampilkan:</span>
+               <select
+                 value={itemsPerPage}
+                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                 className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+               >
+                 <option value={200}>200</option>
+                 <option value={500}>500</option>
+               </select>
+             </div>
            </div>
         </div>
 
@@ -983,7 +1079,12 @@ export default function ChannelPricingPage() {
                                       className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                   />
                                   <div>
-                                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight leading-tight">{displayName}</h3>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                          {p.isActive ? 'Aktif' : 'Draf'}
+                                        </span>
+                                      </div>
                                       <div className="flex flex-col gap-0.5 mt-1">
                                         <p className="text-xs font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
                                         <p className="text-xs font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
@@ -1048,15 +1149,29 @@ export default function ChannelPricingPage() {
                               })}
                           </div>
 
-                          <button
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(p)}
+                              disabled={togglingId === p.id}
+                              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-[0.1em] flex items-center justify-center gap-1 transition-colors ${
+                                p.isActive 
+                                  ? 'bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800' 
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                              }`}
+                            >
+                              {togglingId === p.id ? 'Memproses...' : p.isActive ? 'Ubah ke Draf' : 'Aktifkan Produk'}
+                            </button>
+                            <button
                               type="button"
                               onClick={() => handleSave(p)}
                               disabled={savingId === p.id}
-                              className="w-full py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 disabled:opacity-50"
-                          >
+                              className="flex-1 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+                            >
                               <Save size={14} />
                               {savingId === p.id ? 'Menyimpan...' : 'Simpan Perubahan'}
-                          </button>
+                            </button>
+                          </div>
                       </div>
                   );
               })}
@@ -1131,9 +1246,14 @@ export default function ChannelPricingPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs font-black text-gray-800 uppercase">
-                            {displayName}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-gray-800 uppercase">
+                              {displayName}
+                            </span>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {p.isActive ? 'Aktif' : 'Draf'}
+                            </span>
+                          </div>
                           <div className="flex flex-col">
                             <span className="text-xs font-bold text-gray-400">
                               Harga dasar: Rp {Number(currentDasar).toLocaleString()}
@@ -1200,15 +1320,30 @@ export default function ChannelPricingPage() {
                         );
                       })}
                       <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleSave(p)}
-                          disabled={savingId === p.id}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-black text-white text-xs font-black uppercase tracking-[0.2em] disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Save size={14} />
-                          {savingId === p.id ? 'Menyimpan...' : 'Simpan'}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActive(p)}
+                            disabled={togglingId === p.id}
+                            className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-colors ${
+                              p.isActive 
+                                ? 'bg-gray-100 hover:bg-amber-50 text-gray-600 hover:text-amber-700' 
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                            }`}
+                            title={p.isActive ? 'Ubah ke Draf' : 'Aktifkan Produk'}
+                          >
+                            {togglingId === p.id ? '...' : p.isActive ? 'Draf' : 'Aktifkan'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSave(p)}
+                            disabled={savingId === p.id}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white text-xs font-black uppercase tracking-[0.2em] disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                          >
+                            <Save size={14} />
+                            {savingId === p.id ? 'Menyimpan...' : 'Simpan'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
