@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { sbUpdateDoc } from '@/lib/supabase-helpers';
 
 import { applyBulkPriceAdjustment, type BulkPricingMode } from '@/lib/channel-pricing-bulk';
+import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
 
 type ChannelPricingState = {
@@ -46,6 +47,7 @@ type ImportRow = Partial<ExportRow> & Record<string, unknown>;
 
 export default function ChannelPricingPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [showTikTokModal, setShowTikTokModal] = useState(false);
   const { products: liveProducts, loading } = useProducts({ isActive: true, orderByField: 'name', orderDirection: 'asc' });
   
   // Admin Fee Rates (in percentage)
@@ -432,6 +434,30 @@ export default function ChannelPricingPage() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
 
+      if (!jsonData.length) {
+        notify.admin.error('File Excel kosong atau tidak memiliki baris data.', { id: toastId });
+        return;
+      }
+
+      // Check if this is a TikTok Shop template
+      const firstRow = jsonData[0] as Record<string, unknown>;
+      const keys = Object.keys(firstRow).map((k) => k.toLowerCase().trim());
+      const isTikTokTemplate = keys.some(
+        (k) =>
+          k.includes('harga ritel') ||
+          k.includes('id sku') ||
+          k.includes('nilai variasi') ||
+          k.includes('gambar utama') ||
+          k.includes('gambar 2')
+      );
+
+      if (isTikTokTemplate) {
+        setShowTikTokModal(true);
+        notify.admin.success('Terdeteksi template TikTok Shop! Membuka wizard import TikTok...', { id: toastId });
+        e.target.value = '';
+        return;
+      }
+
       // Group updates by product ID
       const updates: Record<string, Record<string, Record<string, { price: number }>>> = {};
 
@@ -602,6 +628,14 @@ export default function ChannelPricingPage() {
             <svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="white"/><text x="16" y="22" textAnchor="middle" fontSize="18" fill="black">♪</text></svg>
             Kalkulator TikTok
           </Link>
+          <button
+            type="button"
+            onClick={() => setShowTikTokModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-black text-white rounded-xl shadow-sm hover:bg-slate-800 transition-all text-xs font-black uppercase tracking-wider"
+          >
+            <Upload size={14} />
+            Import TikTok (2 Versi)
+          </button>
         </div>
       </div>
 
@@ -852,6 +886,16 @@ export default function ChannelPricingPage() {
                   className="hidden"
                 />
               </label>
+              <button
+                type="button"
+                onClick={() => setShowTikTokModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 32 32" fill="white">
+                  <path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm4.8 11.2a4.4 4.4 0 0 1-2.8-1v5.6a4.8 4.8 0 1 1-4.8-4.8c.3 0 .7 0 1 .1v2.7a2.1 2.1 0 1 0 1.1 1.9v-9.5h2.7a4.4 4.4 0 0 0 2.8 1.5z" />
+                </svg>
+                Import TikTok Shop (2 Versi)
+              </button>
            </div>
            
            <div className="flex items-center gap-2">
@@ -1168,6 +1212,14 @@ export default function ChannelPricingPage() {
           </div>
         </div>
       </div>
+
+      <TikTokImportModal
+        isOpen={showTikTokModal}
+        onClose={() => setShowTikTokModal(false)}
+        onSuccess={() => {
+          // Handled by realtime hook
+        }}
+      />
     </div>
   );
 }

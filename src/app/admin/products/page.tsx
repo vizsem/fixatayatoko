@@ -23,6 +23,7 @@ import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
+import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 import { playScanBeep } from '@/lib/sound';
 
 
@@ -177,6 +178,7 @@ export default function AdminProducts() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showTikTokModal, setShowTikTokModal] = useState(false);
   /* badge BARU di-nonaktifkan untuk menjaga kepatuhan lint */
 
   // Fungsi Toggle Select
@@ -741,6 +743,17 @@ export default function AdminProducts() {
             </button>
             <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
             <Link href="/admin/purchases/import-supplier-prices" className="bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-blue-700 transition-all" title="Import Broadcast Supplier (Indogrosir, dll)"><UploadCloud size={12} /> Supplier</Link>
+            <button
+              type="button"
+              onClick={() => setShowTikTokModal(true)}
+              className="bg-black text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-slate-800 transition-all"
+              title="Import TikTok Shop (2 Versi: Harga/Nama & URL Foto)"
+            >
+              <svg width="12" height="12" viewBox="0 0 32 32" fill="white">
+                <path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm4.8 11.2a4.4 4.4 0 0 1-2.8-1v5.6a4.8 4.8 0 1 1-4.8-4.8c.3 0 .7 0 1 .1v2.7a2.1 2.1 0 1 0 1.1 1.9v-9.5h2.7a4.4 4.4 0 0 0 2.8 1.5z" />
+              </svg>
+              TikTok
+            </button>
             <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
             <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
           </div>
@@ -760,6 +773,16 @@ export default function AdminProducts() {
 
       {/* Mobile extra actions row */}
       <div className="sm:hidden flex gap-1.5 mb-3">
+        <button
+          type="button"
+          onClick={() => setShowTikTokModal(true)}
+          className="flex-1 bg-black text-white px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"
+        >
+          <svg width="12" height="12" viewBox="0 0 32 32" fill="white">
+            <path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm4.8 11.2a4.4 4.4 0 0 1-2.8-1v5.6a4.8 4.8 0 1 1-4.8-4.8c.3 0 .7 0 1 .1v2.7a2.1 2.1 0 1 0 1.1 1.9v-9.5h2.7a4.4 4.4 0 0 0 2.8 1.5z" />
+          </svg>
+          TikTok
+        </button>
         <Link href="/admin/purchases/import-supplier-prices" className="flex-1 bg-blue-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><UploadCloud size={11} /> Supplier</Link>
         <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
         <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
@@ -1354,6 +1377,12 @@ export default function AdminProducts() {
           setSearchTerm(newBarcode);
           setCurrentPage(1);
         }}
+      />
+
+      {/* Modal TikTok Shop Import (2 Versi) */}
+      <TikTokImportModal
+        isOpen={showTikTokModal}
+        onClose={() => setShowTikTokModal(false)}
       />
 
     </div>
