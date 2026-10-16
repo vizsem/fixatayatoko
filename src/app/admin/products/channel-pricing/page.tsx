@@ -52,6 +52,7 @@ export default function ChannelPricingPage() {
   const [showTikTokModal, setShowTikTokModal] = useState(false);
   const [showShopeeModal, setShowShopeeModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'draft'>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | 'tiktok-sold' | 'tiktok-priced' | 'tiktok-unpriced'>('all');
 
   const queryOptions = useMemo(() => {
     const opts: {
@@ -92,14 +93,39 @@ export default function ChannelPricingPage() {
   const [bulkApplying, setBulkApplying] = useState(false);
   const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
 
+  const tiktokSoldCount = useMemo(() => {
+    return (liveProducts as Product[]).filter(p => Number((p as any).raw_data?.tiktokSold || 0) > 0).length;
+  }, [liveProducts]);
+
   const filteredProducts = useMemo(() => {
-    const products = liveProducts as Product[];
+    let products = [...(liveProducts as Product[])];
+
+    // Filter by channel/tiktok
+    if (channelFilter === 'tiktok-sold') {
+      products = products
+        .filter(p => Number((p as any).raw_data?.tiktokSold || 0) > 0)
+        .sort((a, b) => Number((b as any).raw_data?.tiktokSold || 0) - Number((a as any).raw_data?.tiktokSold || 0));
+    } else if (channelFilter === 'tiktok-priced') {
+      products = products.filter(p => {
+        const u = selectedUnit[p.id] || (p.unit || 'PCS').toString().toUpperCase();
+        return Number(prices[p.id]?.[u]?.tiktok || 0) > 0;
+      });
+    } else if (channelFilter === 'tiktok-unpriced') {
+      products = products.filter(p => {
+        const u = selectedUnit[p.id] || (p.unit || 'PCS').toString().toUpperCase();
+        return !prices[p.id]?.[u]?.tiktok || Number(prices[p.id]?.[u]?.tiktok || 0) === 0;
+      });
+    }
+
     if (!search) return products;
-    const lower = search.toLowerCase();
+    const lower = search.toLowerCase().trim();
     return products.filter(p => {
-      return (p.name || '').toLowerCase().includes(lower);
+      const nameMatch = (p.name || '').toLowerCase().includes(lower);
+      const skuMatch = (p.sku || '').toLowerCase().includes(lower);
+      const ttIdMatch = String((p as any).raw_data?.tiktokProductId || '').includes(lower);
+      return nameMatch || skuMatch || ttIdMatch;
     });
-  }, [liveProducts, search]);
+  }, [liveProducts, channelFilter, prices, selectedUnit, search]);
 
   const bulkTargetProducts = useMemo(() => {
     if (!selectedProductIds.length) return filteredProducts;
@@ -727,19 +753,19 @@ export default function ChannelPricingPage() {
 
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)] overflow-hidden">
         <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="relative w-full md:w-80">
+          <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               className="w-full bg-gray-50 pl-10 pr-4 py-3 rounded-2xl text-xs font-bold outline-none"
-              placeholder="Cari produk berdasarkan nama..."
+              placeholder="Cari nama produk, SKU, atau ID TikTok..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="text-xs font-black uppercase text-gray-400 tracking-[0.25em] flex items-center gap-2">
+          <div className="text-xs font-black uppercase text-gray-400 tracking-[0.15em] flex items-center gap-2">
             <Tag size={14} />
-            {filteredProducts.length} Produk Aktif
+            {filteredProducts.length} Produk Ditampilkan
           </div>
         </div>
 
@@ -995,42 +1021,95 @@ export default function ChannelPricingPage() {
               </button>
            </div>
            
-           <div className="flex flex-wrap items-center gap-4">
-             <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
-               <button
-                 type="button"
-                 onClick={() => setStatusFilter('all')}
-                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                   statusFilter === 'all'
-                     ? 'bg-white text-gray-900 shadow-sm'
-                     : 'text-gray-500 hover:text-gray-900'
-                 }`}
-               >
-                 Semua Status ({liveProducts.length})
-               </button>
-               <button
-                 type="button"
-                 onClick={() => setStatusFilter('active')}
-                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                   statusFilter === 'active'
-                     ? 'bg-emerald-600 text-white shadow-sm'
-                     : 'text-gray-500 hover:text-gray-900'
-                 }`}
-               >
-                 Aktif
-               </button>
-               <button
-                 type="button"
-                 onClick={() => setStatusFilter('draft')}
-                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                   statusFilter === 'draft'
-                     ? 'bg-amber-500 text-white shadow-sm'
-                     : 'text-gray-500 hover:text-gray-900'
-                 }`}
-               >
-                 Draf / Nonaktif
-               </button>
-             </div>
+           <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    statusFilter === 'all'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Semua Status ({liveProducts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    statusFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Aktif
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStatusFilter('draft'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    statusFilter === 'draft'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Draf / Nonaktif
+                </button>
+              </div>
+
+              {/* Channel / TikTok Sales Filter */}
+              <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => { setChannelFilter('all'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    channelFilter === 'all'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Semua Channel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setChannelFilter('tiktok-sold'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                    channelFilter === 'tiktok-sold'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-rose-600 hover:bg-rose-50'
+                  }`}
+                >
+                  <span>🔥 Terjual di TikTok</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    channelFilter === 'tiktok-sold' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-700'
+                  }`}>
+                    {tiktokSoldCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setChannelFilter('tiktok-priced'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    channelFilter === 'tiktok-priced'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Ada Harga TikTok
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setChannelFilter('tiktok-unpriced'); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    channelFilter === 'tiktok-unpriced'
+                      ? 'bg-gray-800 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Belum Ada Harga
+                </button>
+              </div>
 
              <div className="flex items-center gap-2">
                <span className="text-xs font-bold text-gray-500">Tampilkan:</span>
@@ -1067,6 +1146,10 @@ export default function ChannelPricingPage() {
                   const conversion = unitConfig?.contains || 1;
                   const currentModal = (p.purchasePrice || 0) * conversion;
                   const currentDasar = (p.priceEcer || 0) * conversion;
+                  const rawData = (p as any).raw_data || {};
+                  const tiktokSold = Number(rawData.tiktokSold || 0);
+                  const tiktokRevenue = Number(rawData.tiktokRevenue || 0);
+                  const tiktokId = rawData.tiktokProductId || (p as any).tiktokProductId;
 
                   return (
                       <div key={p.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-lg flex flex-col gap-4">
@@ -1084,10 +1167,20 @@ export default function ChannelPricingPage() {
                                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                                           {p.isActive ? 'Aktif' : 'Draf'}
                                         </span>
+                                        {tiktokSold > 0 && (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                            🔥 {tiktokSold.toLocaleString('id-ID')} Terjual di TikTok
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="flex flex-col gap-0.5 mt-1">
                                         <p className="text-xs font-bold text-gray-400">Dasar: Rp {Number(currentDasar).toLocaleString()}</p>
                                         <p className="text-xs font-bold text-blue-500">Modal: Rp {Number(currentModal).toLocaleString()}</p>
+                                        {tiktokId && (
+                                          <p className="text-[10px] font-mono text-gray-500">
+                                            TikTok ID: {tiktokId} {tiktokRevenue > 0 ? `• Omzet Rp ${tiktokRevenue.toLocaleString('id-ID')}` : ''}
+                                          </p>
+                                        )}
                                       </div>
                                   </div>
                               </div>
@@ -1233,6 +1326,10 @@ export default function ChannelPricingPage() {
                   const conversion = unitConfig?.contains || 1;
                   const currentModal = (p.purchasePrice || 0) * conversion;
                   const currentDasar = (p.priceEcer || 0) * conversion;
+                  const rawData = (p as any).raw_data || {};
+                  const tiktokSold = Number(rawData.tiktokSold || 0);
+                  const tiktokRevenue = Number(rawData.tiktokRevenue || 0);
+                  const tiktokId = rawData.tiktokProductId || (p as any).tiktokProductId;
                   
                   return (
                     <tr key={p.id}>
@@ -1246,13 +1343,18 @@ export default function ChannelPricingPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-black text-gray-800 uppercase">
                               {displayName}
                             </span>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                               {p.isActive ? 'Aktif' : 'Draf'}
                             </span>
+                            {tiktokSold > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                🔥 {tiktokSold.toLocaleString('id-ID')} Terjual di TikTok
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-col">
                             <span className="text-xs font-bold text-gray-400">
@@ -1261,6 +1363,11 @@ export default function ChannelPricingPage() {
                             <span className="text-xs font-bold text-blue-500">
                               Modal: Rp {Number(currentModal).toLocaleString()}
                             </span>
+                            {tiktokId && (
+                              <span className="text-[10px] font-mono text-gray-500 mt-0.5">
+                                TikTok ID: {tiktokId} {tiktokRevenue > 0 ? `• Omzet Rp ${tiktokRevenue.toLocaleString('id-ID')}` : ''}
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1">
                             <select
