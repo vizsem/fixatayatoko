@@ -1,58 +1,59 @@
 import { MetadataRoute } from 'next';
 import { supabase } from '@/lib/supabase';
 
+const BASE_URL = 'https://atayatoko.aty0.com';
+
 export const revalidate = 3600; // Cache sitemap selama 1 jam di server/CDN
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://atayatoko.aty0.com';
   const now = new Date();
 
   // 1. Halaman Statis Utama
   const staticRoutes: MetadataRoute.Sitemap = [
     {
-      url: `${baseUrl}`,
+      url: `${BASE_URL}`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/semua-kategori`,
+      url: `${BASE_URL}/semua-kategori`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/semua-produk`,
+      url: `${BASE_URL}/semua-produk`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/promo`,
+      url: `${BASE_URL}/promo`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/tentang`,
+      url: `${BASE_URL}/tentang`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/kontak`,
+      url: `${BASE_URL}/kontak`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/kebijakan-privasi`,
+      url: `${BASE_URL}/kebijakan-privasi`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/syarat-ketentuan`,
+      url: `${BASE_URL}/syarat-ketentuan`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
@@ -71,7 +72,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       categoryRoutes = categories.map((cat: any) => {
         const slug = cat.slug || cat.id || cat.name?.toLowerCase().replace(/\s+/g, '-');
         return {
-          url: `${baseUrl}/kategori/${slug}`,
+          url: `${BASE_URL}/kategori/${slug}`,
           lastModified: cat.updated_at ? new Date(cat.updated_at) : now,
           changeFrequency: 'weekly',
           priority: 0.7,
@@ -98,16 +99,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           return raw.isActive !== false && raw.status !== 'ARCHIVED' && raw.Status !== 1;
         })
         .map((prod: any) => {
+          const raw = prod.raw_data || {};
           const lastMod = prod.updated_at
             ? new Date(prod.updated_at)
             : prod.created_at
               ? new Date(prod.created_at)
               : now;
+          const imageUrl = prod.image_url || raw.imageUrl || raw.Link_Foto || raw.image || null;
+          const fullImageUrl = imageUrl
+            ? imageUrl.startsWith('http')
+              ? imageUrl
+              : `${BASE_URL}${imageUrl}`
+            : null;
+          const productName = prod.name || raw.name || raw.Nama || 'Produk';
           return {
-            url: `${baseUrl}/produk/${prod.id}`,
+            url: `${BASE_URL}/produk/${prod.id}`,
             lastModified: lastMod,
-            changeFrequency: 'daily',
+            changeFrequency: 'daily' as const,
             priority: 0.8,
+            ...(fullImageUrl ? {
+              images: [fullImageUrl],
+            } : {}),
           };
         });
     }

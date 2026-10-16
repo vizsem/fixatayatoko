@@ -1,342 +1,126 @@
-'use client';
-
-import { useEffect, useState, Suspense, use } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  ArrowLeft, ShoppingCart, Search, LayoutGrid, List, 
-  ChevronLeft, ChevronRight, Sparkles, Package 
-} from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
-import notify from '@/lib/notify';
+import { Metadata } from 'next';
 import { supabase } from '@/lib/supabase';
+import CategoryContent from './CategoryContent';
 
-import { sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  wholesalePrice: number;
-  minWholesale: number;
-  category: string;
-  unit: string;
-  image: string;
-  stock: number;
+const BASE_URL = 'https://atayatoko.aty0.com';
+
+type PageProps = {
+  params: Promise<{ slug: string }>;
 };
 
-type CartItem = Product & {
-  quantity: number;
-};
+// ─── Helper: ambil nama kategori dari Supabase ───────────────────────────────
+async function fetchCategoryName(slug: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('products')
+      .select('category')
+      .eq('is_active', true)
+      .limit(20);
 
-function CategoryContent({ params }: { params: Promise<{ slug: string }> }) {
-  const router = useRouter();
-  const resolvedParams = use(params);
-  const slug = resolvedParams.slug;
-  
-  const [loading, setLoading] = useState(true);
-  const [allCategoryProducts, setAllCategoryProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [categoryName, setCategoryName] = useState('');
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  
-  const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 20;
-
-  // ✅ Fungsi Proxy Gambar agar gambar eksternal (Panen Square, dll) muncul
-  const getProxiedImage = (url: string) => {
-    if (!url || url.includes('firebasestorage.googleapis.com') || url.startsWith('data:')) {
-      return url || '/logo-atayatoko.png';
+    if (data && data.length > 0) {
+      // Cari produk yang kategorinya cocok dengan slug
+      const match = data.find((d: any) => {
+        const cat = String(d.category || '');
+        const generatedSlug = cat
+          .toLowerCase()
+          .replace(/&/g, 'dan')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        return generatedSlug === slug || cat.toLowerCase() === slug;
+      });
+      if (match) return match.category;
     }
-    return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&output=webp`;
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch settings first
-        const settingsSnap = await sbGetDoc('settings', 'system');
-        const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
-
-        // Coba query terindeks berdasarkan kategori asli (nama kategori penuh)
-        const indexedSnap = await sbGetDocs({
-          table: 'products',
-          where: [
-            { field: 'isActive', op: '==', val: true },
-            { field: 'category', op: '==', val: slug }
-          ],
-          orderBy: [{ field: 'name', direction: 'asc' }],
-          useAdmin: false,
-        });
-        let products: Product[] = indexedSnap.docs
-          .map(docSnap => {
-            const d = docSnap.data() as Record<string, unknown>;
-            // Tambahan filter client-side untuk keamanan (Status 0 / isActive false)
-            const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
-            if (!isActive) return null;
-
-            let stock = Number(d.Stok ?? d.stock ?? 0);
-            const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
-
-            if (displayWarehouseId && stockByWarehouse) {
-              stock = Number(stockByWarehouse[displayWarehouseId] || 0);
-            } else if (displayWarehouseId && !stockByWarehouse) {
-              stock = 0;
-            }
-
-            return {
-              id: docSnap.id,
-              name: String(d.Nama ?? d.name ?? 'Produk'),
-              price: Number(d.Ecer ?? d.price ?? 0),
-              wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
-              minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
-              category: String(d.Kategori ?? d.category ?? 'Umum'),
-              image: String(d.Link_Foto ?? d.image ?? ''),
-              unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-              stock: stock
-            };
-          })
-          .filter(Boolean) as Product[];
-
-        // Fallback: jika tidak ada hasil (mungkin field bukan 'category' atau link memakai slug)
-        if (products.length === 0) {
-          const activeSnap = await sbGetDocs({
-            table: 'products',
-            where: [{ field: 'isActive', op: '==', val: true }],
-            orderBy: [{ field: 'name', direction: 'asc' }],
-            useAdmin: false,
-          });
-          const mapped = activeSnap.docs
-            .map(docSnap => {
-              const d = docSnap.data() as Record<string, unknown>;
-              // Filter client-side
-              const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
-              if (!isActive) return null;
-
-              let stock = Number(d.Stok ?? d.stock ?? 0);
-              const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
-
-              if (displayWarehouseId && stockByWarehouse) {
-                stock = Number(stockByWarehouse[displayWarehouseId] || 0);
-              } else if (displayWarehouseId && !stockByWarehouse) {
-                stock = 0;
-              }
-
-              return {
-                id: docSnap.id,
-                name: String(d.Nama ?? d.name ?? 'Produk'),
-                price: Number(d.Ecer ?? d.price ?? 0),
-                wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
-                minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
-                category: String(d.Kategori ?? d.category ?? 'Umum'),
-                image: String(d.Link_Foto ?? d.image ?? ''),
-                unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-                stock: stock
-              } as Product;
-            })
-            .filter(Boolean) as Product[];
-          products = mapped.filter(p => {
-            const generatedSlug = p.category.toLowerCase()
-              .replace(/&/g, 'dan')
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/^-+|-+$/g, '');
-            return generatedSlug === slug;
-          });
-        }
-
-        if (products.length > 0) {
-          setCategoryName(products[0].category);
-          setAllCategoryProducts(products);
-        } else {
-          setCategoryName(slug.replace(/-/g, ' '));
-        }
-      } catch (error) {
-        console.error(error);
-        notify.user.error("Gagal memuat produk");
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (slug) fetchData();
-  }, [slug]);
-
-  useEffect(() => {
-    const searched = allCategoryProducts.filter(p => 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredProducts(searched);
-    setCurrentPage(1);
-  }, [searchQuery, allCategoryProducts]);
-
-  const indexOfLastProduct = currentPage * productsPerPage;
-  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentItems = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-
-  const addToCart = (p: Product) => {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
-    const existingIdx = cart.findIndex(item => item.id === p.id);
-    if (existingIdx >= 0) cart[existingIdx].quantity += 1;
-    else cart.push({ ...p, quantity: 1 });
-    
-    localStorage.setItem('cart', JSON.stringify(cart));
-    window.dispatchEvent(new Event('cart-updated'));
-    notify.user.success("Berhasil ditambah!");
-  };
-
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <div className="w-12 h-12 border-4 border-green-100 border-t-green-600 rounded-full animate-spin mb-4"></div>
-      <p className="text-xs font-black uppercase tracking-widest text-green-600">Menyiapkan Produk...</p>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-50 pb-32">
-      <Toaster position="top-center" reverseOrder={false} />
-      
-      {/* HEADER MOBILE OPTIMIZED */}
-      <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-gray-100 px-4 py-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-transform">
-                <ArrowLeft size={18}/>
-              </button>
-              <div>
-                <h1 className="text-xs font-black text-green-600 uppercase tracking-tighter leading-none mb-1">{categoryName}</h1>
-                <p className="text-xs font-bold text-gray-400 uppercase">{filteredProducts.length} Produk Tersedia</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
-                className="p-2.5 bg-gray-50 rounded-2xl text-gray-600 active:scale-90 transition-all"
-              >
-                {viewMode === 'grid' ? <List size={20}/> : <LayoutGrid size={20}/>}
-              </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
-            <input 
-              type="text" 
-              placeholder="Cari di kategori ini..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-100 border-none rounded-2xl py-3.5 pl-12 pr-4 text-xs font-bold focus:ring-2 focus:ring-green-500/20 transition-all"
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* PRODUCT CONTENT */}
-      <div className="max-w-7xl mx-auto px-4 mt-6">
-        {currentItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Package size={48} className="text-gray-200 mb-4" />
-            <p className="font-black text-gray-300 uppercase italic text-xs tracking-widest">Produk Tidak Ditemukan</p>
-          </div>
-        ) : (
-          <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3" : "flex flex-col gap-3"}>
-            {currentItems.map((product) => (
-              <div 
-                key={product.id} 
-                className={`bg-white border border-gray-100 shadow-sm transition-all active:scale-[0.98] ${
-                  viewMode === 'grid' 
-                  ? 'rounded-[2rem] p-3 flex flex-col' 
-                  : 'rounded-[1.5rem] p-3 flex gap-4 items-center'
-                }`}
-              >
-                {/* Image Container */}
-                <Link 
-                  href={`/produk/${product.id}`} 
-                  className={`${viewMode === 'grid' ? 'aspect-square w-full mb-3' : 'w-24 h-24'} block overflow-hidden rounded-[1.5rem] bg-gray-50 relative flex-shrink-0`}
-                >
-                  <img 
-                    src={getProxiedImage(product.image)} 
-                    alt={product.name}
-                    className="object-cover w-full h-full"
-                    sizes={viewMode === 'grid' ? "50vw" : "100px"}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  {product.wholesalePrice > 0 && (
-                    <div className="absolute top-2 left-2 bg-blue-600 text-xs text-white font-bold px-2 py-1 rounded-lg uppercase shadow-lg flex items-center gap-1">
-                      <Sparkles size={10} /> Grosir
-                    </div>
-                  )}
-                </Link>
-
-                {/* Info Container */}
-                <div className="flex-1 flex flex-col">
-                  <h3 className="text-xs font-bold text-gray-800 uppercase line-clamp-2 leading-snug mb-1">{product.name}</h3>
-                  <div className="mb-3 mt-auto">
-                    <p className="text-sm font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-tight">Per {product.unit}</p>
-                  </div>
-                  <button 
-                    onClick={() => addToCart(product)} 
-                    className="w-full py-2.5 bg-gray-900 text-white text-xs font-bold rounded-xl uppercase tracking-wider active:bg-green-600 shadow-md"
-                  >
-                    + Keranjang
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* MODERN PAGINATION */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-12 bg-white p-2 rounded-[2rem] border border-gray-100 shadow-sm">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => {
-                setCurrentPage(prev => prev - 1);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="p-4 bg-gray-50 rounded-full disabled:opacity-20 transition-all active:bg-green-100"
-            >
-              <ChevronLeft size={20}/>
-            </button>
-            
-            <div className="flex items-center gap-1">
-              <span className="text-xs font-black uppercase text-gray-400">Halaman</span>
-              <span className="text-[12px] font-black text-green-600 mx-1">{currentPage}</span>
-              <span className="text-xs font-black uppercase text-gray-400">dari {totalPages}</span>
-            </div>
-
-            <button 
-              disabled={currentPage === totalPages}
-              onClick={() => {
-                setCurrentPage(prev => prev + 1);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="p-4 bg-gray-50 rounded-full disabled:opacity-20 transition-all active:bg-green-100"
-            >
-              <ChevronRight size={20}/>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* MOBILE FLOATING CART (Optional) */}
-      <Link href="/cart" className="fixed bottom-6 right-6 z-[60] bg-green-600 text-white p-5 rounded-full shadow-2xl active:scale-90 transition-all md:hidden">
-        <ShoppingCart size={24} />
-      </Link>
-    </div>
-  );
+  } catch {
+    // fallback
+  }
+  return slug.replace(/-/g, ' ');
 }
 
-export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+// ─── 1. SEO Metadata per-kategori ───────────────────────────────────────────
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const categoryName = await fetchCategoryName(slug);
+
+  const title = `${categoryName} Grosir Murah Kediri | ATAYATOKO`;
+  const description = `Beli ${categoryName} grosir murah di ATAYATOKO Kediri. Tersedia partai besar & eceran, gratis ongkir Kediri Kota. Stok lengkap & harga terbaik.`;
+  const canonicalUrl = `${BASE_URL}/kategori/${slug}`;
+
+  return {
+    title,
+    description,
+    keywords: `${categoryName} kediri, grosir ${categoryName} kediri, beli ${categoryName} murah, distributor ${categoryName} kediri, ATAYATOKO`,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: 'ATAYATOKO Sembako Kediri',
+      locale: 'id_ID',
+      type: 'website',
+      images: [
+        {
+          url: `${BASE_URL}/logo-atayatoko.png`,
+          width: 800,
+          height: 600,
+          alt: `${categoryName} - ATAYATOKO Kediri`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [`${BASE_URL}/logo-atayatoko.png`],
+    },
+  };
+}
+
+// ─── 2. Server Component ─────────────────────────────────────────────────────
+export default async function CategoryPage({ params }: PageProps) {
+  const { slug } = await params;
+  const categoryName = await fetchCategoryName(slug);
+  const canonicalUrl = `${BASE_URL}/kategori/${slug}`;
+
+  const collectionSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': canonicalUrl,
+    name: `${categoryName} Grosir Murah - ATAYATOKO Kediri`,
+    description: `Daftar produk ${categoryName} grosir murah di ATAYATOKO Kediri`,
+    url: canonicalUrl,
+    publisher: {
+      '@type': 'Organization',
+      '@id': `${BASE_URL}/#organization`,
+      name: 'ATAYATOKO Sembako Kediri',
+    },
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Beranda', item: BASE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Semua Kategori', item: `${BASE_URL}/semua-kategori` },
+      { '@type': 'ListItem', position: 3, name: categoryName, item: canonicalUrl },
+    ],
+  };
+
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-black uppercase text-xs">Menghubungkan...</div>}>
-      <CategoryContent params={params} />
-    </Suspense>
+    <>
+      {/* JSON-LD — native <script> per Next.js recommendation */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(collectionSchema).replace(/</g, '\\u003c'),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema).replace(/</g, '\\u003c'),
+        }}
+      />
+      <CategoryContent slug={slug} />
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { Inter } from 'next/font/google';
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import './globals.css';
 import MobileNav from '@/components/MobileNav';
 import { Toaster } from 'react-hot-toast';
@@ -83,26 +82,89 @@ export default function RootLayout({
       </head>
 
       <body className={`${inter.className} antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
-        <Script
-          id="structured-data"
+        {/* JSON-LD Structured Data — native <script> per Next.js recommendation */}
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "LocalBusiness",
-              "name": "ATAYATOKO Sembako Kediri",
-              "image": "https://atayatoko.aty0.com/logo-atayatoko.png",
-              "description": "Pusat belanja grosir sembako Kediri paling murah dan terlengkap.",
-              "address": {
-                "@type": "PostalAddress",
-                "addressLocality": "Kediri",
-                "addressRegion": "Jawa Timur",
-                "addressCountry": "ID"
-              },
-              "url": "https://atayatoko.aty0.com",
-              "telephone": "+628123456789",
-              "priceRange": "$$"
-            })
+              "@graph": [
+                {
+                  "@type": ["LocalBusiness", "Store"],
+                  "@id": "https://atayatoko.aty0.com/#organization",
+                  "name": "ATAYATOKO Sembako Kediri",
+                  "alternateName": "Ataya Toko",
+                  "image": "https://atayatoko.aty0.com/logo-atayatoko.png",
+                  "logo": "https://atayatoko.aty0.com/logo-atayatoko.png",
+                  "description": "Pusat belanja grosir sembako Kediri paling murah dan terlengkap. Jual beras, minyak, gula, snack partai besar dan eceran. Gratis ongkir Kediri Kota.",
+                  "url": "https://atayatoko.aty0.com",
+                  "telephone": "+6282234567890",
+                  "priceRange": "Rp5.000 - Rp500.000",
+                  "currenciesAccepted": "IDR",
+                  "paymentAccepted": "Cash, Transfer Bank, QRIS",
+                  "address": {
+                    "@type": "PostalAddress",
+                    "streetAddress": "Kediri",
+                    "addressLocality": "Kediri",
+                    "addressRegion": "Jawa Timur",
+                    "postalCode": "64100",
+                    "addressCountry": "ID"
+                  },
+                  "geo": {
+                    "@type": "GeoCoordinates",
+                    "latitude": -7.8166,
+                    "longitude": 112.0108
+                  },
+                  "openingHoursSpecification": [
+                    {
+                      "@type": "OpeningHoursSpecification",
+                      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+                      "opens": "07:00",
+                      "closes": "21:00"
+                    },
+                    {
+                      "@type": "OpeningHoursSpecification",
+                      "dayOfWeek": "Sunday",
+                      "opens": "08:00",
+                      "closes": "17:00"
+                    }
+                  ],
+                  "hasOfferCatalog": {
+                    "@type": "OfferCatalog",
+                    "name": "Katalog Sembako Grosir ATAYATOKO",
+                    "itemListElement": [
+                      { "@type": "OfferCatalog", "name": "Sembako & Kebutuhan Pokok" },
+                      { "@type": "OfferCatalog", "name": "Snack & Makanan Ringan" },
+                      { "@type": "OfferCatalog", "name": "Bumbu & Bahan Masakan" },
+                      { "@type": "OfferCatalog", "name": "Produk Rumah Tangga" }
+                    ]
+                  },
+                  "areaServed": {
+                    "@type": "City",
+                    "name": "Kediri"
+                  },
+                  "sameAs": [
+                    "https://atayatoko.aty0.com"
+                  ]
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": "https://atayatoko.aty0.com/#website",
+                  "url": "https://atayatoko.aty0.com",
+                  "name": "ATAYATOKO Sembako Kediri",
+                  "description": "Pusat grosir sembako Kediri termurah",
+                  "publisher": { "@id": "https://atayatoko.aty0.com/#organization" },
+                  "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": {
+                      "@type": "EntryPoint",
+                      "urlTemplate": "https://atayatoko.aty0.com/search?q={search_term_string}"
+                    },
+                    "query-input": "required name=search_term_string"
+                  }
+                }
+              ]
+            }).replace(/</g, '\\u003c')
           }}
         />
         <ErrorBoundary>

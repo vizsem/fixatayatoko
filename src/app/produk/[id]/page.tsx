@@ -1,6 +1,5 @@
 import ProductDetailClient, { Product, RelatedProduct, PromoProduct, Review, ProductVariant } from './ProductDetailClient';
 import { Metadata } from 'next';
-import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 
 type PageProps = {
@@ -288,22 +287,67 @@ export default async function ProductDetailPage({ params }: PageProps) {
           '@type': 'Brand',
           name: 'ATAYATOKO',
         },
-        offers: {
-          '@type': 'Offer',
-          url: `${BASE_URL}/produk/${product.id}`,
-          priceCurrency: 'IDR',
-          price: product.price,
-          priceValidUntil: isoDateInDays(60),
-          itemCondition: 'https://schema.org/NewCondition',
-          availability:
-            product.stock > 0
-              ? 'https://schema.org/InStock'
-              : 'https://schema.org/OutOfStock',
-          seller: {
-            '@type': 'Organization',
-            name: 'ATAYATOKO Sembako Kediri',
-          },
-        },
+        category: product.category,
+        offers: product.wholesalePrice > 0
+          ? {
+              '@type': 'AggregateOffer',
+              priceCurrency: 'IDR',
+              lowPrice: product.wholesalePrice,
+              highPrice: product.price,
+              offerCount: 2,
+              offers: [
+                {
+                  '@type': 'Offer',
+                  name: `Harga Eceran per ${product.unit}`,
+                  url: `${BASE_URL}/produk/${product.id}`,
+                  priceCurrency: 'IDR',
+                  price: product.price,
+                  priceValidUntil: isoDateInDays(60),
+                  itemCondition: 'https://schema.org/NewCondition',
+                  availability:
+                    product.stock > 0
+                      ? 'https://schema.org/InStock'
+                      : 'https://schema.org/OutOfStock',
+                  seller: {
+                    '@type': 'Organization',
+                    name: 'ATAYATOKO Sembako Kediri',
+                  },
+                },
+                {
+                  '@type': 'Offer',
+                  name: `Harga Grosir min. ${product.minWholesale} ${product.unit}`,
+                  url: `${BASE_URL}/produk/${product.id}`,
+                  priceCurrency: 'IDR',
+                  price: product.wholesalePrice,
+                  priceValidUntil: isoDateInDays(60),
+                  itemCondition: 'https://schema.org/NewCondition',
+                  availability:
+                    product.stock > 0
+                      ? 'https://schema.org/InStock'
+                      : 'https://schema.org/OutOfStock',
+                  seller: {
+                    '@type': 'Organization',
+                    name: 'ATAYATOKO Sembako Kediri',
+                  },
+                },
+              ],
+            }
+          : {
+              '@type': 'Offer',
+              url: `${BASE_URL}/produk/${product.id}`,
+              priceCurrency: 'IDR',
+              price: product.price,
+              priceValidUntil: isoDateInDays(60),
+              itemCondition: 'https://schema.org/NewCondition',
+              availability:
+                product.stock > 0
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+              seller: {
+                '@type': 'Organization',
+                name: 'ATAYATOKO Sembako Kediri',
+              },
+            },
       }
     : null;
 
@@ -337,17 +381,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
   return (
     <>
       {product && productSchema && (
-        <Script
-          id={`product-jsonld-${product.id}`}
+        <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema).replace(/</g, '\\u003c') }}
         />
       )}
       {product && breadcrumbSchema && (
-        <Script
-          id={`breadcrumb-jsonld-${product.id}`}
+        <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema).replace(/</g, '\\u003c') }}
         />
       )}
       <ProductDetailClient
