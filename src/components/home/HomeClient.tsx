@@ -319,7 +319,7 @@ export default function HomeClient({
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                {filteredProducts.map((p) => (
+                {filteredProducts.map((p, idx) => (
                   <ProductCard
                     key={p.id}
                     product={p}
@@ -327,6 +327,7 @@ export default function HomeClient({
                     isWish={wishlist.includes(p.id)}
                     onWishlistToggle={onWishlistToggle}
                     onAddToCart={addToCart}
+                    priority={idx < 4}
                   />
                 ))}
               </div>
@@ -344,7 +345,7 @@ export default function HomeClient({
                   <h2 className="text-sm font-black text-red-600 tracking-tighter">Penawaran Terbatas</h2>
                 </div>
                 <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
-                  {promoProducts.map((p) => (
+                  {promoProducts.map((p, idx) => (
                     <ProductCard
                       key={`promo-${p.id}`}
                       product={p}
@@ -352,6 +353,7 @@ export default function HomeClient({
                       isWish={wishlist.includes(p.id)}
                       onWishlistToggle={onWishlistToggle}
                       onAddToCart={addToCart}
+                      priority={idx < 4}
                     />
                   ))}
                 </div>
@@ -387,7 +389,7 @@ export default function HomeClient({
                 <h2 className="text-sm font-black text-gray-800 tracking-tighter">Khusus Untukmu</h2>
               </div>
               <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
-                {randomProducts.map((p) => (
+                {randomProducts.map((p, idx) => (
                   <ProductCard
                     key={`rand-${p.id}`}
                     product={p}
@@ -395,6 +397,7 @@ export default function HomeClient({
                     isWish={wishlist.includes(p.id)}
                     onWishlistToggle={onWishlistToggle}
                     onAddToCart={addToCart}
+                    priority={promoProducts.length === 0 && idx < 4}
                   />
                 ))}
               </div>

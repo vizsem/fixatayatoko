@@ -114,38 +114,38 @@ export const HomeFooter = ({ cartCount }: HomeFooterProps) => {
 
         {/* Bottom Legal Bar */}
         <div className="max-w-7xl mx-auto border-t border-slate-800/80 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-          <p className="text-xs text-slate-500 font-medium">
-            © {new Date().getFullYear()} <strong className="text-slate-300">ATAYATOKO</strong>. Seluruh hak cipta dilindungi undang-undang.
+          <p className="text-xs text-slate-400 font-medium">
+            © {new Date().getFullYear()} <strong className="text-slate-200">ATAYATOKO</strong>. Seluruh hak cipta dilindungi undang-undang.
           </p>
-          <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-xs text-slate-400 font-medium">
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-xs text-slate-300 font-medium">
             <Link href="/tentang" className="hover:text-emerald-400 transition-colors">Tentang Kami</Link>
             <Link href="/kontak" className="hover:text-emerald-400 transition-colors">Kontak</Link>
             <Link href="/kebijakan-privasi" className="hover:text-emerald-400 transition-colors">Kebijakan Privasi</Link>
             <Link href="/syarat-ketentuan" className="hover:text-emerald-400 transition-colors">Syarat & Ketentuan</Link>
-            <Link href="/profil/login" className="text-slate-600 hover:text-slate-400 transition-colors">Panel Admin</Link>
+            <Link href="/profil/login" className="text-slate-400 hover:text-slate-200 transition-colors">Panel Admin</Link>
           </div>
         </div>
       </footer>
 
       {/* Mobile Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-6 py-2.5 flex justify-between items-center z-50">
-        <Link href="/" className="flex flex-col items-center gap-0.5 text-emerald-600">
+      <nav aria-label="Navigasi Bawah Seluler" className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-6 py-2.5 flex justify-between items-center z-50">
+        <Link href="/" aria-label="Beranda" className="flex flex-col items-center gap-0.5 text-emerald-600">
           <HomeIcon size={20} /><span className="text-xs font-bold">Beranda</span>
         </Link>
-        <Link href="/semua-kategori" className="flex flex-col items-center gap-0.5 text-gray-400">
+        <Link href="/semua-kategori" aria-label="Katalog Kategori" className="flex flex-col items-center gap-0.5 text-gray-600 hover:text-emerald-600">
           <Grid size={20} /><span className="text-xs font-bold">Katalog</span>
         </Link>
-        <Link href="/cart" className="flex flex-col items-center gap-0.5 text-gray-400 relative">
+        <Link href="/cart" aria-label="Keranjang Belanja" className="flex flex-col items-center gap-0.5 text-gray-600 hover:text-emerald-600 relative">
           <div className="relative">
             <ShoppingCart size={20} />
             {cartCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-bounce">{cartCount}</span>}
           </div>
           <span className="text-xs font-bold">Keranjang</span>
         </Link>
-        <Link href="/orders" className="flex flex-col items-center gap-0.5 text-gray-400">
+        <Link href="/orders" aria-label="Riwayat Pesanan" className="flex flex-col items-center gap-0.5 text-gray-600 hover:text-emerald-600">
           <FileText size={20} /><span className="text-xs font-bold">Pesanan</span>
         </Link>
-        <Link href="/profil" className="flex flex-col items-center gap-0.5 text-gray-400">
+        <Link href="/profil" aria-label="Akun Pengguna" className="flex flex-col items-center gap-0.5 text-gray-600 hover:text-emerald-600">
           <User size={20} /><span className="text-xs font-bold">Akun</span>
         </Link>
       </nav>

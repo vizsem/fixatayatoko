@@ -37,7 +37,8 @@ export default function CategoryProductSection({
         </div>
         <Link 
           href={`/kategori/${category.slug}`} 
-          className="text-xs font-bold text-gray-400 hover:text-green-600 transition-colors flex items-center gap-1"
+          aria-label={`Lihat semua produk kategori ${category.name}`}
+          className="text-xs font-bold text-gray-500 hover:text-green-600 transition-colors flex items-center gap-1"
         >
           SEMUA <ArrowRight size={12} className="inline" />
         </Link>

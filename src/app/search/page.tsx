@@ -231,7 +231,7 @@ function SearchPageContent() {
           </div>
         ) : filteredProducts.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredProducts.map(p => (
+            {filteredProducts.map((p, idx) => (
               <ProductCard 
                 key={p.id} 
                 product={p} 
@@ -239,6 +239,7 @@ function SearchPageContent() {
                 isWish={wishlist.includes(p.id)} 
                 onWishlistToggle={handleWishlistToggle} 
                 onAddToCart={addToCart} 
+                priority={idx < 4}
               />
             ))}
           </div>

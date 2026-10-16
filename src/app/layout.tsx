@@ -79,6 +79,14 @@ export default function RootLayout({
         {/* ✅ FIX GOOGLE LOGIN (COOP) */}
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
+
+        {/* ✅ Preconnect & DNS-Prefetch for Fast LCP Image Delivery */}
+        <link rel="preconnect" href="https://wsrv.nl" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://wsrv.nl" />
+        <link rel="preconnect" href="https://p16-oec-sg.ibyteimg.com" />
+        <link rel="dns-prefetch" href="https://p16-oec-sg.ibyteimg.com" />
+        <link rel="preconnect" href="https://arti-assets.sgp1.cdn.digitaloceanspaces.com" />
+        <link rel="dns-prefetch" href="https://arti-assets.sgp1.cdn.digitaloceanspaces.com" />
       </head>
 
       <body className={`${inter.className} antialiased overflow-x-hidden min-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>

@@ -128,6 +128,7 @@ export default function CustomerGuarantees({ variant = 'full', className = '' }:
             <div className="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-100 relative">
               <button
                 onClick={() => setActiveModal(null)}
+                aria-label="Tutup informasi jaminan"
                 className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />

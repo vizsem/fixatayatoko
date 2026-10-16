@@ -168,6 +168,7 @@ function WishlistCard({ product, onRemove, onAdd, isWishlist }: {
             onClick={onRemove}
             className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur p-2 rounded-xl text-red-500 shadow-sm hover:bg-red-500 hover:text-white transition-all active:scale-90"
             title="Hapus dari Wishlist"
+            aria-label="Hapus dari Wishlist"
           >
             <Trash2 size={14} />
           </button>

@@ -10,14 +10,23 @@ interface ProductCardProps {
   isWish: boolean;
   onWishlistToggle: (id: string) => void;
   onAddToCart: (product: Product) => void;
+  priority?: boolean;
 }
+
+const getOptimizedThumb = (url?: string) => {
+  if (!url) return '/logo-atayatoko.webp';
+  if (url.startsWith('/')) return url;
+  if (url.includes('wsrv.nl') || url.endsWith('.svg')) return url;
+  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=360&q=80&output=webp`;
+};
 
 export const ProductCard = ({ 
   product, 
   promoInfo, 
   isWish, 
   onWishlistToggle, 
-  onAddToCart 
+  onAddToCart,
+  priority = false,
 }: ProductCardProps) => {
   const isOut = product.stock <= 0;
   const baseUnit = (product.unit || 'PCS').toString().toUpperCase();
@@ -52,11 +61,13 @@ export const ProductCard = ({
   return (
     <div className="min-w-[165px] md:min-w-[210px] bg-white rounded-2xl border border-gray-100 overflow-hidden snap-start shadow-sm hover:shadow-md transition-shadow flex flex-col relative group">
       <button 
+        type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           onWishlistToggle(product.id);
         }}
+        aria-label={isWish ? `Hapus ${product.name} dari wishlist` : `Tambah ${product.name} ke wishlist`}
         className="absolute top-2 right-2 z-30 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md active:scale-75 transition-all cursor-pointer"
       >
         <Heart size={14} className={isWish ? "fill-red-500 text-red-500" : "text-gray-400"} />
@@ -64,12 +75,20 @@ export const ProductCard = ({
 
       <Link href={`/produk/${product.id}`} className="relative aspect-square bg-gray-50 overflow-hidden block z-10">
         <img 
-          src={product.image || '/logo-atayatoko.png'} 
+          src={getOptimizedThumb(product.image)} 
           alt={product.name} 
+          width={285}
+          height={285}
           className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${isOut ? 'grayscale opacity-50' : ''}`} 
-          loading="lazy"
-          decoding="async"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding={priority ? 'sync' : 'async'}
+          onError={(e) => { 
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.src !== '/logo-atayatoko.webp' && img.src !== '/logo-atayatoko.png') {
+              img.src = '/logo-atayatoko.webp';
+            }
+          }}
         />
         {isOut && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
@@ -88,7 +107,7 @@ export const ProductCard = ({
           <h3 className="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 leading-snug hover:text-green-600 transition-colors">{product.name}</h3>
         </Link>
         <div className="mt-1 flex items-center justify-between">
-          <p className="text-xs font-medium text-gray-400">{product.category}</p>
+          <p className="text-xs font-medium text-gray-500">{product.category}</p>
           <p className={`text-xs font-bold uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
             {isOut ? 'Habis' : `Stok ${product.stock}`}
           </p>
@@ -97,7 +116,7 @@ export const ProductCard = ({
         <Link href={`/produk/${product.id}`} className="flex flex-col mb-3 block cursor-pointer">
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-base font-black text-green-600">Rp{Number(promoInfo.price || 0).toLocaleString('id-ID')}</span>
-            <span className="text-xs font-medium text-gray-400">/{baseUnit}</span>
+            <span className="text-xs font-medium text-gray-500">/{baseUnit}</span>
           </div>
           
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -108,7 +127,7 @@ export const ProductCard = ({
                 title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
               >
                 <span className="text-gray-900">{u.code}</span>
-                {u.contains > 1 && <span className="text-gray-400">×{u.contains}</span>}
+                {u.contains > 1 && <span className="text-gray-500">×{u.contains}</span>}
                 <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
               </span>
             ))}
@@ -146,12 +165,14 @@ export const ProductCard = ({
         </Link>
 
         <button 
+          type="button"
           onClick={(e) => { 
             e.preventDefault(); 
             e.stopPropagation(); 
             onAddToCart(product); 
           }} 
           disabled={isOut} 
+          aria-label={isOut ? 'Stok habis' : `Tambah ${product.name} ke keranjang`}
           className={`mt-auto w-full py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all relative z-30 uppercase tracking-wider ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
         >
           {isOut ? 'Stok Habis' : '+ Keranjang'}

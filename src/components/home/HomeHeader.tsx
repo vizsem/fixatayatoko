@@ -91,8 +91,8 @@ export const HomeHeader = ({
 
       <div className="px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo-atayatoko.png" alt="Logo" width={32} height={32} className="h-8 w-auto" />
+          <Link href="/" className="flex items-center gap-2" aria-label="Beranda ATAYATOKO">
+            <img src="/logo-atayatoko.webp" alt="Logo ATAYATOKO" width={32} height={32} className="h-8 w-auto" />
             <h1 className="hidden sm:block text-lg font-black text-green-600 uppercase">ATAYAMARKET</h1>
           </Link>
           <form 
@@ -117,6 +117,7 @@ export const HomeHeader = ({
             <button 
               type="button"
               onClick={() => router.push('/search')}
+              aria-label="Filter dan cari produk"
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors bg-gray-200 text-gray-500 hover:bg-green-100 hover:text-green-600"
             >
               <Filter size={14} />
@@ -128,6 +129,7 @@ export const HomeHeader = ({
               <div className="relative group">
                 <Link
                   href="/profil"
+                  aria-label="Profil Pengguna"
                   className="flex items-center gap-2 h-10 px-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
                 >
                   <div className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 p-1 bg-white">
@@ -185,6 +187,7 @@ export const HomeHeader = ({
             ) : (
               <Link
                 href="/profil/login"
+                aria-label="Masuk ke Akun"
                 className="flex items-center gap-2 h-10 px-3 rounded-full hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-[12px]"
               >
                 <User size={18} className="text-gray-500" />
@@ -192,13 +195,14 @@ export const HomeHeader = ({
               </Link>
             )}
 
-            <Link href="/orders" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative">
+            <Link href="/orders" aria-label="Riwayat Pesanan" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative">
               <ClipboardList size={22} strokeWidth={1.8} />
             </Link>
 
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
+                aria-label="Buka Notifikasi"
                 className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative"
               >
                 <Bell size={22} strokeWidth={1.8} />
@@ -238,7 +242,7 @@ export const HomeHeader = ({
               )}
             </div>
 
-            <Link href="/cart" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative">
+            <Link href="/cart" aria-label="Keranjang Belanja" className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 relative">
               <ShoppingCart size={22} strokeWidth={1.8} />
               {cartCount > 0 && <span className="absolute top-1 right-1 h-4 min-w-[16px] px-1 bg-red-600 text-white text-xs flex items-center justify-center rounded-full font-bold border-2 border-white">{cartCount}</span>}
             </Link>

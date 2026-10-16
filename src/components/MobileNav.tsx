@@ -54,7 +54,7 @@ export default function MobileNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_24px_rgba(15,23,42,0.10)] md:hidden page-fade pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label="Navigasi Bawah" className="fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur shadow-[0_-8px_24px_rgba(15,23,42,0.10)] md:hidden page-fade pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-4xl mx-auto px-3 py-1.5 flex items-center justify-between gap-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -67,6 +67,7 @@ export default function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-colors ${
                 isActive
                   ? 'bg-green-50 text-green-700'

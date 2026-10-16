@@ -252,7 +252,7 @@ function SemuaProdukContent() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-            {processedProducts.map((p) => (
+            {processedProducts.map((p, idx) => (
               <ProductCard
                 key={p.id}
                 product={p}
@@ -260,6 +260,7 @@ function SemuaProdukContent() {
                 isWish={wishlist.includes(p.id)}
                 onWishlistToggle={handleWishlistToggle}
                 onAddToCart={(prod) => addToCart(prod, 1, prod.unit)}
+                priority={idx < 4}
               />
             ))}
           </div>
