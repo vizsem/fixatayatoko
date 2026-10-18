@@ -548,7 +548,7 @@ function AddPurchaseFormContent() {
   // keduanya (pb-32 khusus mobile untuk bottom nav), sehingga sebelumnya
   // terhitung dua kali dan menyisakan ruang kosong besar di bawah.
   return (
-    <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans">
+    <div className="p-3 md:p-4 bg-[#FBFBFE] font-sans pb-32 lg:pb-6">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
@@ -1026,7 +1026,8 @@ function AddPurchaseFormContent() {
             </div>
 
             <button
-              disabled={loading || pendingHistoryLookups > 0}
+              type="submit"
+              disabled={loading || pendingHistoryLookups > 0 || cart.length === 0}
               className="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all hidden lg:flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
               <Save size={18} /> {loading ? 'Saving Order...' : pendingHistoryLookups > 0 ? 'Memuat Harga...' : 'Post Purchase Order'}
@@ -1048,21 +1049,41 @@ function AddPurchaseFormContent() {
           </div>
         </div>
 
-        {/* Aksi utama menempel di dasar layar, khusus mobile: tanpa ini tombol
-            berada di ujung bawah halaman dan harus dicari dengan menggulir.
-            Di desktop tombol di dalam kartu ringkasan yang dipakai. */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-center gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Total</p>
-              <p className="text-sm font-black text-gray-900 truncate">Rp {total.toLocaleString()}</p>
+        {/* Aksi utama menempel di dasar layar, khusus mobile: profesional & proporsional */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-[80] bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] px-4 pt-3 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] transition-all">
+          <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Total PO</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-slate-100 text-slate-600">
+                  {cart.length} item
+                </span>
+              </div>
+              <p className="text-base sm:text-lg font-black text-slate-900 truncate tracking-tight mt-0.5">
+                Rp {total.toLocaleString('id-ID')}
+              </p>
             </div>
             <button
               type="submit"
-              disabled={loading || pendingHistoryLookups > 0}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 py-3.5 rounded-2xl text-xs font-black uppercase tracking-[0.15em] text-white shadow-lg shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+              disabled={loading || pendingHistoryLookups > 0 || cart.length === 0}
+              className="shrink-0 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-3.5 px-5 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Menyimpan...' : pendingHistoryLookups > 0 ? 'Memuat Harga...' : 'Post Purchase Order'}
+              {loading ? (
+                <>
+                  <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : pendingHistoryLookups > 0 ? (
+                <>
+                  <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                  <span>Memuat Harga...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={16} className="shrink-0" />
+                  <span>Post Purchase Order</span>
+                </>
+              )}
             </button>
           </div>
         </div>
