@@ -33,7 +33,10 @@ import {
   Landmark,
   AlertTriangle,
   ChevronRight,
-  Store
+  Store,
+  ClipboardCheck,
+  TrendingUp,
+  UsersRound
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
@@ -62,6 +65,8 @@ const navItems: NavItem[] = [
   { label: 'Stok & Inventory Gudang', href: '/admin/inventory', icon: Database, category: '2. Katalog & Stok' },
   { label: 'Gudang & Lokasi', href: '/admin/warehouses', icon: Warehouse, category: '2. Katalog & Stok' },
   { label: 'Retur Barang', href: '/admin/returns', icon: RefreshCcw, category: '2. Katalog & Stok' },
+  { label: 'Kategori Produk', href: '/admin/kategori', icon: Tag, category: '2. Katalog & Stok' },
+  { label: 'Sampling Harian (5 Mnt)', href: '/admin/inventory/daily-check', icon: ClipboardCheck, category: '2. Katalog & Stok' },
   
   // 3. Keuangan & Laporan
   { label: 'Dashboard Keuangan', href: '/admin/finance', icon: Landmark, category: '3. Keuangan & Laporan' },
@@ -69,10 +74,13 @@ const navItems: NavItem[] = [
   { label: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: CreditCard, category: '3. Keuangan & Laporan' },
   { label: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard, category: '3. Keuangan & Laporan' },
   { label: 'Laporan Bisnis & Pajak', href: '/admin/reports', icon: BarChart3, category: '3. Keuangan & Laporan' },
+  { label: 'Laporan Penjualan', href: '/admin/reports/sales', icon: TrendingUp, category: '3. Keuangan & Laporan' },
+  { label: 'Hutang & Piutang', href: '/admin/reports/hutang', icon: CreditCard, category: '3. Keuangan & Laporan' },
   
   // 4. Manajemen & Pengaturan
   { label: 'Supplier / Distributor', href: '/admin/suppliers', icon: Truck, category: '4. Manajemen & Pengaturan' },
   { label: 'Pelanggan & Member', href: '/admin/customers', icon: Users, category: '4. Manajemen & Pengaturan' },
+  { label: 'Karyawan & Staf', href: '/admin/employees', icon: UsersRound, category: '4. Manajemen & Pengaturan' },
   { label: 'Promosi & Diskon', href: '/admin/promotions', icon: Tag, category: '4. Manajemen & Pengaturan' },
   { label: 'Dompet Digital & Poin', href: '/admin/wallet', icon: Wallet, category: '4. Manajemen & Pengaturan' },
   { label: 'Pesan & Kotak Masuk', href: '/admin/messages', icon: MessageCircle, category: '4. Manajemen & Pengaturan' },

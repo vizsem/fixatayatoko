@@ -34,7 +34,11 @@ import {
   Activity, 
   AlertTriangle,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Landmark,
+  Truck,
+  Tag,
+  UsersRound
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
@@ -213,6 +217,7 @@ export default function AdminMobileNav() {
       title: 'Penjualan & Transaksi',
       items: [
         { name: 'POS Kasir', icon: ShoppingCart, href: '/cashier', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', desc: 'Kasir Penjualan Toko' },
+        { name: 'Pesanan Web & Toko', icon: ShoppingCart, href: '/admin/orders', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', desc: 'Faktur & Invoice Order' },
         { name: 'Marketplace', icon: ShoppingBag, href: '/admin/marketplace-orders', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', desc: 'Order Online & Ekspedisi' },
         { name: 'Pelanggan', icon: Users, href: '/admin/customers', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', desc: 'Database Member & Piutang' },
       ]
@@ -222,6 +227,8 @@ export default function AdminMobileNav() {
       items: [
         { name: 'Stok Gudang', icon: Package, href: '/admin/inventory', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', desc: 'Opname & Penyesuaian' },
         { name: 'Pembelian (PO)', icon: Receipt, href: '/admin/purchases', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', desc: 'Supplier & Tagihan Hutang' },
+        { name: 'Harga Channel', icon: Tag, href: '/admin/products/channel-pricing', color: 'text-pink-600', bg: 'bg-pink-50', border: 'border-pink-100', desc: 'Atur Margin & Marketplace' },
+        { name: 'Retur Barang', icon: RefreshCcw, href: '/admin/returns', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', desc: 'Klaim Retur & Rusak' },
         { name: 'Log Mutasi', icon: Activity, href: '/admin/inventory/logs', color: 'text-cyan-600', bg: 'bg-cyan-50', border: 'border-cyan-100', desc: 'Histori Keluar Masuk' },
         { name: 'Kartu Stok', icon: History, href: '/admin/inventory/history', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', desc: 'Audit Pergerakan Barang' },
       ]
@@ -229,15 +236,20 @@ export default function AdminMobileNav() {
     {
       title: 'Laporan & Keuangan',
       items: [
-        { name: 'Lap. Finansial', icon: CreditCard, href: '/admin/reports/finance', color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-100', desc: 'Laba Rugi & Arus Kas' },
-        { name: 'Lap. Penjualan', icon: BarChart3, href: '/admin/reports', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', desc: 'Grafik Omzet & Margin' },
+        { name: 'Hub Keuangan', icon: Landmark, href: '/admin/finance', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', desc: 'Saldo Kas & Modal Terpadu' },
+        { name: 'Hutang & Piutang', icon: CreditCard, href: '/admin/reports/hutang', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', desc: 'Monitoring & Tagih WA' },
+        { name: 'Lap. Bisnis & Pajak', icon: BarChart3, href: '/admin/reports', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', desc: 'Ringkasan Eksekutif' },
+        { name: 'Lap. Penjualan', icon: TrendingUp, href: '/admin/reports/sales', color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-100', desc: 'Grafik Omzet & Margin' },
         { name: 'Dompet & Kas', icon: Wallet, href: '/admin/wallet', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', desc: 'Mutasi Saldo & Bank' },
       ]
     },
     {
-      title: 'Pengaturan & Toko',
+      title: 'Pengaturan & Master Data',
       items: [
         { name: 'Tambah Produk', icon: PlusCircle, href: '/admin/products/add', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100', desc: 'Katalog & Barcode Baru' },
+        { name: 'Supplier / Agen', icon: Truck, href: '/admin/suppliers', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', desc: 'Distributor & Grosir' },
+        { name: 'Karyawan & Staf', icon: UsersRound, href: '/admin/employees', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100', desc: 'Akses & Hak Kasir' },
+        { name: 'Promosi & Diskon', icon: Star, href: '/admin/promotions', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', desc: 'Voucher & Flash Sale' },
         { name: 'Pengaturan', icon: Settings, href: '/admin/settings', color: 'text-gray-700', bg: 'bg-gray-100', border: 'border-gray-200', desc: 'Toko, Printer & Sistem' },
       ]
     }
