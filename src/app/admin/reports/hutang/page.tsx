@@ -6,7 +6,8 @@ import Link from 'next/link';
 import {
   ArrowLeft, AlertTriangle, TrendingDown, TrendingUp, CheckCircle2,
   Clock, CreditCard, Building2, User, Calendar, RefreshCcw,
-  ChevronRight, X, DollarSign, Loader2, FileText, Search
+  ChevronRight, X, DollarSign, Loader2, FileText, Search,
+  MessageSquare, Copy
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
@@ -44,6 +45,10 @@ export default function HutangReportPage() {
   const [custPayMethod, setCustPayMethod] = useState('CASH');
   const [custPayNotes, setCustPayNotes] = useState('');
   const [custPaying, setCustPaying] = useState(false);
+
+  // WhatsApp debt reminder modal
+  const [waModalCustomer, setWaModalCustomer] = useState<CustomerDebt | null>(null);
+  const [waPhoneInput, setWaPhoneInput] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -107,6 +112,41 @@ export default function HutangReportPage() {
     } finally {
       setCustPaying(false);
     }
+  };
+
+  const getWaReminderMessage = (d: CustomerDebt) => {
+    const dueDateStr = d.dueDate ? fmtDate(d.dueDate) : '-';
+    return `Halo Kak ${d.customerName || 'Pelanggan Ataya'},\n\nKami dari *Ataya Toko* menginformasikan catatan piutang/tempo pesanan Anda:\n• No. Transaksi: *${d.orderId}*\n• Total Tagihan: *${fmtCurrency(d.totalAmount)}*\n• Jatuh Tempo: ${dueDateStr}\n• Status: *Belum Lunas*\n\nMohon kesediaannya untuk melakukan pembayaran tepat waktu. Pembayaran dapat melalui transfer atau langsung ke kasir toko kami. Terima kasih banyak atas kerjasamanya! 🙏`;
+  };
+
+  const handleOpenWaReminder = (d: CustomerDebt) => {
+    if (d.customerPhone && d.customerPhone.trim()) {
+      const clean = d.customerPhone.replace(/\D/g, '').replace(/^0/, '62');
+      const msg = getWaReminderMessage(d);
+      window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      setWaModalCustomer(d);
+      setWaPhoneInput('');
+    }
+  };
+
+  const handleSendCustomWa = () => {
+    if (!waModalCustomer) return;
+    const clean = waPhoneInput.replace(/\D/g, '').replace(/^0/, '62');
+    if (!clean || clean.length < 9) {
+      notify.admin.error('Masukkan nomor WhatsApp yang valid');
+      return;
+    }
+    const msg = getWaReminderMessage(waModalCustomer);
+    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
+    setWaModalCustomer(null);
+  };
+
+  const handleCopyWaText = () => {
+    if (!waModalCustomer) return;
+    const msg = getWaReminderMessage(waModalCustomer);
+    navigator.clipboard.writeText(msg);
+    notify.admin.success('Format teks tagihan berhasil disalin!');
   };
 
   const handleExport = () => {
@@ -465,10 +505,17 @@ export default function HutangReportPage() {
                             <span className="text-base font-black text-gray-900">
                               {fmtCurrency(d.totalAmount)}
                             </span>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleOpenWaReminder(d)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition shadow-sm"
+                                title="Kirim Pengingat Tagihan WhatsApp"
+                              >
+                                <MessageSquare size={12} /> Tagih WA
+                              </button>
                               <Link
                                 href={`/admin/orders/${d.id}`}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
                               >
                                 <ChevronRight size={12} /> Detail
                               </Link>
@@ -640,6 +687,82 @@ export default function HutangReportPage() {
               >
                 {custPaying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                 {custPaying ? 'Memproses...' : 'Konfirmasi Diterima'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ===== WhatsApp Reminder Modal ===== */}
+      {waModalCustomer && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <h3 className="font-black text-gray-900 text-base">Kirim Tagihan WhatsApp</h3>
+                  <p className="text-xs text-gray-400">{waModalCustomer.customerName}</p>
+                </div>
+              </div>
+              <button onClick={() => setWaModalCustomer(null)} className="p-2 rounded-xl hover:bg-gray-100 transition">
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-4 mb-4">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-emerald-800 uppercase">Total Piutang</span>
+                <span className="text-xs font-mono text-gray-500">#{waModalCustomer.orderId.slice(0, 8)}</span>
+              </div>
+              <p className="text-xl font-black text-emerald-700">{fmtCurrency(waModalCustomer.totalAmount)}</p>
+              {waModalCustomer.dueDate && (
+                <p className="text-xs text-emerald-800/80 mt-1 font-medium">
+                  Jatuh Tempo: {fmtDate(waModalCustomer.dueDate)}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                  Nomor WhatsApp Pelanggan
+                </label>
+                <input
+                  type="tel"
+                  value={waPhoneInput}
+                  onChange={(e) => setWaPhoneInput(e.target.value)}
+                  placeholder="Contoh: 08123456789 atau 62812..."
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">
+                  Preview Pesan Tagihan
+                </label>
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-600 font-mono whitespace-pre-wrap max-h-36 overflow-y-auto">
+                  {getWaReminderMessage(waModalCustomer)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleCopyWaText}
+                className="py-3 px-4 border border-gray-200 rounded-2xl text-xs font-black text-gray-600 hover:bg-gray-50 transition flex items-center justify-center gap-1.5"
+              >
+                <Copy size={14} /> Salin
+              </button>
+              <button
+                type="button"
+                onClick={handleSendCustomWa}
+                className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+              >
+                <MessageSquare size={14} /> Buka WhatsApp
               </button>
             </div>
           </div>

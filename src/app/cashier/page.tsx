@@ -189,6 +189,7 @@ export default function CashierPOS() {
   const [qrisReferenceNo, setQrisReferenceNo] = useState('');
   const [qrisConfirmed, setQrisConfirmed] = useState(false); // true = BRI SNAP sudah konfirmasi, skip upload bukti
   const qrisConfirmedRef = useRef(false); // ref untuk akses sinkron di handleTransaction
+  const handleTransactionRef = useRef<() => void>(() => {});
 
   // Order history filter
   const [orderDateFilter, setOrderDateFilter] = useState<string>('');
@@ -645,7 +646,13 @@ export default function CashierPOS() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F1') { e.preventDefault(); searchInputRef.current?.focus(); }
+      if (e.key === 'F1') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        handleTransactionRef.current?.();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -1454,6 +1461,10 @@ export default function CashierPOS() {
       toast.error('Gagal Transaksi');
     } finally { setIsProcessing(false); }
   };
+
+  useEffect(() => {
+    handleTransactionRef.current = handleTransaction;
+  }, [handleTransaction]);
 
   const printReceipt = useCallback(async (order: Partial<Order>) => {
     // FIX: Fetch cashier name BEFORE template string (await inside template literal tidak valid)
@@ -2310,7 +2321,7 @@ export default function CashierPOS() {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       <span>Memproses Transaksi...</span>
                     </div>
-                  ) : <><Printer size={16} /> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi'}</>}
+                  ) : <><Printer size={16} /> {transactionType === 'online' ? 'Simpan Pesanan Online' : 'Selesaikan Transaksi [F2]'}</>}
                 </button>
               </div>
             </div>
