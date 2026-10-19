@@ -640,7 +640,11 @@ function AddPurchaseFormContent() {
                       e.preventDefault();
                       const term = searchProduct.trim();
                       if (!term) return;
-                      handleScan(term);
+                      if (filteredSearch.length > 0) {
+                        addToCart(filteredSearch[0]);
+                      } else {
+                        handleScan(term);
+                      }
                     }
                   }}
                 />
@@ -680,6 +684,24 @@ function AddPurchaseFormContent() {
                   </div>
                 )}
               </div>
+
+              {/* Rekomendasi Cepat saat Keranjang Masih Kosong */}
+              {cart.length === 0 && !searchProduct && products.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">⚡ Tambah Cepat:</span>
+                  {products.slice(0, 5).map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => addToCart(p)}
+                      className="px-2.5 py-1 bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 rounded-xl text-[10px] font-bold text-gray-700 transition-all flex items-center gap-1 truncate max-w-[160px]"
+                    >
+                      <Plus size={10} className="shrink-0" />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="md:hidden space-y-3 px-4 pb-4">
               {cart.map((item) => (

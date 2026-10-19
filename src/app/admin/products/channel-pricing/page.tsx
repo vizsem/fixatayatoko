@@ -824,7 +824,47 @@ export default function ChannelPricingPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {/* Quick Presets 1-Klik */}
+          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Preset Cepat:</span>
+            <button
+              type="button"
+              onClick={() => { setBulkMode('add-percent'); setBulkValue(10); }}
+              className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-black transition-colors"
+            >
+              +10%
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBulkMode('add-percent'); setBulkValue(15); }}
+              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] font-black transition-colors"
+            >
+              ⚡ +15% (Rekomendasi Marketplace)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBulkMode('add-percent'); setBulkValue(20); }}
+              className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-black transition-colors"
+            >
+              +20%
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBulkMode('add-nominal'); setBulkValue(2000); }}
+              className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-black transition-colors"
+            >
+              +Rp 2.000
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBulkMode('add-nominal'); setBulkValue(5000); }}
+              className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-black transition-colors"
+            >
+              +Rp 5.000
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Mode</span>
               <select
@@ -1230,11 +1270,17 @@ export default function ChannelPricingPage() {
                                           </div>
                                       </div>
                                       {(key === 'shopee' || key === 'tiktok') && price ? (
-                                        <div className="flex justify-end gap-3 text-xs">
-                                          <span className="text-gray-400">Fee: Rp{Math.round(fee).toLocaleString()}</span>
-                                          <span className={`font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                            Laba: Rp{Math.round(profit).toLocaleString()}
-                                          </span>
+                                        <div className="flex items-center justify-end gap-2.5 text-xs">
+                                          <span className="text-gray-400">Fee: -Rp{Math.round(fee).toLocaleString('id-ID')}</span>
+                                          {profit < 0 ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black">
+                                              ⚠️ Rugi: -Rp{Math.abs(Math.round(profit)).toLocaleString('id-ID')}
+                                            </span>
+                                          ) : (
+                                            <span className="font-bold text-emerald-600">
+                                              Laba: +Rp{Math.round(profit).toLocaleString('id-ID')}
+                                            </span>
+                                          )}
                                         </div>
                                       ) : null}
                                     </div>
@@ -1414,12 +1460,18 @@ export default function ChannelPricingPage() {
                               </div>
                               {(key === 'shopee' || key === 'tiktok') && price ? (
                                 <div className="text-right space-y-0.5">
-                                  <p className="text-xs text-gray-400">
-                                    Fee: -Rp{Math.round(fee).toLocaleString()}
+                                  <p className="text-[11px] text-gray-400">
+                                    Fee: -Rp{Math.round(fee).toLocaleString('id-ID')}
                                   </p>
-                                  <p className={`text-xs font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                    Laba: Rp{Math.round(profit).toLocaleString()}
-                                  </p>
+                                  {profit < 0 ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black">
+                                      ⚠️ Rugi: -Rp{Math.abs(Math.round(profit)).toLocaleString('id-ID')}
+                                    </span>
+                                  ) : (
+                                    <p className="text-xs font-bold text-emerald-600">
+                                      Laba: +Rp{Math.round(profit).toLocaleString('id-ID')}
+                                    </p>
+                                  )}
                                 </div>
                               ) : null}
                             </div>

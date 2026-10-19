@@ -10,7 +10,7 @@ import {
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
   Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
-  DollarSign, AlertTriangle, ClipboardCheck, UploadCloud
+  DollarSign, AlertTriangle, ClipboardCheck, UploadCloud, Store
 } from 'lucide-react';
 
 import AdminMobileHeader from '@/components/AdminMobileHeader';
@@ -110,83 +110,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const menuItems = [
     {
-      group: "Utama", items: [
+      group: "1. Penjualan & Kasir", items: [
         { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-        { name: 'Pesanan', href: '/admin/orders', icon: ShoppingCart },
+        { name: 'Kasir POS Toko', href: '/cashier', icon: Store },
+        { name: 'Pesanan Web & Toko', href: '/admin/orders', icon: ShoppingCart },
         { name: 'Order Marketplace', href: '/admin/marketplace-orders', icon: Receipt },
       ]
     },
     {
-      group: "Katalog & Stok", items: [
-        { name: 'Produk', href: '/admin/products', icon: Package },
-        { name: 'HPP & Margin Harga', href: '/admin/products/pricing-hpp', icon: DollarSign },
+      group: "2. Katalog & Stok", items: [
+        { name: 'Daftar Produk', href: '/admin/products', icon: Package },
         { name: 'Harga per Channel', href: '/admin/products/channel-pricing', icon: Tag },
-        { name: 'Sampling Harian (5 Menit)', href: '/admin/inventory/daily-check', icon: ClipboardCheck },
-        { name: 'Kategori', href: '/admin/kategori', icon: Tag },
-        { name: 'Gudang', href: '/admin/warehouses', icon: Database },
-        { name: 'Inventory', href: '/admin/inventory', icon: History },
-        { name: 'Rekonsiliasi Produk', href: '/admin/inventory/reconciliation', icon: RefreshCcw },
-        { name: 'Layer Persediaan', href: '/admin/inventory/layers', icon: Database },
-      ]
-    },
-    {
-      group: "Pembelian & Suplai", items: [
-        { name: 'Pembelian (Purchases)', href: '/admin/purchases', icon: Receipt },
-        { name: 'Supplier', href: '/admin/suppliers', icon: Truck },
-        { name: 'Import Harga Supplier', href: '/admin/purchases/import-supplier-prices', icon: UploadCloud },
-      ]
-    },
-    {
-      group: "Keuangan & Operasional", items: [
-        { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
-        { name: 'Modal & Aset', href: '/admin/capital', icon: Landmark },
-        { name: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard },
-      ]
-    },
-    {
-      group: "Layanan & Purna Jual", items: [
+        { name: 'HPP & Margin Harga', href: '/admin/products/pricing-hpp', icon: DollarSign },
+        { name: 'Pembelian PO (Stok Masuk)', href: '/admin/purchases', icon: Receipt },
+        { name: 'Stok & Inventory Gudang', href: '/admin/inventory', icon: History },
         { name: 'Retur Barang', href: '/admin/returns', icon: RefreshCcw },
+        { name: 'Gudang & Lokasi', href: '/admin/warehouses', icon: Database },
+        { name: 'Kategori Produk', href: '/admin/kategori', icon: Tag },
+        { name: 'Sampling Harian (5 Mnt)', href: '/admin/inventory/daily-check', icon: ClipboardCheck },
       ]
     },
     {
-      group: "Pelanggan & SDM", items: [
-        { name: 'Live Chat', href: '/admin/chat', icon: MessageCircle },
-        { name: 'Kotak Masuk', href: '/admin/messages', icon: Mail, badge: unreadMessages },
-        { name: 'Pelanggan', href: '/admin/customers', icon: Users },
-        { name: 'Karyawan', href: '/admin/employees', icon: UsersRound },
-        { name: 'Sistem Poin', href: '/admin/points', icon: Star },
-        { name: 'Dompet Digital', href: '/admin/wallet', icon: Wallet },
-        { name: 'Users', href: '/admin/users', icon: Users },
-      ]
-    },
-    {
-      group: "Pemasaran", items: [
-        { name: 'Promosi', href: '/admin/promotions', icon: Star },
-        { name: 'Notifikasi', href: '/admin/notifications', icon: Bell },
-      ]
-    },
-      {
-      group: "Laporan", items: [
-        { name: 'Laporan', href: '/admin/reports', icon: BarChart3 },
-        { name: 'Penjualan', href: '/admin/reports/sales', icon: TrendingUp },
-        { name: 'Inventaris', href: '/admin/reports/inventory', icon: Database },
-        { name: 'Keuangan', href: '/admin/reports/finance', icon: CreditCard },
-        { name: 'Operasional', href: '/admin/reports/operations', icon: Settings },
-        { name: 'Promosi', href: '/admin/reports/promotions', icon: Star },
-        { name: 'Pelanggan', href: '/admin/reports/customers', icon: Users },
-        { name: 'Laporan Pajak', href: '/admin/reports/tax', icon: Receipt },
+      group: "3. Keuangan & Laporan", items: [
+        { name: 'Dashboard Keuangan', href: '/admin/finance', icon: Landmark },
+        { name: 'Modal & Saldo Kas', href: '/admin/capital', icon: Wallet },
+        { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
+        { name: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard },
+        { name: 'Laporan Bisnis & Pajak', href: '/admin/reports', icon: BarChart3 },
+        { name: 'Laporan Penjualan', href: '/admin/reports/sales', icon: TrendingUp },
         { name: 'Hutang & Piutang', href: '/admin/reports/hutang', icon: CreditCard },
       ]
     },
     {
-      group: "Audit & Keamanan", items: [
-        { name: 'Audit Terpusat', href: '/admin/audit', icon: History },
-        { name: 'Audit Pajak', href: '/admin/audit?tab=tax', icon: Receipt },
-      ]
-    },
-    {
-      group: "Sistem", items: [
-        { name: 'Pengaturan', href: '/admin/settings', icon: Settings },
+      group: "4. Manajemen & Pengaturan", items: [
+        { name: 'Supplier / Distributor', href: '/admin/suppliers', icon: Truck },
+        { name: 'Pelanggan & Member', href: '/admin/customers', icon: Users },
+        { name: 'Karyawan & Staf', href: '/admin/employees', icon: UsersRound },
+        { name: 'Pesan & Kotak Masuk', href: '/admin/messages', icon: Mail, badge: unreadMessages },
+        { name: 'Promosi & Diskon', href: '/admin/promotions', icon: Star },
+        { name: 'Dompet Digital & Poin', href: '/admin/wallet', icon: Wallet },
+        { name: 'Audit Log Terpusat', href: '/admin/audit', icon: History },
+        { name: 'Pengaturan Sistem', href: '/admin/settings', icon: Settings },
       ]
     }
   ];

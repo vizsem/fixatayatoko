@@ -32,7 +32,8 @@ import {
   Banknote,
   Landmark,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Store
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
@@ -47,37 +48,36 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  // Dashboard & Overview
-  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, category: 'Overview' },
-  { label: 'Analytics', href: '/admin/reports', icon: BarChart3, category: 'Overview' },
+  // 1. Penjualan & Kasir
+  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, category: '1. Penjualan & Kasir' },
+  { label: 'Kasir POS Toko', href: '/cashier', icon: Store, category: '1. Penjualan & Kasir' },
+  { label: 'Pesanan Web & Toko', href: '/admin/orders', icon: ShoppingCart, category: '1. Penjualan & Kasir' },
+  { label: 'Order Marketplace', href: '/admin/marketplace-orders', icon: ShoppingBag, category: '1. Penjualan & Kasir' },
   
-  // Orders & Sales
-  { label: 'Orders', href: '/admin/orders', icon: ShoppingCart, category: 'Sales' },
-  { label: 'Marketplace', href: '/admin/marketplace-orders', icon: ShoppingBag, category: 'Sales' },
-  { label: 'Purchases', href: '/admin/purchases', icon: Truck, category: 'Sales' },
+  // 2. Katalog & Stok
+  { label: 'Daftar Produk', href: '/admin/products', icon: Package, category: '2. Katalog & Stok' },
+  { label: 'Harga per Channel', href: '/admin/products/channel-pricing', icon: Tag, category: '2. Katalog & Stok' },
+  { label: 'HPP & Margin Harga', href: '/admin/products/pricing-hpp', icon: Tag, category: '2. Katalog & Stok' },
+  { label: 'Pembelian PO (Stok Masuk)', href: '/admin/purchases', icon: Truck, category: '2. Katalog & Stok' },
+  { label: 'Stok & Inventory Gudang', href: '/admin/inventory', icon: Database, category: '2. Katalog & Stok' },
+  { label: 'Gudang & Lokasi', href: '/admin/warehouses', icon: Warehouse, category: '2. Katalog & Stok' },
+  { label: 'Retur Barang', href: '/admin/returns', icon: RefreshCcw, category: '2. Katalog & Stok' },
   
-  // Products & Inventory
-  { label: 'Products', href: '/admin/products', icon: Package, category: 'Inventory' },
-  { label: 'Inventory', href: '/admin/inventory', icon: Database, category: 'Inventory' },
-  { label: 'Warehouses', href: '/admin/warehouses', icon: Warehouse, category: 'Inventory' },
+  // 3. Keuangan & Laporan
+  { label: 'Dashboard Keuangan', href: '/admin/finance', icon: Landmark, category: '3. Keuangan & Laporan' },
+  { label: 'Modal & Saldo Kas', href: '/admin/capital', icon: Banknote, category: '3. Keuangan & Laporan' },
+  { label: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: CreditCard, category: '3. Keuangan & Laporan' },
+  { label: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard, category: '3. Keuangan & Laporan' },
+  { label: 'Laporan Bisnis & Pajak', href: '/admin/reports', icon: BarChart3, category: '3. Keuangan & Laporan' },
   
-  // Finance
-  { label: 'Finance', href: '/admin/capital', icon: Banknote, category: 'Finance' },
-  { label: 'Wallet', href: '/admin/wallet', icon: Wallet, category: 'Finance' },
-  { label: 'Expenses', href: '/admin/operational-expenses', icon: CreditCard, category: 'Finance' },
-  
-  // Customers & Marketing
-  { label: 'Customers', href: '/admin/customers', icon: Users, category: 'Marketing' },
-  { label: 'Promotions', href: '/admin/promotions', icon: Tag, category: 'Marketing' },
-  { label: 'Points', href: '/admin/points', icon: Star, category: 'Marketing' },
-  
-  // Communication
-  { label: 'Messages', href: '/admin/messages', icon: MessageCircle, category: 'Communication' },
-  { label: 'Notifications', href: '/admin/notifications', icon: Bell, category: 'Communication' },
-  
-  // System
-  { label: 'Audit Logs', href: '/admin/audit-logs', icon: History, category: 'System' },
-  { label: 'Settings', href: '/admin/settings', icon: Settings, category: 'System' },
+  // 4. Manajemen & Pengaturan
+  { label: 'Supplier / Distributor', href: '/admin/suppliers', icon: Truck, category: '4. Manajemen & Pengaturan' },
+  { label: 'Pelanggan & Member', href: '/admin/customers', icon: Users, category: '4. Manajemen & Pengaturan' },
+  { label: 'Promosi & Diskon', href: '/admin/promotions', icon: Tag, category: '4. Manajemen & Pengaturan' },
+  { label: 'Dompet Digital & Poin', href: '/admin/wallet', icon: Wallet, category: '4. Manajemen & Pengaturan' },
+  { label: 'Pesan & Kotak Masuk', href: '/admin/messages', icon: MessageCircle, category: '4. Manajemen & Pengaturan' },
+  { label: 'Audit Log Terpusat', href: '/admin/audit', icon: History, category: '4. Manajemen & Pengaturan' },
+  { label: 'Pengaturan Sistem', href: '/admin/settings', icon: Settings, category: '4. Manajemen & Pengaturan' },
 ];
 
 export default function AdminMobileHeader() {
@@ -305,7 +305,7 @@ export default function AdminMobileHeader() {
 
             {/* Menu Items */}
             <div className="flex-1 overflow-y-auto pb-24">
-              {['Overview', 'Sales', 'Inventory', 'Finance', 'Marketing', 'Communication', 'System'].map((category) => {
+              {['1. Penjualan & Kasir', '2. Katalog & Stok', '3. Keuangan & Laporan', '4. Manajemen & Pengaturan'].map((category) => {
                 const categoryItems = navItems.filter(item => item.category === category);
                 if (categoryItems.length === 0) return null;
 
