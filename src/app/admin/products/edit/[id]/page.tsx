@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
-  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package, Check, Info, Sparkles, Plus
+  Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package, Check, Info, Sparkles, Plus,
+  ShieldAlert, EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -122,6 +123,8 @@ export default function EditProductPage() {
   // State for Units and Categories
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [newUnitCode, setNewUnitCode] = useState('');
+  const [hideBaseUnit, setHideBaseUnit] = useState(false);
+  const [defaultSellUnit, setDefaultSellUnit] = useState('');
   const [newKategoriInput, setNewKategoriInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -525,6 +528,9 @@ export default function EditProductPage() {
       });
 
       setUnits(mergedUnits);
+      const isHidden = Boolean((data as any).hideBaseUnit ?? (data as any).hide_base_unit);
+      setHideBaseUnit(isHidden);
+      setDefaultSellUnit(String((data as any).defaultSellUnit ?? (data as any).default_sell_unit ?? ''));
     } catch (e) {
       console.error(e);
       toast.error("Gagal sinkron data produk");
@@ -843,6 +849,10 @@ export default function EditProductPage() {
         Supplier: formData.Supplier || '',
         No_WA_Supplier: formData.No_WA_Supplier || '',
         units: ensuredBase,
+        hideBaseUnit,
+        hide_base_unit: hideBaseUnit,
+        defaultSellUnit: hideBaseUnit ? (defaultSellUnit || ensuredBase.find(u => u.code !== baseUnit)?.code || '') : '',
+        default_sell_unit: hideBaseUnit ? (defaultSellUnit || ensuredBase.find(u => u.code !== baseUnit)?.code || '') : '',
         channelPricing,
         minPurchase: Number(formData.minPurchase || 1),
         maxPurchase: Number(formData.maxPurchase || 0),
@@ -1815,19 +1825,98 @@ export default function EditProductPage() {
               </div>
             </div>
 
+            {/* Toggle: Tidak Dijual Per Satuan Dasar / Ecer (Hide PCS) */}
+            <div className="mb-5 space-y-3">
+              <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl mt-0.5 shrink-0">
+                    <ShieldAlert size={17} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-amber-950 uppercase tracking-tight">
+                      Nonaktifkan Penjualan Satuan Dasar ({formData.Satuan || 'PCS'})
+                    </p>
+                    <p className="text-[11px] text-amber-800 font-medium leading-relaxed mt-0.5">
+                      Aktifkan jika produk <b>tidak boleh dijual eceran per {formData.Satuan || 'PCS'}</b> di kasir (hanya boleh dijual dalam kemasan lebih besar seperti RTG, PAK, atau CTN/DUS).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hideBaseUnit}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHideBaseUnit(checked);
+                        if (checked && !defaultSellUnit) {
+                          const firstHigher = units.find(u => u.code !== (formData.Satuan || 'PCS') && Number(u.contains || 0) > 1);
+                          if (firstHigher) setDefaultSellUnit(firstHigher.code);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {hideBaseUnit && (
+                <div className="p-3.5 bg-blue-50/80 border border-blue-200/90 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                    <div>
+                      <p className="text-xs font-black text-blue-950 uppercase">Satuan Jual Default di Kasir</p>
+                      <p className="text-[11px] text-blue-700">Satuan yang otomatis masuk ke keranjang saat kasir klik atau scan produk ini.</p>
+                    </div>
+                  </div>
+                  <select
+                    value={defaultSellUnit}
+                    onChange={(e) => setDefaultSellUnit(e.target.value)}
+                    className="bg-white border border-blue-300 text-xs font-black text-blue-900 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400 shadow-xs shrink-0"
+                  >
+                    <option value="">-- Pilih Satuan Default --</option>
+                    {units.filter(u => u.code !== (formData.Satuan || 'PCS')).map(u => (
+                      <option key={u.code} value={u.code}>
+                        {u.code} (Isi {u.contains} {formData.Satuan || 'PCS'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {units.map((u, index) => {
                 const code = u.code || '';
                 const idx = index;
                 const current = u;
                 const baseUnit = String(formData.Satuan || 'PCS').toUpperCase();
+                const isCurrentBase = code === baseUnit || idx === 0;
+                const isBaseHidden = isCurrentBase && hideBaseUnit;
                 const basePrice = Number(formData.Ecer || 0);
                 const contains = Number(current.contains || (idx === 0 ? 1 : 0));
                 const unitPrice = Number(current.price || 0);
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 relative group space-y-3">
+                  <div key={idx} className={`p-4 rounded-2xl border relative group space-y-3 transition-all ${
+                    isBaseHidden 
+                      ? 'bg-amber-50/40 border-dashed border-amber-300 opacity-80' 
+                      : defaultSellUnit === code 
+                        ? 'bg-blue-50/30 border-blue-400 ring-2 ring-blue-100' 
+                        : 'bg-slate-50/70 border-slate-200'
+                  }`}>
+                    {isBaseHidden && (
+                      <div className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <EyeOff size={11} /> Tidak Dijual Eceran
+                      </div>
+                    )}
+                    {!isBaseHidden && defaultSellUnit === code && (
+                      <div className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        ⭐ Satuan Utama Kasir
+                      </div>
+                    )}
                     {idx > 0 && (
                       <button
                         type="button"

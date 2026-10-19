@@ -48,6 +48,10 @@ type Product = {
   barcode?: string;
   image?: string;
   units?: UnitOption[];
+  hideBaseUnit?: boolean;
+  defaultSellUnit?: string;
+  displayUnit?: string;
+  displayPrice?: number;
   stockByWarehouse?: Record<string, number>;
   Kategori?: string;
   kategori?: string;
@@ -222,49 +226,6 @@ export default function CashierPOS() {
     return 'offline';
   }, []);
 
-  const addToCart = useCallback((product: Product) => {
-    if (product.stock <= 0) return toast.error("Stok habis!");
-    
-    const channel = getChannelKey(transactionType);
-    const baseCode = (product.unit || 'PCS').toUpperCase();
-    const containsBase = 1;
-    
-    let priceToUse = product.price;
-    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[baseCode]?.price;
-    
-    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
-      priceToUse = chPrice;
-    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[baseCode]?.price) {
-       // Fallback logic: Shopee/TikTok -> Website -> Base
-       priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
-    }
-
-    setCart(prev => {
-      const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
-      
-      // Check stock limit
-      if (exist) {
-        if (exist.quantity + 1 > product.stock) {
-          toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
-          return prev;
-        }
-        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-
-      return [...prev, { 
-        id: product.id, 
-        name: product.name, 
-        price: priceToUse, 
-        originalPrice: product.price,
-        cost: product.cost,
-        quantity: 1, 
-        unit: baseCode, 
-        contains: containsBase, 
-        channel 
-      }];
-    });
-  }, [transactionType, getChannelKey]);
-
   const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
     if (product.stock <= 0) return toast.error("Stok habis!");
 
@@ -315,6 +276,59 @@ export default function CashierPOS() {
       }];
     });
   }, [transactionType, getChannelKey]);
+
+  const addToCart = useCallback((product: Product) => {
+    if (product.stock <= 0) return toast.error("Stok habis!");
+    
+    // Skema 2: Jika produk diset tidak boleh dijual per satuan dasar (PCS di-hide)
+    if (product.hideBaseUnit) {
+      const targetUnit = (product.units || []).find(u => u.code === product.defaultSellUnit) 
+        || (product.units || []).find(u => u.code !== product.unit && Number(u.contains || 0) > 1);
+      if (targetUnit) {
+        addToCartWithUnit(product, targetUnit);
+        return;
+      }
+    }
+
+    const channel = getChannelKey(transactionType);
+    const baseCode = (product.unit || 'PCS').toUpperCase();
+    const containsBase = 1;
+    
+    let priceToUse = product.price;
+    const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[baseCode]?.price;
+    
+    if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
+      priceToUse = chPrice;
+    } else if ((channel === 'shopee' || channel === 'tiktok') && (product.channelPricing as ChannelPricing)?.['website']?.[baseCode]?.price) {
+       // Fallback logic: Shopee/TikTok -> Website -> Base
+       priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
+    }
+
+    setCart(prev => {
+      const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
+      
+      // Check stock limit
+      if (exist) {
+        if (exist.quantity + 1 > product.stock) {
+          toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
+          return prev;
+        }
+        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: priceToUse, 
+        originalPrice: product.price,
+        cost: product.cost,
+        quantity: 1, 
+        unit: baseCode, 
+        contains: containsBase, 
+        channel 
+      }];
+    });
+  }, [transactionType, getChannelKey, addToCartWithUnit]);
 
   const handleScan = useCallback(async (code: string) => {
     try {
@@ -778,12 +792,22 @@ export default function CashierPOS() {
             .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
           if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
 
+          const hideBaseUnit = Boolean((d as any).hideBaseUnit ?? raw.hideBaseUnit ?? raw.hide_base_unit);
+          const defaultSellUnit = String((d as any).defaultSellUnit ?? raw.defaultSellUnit ?? raw.default_sell_unit ?? '').toUpperCase();
+          const targetUnit = (hideBaseUnit && (units.find(u => u.code === defaultSellUnit) || units.find(u => u.code !== baseUnit && Number(u.contains || 0) > 1))) || null;
+          const displayUnit = targetUnit ? targetUnit.code : baseUnit;
+          const displayPrice = targetUnit ? Number(targetUnit.price || (basePrice * Number(targetUnit.contains || 1))) : basePrice;
+
           p.push({
             id: d.id,
             name: d.name || raw.name || raw.Nama || 'TANPA NAMA',
             price: basePrice,
             cost: baseCost,
             unit: baseUnit,
+            displayUnit,
+            displayPrice,
+            hideBaseUnit,
+            defaultSellUnit,
             stock: Number(d.stock ?? raw.stock ?? raw.Stok ?? 0),
             barcode: d.barcode || raw.barcode || raw.Barcode || '',
             image: (() => {
@@ -1879,12 +1903,39 @@ export default function CashierPOS() {
                 </div>
                   <div className="flex-1">
                     <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
-                    <p className="text-green-600 font-black text-sm">Rp{p.price.toLocaleString()}</p>
+                    <p className="text-green-600 font-black text-sm flex items-center gap-1">
+                      <span>Rp{(p.displayPrice || p.price).toLocaleString()}</span>
+                      {p.hideBaseUnit && p.displayUnit && (
+                        <span className="text-[10px] font-black px-1 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
+                          /{p.displayUnit}
+                        </span>
+                      )}
+                    </p>
                     <div className="mt-1 flex items-center justify-between flex-wrap gap-y-1">
-                      <span className="text-xs font-bold text-gray-400">{p.unit}</span>
-                      <span className={`text-xs font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>Stok: {p.stock}</span>
+                      {p.hideBaseUnit ? (
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          📦 Minimal {p.displayUnit || 'Kemasan'} (Ecer Nonaktif)
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-gray-400">{p.unit}</span>
+                      )}
+                      <span className={`text-xs font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>
+                        {p.hideBaseUnit && p.displayUnit ? (
+                          (() => {
+                            const uObj = (p.units || []).find(u => u.code === p.displayUnit);
+                            const c = Number(uObj?.contains || 1);
+                            const st = Math.floor((p.stock || 0) / (c > 0 ? c : 1));
+                            return `${st} ${p.displayUnit} (${p.stock} ${p.unit})`;
+                          })()
+                        ) : (
+                          `Stok: ${p.stock}`
+                        )}
+                      </span>
                     </div>
-                    {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).map(u => {
+                    {(p.units || []).filter(u => {
+                      if (p.hideBaseUnit && u.code === p.unit) return false;
+                      return u.contains && Number(u.contains) > 1;
+                    }).map(u => {
                       const contains = Number(u.contains);
                       const unitStock = Math.floor((p.stock || 0) / contains);
                       const channel = getChannelKey(transactionType);
@@ -1902,11 +1953,17 @@ export default function CashierPOS() {
                             e.stopPropagation();
                             addToCartWithUnit(p, u);
                           }}
-                          className="flex items-center justify-between mt-0.5 gap-1 hover:bg-blue-50/50 p-0.5 rounded cursor-pointer transition-colors"
+                          className={`flex items-center justify-between mt-1 gap-1 p-1 rounded-lg cursor-pointer transition-colors ${
+                            p.hideBaseUnit && p.displayUnit === u.code
+                              ? 'bg-blue-50/80 border border-blue-200 hover:bg-blue-100/70'
+                              : 'hover:bg-blue-50/50'
+                          }`}
                         >
-                          <span className="text-xs font-bold text-blue-400 shrink-0">{u.code} <span className="text-gray-300 font-medium">Isi {contains}</span></span>
-                          <span className="text-xs font-black text-gray-600">Rp{unitPrice.toLocaleString()}</span>
-                          <span className={`text-xs font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                          <span className="text-xs font-bold text-blue-600 shrink-0">
+                            {u.code} <span className="text-gray-400 font-medium text-[10px]">Isi {contains} {p.unit}</span>
+                          </span>
+                          <span className="text-xs font-black text-gray-700">Rp{unitPrice.toLocaleString()}</span>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded shrink-0 ${unitStock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-100 text-blue-700'}`}>
                             {unitStock} {u.code}
                           </span>
                         </div>

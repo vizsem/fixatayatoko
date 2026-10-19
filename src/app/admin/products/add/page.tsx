@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
-  Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package
+  Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package,
+  ShieldAlert, EyeOff
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
@@ -78,6 +79,8 @@ export default function AddProductPage() {
     { code: 'KARTON', contains: 0, price: 0, label: '' },
   ]);
   const [newUnitCode, setNewUnitCode] = useState('');
+  const [hideBaseUnit, setHideBaseUnit] = useState(false);
+  const [defaultSellUnit, setDefaultSellUnit] = useState('');
   const [newKategoriInput, setNewKategoriInput] = useState('');
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -431,6 +434,8 @@ export default function AddProductPage() {
         ID: baseId,
         Ecer: nextEcer,
         units: normalizedUnits,
+        hideBaseUnit,
+        defaultSellUnit: hideBaseUnit ? (defaultSellUnit || normalizedUnits.find(u => u.code !== baseUnit)?.code || '') : '',
         imageUrl,
         pricingStrategy: pricingStrategy as Record<string, unknown>,
       });
@@ -1030,18 +1035,97 @@ export default function AddProductPage() {
                 </button>
               </div>
             </div>
+            {/* Toggle: Tidak Dijual Per Satuan Dasar / Ecer (Hide PCS) */}
+            <div className="mb-5 space-y-3">
+              <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl mt-0.5 shrink-0">
+                    <ShieldAlert size={17} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-amber-950 uppercase tracking-tight">
+                      Nonaktifkan Penjualan Satuan Dasar ({formData.Satuan || 'PCS'})
+                    </p>
+                    <p className="text-[11px] text-amber-800 font-medium leading-relaxed mt-0.5">
+                      Aktifkan jika produk <b>tidak boleh dijual eceran per {formData.Satuan || 'PCS'}</b> di kasir (hanya boleh dijual dalam kemasan lebih besar seperti RTG, PAK, atau CTN/DUS).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hideBaseUnit}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHideBaseUnit(checked);
+                        if (checked && !defaultSellUnit) {
+                          const firstHigher = units.find(u => u.code !== (formData.Satuan || 'PCS') && Number(u.contains || 0) > 1);
+                          if (firstHigher) setDefaultSellUnit(firstHigher.code);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {hideBaseUnit && (
+                <div className="p-3.5 bg-blue-50/80 border border-blue-200/90 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                    <div>
+                      <p className="text-xs font-black text-blue-950 uppercase">Satuan Jual Default di Kasir</p>
+                      <p className="text-[11px] text-blue-700">Satuan yang otomatis masuk ke keranjang saat kasir klik atau scan produk ini.</p>
+                    </div>
+                  </div>
+                  <select
+                    value={defaultSellUnit}
+                    onChange={(e) => setDefaultSellUnit(e.target.value)}
+                    className="bg-white border border-blue-300 text-xs font-black text-blue-900 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400 shadow-xs shrink-0"
+                  >
+                    <option value="">-- Pilih Satuan Default --</option>
+                    {units.filter(u => u.code !== (formData.Satuan || 'PCS')).map(u => (
+                      <option key={u.code} value={u.code}>
+                        {u.code} (Isi {u.contains} {formData.Satuan || 'PCS'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {units.map((u, index) => {
                 const code = u.code || '';
                 const idx = index;
                 const current = u;
+                const isCurrentBase = code === (formData.Satuan || 'PCS');
+                const isBaseHidden = isCurrentBase && hideBaseUnit;
                 const basePrice = Number(formData.Ecer || 0);
                 const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
                 const unitPrice = Number(current.price || 0);
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={code} className="p-4 rounded-2xl border bg-gray-50 relative group">
+                  <div key={code} className={`p-4 rounded-2xl border relative group transition-all ${
+                    isBaseHidden 
+                      ? 'bg-amber-50/40 border-dashed border-amber-300 opacity-80' 
+                      : defaultSellUnit === code 
+                        ? 'bg-blue-50/30 border-blue-400 ring-2 ring-blue-100' 
+                        : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    {isBaseHidden && (
+                      <div className="mb-2 px-2 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <EyeOff size={11} /> Tidak Dijual Eceran
+                      </div>
+                    )}
+                    {!isBaseHidden && defaultSellUnit === code && (
+                      <div className="mb-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        ⭐ Satuan Utama Kasir
+                      </div>
+                    )}
                     {code !== 'PCS' && (
                       <button
                         type="button"

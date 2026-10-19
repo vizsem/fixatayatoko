@@ -13,6 +13,7 @@ export interface UnitOption {
     label?: string;
     price?: number;
     barcode?: string;
+    isSellable?: boolean;
 }
 
 export interface Product {
@@ -29,6 +30,8 @@ export interface Product {
     imageUrl?: string;
     minWholesaleQty?: number;
     units?: UnitOption[];
+    hideBaseUnit?: boolean;
+    defaultSellUnit?: string;
     minPurchase?: number;
     maxPurchase?: number;
     dimensions?: {

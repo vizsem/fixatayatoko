@@ -561,8 +561,10 @@ export async function addProductFull(payload: {
   Harga_Coret?: number;
   Grosir?: number;
   Min_Grosir?: number;
-  // Satuan multi-unit
+  // Satuan multi-unit & penjualan
   units?: Array<{ code: string; contains: number; price?: number; label?: string; minQty?: number }>;
+  hideBaseUnit?: boolean;
+  defaultSellUnit?: string;
   // Supplier
   Supplier?: string;
   No_WA_Supplier?: string;
@@ -641,6 +643,10 @@ export async function addProductFull(payload: {
       },
       volumeInCtn: Number(payload.volumeInCtn || 0),
       units: payload.units || [{ code: baseUnit, contains: 1, price: Number(payload.Ecer || 0), label: '' }],
+      hideBaseUnit: Boolean(payload.hideBaseUnit),
+      hide_base_unit: Boolean(payload.hideBaseUnit),
+      defaultSellUnit: payload.defaultSellUnit || '',
+      default_sell_unit: payload.defaultSellUnit || '',
       Supplier: payload.Supplier || '',
       supplierName: payload.Supplier || '',
       No_WA_Supplier: payload.No_WA_Supplier || '',

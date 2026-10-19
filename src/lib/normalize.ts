@@ -7,6 +7,7 @@ export type UnitOption = {
   minQty?: number;
   label?: string;
   barcode?: string;
+  isSellable?: boolean;
 };
 
 export function getLargestPurchaseUnit(units?: UnitOption[], baseUnit = 'PCS'): UnitOption {
@@ -40,6 +41,8 @@ export type NormalizedProduct = {
   imageUrl?: string;
   purchasePrice?: number;
   units?: UnitOption[];
+  hideBaseUnit?: boolean;
+  defaultSellUnit?: string;
   updatedAt?: number;
   createdAt?: number;
   minWholesaleQty?: number;
@@ -116,6 +119,8 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
   result.units = parseUnits(rawUnits, unit, priceEcer, priceGrosir, minGrosir);
   result.minWholesaleQty = minGrosir;
   result.Modal = getNum(raw.purchasePrice ?? raw.Modal);
+  result.hideBaseUnit = typeof raw.hideBaseUnit === 'boolean' ? raw.hideBaseUnit : Boolean(raw.hide_base_unit);
+  result.defaultSellUnit = getStr(raw.defaultSellUnit ?? raw.default_sell_unit ?? '');
   result.channelPricing = (raw as Record<string, unknown>).channelPricing;
   result.raw_data = raw;
   return result;
