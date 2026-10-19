@@ -351,6 +351,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost'>('all');
   const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
 
   const { products: liveProducts, loading: productsLoading } = useProducts({
@@ -498,8 +499,41 @@ export default function AdminProducts() {
         );
       });
     }
-    return result.filter((p) => (showInactive ? p.isActive === false : p.isActive !== false));
-  }, [rows, searchTerm, showInactive]);
+    let filtered = result.filter((p) => (showInactive ? p.isActive === false : p.isActive !== false));
+    if (quickFilter === 'out_of_stock') {
+      filtered = filtered.filter(p => Number(p.stock || p.Stok || 0) <= 0);
+    } else if (quickFilter === 'low_stock') {
+      filtered = filtered.filter(p => {
+        const stock = Number(p.stock || p.Stok || 0);
+        const min = Number(p.minStock || p.Min_Stok || 5);
+        return stock > 0 && stock <= min;
+      });
+    } else if (quickFilter === 'no_image') {
+      filtered = filtered.filter(p => !p.imageUrl && !p.image && !p.foto && !p.URL_Produk);
+    } else if (quickFilter === 'no_cost') {
+      filtered = filtered.filter(p => Number(p.purchasePrice || p.Modal || 0) <= 0);
+    }
+    return filtered;
+  }, [rows, searchTerm, showInactive, quickFilter]);
+
+  const quickCounts = useMemo(() => {
+    let outOfStock = 0;
+    let lowStock = 0;
+    let noImage = 0;
+    let noCost = 0;
+    rows.forEach(p => {
+      const stock = Number(p.stock || p.Stok || 0);
+      const min = Number(p.minStock || p.Min_Stok || 5);
+      const cost = Number(p.purchasePrice || p.Modal || 0);
+      const hasImage = Boolean(p.imageUrl || p.image || p.foto || p.URL_Produk);
+
+      if (stock <= 0) outOfStock++;
+      else if (stock <= min) lowStock++;
+      if (!hasImage) noImage++;
+      if (cost <= 0) noCost++;
+    });
+    return { outOfStock, lowStock, noImage, noCost };
+  }, [rows]);
 
   const stats = useMemo(() => {
     const totalAset = filteredAndSorted.reduce((acc, curr) => acc + (Number(curr.stock || 0) * Number(curr.purchasePrice || 0)), 0);
@@ -976,6 +1010,78 @@ export default function AdminProducts() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Quick Filter Pills */}
+        <div className="px-3 py-2 bg-gray-50/50 border-b border-gray-100 flex flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0">Filter Cepat:</span>
+          <button
+            type="button"
+            onClick={() => { setQuickFilter('all'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+              quickFilter === 'all'
+                ? 'bg-gray-900 text-white shadow-xs'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Semua ({rows.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setQuickFilter('out_of_stock'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
+              quickFilter === 'out_of_stock'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+            }`}
+          >
+            <span>🔴 Stok Habis</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'out_of_stock' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-700'}`}>
+              {quickCounts.outOfStock}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setQuickFilter('low_stock'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
+              quickFilter === 'low_stock'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-white text-amber-600 border border-amber-200 hover:bg-amber-50'
+            }`}
+          >
+            <span>⚠️ Stok Menipis</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'low_stock' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'}`}>
+              {quickCounts.lowStock}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setQuickFilter('no_image'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
+              quickFilter === 'no_image'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'
+            }`}
+          >
+            <span>📷 Tanpa Foto</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'no_image' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-700'}`}>
+              {quickCounts.noImage}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setQuickFilter('no_cost'); setCurrentPage(1); }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
+              quickFilter === 'no_cost'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50'
+            }`}
+          >
+            <span>💰 Tanpa Modal/HPP</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'no_cost' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700'}`}>
+              {quickCounts.noCost}
+            </span>
+          </button>
         </div>
 
         {/* MOBILE LIST (Card mode) */}

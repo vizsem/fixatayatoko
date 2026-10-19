@@ -2183,10 +2183,55 @@ export default function CashierPOS() {
                     )}
                   </div>
                 ) : paymentMethod === 'CASH' ? (
-                  <div className="bg-gray-50 p-3 rounded-2xl">
-                    <label className="text-xs font-black text-gray-400 uppercase">Bayar Tunai</label>
-                    <input type="number" value={cashGiven} onChange={e => setCashGiven(e.target.value)} className="w-full bg-transparent font-black text-lg outline-none" placeholder="0" />
-                    {change >= 0 && <p className="text-xs font-bold text-green-600 mt-1">Kembali: Rp{change.toLocaleString()}</p>}
+                  <div className="bg-gray-50 p-3 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-gray-400 uppercase">Bayar Tunai</label>
+                      <button
+                        type="button"
+                        onClick={() => setCashGiven(String(total))}
+                        className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors"
+                      >
+                        ⚡ Uang Pas (Rp{total.toLocaleString('id-ID')})
+                      </button>
+                    </div>
+                    <input 
+                      type="number" 
+                      value={cashGiven} 
+                      onChange={e => setCashGiven(e.target.value)} 
+                      className="w-full bg-white p-2.5 rounded-xl border border-gray-200 font-black text-lg outline-none focus:border-emerald-500" 
+                      placeholder="0" 
+                    />
+                    
+                    {/* Quick Cash Presets */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[10000, 20000, 50000, 100000, 200000].map(nominal => (
+                        <button
+                          key={nominal}
+                          type="button"
+                          onClick={() => setCashGiven(String(nominal))}
+                          className="px-2 py-1 bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-[10px] font-black rounded-lg transition-colors text-gray-700"
+                        >
+                          Rp{nominal >= 1000 ? `${nominal / 1000}k` : nominal}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const roundedUp50k = Math.ceil(total / 50000) * 50000;
+                          setCashGiven(String(roundedUp50k));
+                        }}
+                        className="px-2 py-1 bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-[10px] font-black rounded-lg transition-colors text-emerald-700"
+                      >
+                        Bulatkan
+                      </button>
+                    </div>
+
+                    {change >= 0 && (
+                      <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500">Kembalian:</span>
+                        <span className="text-sm font-black text-emerald-700">Rp{change.toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
                   </div>
                 ) : paymentMethod === 'TEMPO' ? (
                    <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100 space-y-3">
@@ -2409,7 +2454,21 @@ export default function CashierPOS() {
                   <div className="flex justify-between items-center pt-2 border-t">
                     <p className="font-black text-blue-600 text-sm">Rp{o.total?.toLocaleString()}</p>
                     <div className="flex gap-2">
-                      <a href={`https://wa.me/${o.customerPhone}`} target="_blank" className="p-2 bg-green-50 text-green-600 rounded-lg"><MessageSquare size={16} /></a>
+                      {o.customerPhone && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cleanPhone = (o.customerPhone || '').replace(/\D/g, '').replace(/^0/, '62');
+                            const itemLines = (o.items || []).map((it: any) => `• ${it.quantity}x ${it.name} = Rp${(Number(it.price || 0) * Number(it.quantity || 1)).toLocaleString('id-ID')}`).join('\n');
+                            const waMsg = `Halo Kak *${o.customerName || 'Pelanggan'}*,\nBerikut rincian pesanan dari *ATAYATOKO*:\n\n${itemLines}\n\n*Total: Rp${Number(o.total || 0).toLocaleString('id-ID')}*\nStatus: ${o.status || 'Masuk'}\n\nTerima kasih telah berbelanja di ATAYATOKO!\natayatoko.aty0.com`;
+                            window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                          }}
+                          className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                          title="Kirim Nota via WhatsApp"
+                        >
+                          <MessageSquare size={16} />
+                        </button>
+                      )}
                       <button onClick={async () => {
                         try {
                           await sbUpdateDoc('orders', o.id, { status: 'DIPROSES' });
