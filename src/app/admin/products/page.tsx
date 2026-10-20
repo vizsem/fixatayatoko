@@ -25,7 +25,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -369,6 +369,22 @@ export default function AdminProducts() {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewHierarchy, setViewHierarchy] = useState<'grouped' | 'flat' | 'parents_only' | 'variants_only'>('grouped');
   const [detachingId, setDetachingId] = useState<string | null>(null);
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
+  const [showImportExportMenu, setShowImportExportMenu] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-action-menu]')) {
+        setActiveActionMenuId(null);
+      }
+      if (!target.closest('[data-import-menu]')) {
+        setShowImportExportMenu(false);
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   const toggleParentExpand = (parentId: string) => {
     setExpandedParents((prev) => {
@@ -760,7 +776,58 @@ export default function AdminProducts() {
 
 
 
-  if (loading) return <div className="p-10 text-center font-black">Loading ataya...</div>;
+  if (loading) {
+    return (
+      <div className="p-3 md:p-6 bg-gray-50 min-h-screen space-y-4 animate-pulse">
+        {/* Header skeleton */}
+        <div className="flex justify-between items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 rounded-xl" />
+            <div className="space-y-1.5">
+              <div className="w-32 h-6 bg-gray-200 rounded-md" />
+              <div className="w-24 h-3 bg-gray-100 rounded" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="w-24 h-9 bg-gray-200 rounded-xl" />
+            <div className="w-28 h-9 bg-gray-300 rounded-xl" />
+          </div>
+        </div>
+
+        {/* 4 Stats skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-100 rounded-xl shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="w-16 h-3 bg-gray-200 rounded" />
+                <div className="w-24 h-5 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Table skeleton */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3 shadow-xs">
+          <div className="h-10 bg-gray-100 rounded-xl w-full" />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b border-gray-50 gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 bg-gray-200 rounded-xl shrink-0" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="w-1/3 h-4 bg-gray-200 rounded" />
+                  <div className="w-1/4 h-3 bg-gray-100 rounded" />
+                </div>
+              </div>
+              <div className="w-20 h-4 bg-gray-200 rounded" />
+              <div className="w-24 h-4 bg-gray-200 rounded" />
+              <div className="w-24 h-8 bg-gray-100 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
 
   const handleDelete = async (product: ProductRow) => {
@@ -837,137 +904,191 @@ export default function AdminProducts() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-3 gap-2">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-sm">
-            <Package size={16} />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3.5 gap-2.5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-sm shadow-blue-500/20">
+            <Package size={20} />
           </div>
           <div>
-            <h1 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-none">Produk</h1>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Inventory Management</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight leading-none">Katalog Produk</h1>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                <Sparkles size={11} className="text-blue-500" />
+                Live Sync
+              </span>
+            </div>
+            <p className="text-xs font-semibold text-gray-400 mt-1">Kelola stok inventaris, varian produk, dan penetapan harga</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Tombol sekunder: hanya tampil di sm ke atas */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <button
-              onClick={handleSync}
-              className="bg-white border border-gray-100 text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-all shadow-sm"
-              title="Sinkron & Reset Filter"
-            >
-              <RefreshCw size={13} />
-            </button>
-            <button onClick={downloadTemplate} className="bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 hover:bg-gray-50 transition-all"><FileSpreadsheet size={12} /> Template</button>
-            <Link href="/admin/purchases/import-supplier-prices" className="bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-blue-700 transition-all" title="Import Broadcast Supplier (Indogrosir, dll)"><UploadCloud size={12} /> Supplier</Link>
-            <button
-              type="button"
-              onClick={() => setShowShopeeModal(true)}
-              className="bg-[#EE4D2D] text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-[#d83f21] transition-all"
-              title="Import Shopee (2 Versi: Harga/Nama & URL Foto)"
-            >
-              <svg width="12" height="12" viewBox="0 0 100 100" fill="white">
-                <circle cx="50" cy="50" r="46" fill="white" />
-                <text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text>
-              </svg>
-              Shopee
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTikTokModal(true)}
-              className="bg-black text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-slate-800 transition-all"
-              title="Import TikTok Shop (2 Versi: Harga/Nama & URL Foto)"
-            >
-              <svg width="12" height="12" viewBox="0 0 32 32" fill="white">
-                <path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm4.8 11.2a4.4 4.4 0 0 1-2.8-1v5.6a4.8 4.8 0 1 1-4.8-4.8c.3 0 .7 0 1 .1v2.7a2.1 2.1 0 1 0 1.1 1.9v-9.5h2.7a4.4 4.4 0 0 0 2.8 1.5z" />
-              </svg>
-              TikTok
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-orange-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-orange-600 transition-all"><Upload size={12} /> Import</button>
-            <button onClick={handleExport} className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tight flex items-center gap-1 shadow-sm hover:bg-emerald-700 transition-all"><Download size={12} /> Export</button>
-          </div>
-          {/* Sync icon always visible on mobile */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
           <button
             onClick={handleSync}
-            className="sm:hidden bg-white border border-gray-100 text-blue-600 p-2 rounded-lg transition-all shadow-sm"
-            title="Sinkron"
+            className="p-2.5 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-xs"
+            title="Sinkron & Reset Filter"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={15} />
           </button>
-          <Link href="/admin/purchases/import-supplier-prices" className="sm:hidden bg-blue-600 text-white p-2 rounded-lg transition-all shadow-sm" title="Import Supplier"><UploadCloud size={13} /></Link>
-          {/* NEW SKU selalu tampil */}
-          <button onClick={() => router.push('/admin/products/add')} className="bg-gradient-to-r from-gray-900 to-black text-white px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-md hover:shadow-lg transition-all"><Plus size={14} /> <span className="hidden xs:inline">NEW</span> SKU</button>
+
+          {/* Import / Export & Integrasi Dropdown */}
+          <div className="relative" data-import-menu>
+            <button
+              type="button"
+              onClick={() => setShowImportExportMenu(prev => !prev)}
+              className="px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <UploadCloud size={14} className="text-blue-600" />
+              <span>Import & Integrasi</span>
+              <ChevronDown size={14} className={`text-gray-400 transition-transform ${showImportExportMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showImportExportMenu && (
+              <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-gray-400">Excel / Spreadsheet</div>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportExportMenu(false); fileInputRef.current?.click(); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors"
+                >
+                  <Upload size={14} className="text-orange-500" />
+                  <span>Import Data Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportExportMenu(false); handleExport(); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                >
+                  <Download size={14} className="text-emerald-600" />
+                  <span>Export Data Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportExportMenu(false); downloadTemplate(); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <FileSpreadsheet size={14} className="text-blue-500" />
+                  <span>Unduh Template Excel</span>
+                </button>
+
+                <div className="my-1 border-t border-gray-100" />
+                <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-gray-400">Marketplace & Supplier</div>
+                <Link
+                  href="/admin/purchases/import-supplier-prices"
+                  onClick={() => setShowImportExportMenu(false)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                >
+                  <UploadCloud size={14} className="text-blue-600" />
+                  <span>Import Harga Supplier</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportExportMenu(false); setShowShopeeModal(true); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                >
+                  <span className="w-4 h-4 rounded-full bg-[#EE4D2D] text-white flex items-center justify-center text-[10px] font-black">S</span>
+                  <span>Integrasi Shopee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportExportMenu(false); setShowTikTokModal(true); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-black">T</span>
+                  <span>Integrasi TikTok Shop</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => router.push('/admin/products/add')}
+            className="bg-gray-900 hover:bg-black text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all active:scale-95"
+          >
+            <Plus size={15} />
+            <span>Tambah Produk</span>
+          </button>
         </div>
       </div>
 
-      {/* Mobile extra actions row */}
-      <div className="sm:hidden flex gap-1.5 mb-3">
-        <button
-          type="button"
-          onClick={() => setShowShopeeModal(true)}
-          className="flex-1 bg-[#EE4D2D] text-white px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"
-        >
-          <svg width="12" height="12" viewBox="0 0 100 100" fill="white">
-            <circle cx="50" cy="50" r="46" fill="white" />
-            <text x="50" y="68" textAnchor="middle" fontSize="52" fill="#EE4D2D" fontWeight="bold">S</text>
-          </svg>
-          Shopee
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowTikTokModal(true)}
-          className="flex-1 bg-black text-white px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"
-        >
-          <svg width="12" height="12" viewBox="0 0 32 32" fill="white">
-            <path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm4.8 11.2a4.4 4.4 0 0 1-2.8-1v5.6a4.8 4.8 0 1 1-4.8-4.8c.3 0 .7 0 1 .1v2.7a2.1 2.1 0 1 0 1.1 1.9v-9.5h2.7a4.4 4.4 0 0 0 2.8 1.5z" />
-          </svg>
-          TikTok
-        </button>
-        <Link href="/admin/purchases/import-supplier-prices" className="flex-1 bg-blue-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><UploadCloud size={11} /> Supplier</Link>
-        <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-orange-500 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Upload size={11} /> Import</button>
-        <button onClick={handleExport} className="flex-1 bg-emerald-600 text-white px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1 shadow-sm"><Download size={11} /> Export</button>
-        <button onClick={downloadTemplate} className="flex-1 bg-white border border-gray-200 px-2.5 py-2 rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-center gap-1"><FileSpreadsheet size={11} /> Template</button>
-      </div>
-
-      {/* STATS */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:shadow-md transition-all">
-          <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Package size={16} /></div>
-          <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total SKU</p>
-            <p className="text-sm font-black text-gray-900 leading-none tabular-nums">{stats.totalJenis}</p>
+      {/* STATS KPI CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-3.5">
+        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+          <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl shrink-0">
+            <Package size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Katalog</p>
+            <p className="text-base font-black text-gray-900 leading-tight tabular-nums mt-0.5">{stats.totalJenis.toLocaleString('id-ID')} <span className="text-[11px] font-bold text-gray-400">SKU</span></p>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">{dbCounts.active || stats.totalJenis} Aktif • {dbCounts.inactive || 0} Arsip</p>
           </div>
         </div>
-        
-        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:shadow-md transition-all">
-          <div className="bg-emerald-50 p-2 rounded-lg text-emerald-600">
-            <Banknote size={16} />
+
+        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+          <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl shrink-0">
+            <Banknote size={18} />
           </div>
-          <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-0.5">Total Value</p>
-            <p className="text-sm font-black text-emerald-700 leading-none tabular-nums">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Estimasi Nilai Aset</p>
+            <p className="text-base font-black text-emerald-700 leading-tight tabular-nums mt-0.5">
               <span className="text-xs font-bold mr-0.5">Rp</span>
               {stats.totalAset.toLocaleString('id-ID')}
+            </p>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">HPP Modal × Stok Fisik</p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => { setQuickFilter(quickFilter === 'out_of_stock' ? 'all' : 'out_of_stock'); setCurrentPage(1); }}
+          className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-rose-200 transition-all group"
+        >
+          <div className="bg-rose-50 text-rose-600 group-hover:bg-rose-100 p-2.5 rounded-xl shrink-0 transition-colors">
+            <AlertTriangle size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Perhatian Stok</p>
+            <p className="text-base font-black text-rose-600 leading-tight tabular-nums mt-0.5">
+              {(quickCounts.outOfStock + quickCounts.lowStock).toLocaleString('id-ID')} <span className="text-[11px] font-bold text-rose-400">Item</span>
+            </p>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">
+              {quickCounts.outOfStock} Habis • {quickCounts.lowStock} Menipis
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => { setQuickFilter(quickFilter === 'no_image' ? 'all' : 'no_image'); setCurrentPage(1); }}
+          className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-purple-200 transition-all group"
+        >
+          <div className="bg-purple-50 text-purple-600 group-hover:bg-purple-100 p-2.5 rounded-xl shrink-0 transition-colors">
+            <Camera size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Perlu Dilengkapi</p>
+            <p className="text-base font-black text-purple-600 leading-tight tabular-nums mt-0.5">
+              {(quickCounts.noImage + quickCounts.noCost).toLocaleString('id-ID')} <span className="text-[11px] font-bold text-purple-400">Item</span>
+            </p>
+            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">
+              {quickCounts.noImage} Tanpa Foto • {quickCounts.noCost} Tanpa HPP
             </p>
           </div>
         </div>
       </div>
 
       {/* TABLE BOX */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-2">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
         {/* SEGMENTED TAB (AKTIF VS ARSIP) */}
         <div className="flex border-b border-gray-100 bg-gray-50/50 p-1.5 gap-1.5 overflow-x-auto no-scrollbar">
           <button
             onClick={() => { setShowInactive(false); setCurrentPage(1); setSelectedIds([]); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               !showInactive 
-                ? 'bg-white text-emerald-700 border border-emerald-200/60 shadow-sm' 
+                ? 'bg-white text-emerald-700 border border-emerald-200 shadow-xs' 
                 : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
             }`}
           >
-            <Eye size={15} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
+            <Eye size={14} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
             <span>Produk Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
               !showInactive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.active || stats.totalJenis}
@@ -976,15 +1097,15 @@ export default function AdminProducts() {
 
           <button
             onClick={() => { setShowInactive(true); setCurrentPage(1); setSelectedIds([]); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               showInactive 
-                ? 'bg-white text-rose-700 border border-rose-200/60 shadow-sm' 
+                ? 'bg-white text-rose-700 border border-rose-200 shadow-xs' 
                 : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
             }`}
           >
-            <Archive size={15} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
+            <Archive size={14} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
             <span>Arsip / Non-Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
               showInactive ? 'bg-rose-100 text-rose-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.inactive || 0}
@@ -995,9 +1116,9 @@ export default function AdminProducts() {
         <div className="p-2.5 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
           <div className="relative flex-1 min-w-[200px]">
             {productsLoading ? (
-              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={13} />
+              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={14} />
             ) : (
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             )}
             <input
               type="text"
@@ -1020,7 +1141,7 @@ export default function AdminProducts() {
           <button
             type="button"
             onClick={() => setShowScannerModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-black transition-all border border-blue-200/60 shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all border border-blue-200/60 shadow-xs"
             title="Scan Barcode Kamera"
           >
             <Camera size={14} />
@@ -1031,7 +1152,7 @@ export default function AdminProducts() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-black uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
+              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-bold uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
             >
               <option value="createdAt">URUTKAN: TERBARU</option>
               <option value="updatedAt">URUTKAN: DIUPDATE</option>
@@ -1041,16 +1162,16 @@ export default function AdminProducts() {
             {/* Tombol Pilih Semua Halaman Ini */}
             <button
               onClick={toggleSelectAll}
-              className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-xs active:scale-95 ${
                 selectedIds.length === currentItems.length && currentItems.length > 0
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
             >
               {selectedIds.length === currentItems.length && currentItems.length > 0 ? (
-                <CheckSquare size={13} />
+                <CheckSquare size={14} />
               ) : (
-                <Square size={13} />
+                <Square size={14} />
               )}
               <span>{selectedIds.length > 0 ? `Dipilih (${selectedIds.length})` : 'Pilih Semua'}</span>
             </button>
@@ -1058,7 +1179,7 @@ export default function AdminProducts() {
 
           {/* Bulk Action Button Bar */}
           {selectedIds.length > 0 && (
-            <div className="w-full flex flex-wrap items-center gap-2 p-2 bg-blue-50/70 rounded-xl border border-blue-100 animate-in fade-in duration-200">
+            <div className="w-full flex flex-wrap items-center gap-2 p-2 bg-blue-50/80 rounded-xl border border-blue-200 animate-in fade-in duration-200">
               <span className="text-xs font-black text-blue-900 uppercase tracking-wide mr-1">
                 {selectedIds.length} Produk Terpilih:
               </span>
@@ -1067,13 +1188,13 @@ export default function AdminProducts() {
                   const idsParam = selectedIds.join(',');
                   window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
                 }}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
                 <Printer size={13} /> Cetak Label ({selectedIds.length})
               </button>
               <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
                 <CheckSquare size={13} /> {showInactive ? 'Pulihkan (Aktifkan)' : 'Arsipkan'}
               </button>
@@ -1081,14 +1202,14 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={() => setShowMergeModal(true)}
-                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
                 >
                   <Layers size={13} /> Jadikan Varian ({selectedIds.length})
                 </button>
               )}
               <button
                 onClick={handleBulkDelete}
-                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
                 <Trash2 size={13} /> Hapus Permanen
               </button>
@@ -1102,20 +1223,21 @@ export default function AdminProducts() {
           )}
         </div>
 
-        {/* Mode Hierarki Varian & Quick Filter Pills */}
-        <div className="px-3 py-2 bg-gray-50/50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1 shrink-0 flex-wrap">
-            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0 flex items-center gap-1">
-              <Layers size={11} className="text-violet-600" />
+        {/* Mode Hierarki Varian & Quick Filter Section */}
+        <div className="px-3 py-2 bg-gray-50/70 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+          {/* Mode Varian Switcher */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200/80 shadow-2xs overflow-x-auto no-scrollbar">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-2 flex items-center gap-1 shrink-0">
+              <Layers size={12} className="text-violet-600" />
               Tampilan:
             </span>
             <button
               type="button"
               onClick={() => { setViewHierarchy('grouped'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
                 viewHierarchy === 'grouped'
                   ? 'bg-violet-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               Hierarki Varian
@@ -1123,10 +1245,10 @@ export default function AdminProducts() {
             <button
               type="button"
               onClick={() => { setViewHierarchy('flat'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
                 viewHierarchy === 'flat'
                   ? 'bg-violet-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               Semua Baris (Flat)
@@ -1134,87 +1256,96 @@ export default function AdminProducts() {
             <button
               type="button"
               onClick={() => { setViewHierarchy('parents_only'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
                 viewHierarchy === 'parents_only'
                   ? 'bg-violet-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               Hanya Induk & Mandiri
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0">Filter:</span>
+          {/* Quick Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             <button
               type="button"
               onClick={() => { setQuickFilter('all'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
                 quickFilter === 'all'
                   ? 'bg-gray-900 text-white shadow-xs'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              Semua ({rows.length})
+              <span>Semua</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${quickFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}>{rows.length}</span>
             </button>
-          <button
-            type="button"
-            onClick={() => { setQuickFilter('out_of_stock'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
-              quickFilter === 'out_of_stock'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
-            }`}
-          >
-            <span>🔴 Stok Habis</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'out_of_stock' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-700'}`}>
-              {quickCounts.outOfStock}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setQuickFilter('low_stock'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
-              quickFilter === 'low_stock'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-white text-amber-600 border border-amber-200 hover:bg-amber-50'
-            }`}
-          >
-            <span>⚠️ Stok Menipis</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'low_stock' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'}`}>
-              {quickCounts.lowStock}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setQuickFilter('no_image'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
-              quickFilter === 'no_image'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'
-            }`}
-          >
-            <span>📷 Tanpa Foto</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'no_image' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-700'}`}>
-              {quickCounts.noImage}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setQuickFilter('no_cost'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${
-              quickFilter === 'no_cost'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50'
-            }`}
-          >
-            <span>💰 Tanpa Modal/HPP</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${quickFilter === 'no_cost' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700'}`}>
-              {quickCounts.noCost}
-            </span>
-          </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter('out_of_stock'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'out_of_stock'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+              }`}
+            >
+              <AlertCircle size={12} />
+              <span>Stok Habis</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'out_of_stock' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-700'}`}>
+                {quickCounts.outOfStock}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter('low_stock'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'low_stock'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white text-amber-600 border border-amber-200 hover:bg-amber-50'
+              }`}
+            >
+              <AlertTriangle size={12} />
+              <span>Stok Menipis</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'low_stock' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'}`}>
+                {quickCounts.lowStock}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter('no_image'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'no_image'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'
+              }`}
+            >
+              <Camera size={12} />
+              <span>Tanpa Foto</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'no_image' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-700'}`}>
+                {quickCounts.noImage}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter('no_cost'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'no_cost'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50'
+              }`}
+            >
+              <Banknote size={12} />
+              <span>Tanpa HPP</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'no_cost' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700'}`}>
+                {quickCounts.noCost}
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
 
         {/* MOBILE LIST (Card mode) */}
         <div className="md:hidden">
@@ -1298,42 +1429,76 @@ export default function AdminProducts() {
                         Exp: {p.expired_date || '-'}
                       </p>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-1.5 relative" data-action-menu>
                       <button 
                         onClick={() => setSelectedProductRestock(p)} 
-                        className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs"
                         title="Quick Stock"
                       >
-                        <Calculator size={16} />
+                        <Calculator size={15} />
                       </button>
                       <Link 
                         href={`/admin/products/edit/${p.id}`} 
-                        className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-600 rounded-xl hover:bg-black hover:text-white transition-all shadow-sm"
+                        className="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-700 rounded-xl hover:bg-black hover:text-white transition-all shadow-xs"
                         title="Edit Item"
                       >
-                        <Edit size={16} />
+                        <Edit size={15} />
                       </Link>
                       <button 
                         onClick={() => setSelectedProductVariants(p)}
-                        className="w-10 h-10 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-sm"
-                        title="Kelola & Tambah Varian"
+                        className="w-9 h-9 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-xs"
+                        title="Kelola Varian"
                       >
-                        <Layers size={16} />
+                        <Layers size={15} />
                       </button>
+
+                      {/* More Dropdown Mobile */}
                       <button 
-                        onClick={() => handleArchive(p, p.isActive !== false)} 
-                        className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
-                        title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
+                        type="button"
+                        onClick={() => setActiveActionMenuId(activeActionMenuId === p.id ? null : p.id)}
+                        className="w-9 h-9 flex items-center justify-center bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-100 transition-all shadow-xs"
+                        title="Aksi Lainnya"
                       >
-                        {p.isActive === false ? <RotateCcw size={16} /> : <Archive size={16} />}
+                        <MoreVertical size={15} />
                       </button>
-                      <button 
-                        onClick={() => handleDelete(p)} 
-                        className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                        title="Hapus Permanen"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+
+                      {activeActionMenuId === p.id && (
+                        <div className="absolute right-0 bottom-full mb-1.5 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                          <Link
+                            href={`/admin/products/print-label/${p.id}`}
+                            onClick={() => setActiveActionMenuId(null)}
+                            className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-gray-700 hover:bg-amber-50 hover:text-amber-700 rounded-xl transition-colors"
+                          >
+                            <Printer size={13} className="text-amber-500" />
+                            <span>Cetak Label Rak</span>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => { setActiveActionMenuId(null); handleDuplicate(p); }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-gray-700 hover:bg-sky-50 hover:text-sky-700 rounded-xl transition-colors"
+                          >
+                            <Copy size={13} className="text-sky-500" />
+                            <span>Duplikat Produk</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setActiveActionMenuId(null); handleArchive(p, p.isActive !== false); }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+                          >
+                            {p.isActive === false ? <RotateCcw size={13} className="text-emerald-600" /> : <Archive size={13} className="text-gray-500" />}
+                            <span>{p.isActive === false ? 'Pulihkan Produk' : 'Arsipkan Produk'}</span>
+                          </button>
+                          <div className="my-1 border-t border-gray-100" />
+                          <button
+                            type="button"
+                            onClick={() => { setActiveActionMenuId(null); handleDelete(p); }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={13} />
+                            <span>Hapus Permanen</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1403,21 +1568,21 @@ export default function AdminProducts() {
         {/* DESKTOP TABLE */}
         <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
           <table className="w-full text-left min-w-[640px] md:min-w-0">
-            <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+            <thead className="bg-gray-50/80 text-[11px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-200">
               <tr>
-                <th className="px-2 py-2.5 w-8 sticky left-0 bg-gray-50 z-10 text-center">
+                <th className="px-3 py-3 w-10 sticky left-0 bg-gray-50 z-10 text-center">
                   <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
                     {selectedIds.length === currentItems.length && currentItems.length > 0 ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} />}
                   </button>
                 </th>
-                <th className="px-2 py-2.5">Produk</th>
-                <th className="px-2 py-2.5">Stok & Gudang</th>
-                <th className="hidden md:table-cell px-2 py-2.5">Harga (Avg)</th>
-                <th className="hidden md:table-cell px-2 py-2.5">Tgl & Exp</th>
-                <th className="px-2 py-2.5 text-right pr-4 sticky right-0 bg-gray-50 z-10">Aksi</th>
+                <th className="px-3 py-3 min-w-[240px]">Produk & Identitas</th>
+                <th className="px-3 py-3 min-w-[160px]">Stok & Gudang</th>
+                <th className="hidden md:table-cell px-3 py-3 min-w-[150px]">Harga Jual & Modal</th>
+                <th className="hidden md:table-cell px-3 py-3 min-w-[130px]">Tgl & Exp</th>
+                <th className="px-3 py-3 w-36 text-right pr-4 sticky right-0 bg-gray-50 z-10">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100">
               {currentItems.map(p => {
                 const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
                 const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
@@ -1428,15 +1593,15 @@ export default function AdminProducts() {
 
                 return (
                   <React.Fragment key={p.id}>
-                    <tr className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
-                      <td className="px-2 py-2 sticky left-0 bg-white z-10 text-center">
+                    <tr className={`hover:bg-blue-50/30 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                      <td className="px-3 py-2.5 sticky left-0 bg-white z-10 text-center">
                         <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
                           {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
                         </button>
                       </td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs relative">
                             {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                               <img
                                 src={p.imageUrl}
@@ -1453,8 +1618,8 @@ export default function AdminProducts() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                              <p className="text-xs font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
-                              <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
+                              <p className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded">#{p.sku || 'N/A'}</p>
+                              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
                                 p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                               }`}>
                                 {p.isActive === false ? 'Arsip' : 'Aktif'}
@@ -1468,7 +1633,7 @@ export default function AdminProducts() {
                                 <button
                                   type="button"
                                   onClick={() => toggleParentExpand(p.id)}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shadow-xs"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shadow-2xs"
                                   title="Buka daftar varian produk ini"
                                 >
                                   {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
@@ -1476,26 +1641,26 @@ export default function AdminProducts() {
                                 </button>
                               )}
                             </div>
-                            <h3 className="font-black text-gray-900 text-sm leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
-                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
+                            <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{p.name}</h3>
+                            <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
-                            <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {p.stock} <span className="text-xs uppercase">{p.unit}</span>
+                            <p className={`font-black text-sm leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {p.stock} <span className="text-xs font-bold uppercase text-gray-500">{p.unit}</span>
                             </p>
                             {hasVariants && (
                               <span className="text-[10px] text-gray-400 font-medium">
-                                (Total varian: {pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) + Number(p.stock || 0)})
+                                (Total: {pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) + Number(p.stock || 0)})
                               </span>
                             )}
                           </div>
                           <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
                           {Number(p.stock) <= Number(p.minStock) && (
-                            <p className="text-xs font-bold text-red-500 uppercase">
+                            <p className="text-[11px] font-bold text-red-500 uppercase">
                               Min: {p.minStock}
                             </p>
                           )}
@@ -1504,98 +1669,118 @@ export default function AdminProducts() {
                               Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
                                 const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
                                 return (
-                                  <span key={whId} className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                                  <span key={whId} className="text-[11px] font-bold bg-gray-50 border border-gray-100 text-gray-500 rounded px-1.5 py-0.5 uppercase">
                                     {wName}: {qty}
-                                 </span>
+                                  </span>
                                 );
                               })
                             ) : (
-                              <span className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                              <span className="text-[11px] font-bold bg-gray-50 border border-gray-100 text-gray-500 rounded px-1.5 py-0.5 uppercase">
                                 {whName}: {p.stock}
                               </span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-2 py-2">
+                      <td className="hidden md:table-cell px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-xs font-bold text-blue-500 italic">
-                            Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
-                          </p>
-                          <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
+                          <p className="text-sm font-black text-emerald-600 leading-none tabular-nums">
                             Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
                           </p>
+                          <p className="text-[11px] font-medium text-gray-400">
+                            Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                          </p>
                           {Number(p.priceGrosir || 0) > 0 && (
-                            <p className="text-xs font-black text-purple-600">
-                              Gros: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
-                            </p>
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 rounded px-1 py-0.2 w-max">
+                              Grosir: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
+                            </span>
                           )}
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-2 py-2">
+                      <td className="hidden md:table-cell px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-xs font-bold text-gray-400">
-                            M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
+                          <p className="text-[11px] font-medium text-gray-500">
+                            Masuk: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                           </p>
-                          <p className={`text-xs font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
-                            {isExpired && <AlertTriangle size={8} />} 
-                            E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
+                          <p className={`text-[11px] font-bold uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
+                            {isExpired && <AlertTriangle size={10} className="animate-pulse" />} 
+                            Exp: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
                           </p>
                         </div>
                       </td>
 
-                      <td className="px-2 py-2 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-end gap-1.5">
-                          <button 
-                            onClick={() => setSelectedProductRestock(p)} 
-                            className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                            title="Restock"
-                          >
-                            <Calculator size={14} />
-                          </button>
-                          <Link 
-                            href={`/admin/products/print-label/${p.id}`} 
-                            className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
-                            title="Cetak Label Rak"
-                          >
-                            <Printer size={14} />
-                          </Link>
+                      <td className="px-3 py-2.5 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-end gap-1 relative" data-action-menu>
                           <Link 
                             href={`/admin/products/edit/${p.id}`} 
-                            className="w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
+                            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-700 rounded-lg hover:bg-black hover:text-white transition-all shadow-2xs"
                             title="Edit"
                           >
-                            <Edit size={14} />
+                            <Edit size={13} />
                           </Link>
                           <button 
+                            onClick={() => setSelectedProductRestock(p)} 
+                            className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-2xs"
+                            title="Restock"
+                          >
+                            <Calculator size={13} />
+                          </button>
+                          <button 
                             onClick={() => setSelectedProductVariants(p)} 
-                            className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm"
+                            className="w-7 h-7 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-2xs"
                             title="Kelola & Tambah Varian"
                           >
-                            <Layers size={14} />
+                            <Layers size={13} />
                           </button>
+
+                          {/* Desktop More Dropdown */}
                           <button 
-                            onClick={() => handleDuplicate(p)} 
-                            disabled={duplicatingId === p.id}
-                            className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
-                            title="Duplikat Produk"
+                            type="button"
+                            onClick={() => setActiveActionMenuId(activeActionMenuId === p.id ? null : p.id)} 
+                            className="w-7 h-7 flex items-center justify-center bg-white border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-all shadow-2xs"
+                            title="Aksi Lainnya"
                           >
-                            {duplicatingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}
+                            <MoreVertical size={13} />
                           </button>
-                          <button 
-                            onClick={() => handleArchive(p, p.isActive !== false)} 
-                            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
-                            title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
-                          >
-                            {p.isActive === false ? <RotateCcw size={14} /> : <Archive size={14} />}
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(p)} 
-                            className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                            title="Hapus Permanen"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+
+                          {activeActionMenuId === p.id && (
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 p-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                              <Link 
+                                href={`/admin/products/print-label/${p.id}`} 
+                                onClick={() => setActiveActionMenuId(null)}
+                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-amber-50 hover:text-amber-700 rounded-xl transition-colors"
+                              >
+                                <Printer size={13} className="text-amber-500" />
+                                <span>Cetak Label Rak</span>
+                              </Link>
+                              <button 
+                                type="button"
+                                onClick={() => { setActiveActionMenuId(null); handleDuplicate(p); }} 
+                                disabled={duplicatingId === p.id}
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-sky-50 hover:text-sky-700 rounded-xl transition-colors disabled:opacity-50"
+                              >
+                                {duplicatingId === p.id ? <RefreshCw size={13} className="animate-spin text-sky-500" /> : <Copy size={13} className="text-sky-500" />}
+                                <span>Duplikat Produk</span>
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setActiveActionMenuId(null); handleArchive(p, p.isActive !== false); }} 
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+                              >
+                                {p.isActive === false ? <RotateCcw size={13} className="text-emerald-600" /> : <Archive size={13} className="text-gray-500" />}
+                                <span>{p.isActive === false ? 'Pulihkan Produk' : 'Arsipkan Produk'}</span>
+                              </button>
+                              <div className="my-1 border-t border-gray-100" />
+                              <button 
+                                type="button"
+                                onClick={() => { setActiveActionMenuId(null); handleDelete(p); }} 
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                              >
+                                <Trash2 size={13} />
+                                <span>Hapus Permanen</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1677,25 +1862,43 @@ export default function AdminProducts() {
         </div>
 
         {/* PAGINATION */}
-        <div className="px-3 py-2 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
-          <div className="text-xs font-black text-gray-400 tracking-widest uppercase">Page {currentPage} / {totalPages || 1} — {filteredAndSorted.length} Items</div>
+        <div className="px-3.5 py-3 bg-gray-50/70 flex flex-col sm:flex-row justify-between items-center border-t border-gray-100 gap-2.5">
+          <div className="text-xs font-semibold text-gray-500">
+            Halaman <span className="font-bold text-gray-900">{currentPage}</span> dari <span className="font-bold text-gray-900">{totalPages || 1}</span> — Menampilkan <span className="font-bold text-gray-900">{filteredAndSorted.length.toLocaleString('id-ID')}</span> produk
+          </div>
 
-          <div className="flex gap-1.5 items-center">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest mr-1">Tampilan</span>
-            {[100, 500, 1000].map(n => (
-              <button
-                key={n}
-                onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
-                className={`px-2 py-1 bg-white border rounded-lg text-xs font-black shadow-sm transition-all ${
-                  itemsPerPage === n ? 'bg-black text-white border-black' : 'hover:bg-gray-50'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <div className="w-[1px] h-3 bg-gray-200 mx-1"></div>
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 px-2.5 bg-white border rounded-lg disabled:opacity-30 shadow-sm hover:bg-gray-50 transition-all"><ChevronLeft size={14} /></button>
-            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="p-1 px-2.5 bg-white border rounded-lg disabled:opacity-30 shadow-sm hover:bg-gray-50 transition-all"><ChevronRight size={14} /></button>
+          <div className="flex gap-2 items-center flex-wrap justify-end">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">Tampilkan:</span>
+              {[20, 50, 100, 500].map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    itemsPerPage === n ? 'bg-gray-900 text-white shadow-2xs' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="w-[1px] h-3.5 bg-gray-300 mx-0.5"></div>
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+              className="p-1.5 px-3 bg-white border border-gray-200 rounded-xl disabled:opacity-30 shadow-2xs hover:bg-gray-50 transition-all font-bold text-xs flex items-center gap-1"
+            >
+              <ChevronLeft size={14} />
+              <span className="hidden sm:inline">Sebelumnya</span>
+            </button>
+            <button
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage(p => p + 1)}
+              className="p-1.5 px-3 bg-white border border-gray-200 rounded-xl disabled:opacity-30 shadow-2xs hover:bg-gray-50 transition-all font-bold text-xs flex items-center gap-1"
+            >
+              <span className="hidden sm:inline">Berikutnya</span>
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       </div>
