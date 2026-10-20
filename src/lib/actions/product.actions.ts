@@ -2183,3 +2183,125 @@ export async function quickUpdateVariantAction(
   }
 }
 
+/**
+ * Menggabungkan beberapa produk yang sudah ada menjadi varian dari satu produk induk.
+ */
+export async function mergeProductsAsVariantsAction(payload: {
+  parentId: string;
+  variantProductIds: string[];
+}): Promise<{ success: boolean; mergedCount?: number; error?: string }> {
+  await requireAdmin();
+  try {
+    const { parentId, variantProductIds } = payload;
+    if (!parentId) return { success: false, error: 'Produk induk harus dipilih' };
+    const validChildren = (variantProductIds || []).filter(id => id && id !== parentId);
+    if (validChildren.length === 0) {
+      return { success: false, error: 'Pilih minimal 1 produk varian untuk digabungkan' };
+    }
+
+    // 1. Pastikan produk induk ada
+    const { data: parentProduct, error: pErr } = await supabaseAdmin
+      .from('products')
+      .select('id, name, raw_data')
+      .eq('id', parentId)
+      .single();
+
+    if (pErr || !parentProduct) {
+      return { success: false, error: 'Produk induk tidak ditemukan' };
+    }
+
+    const now = new Date().toISOString();
+
+    // 2. Jika induk sebelumnya adalah anak varian, bersihkan Parent_ID agar menjadi root induk
+    const parentRaw = (parentProduct.raw_data && typeof parentProduct.raw_data === 'object') ? parentProduct.raw_data : {};
+    if (parentRaw.Parent_ID) {
+      const cleanParentRaw = { ...parentRaw, updatedAt: now };
+      delete cleanParentRaw.Parent_ID;
+      await supabaseAdmin
+        .from('products')
+        .update({ raw_data: cleanParentRaw, updated_at: now })
+        .eq('id', parentId);
+    }
+
+    // 3. Ambil data semua anak varian yang akan digabung
+    const { data: children, error: cErr } = await supabaseAdmin
+      .from('products')
+      .select('id, name, raw_data')
+      .in('id', validChildren);
+
+    if (cErr) throw cErr;
+
+    // 4. Update masing-masing anak varian dengan Parent_ID
+    for (const child of (children || [])) {
+      const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const updatedChildRaw = {
+        ...childRaw,
+        Parent_ID: parentId,
+        updatedAt: now,
+      };
+
+      await supabaseAdmin
+        .from('products')
+        .update({
+          raw_data: updatedChildRaw,
+          updated_at: now,
+        })
+        .eq('id', child.id);
+    }
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${parentId}`);
+    revalidatePath('/admin/inventory');
+
+    return { success: true, mergedCount: (children || []).length };
+  } catch (err: any) {
+    console.error('mergeProductsAsVariantsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menggabungkan produk sebagai varian' };
+  }
+}
+
+/**
+ * Melepaskan sebuah produk varian agar menjadi produk mandiri (menghapus Parent_ID)
+ */
+export async function detachVariantAction(variantId: string): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    if (!variantId) return { success: false, error: 'Variant ID harus diisi' };
+
+    const { data: product, error: fErr } = await supabaseAdmin
+      .from('products')
+      .select('id, raw_data')
+      .eq('id', variantId)
+      .single();
+
+    if (fErr || !product) return { success: false, error: 'Produk tidak ditemukan' };
+
+    const raw = (product.raw_data && typeof product.raw_data === 'object') ? product.raw_data : {};
+    const oldParentId = raw.Parent_ID;
+    const now = new Date().toISOString();
+
+    const updatedRaw = { ...raw, updatedAt: now };
+    delete updatedRaw.Parent_ID;
+
+    const { error: uErr } = await supabaseAdmin
+      .from('products')
+      .update({
+        raw_data: updatedRaw,
+        updated_at: now,
+      })
+      .eq('id', variantId);
+
+    if (uErr) throw uErr;
+
+    revalidatePath('/admin/products');
+    if (oldParentId) {
+      revalidatePath(`/admin/products/edit/${oldParentId}`);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('detachVariantAction error:', err);
+    return { success: false, error: err?.message || 'Gagal melepaskan varian' };
+  }
+}
+

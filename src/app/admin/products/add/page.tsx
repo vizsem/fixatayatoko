@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
   Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package,
-  ShieldAlert, EyeOff
+  ShieldAlert, EyeOff, Plus, Trash2, Sparkles
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
@@ -14,7 +14,7 @@ import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
 import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import imageCompression from 'browser-image-compression';
-import { addProductFull, getCategories } from '@/lib/actions/product.actions';
+import { addProductFull, getCategories, batchAddVariantsAction } from '@/lib/actions/product.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
@@ -129,6 +129,83 @@ export default function AddProductPage() {
   // -1 = scanner untuk barcode produk utama, >= 0 = scanner untuk barcode satuan ke-idx
   const [scanUnitBarcodeIdx, setScanUnitBarcodeIdx] = useState<number>(-1);
 
+  // --- IN-PAGE VARIANT GENERATOR ---
+  const [enableVariants, setEnableVariants] = useState(false);
+  const [variantOptions, setVariantOptions] = useState<Array<{ id: string; name: string; values: string }>>([
+    { id: 'opt_1', name: 'Ukuran', values: 'S, M, L' },
+  ]);
+  const [variantRows, setVariantRows] = useState<Array<{
+    id: string;
+    name: string;
+    sku: string;
+    barcode: string;
+    stock: number;
+    costPrice: number;
+    sellPrice: number;
+    wholesalePrice: number;
+  }>>([]);
+
+  const handleGenerateVariants = () => {
+    const activeOpts = variantOptions
+      .map(o => ({
+        name: o.name.trim(),
+        values: o.values.split(',').map(v => v.trim()).filter(Boolean)
+      }))
+      .filter(o => o.name && o.values.length > 0);
+
+    if (activeOpts.length === 0) {
+      notify.admin.error('Isi minimal 1 opsi varian beserta nilainya (pisahkan dengan koma)');
+      return;
+    }
+
+    const cartesian = (arrays: string[][]): string[][] => {
+      return arrays.reduce<string[][]>(
+        (a, b) => a.flatMap(d => b.map(e => [...d, e])),
+        [[]]
+      );
+    };
+
+    const combinations = cartesian(activeOpts.map(o => o.values));
+    const baseSku = formData.ID.trim();
+    const baseModal = Number(formData.Modal || 0);
+    const baseEcer = Number(formData.Ecer || 0);
+    const baseGrosir = Number(formData.Grosir || 0);
+
+    const generated = combinations.map((combo, idx) => {
+      const comboName = combo.join(' - ');
+      const skuSuffix = combo.map(c => c.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()).join('-');
+      return {
+        id: `var_${Date.now()}_${idx}`,
+        name: comboName,
+        sku: baseSku ? `${baseSku}-${skuSuffix}` : '',
+        barcode: '',
+        stock: 0,
+        costPrice: baseModal,
+        sellPrice: baseEcer,
+        wholesalePrice: baseGrosir
+      };
+    });
+
+    setVariantRows(generated);
+    notify.admin.success(`Berhasil membuat ${generated.length} kombinasi varian`);
+  };
+
+  const handleAddManualVariantRow = () => {
+    const baseSku = formData.ID.trim();
+    setVariantRows(prev => [
+      ...prev,
+      {
+        id: `var_${Date.now()}_${prev.length}`,
+        name: `Varian ${prev.length + 1}`,
+        sku: baseSku ? `${baseSku}-VAR${prev.length + 1}` : '',
+        barcode: '',
+        stock: 0,
+        costPrice: Number(formData.Modal || 0),
+        sellPrice: Number(formData.Ecer || 0),
+        wholesalePrice: Number(formData.Grosir || 0)
+      }
+    ]);
+  };
 
   // Auto-fill barcode dan parent_id dari query param
   const [parentName, setParentName] = useState('');
@@ -444,7 +521,33 @@ export default function AddProductPage() {
         throw new Error(result.error || 'Gagal menyimpan produk');
       }
 
-      notify.admin.success('Produk berhasil ditambahkan ke database!');
+      // Batch create variants jika fitur varian diaktifkan
+      if (enableVariants && variantRows.length > 0 && result.data?.id) {
+        const variantsPayload = variantRows.map((v) => ({
+          name: `${formData.Nama.trim()} - ${v.name.trim()}`,
+          sku: v.sku.trim() || undefined,
+          barcode: v.barcode.trim() || undefined,
+          costPrice: Number(v.costPrice || 0),
+          sellPrice: Number(v.sellPrice || 0),
+          wholesalePrice: Number(v.wholesalePrice || 0),
+          stock: Number(v.stock || 0),
+          imageUrl: imageUrl || undefined,
+        }));
+
+        const varRes = await batchAddVariantsAction({
+          parentId: result.data.id,
+          variants: variantsPayload,
+        });
+
+        if (!varRes.success) {
+          notify.admin.error(`Produk induk tersimpan, namun gagal membuat varian: ${varRes.error}`);
+        } else {
+          notify.admin.success(`Produk & ${varRes.insertedCount} varian berhasil dibuat!`);
+        }
+      } else {
+        notify.admin.success('Produk berhasil ditambahkan ke database!');
+      }
+
       router.push('/admin/products');
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -1249,6 +1352,251 @@ export default function AddProductPage() {
               })}
             </div>
           </div>
+
+          {/* BAGIAN VARIAN PRODUK (GENERATOR / BUILDER) */}
+          {!formData.Parent_ID && (
+            <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] shadow-sm border border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 mb-6">
+                <div>
+                  <h3 className="text-xs font-black uppercase flex items-center gap-2 text-violet-600">
+                    <Layers size={16} />
+                    Varian Produk
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Buat beberapa varian sekaligus (misal: Warna, Ukuran, Rasa) yang terhubung ke produk ini sebagai induk.
+                  </p>
+                </div>
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableVariants}
+                    onChange={(e) => setEnableVariants(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600 relative"></div>
+                  <span className="text-xs font-black uppercase text-gray-700">
+                    {enableVariants ? 'Aktif' : 'Nonaktif'}
+                  </span>
+                </label>
+              </div>
+
+              {enableVariants && (
+                <div className="space-y-6">
+                  {/* Option Definition */}
+                  <div className="p-4 bg-violet-50/50 rounded-2xl border border-violet-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-violet-900 uppercase tracking-wider">
+                        1. Tentukan Opsi Varian
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVariantOptions((prev) => [
+                            ...prev,
+                            { id: `opt_${Date.now()}`, name: '', values: '' },
+                          ])
+                        }
+                        className="text-xs font-bold text-violet-700 hover:text-violet-900 flex items-center gap-1"
+                      >
+                        <Plus size={14} /> Tambah Opsi
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {variantOptions.map((opt, idx) => (
+                        <div key={opt.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-white p-3 rounded-xl border border-violet-100">
+                          <div className="sm:col-span-4">
+                            <input
+                              type="text"
+                              placeholder="Nama Opsi (cth: Warna / Ukuran)"
+                              value={opt.name}
+                              onChange={(e) => {
+                                const next = [...variantOptions];
+                                next[idx].name = e.target.value;
+                                setVariantOptions(next);
+                              }}
+                              className="w-full p-2.5 bg-gray-50 rounded-lg text-xs font-bold outline-none border border-gray-200 focus:border-violet-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-7">
+                            <input
+                              type="text"
+                              placeholder="Nilai dipisah koma (cth: Merah, Biru, Hijau)"
+                              value={opt.values}
+                              onChange={(e) => {
+                                const next = [...variantOptions];
+                                next[idx].values = e.target.value;
+                                setVariantOptions(next);
+                              }}
+                              className="w-full p-2.5 bg-gray-50 rounded-lg text-xs font-bold outline-none border border-gray-200 focus:border-violet-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-1 text-right">
+                            {variantOptions.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setVariantOptions(prev => prev.filter((_, i) => i !== idx))}
+                                className="p-2 text-rose-500 hover:text-rose-700"
+                                title="Hapus Opsi"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleGenerateVariants}
+                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                      >
+                        <Sparkles size={14} />
+                        Hasilkan Kombinasi Otomatis
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddManualVariantRow}
+                        className="px-4 py-2.5 bg-white border border-violet-200 hover:bg-violet-50 text-violet-700 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                      >
+                        <Plus size={14} />
+                        Tambah Baris Manual
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Generated Variant Rows Table */}
+                  {variantRows.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                          2. Daftar Varian yang Akan Dibuat ({variantRows.length})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setVariantRows([])}
+                          className="text-xs font-bold text-rose-600 hover:underline"
+                        >
+                          Reset Daftar
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                        <table className="w-full text-left text-xs min-w-[720px]">
+                          <thead className="bg-gray-50 font-black uppercase text-gray-400 border-b border-gray-100">
+                            <tr>
+                              <th className="p-3">Nama Varian</th>
+                              <th className="p-3">SKU</th>
+                              <th className="p-3">Barcode</th>
+                              <th className="p-3 w-24">Stok</th>
+                              <th className="p-3 w-32">Modal (HPP)</th>
+                              <th className="p-3 w-32">Harga Jual</th>
+                              <th className="p-3 w-10 text-center">Hapus</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {variantRows.map((v, vIdx) => (
+                              <tr key={v.id} className="hover:bg-gray-50/50">
+                                <td className="p-2.5 font-bold">
+                                  <input
+                                    type="text"
+                                    value={v.name}
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].name = e.target.value;
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg font-bold text-xs outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  <input
+                                    type="text"
+                                    value={v.sku}
+                                    placeholder="Auto SKU"
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].sku = e.target.value;
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg font-mono text-xs outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  <input
+                                    type="text"
+                                    value={v.barcode}
+                                    placeholder="Barcode"
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].barcode = e.target.value;
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg font-mono text-xs outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={v.stock}
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].stock = Number(e.target.value || 0);
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg text-right font-black text-xs outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={v.costPrice}
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].costPrice = Number(e.target.value || 0);
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg text-right font-black text-xs outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={v.sellPrice}
+                                    onChange={(e) => {
+                                      const next = [...variantRows];
+                                      next[vIdx].sellPrice = Number(e.target.value || 0);
+                                      setVariantRows(next);
+                                    }}
+                                    className="w-full p-2 bg-gray-50 rounded-lg text-right font-black text-xs text-emerald-600 outline-none border border-transparent focus:border-violet-400"
+                                  />
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setVariantRows(prev => prev.filter((_, i) => i !== vIdx))}
+                                    className="text-gray-300 hover:text-rose-500 transition-colors p-1"
+                                    title="Hapus Baris"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* BAGIAN 4: MEDIA & SUPPLIER */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import useProducts from '@/lib/hooks/useProducts';
@@ -8,21 +8,31 @@ import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
 
 
-import { deleteProduct, deleteProductsBulk, archiveProducts, updateProductStatus, restockProductViaSupabase, duplicateProduct } from '@/lib/actions/product.actions';
+import {
+  deleteProduct,
+  deleteProductsBulk,
+  archiveProducts,
+  updateProductStatus,
+  restockProductViaSupabase,
+  duplicateProduct,
+  detachVariantAction,
+} from '@/lib/actions/product.actions';
 
 
 import Link from 'next/link';
 import {
   Plus, Edit, Trash2, Download, Upload, Search, X,
-  Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight,
+  Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
-  CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud
+  CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
+  Unlink, CornerDownRight
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
+import MergeVariantsModal from '@/components/admin/MergeVariantsModal';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
 import { playScanBeep } from '@/lib/sound';
@@ -62,7 +72,7 @@ function StockUnitDisplay({ stock, baseUnit, units }: { stock: number; baseUnit:
 }
 
 
-type ProductRow = NormalizedProduct & {
+export type ProductRow = NormalizedProduct & {
   tgl_masuk?: string;
   expired_date?: string;
   expiredDate?: string;
@@ -354,6 +364,38 @@ export default function AdminProducts() {
   const [quickFilter, setQuickFilter] = useState<'all' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost'>('all');
   const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
 
+  // State untuk Hierarki Varian & Merge Varian
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [viewHierarchy, setViewHierarchy] = useState<'grouped' | 'flat' | 'parents_only' | 'variants_only'>('grouped');
+  const [detachingId, setDetachingId] = useState<string | null>(null);
+
+  const toggleParentExpand = (parentId: string) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
+
+  const handleDetachVariant = async (variant: ProductRow) => {
+    if (!confirm(`Lepas varian "${variant.name}" agar menjadi produk mandiri?`)) return;
+    setDetachingId(variant.id);
+    try {
+      const res = await detachVariantAction(variant.id);
+      if (res.success) {
+        notify.admin.success(`Varian "${variant.name}" kini menjadi produk mandiri.`);
+      } else {
+        notify.admin.error(res.error || 'Gagal melepaskan varian');
+      }
+    } catch (e: any) {
+      notify.admin.error(e?.message || 'Gagal melepaskan varian');
+    } finally {
+      setDetachingId(null);
+    }
+  };
+
   const { products: liveProducts, loading: productsLoading } = useProducts({
     isActive: showInactive ? false : true,
     orderByField: sortBy,
@@ -480,9 +522,28 @@ export default function AdminProducts() {
   }, [barcodeBuffer]);
   // ========================================
 
+  // Peta anak varian berdasarkan Parent_ID
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, ProductRow[]>();
+    rows.forEach((p) => {
+      if (p.parentId) {
+        const list = map.get(p.parentId) || [];
+        list.push(p);
+        map.set(p.parentId, list);
+      }
+    });
+    return map;
+  }, [rows]);
+
+  const selectedProductsForMerge = useMemo(() => {
+    return rows.filter((p) => selectedIds.includes(p.id));
+  }, [rows, selectedIds]);
+
   const filteredAndSorted = useMemo(() => {
     let result = rows;
     const term = searchTerm.trim().toLowerCase();
+    const matchedParentsFromVariants = new Set<string>();
+
     if (term) {
       const tokens = term.split(/\s+/).filter(Boolean);
       result = result.filter((p) => {
@@ -490,15 +551,20 @@ export default function AdminProducts() {
         const sku = (p.sku || '').toLowerCase();
         const barcode = (p.barcode || '').toLowerCase();
         const category = (p.category || '').toLowerCase();
-        return tokens.every(
+        const match = tokens.every(
           (t) =>
             name.includes(t) ||
             sku.includes(t) ||
             barcode.includes(t) ||
             category.includes(t)
         );
+        if (match && p.parentId) {
+          matchedParentsFromVariants.add(p.parentId);
+        }
+        return match;
       });
     }
+
     let filtered = result.filter((p) => (showInactive ? p.isActive === false : p.isActive !== false));
     if (quickFilter === 'out_of_stock') {
       filtered = filtered.filter(p => Number(p.stock || p.Stok || 0) <= 0);
@@ -513,8 +579,21 @@ export default function AdminProducts() {
     } else if (quickFilter === 'no_cost') {
       filtered = filtered.filter(p => Number(p.purchasePrice || p.Modal || 0) <= 0);
     }
+
+    // Filter mode hierarki varian
+    if (viewHierarchy === 'grouped') {
+      // Sembunyikan anak varian dari baris utama, tampilkan hanya induk / produk tunggal
+      // Jika pencarian aktif dan ada varian yang cocok, tampilkan induknya
+      filtered = filtered.filter((p) => !p.parentId || matchedParentsFromVariants.has(p.id));
+    } else if (viewHierarchy === 'parents_only') {
+      filtered = filtered.filter((p) => !p.parentId && (childrenByParent.get(p.id)?.length || 0) > 0);
+    } else if (viewHierarchy === 'variants_only') {
+      filtered = filtered.filter((p) => Boolean(p.parentId));
+    }
+    // 'flat': semua baris tampil mandiri
+
     return filtered;
-  }, [rows, searchTerm, showInactive, quickFilter]);
+  }, [rows, searchTerm, showInactive, quickFilter, viewHierarchy, childrenByParent]);
 
   const quickCounts = useMemo(() => {
     let outOfStock = 0;
@@ -996,6 +1075,15 @@ export default function AdminProducts() {
               >
                 <CheckSquare size={13} /> {showInactive ? 'Pulihkan (Aktifkan)' : 'Arsipkan'}
               </button>
+              {selectedIds.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMergeModal(true)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                >
+                  <Layers size={13} /> Jadikan Varian ({selectedIds.length})
+                </button>
+              )}
               <button
                 onClick={handleBulkDelete}
                 className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
@@ -1012,20 +1100,61 @@ export default function AdminProducts() {
           )}
         </div>
 
-        {/* Quick Filter Pills */}
-        <div className="px-3 py-2 bg-gray-50/50 border-b border-gray-100 flex flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0">Filter Cepat:</span>
-          <button
-            type="button"
-            onClick={() => { setQuickFilter('all'); setCurrentPage(1); }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
-              quickFilter === 'all'
-                ? 'bg-gray-900 text-white shadow-xs'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            Semua ({rows.length})
-          </button>
+        {/* Mode Hierarki Varian & Quick Filter Pills */}
+        <div className="px-3 py-2 bg-gray-50/50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 shrink-0 flex-wrap">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0 flex items-center gap-1">
+              <Layers size={11} className="text-violet-600" />
+              Tampilan:
+            </span>
+            <button
+              type="button"
+              onClick={() => { setViewHierarchy('grouped'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+                viewHierarchy === 'grouped'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Hierarki Varian
+            </button>
+            <button
+              type="button"
+              onClick={() => { setViewHierarchy('flat'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+                viewHierarchy === 'flat'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Semua Baris (Flat)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setViewHierarchy('parents_only'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+                viewHierarchy === 'parents_only'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Hanya Induk
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1 shrink-0">Filter:</span>
+            <button
+              type="button"
+              onClick={() => { setQuickFilter('all'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all shrink-0 ${
+                quickFilter === 'all'
+                  ? 'bg-gray-900 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Semua ({rows.length})
+            </button>
           <button
             type="button"
             onClick={() => { setQuickFilter('out_of_stock'); setCurrentPage(1); }}
@@ -1083,6 +1212,7 @@ export default function AdminProducts() {
             </span>
           </button>
         </div>
+      </div>
 
         {/* MOBILE LIST (Card mode) */}
         <div className="md:hidden">
@@ -1204,6 +1334,64 @@ export default function AdminProducts() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Accordion Varian Mobile */}
+                  {childrenByParent.get(p.id) && childrenByParent.get(p.id)!.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => toggleParentExpand(p.id)}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50/80 hover:bg-violet-100 text-violet-700 text-xs font-black transition-all border border-violet-100"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Layers size={14} className="text-violet-600" />
+                          {childrenByParent.get(p.id)!.length} Varian Terhubung
+                        </span>
+                        <span className="flex items-center gap-1 text-[11px] font-bold">
+                          {expandedParents.has(p.id) ? 'Sembunyikan' : 'Buka Varian'}
+                          {expandedParents.has(p.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </span>
+                      </button>
+
+                      {expandedParents.has(p.id) && (
+                        <div className="mt-2 space-y-2 pl-2 border-l-2 border-violet-300">
+                          {childrenByParent.get(p.id)!.map((child) => (
+                            <div key={child.id} className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[10px] font-black text-violet-600 uppercase">#{child.sku || 'N/A'}</span>
+                                  {child.barcode && <span className="text-[10px] text-gray-400 font-mono">[{child.barcode}]</span>}
+                                </div>
+                                <p className="text-xs font-bold text-gray-900 truncate">{child.name}</p>
+                                <div className="flex items-center gap-3 mt-1 text-[11px]">
+                                  <span className="font-semibold text-gray-500">Stok: <strong className="text-gray-900">{child.stock} {child.unit}</strong></span>
+                                  <span className="font-bold text-emerald-600">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Link
+                                  href={`/admin/products/edit/${child.id}`}
+                                  className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-xs"
+                                  title="Edit Varian"
+                                >
+                                  <Edit size={13} />
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDetachVariant(child)}
+                                  disabled={detachingId === child.id}
+                                  className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-xs disabled:opacity-50"
+                                  title="Lepas Varian jadi Produk Mandiri"
+                                >
+                                  {detachingId === child.id ? <RefreshCw size={13} className="animate-spin" /> : <Unlink size={13} />}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1232,164 +1420,255 @@ export default function AdminProducts() {
                 const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
                 const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
                 const isSelected = selectedIds.includes(p.id);
+                const pChildren = childrenByParent.get(p.id) || [];
+                const hasVariants = pChildren.length > 0;
+                const isExpanded = expandedParents.has(p.id);
 
                 return (
-                  <tr key={p.id} className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
-                    <td className="px-2 py-2 sticky left-0 bg-white z-10 text-center">
-                      <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
-                        {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
-                      </button>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
-                          {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
-                            <img
-                              src={p.imageUrl}
-                              alt={p.name}
-                              className="object-cover w-full h-full"
-                              width={40}
-                              height={40}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <Camera size={14} className="text-gray-300" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <p className="text-xs font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
-                            <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
-                              p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {p.isActive === false ? 'Arsip' : 'Aktif'}
-                            </span>
-                            {p.parentId ? (
-                              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700" title={`Parent: ${p.parentId}`}>
-                                Varian
-                              </span>
-                            ) : null}
+                  <React.Fragment key={p.id}>
+                    <tr className={`hover:bg-gray-50 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                      <td className="px-2 py-2 sticky left-0 bg-white z-10 text-center">
+                        <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
+                          {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
+                        </button>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm relative">
+                            {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
+                              <img
+                                src={p.imageUrl}
+                                alt={p.name}
+                                className="object-cover w-full h-full"
+                                width={40}
+                                height={40}
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <Camera size={14} className="text-gray-300" />
+                            )}
                           </div>
-                          <h3 className="font-black text-gray-900 text-sm leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
-                          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                              <p className="text-xs font-black text-blue-500 tracking-tight italic">ID: {p.sku}</p>
+                              <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
+                                p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {p.isActive === false ? 'Arsip' : 'Aktif'}
+                              </span>
+                              {p.parentId ? (
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700" title={`Parent: ${p.parentId}`}>
+                                  ↳ Varian
+                                </span>
+                              ) : null}
+                              {hasVariants && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleParentExpand(p.id)}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shadow-xs"
+                                  title="Buka daftar varian produk ini"
+                                >
+                                  {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                  <span>{pChildren.length} Varian</span>
+                                </button>
+                              )}
+                            </div>
+                            <h3 className="font-black text-gray-900 text-sm leading-none mb-0.5 max-w-[120px] md:max-w-none truncate">{p.name}</h3>
+                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{p.category}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {p.stock} <span className="text-xs uppercase">{p.unit}</span>
-                          </p>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {p.stock} <span className="text-xs uppercase">{p.unit}</span>
+                            </p>
+                            {hasVariants && (
+                              <span className="text-[10px] text-gray-400 font-medium">
+                                (Total varian: {pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) + Number(p.stock || 0)})
+                              </span>
+                            )}
+                          </div>
+                          <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
+                          {Number(p.stock) <= Number(p.minStock) && (
+                            <p className="text-xs font-bold text-red-500 uppercase">
+                              Min: {p.minStock}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
+                              Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
+                                const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
+                                return (
+                                  <span key={whId} className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                                    {wName}: {qty}
+                                 </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
+                                {whName}: {p.stock}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
-                        {Number(p.stock) <= Number(p.minStock) && (
-                          <p className="text-xs font-bold text-red-500 uppercase">
-                            Min: {p.minStock}
+                      </td>
+                      <td className="hidden md:table-cell px-2 py-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs font-bold text-blue-500 italic">
+                            Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
                           </p>
-                        )}
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
-                            Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
-                              const wName = displayWarehouses.find(w => w.id === whId)?.name || whId;
-                              return (
-                                <span key={whId} className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
-                                  {wName}: {qty}
-                               </span>
-                              );
-                            })
-                          ) : (
-                            <span className="text-xs font-black bg-gray-50 border border-gray-100 text-gray-500 rounded px-1 py-0.5 uppercase">
-                              {whName}: {p.stock}
-                            </span>
+                          <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
+                            Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
+                          </p>
+                          {Number(p.priceGrosir || 0) > 0 && (
+                            <p className="text-xs font-black text-purple-600">
+                              Gros: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
+                            </p>
                           )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-2 py-2">
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-xs font-bold text-blue-500 italic">
-                          Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
-                        </p>
-                        <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
-                          Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
-                        </p>
-                        {Number(p.priceGrosir || 0) > 0 && (
-                          <p className="text-xs font-black text-purple-600">
-                            Gros: Rp{Number(p.priceGrosir || 0).toLocaleString('id-ID')}
+                      </td>
+                      <td className="hidden md:table-cell px-2 py-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs font-bold text-gray-400">
+                            M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
                           </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-2 py-2">
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-xs font-bold text-gray-400">
-                          M: {p.tgl_masuk || p.createdAt ? (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('id-ID') : new Date(p.createdAt).toLocaleDateString('id-ID')) : '-'}
-                        </p>
-                        <p className={`text-xs font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
-                          {isExpired && <AlertTriangle size={8} />} 
-                          E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
-                        </p>
-                      </div>
-                    </td>
+                          <p className={`text-xs font-black uppercase flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-orange-400'}`}>
+                            {isExpired && <AlertTriangle size={8} />} 
+                            E: {p.expired_date || p.expiredDate || p.Expired_Default || '-'}
+                          </p>
+                        </div>
+                      </td>
 
-                    <td className="px-2 py-2 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-end gap-1.5">
-                        <button 
-                          onClick={() => setSelectedProductRestock(p)} 
-                          className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                          title="Restock"
-                        >
-                          <Calculator size={14} />
-                        </button>
-                        <Link 
-                          href={`/admin/products/print-label/${p.id}`} 
-                          className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
-                          title="Cetak Label Rak"
-                        >
-                          <Printer size={14} />
-                        </Link>
-                        <Link 
-                          href={`/admin/products/edit/${p.id}`} 
-                          className="w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
-                          title="Edit"
-                        >
-                          <Edit size={14} />
-                        </Link>
-                        <button 
-                          onClick={() => setSelectedProductVariants(p)} 
-                          className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm"
-                          title="Kelola & Tambah Varian"
-                        >
-                          <Layers size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleDuplicate(p)} 
-                          disabled={duplicatingId === p.id}
-                          className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
-                          title="Duplikat Produk"
-                        >
-                          {duplicatingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}
-                        </button>
-                        <button 
-                          onClick={() => handleArchive(p, p.isActive !== false)} 
-                          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
-                          title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
-                        >
-                          {p.isActive === false ? <RotateCcw size={14} /> : <Archive size={14} />}
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(p)} 
-                          className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                          title="Hapus Permanen"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
+                      <td className="px-2 py-2 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-end gap-1.5">
+                          <button 
+                            onClick={() => setSelectedProductRestock(p)} 
+                            className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                            title="Restock"
+                          >
+                            <Calculator size={14} />
+                          </button>
+                          <Link 
+                            href={`/admin/products/print-label/${p.id}`} 
+                            className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-500 hover:text-white transition-all shadow-sm"
+                            title="Cetak Label Rak"
+                          >
+                            <Printer size={14} />
+                          </Link>
+                          <Link 
+                            href={`/admin/products/edit/${p.id}`} 
+                            className="w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-600 rounded-lg hover:bg-black hover:text-white transition-all shadow-sm"
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </Link>
+                          <button 
+                            onClick={() => setSelectedProductVariants(p)} 
+                            className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm"
+                            title="Kelola & Tambah Varian"
+                          >
+                            <Layers size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDuplicate(p)} 
+                            disabled={duplicatingId === p.id}
+                            className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                            title="Duplikat Produk"
+                          >
+                            {duplicatingId === p.id ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}
+                          </button>
+                          <button 
+                            onClick={() => handleArchive(p, p.isActive !== false)} 
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm ${p.isActive === false ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white'}`}
+                            title={p.isActive === false ? "Pulihkan Produk" : "Arsipkan Produk"}
+                          >
+                            {p.isActive === false ? <RotateCcw size={14} /> : <Archive size={14} />}
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(p)} 
+                            className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            title="Hapus Permanen"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Accordion Sub-table untuk Varian Produk (Desktop) */}
+                    {hasVariants && isExpanded && (
+                      <tr key={`${p.id}-variants-row`} className="bg-gradient-to-r from-violet-50/40 via-purple-50/20 to-transparent">
+                        <td colSpan={6} className="px-3 py-3 pl-12 border-y border-violet-100/60">
+                          <div className="rounded-2xl bg-white border border-violet-100 shadow-xs overflow-hidden">
+                            <div className="px-4 py-2 bg-violet-50/60 border-b border-violet-100 flex items-center justify-between">
+                              <span className="text-xs font-black text-violet-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <Layers size={14} className="text-violet-600" />
+                                Daftar Varian Terhubung ({pChildren.length})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProductVariants(p)}
+                                className="text-[11px] font-black text-violet-700 hover:text-violet-900 flex items-center gap-1 transition-colors"
+                              >
+                                + Tambah Varian Baru
+                              </button>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                              {pChildren.map((child) => (
+                                <div key={child.id} className="px-4 py-2 flex items-center justify-between gap-4 hover:bg-violet-50/30 transition-colors">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <span className="text-violet-400 font-bold select-none text-xs">↳</span>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-black text-xs text-gray-900">{child.name}</span>
+                                        <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1 rounded">SKU: {child.sku || '-'}</span>
+                                        {child.barcode && (
+                                          <span className="text-[10px] font-mono text-gray-400">Barcode: {child.barcode}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-6 shrink-0">
+                                    <div className="text-right">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase">Stok</p>
+                                      <p className="text-xs font-black text-gray-900">{child.stock} <span className="text-[10px] uppercase font-normal">{child.unit}</span></p>
+                                    </div>
+                                    <div className="text-right min-w-[90px]">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase">Harga Ecer</p>
+                                      <p className="text-xs font-black text-emerald-600">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Link
+                                        href={`/admin/products/edit/${child.id}`}
+                                        className="p-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-black hover:text-white transition-all"
+                                        title="Edit Varian"
+                                      >
+                                        <Edit size={13} />
+                                      </Link>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDetachVariant(child)}
+                                        disabled={detachingId === child.id}
+                                        className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white text-[11px] font-bold flex items-center gap-1 transition-all disabled:opacity-50"
+                                        title="Pisahkan varian ini menjadi produk mandiri"
+                                      >
+                                        {detachingId === child.id ? <RefreshCw size={11} className="animate-spin" /> : <Unlink size={11} />}
+                                        <span>Lepas</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
               })}
             </tbody>
           </table>
@@ -1520,6 +1799,16 @@ export default function AdminProducts() {
       <ShopeeImportModal
         isOpen={showShopeeModal}
         onClose={() => setShowShopeeModal(false)}
+      />
+
+      {/* Modal Gabungkan Produk Menjadi Varian */}
+      <MergeVariantsModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        selectedProducts={selectedProductsForMerge}
+        onSuccess={() => {
+          setSelectedIds([]);
+        }}
       />
 
     </div>
