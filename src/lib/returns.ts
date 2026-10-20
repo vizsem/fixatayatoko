@@ -37,6 +37,12 @@ export interface ItemRetur {
   productName: string;
   quantity: number;
   price: number;
+  /** Satuan produk (pcs, ctn, box, dll). */
+  unit?: string;
+  /** Nilai konversi ke satuan dasar (contoh: 1 CTN = 24 PCS -> contains: 24). Default: 1. */
+  contains?: number;
+  /** Satuan-satuan yang terdaftar pada master produk. */
+  availableUnits?: Array<{ code: string; label?: string; contains: number; price?: number }>;
 }
 
 export interface Retur {
@@ -53,6 +59,10 @@ export interface Retur {
   diprosesPada: string | null;
   diprosesOleh: string;
   catatanProses: string;
+  /** Nomor resi / tracking pengiriman balik (opsional). */
+  nomorResi: string;
+  /** Nama ekspedisi / kurir (opsional). */
+  ekspedisi: string;
 }
 
 export const JENIS_RETUR: JenisRetur[] = ['SALES_RETURN', 'PURCHASE_RETURN'];
@@ -208,12 +218,32 @@ export function normalisasiItem(nilai: unknown): ItemRetur | null {
   if (!nama && !rec.productId) return null;
   if (!Number.isFinite(quantity) || quantity < 1) return null;
 
-  return {
+  const item: ItemRetur = {
     productId: String(rec.productId ?? '').trim(),
     productName: nama || 'Produk tanpa nama',
     quantity,
     price: Number.isFinite(price) && price > 0 ? price : 0,
   };
+
+  if (rec.unit) item.unit = String(rec.unit).trim();
+  if (rec.contains != null) {
+    const c = Number(rec.contains);
+    if (Number.isFinite(c) && c > 0) item.contains = c;
+  }
+  if (Array.isArray(rec.availableUnits) && rec.availableUnits.length > 0) {
+    const rawUnits = rec.availableUnits
+      .filter((u): u is Record<string, unknown> => !!u && typeof u === 'object')
+      .map((u) => ({
+        code: String(u.code ?? u.label ?? '').trim().toUpperCase(),
+        label: u.label ? String(u.label).trim() : undefined,
+        contains: Number(u.contains ?? 1) || 1,
+        price: u.price != null && Number(u.price) > 0 ? Number(u.price) : undefined,
+      }))
+      .filter((u) => u.code);
+    if (rawUnits.length > 0) item.availableUnits = rawUnits;
+  }
+
+  return item;
 }
 
 export function normalisasiItems(nilai: unknown): ItemRetur[] {
@@ -252,6 +282,8 @@ export function keRetur(baris: Record<string, any> | null | undefined): Retur {
     diprosesPada: tanggalKeIso(raw.processedAt ?? raw.diprosesPada),
     diprosesOleh: String(raw.processedBy ?? raw.diprosesOleh ?? '').trim(),
     catatanProses: String(raw.processNote ?? raw.catatanProses ?? '').trim(),
+    nomorResi: String(raw.nomorResi ?? '').trim(),
+    ekspedisi: String(raw.ekspedisi ?? '').trim(),
   };
 }
 

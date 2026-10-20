@@ -87,7 +87,10 @@ export interface ProdukUntukRetur {
   name: string;
   price: number;
   stock: number;
+  /** Satuan utama dari kolom `unit` di tabel products. */
   unit: string;
+  /** Semua satuan yang terdaftar di master produk (dari raw_data.units). */
+  units: Array<{ code: string; label?: string; contains: number; price?: number }>;
 }
 
 /**
@@ -108,7 +111,10 @@ export async function cariProdukUntukRetur(kata: string): Promise<ActionResult<P
 
     let builder = supabaseAdmin
       .from('products')
-      .select('id,name,price,stock,unit')
+      // Ambil raw_data untuk mendapatkan units array yang terdaftar.
+      .select('id,name,price,stock,unit,raw_data')
+      // Hanya produk aktif — produk draft/nonaktif tidak boleh diretur.
+      .or('is_active.eq.true,is_active.is.null')
       .order('name', { ascending: true })
       .limit(8);
 
@@ -119,13 +125,52 @@ export async function cariProdukUntukRetur(kata: string): Promise<ActionResult<P
     const { data, error } = await builder;
     if (error) throw new Error(error.message);
 
-    const produk = (data ?? []).map((p: Record<string, unknown>) => ({
-      id: String(p.id ?? ''),
-      name: String(p.name ?? 'Produk'),
-      price: Number(p.price ?? 0) || 0,
-      stock: Number(p.stock ?? 0) || 0,
-      unit: String(p.unit ?? 'pcs'),
-    }));
+    const produk = (data ?? []).map((p: Record<string, unknown>) => {
+      const raw = (p.raw_data && typeof p.raw_data === 'object'
+        ? p.raw_data
+        : {}) as Record<string, unknown>;
+
+      // Satuan utama: kolom `unit` dari DB, fallback ke raw_data.unit, default PCS.
+      const unitUtama = String(p.unit ?? raw.unit ?? 'PCS').trim().toUpperCase() || 'PCS';
+
+      // Satuan tambahan dari raw_data.units (array UnitOption).
+      const rawUnits = Array.isArray(raw.units) ? raw.units : [];
+      const unitsMap = new Map<string, { code: string; label?: string; contains: number; price?: number }>();
+
+      // Satuan utama produk selalu didaftarkan
+      unitsMap.set(unitUtama, {
+        code: unitUtama,
+        label: unitUtama,
+        contains: 1,
+        price: Number(p.price ?? 0) || 0,
+      });
+
+      rawUnits
+        .filter((u): u is Record<string, unknown> => !!u && typeof u === 'object')
+        .forEach((u) => {
+          const code = String(u.code ?? u.label ?? '').trim().toUpperCase();
+          if (!code) return;
+          const contains = Number(u.contains ?? 1) || 1;
+          const price = u.price != null && Number(u.price) > 0 ? Number(u.price) : undefined;
+          unitsMap.set(code, {
+            code,
+            label: u.label ? String(u.label).trim() : code,
+            contains,
+            price: price ?? (contains === 1 ? Number(p.price ?? 0) : undefined),
+          });
+        });
+
+      const units = Array.from(unitsMap.values());
+
+      return {
+        id: String(p.id ?? ''),
+        name: String(p.name ?? 'Produk'),
+        price: Number(p.price ?? 0) || 0,
+        stock: Number(p.stock ?? 0) || 0,
+        unit: unitUtama,
+        units,
+      };
+    });
 
     return { ok: true, data: produk };
   } catch (error) {
@@ -144,6 +189,10 @@ export interface InputReturBaru {
   alasan: string;
   items: ItemRetur[];
   penyelesaian?: PenyelesaianRetur;
+  /** Nomor resi / tracking pengiriman balik. */
+  nomorResi?: string;
+  /** Nama ekspedisi / kurir (mis. JNE, TIKI, SiCepat). */
+  ekspedisi?: string;
 }
 
 /**
@@ -163,36 +212,105 @@ export async function buatRetur(input: InputReturBaru): Promise<ActionResult<{ i
     const refId = String(input?.refId ?? '').trim();
     const alasan = String(input?.alasan ?? '').trim();
     const penyelesaian = normalisasiPenyelesaian(input?.penyelesaian);
+    const nomorResi = String(input?.nomorResi ?? '').trim();
+    const ekspedisi = String(input?.ekspedisi ?? '').trim();
 
     const pesan = validasiReturBaru({ jenis, refId, pihak, alasan, items: itemsMasuk });
     if (pesan) return { ok: false, code: 'INVALID_INPUT', error: pesan };
 
-    // Ambil harga & nama resmi dari master produk.
+    // Ambil harga & nama resmi serta satuan terdaftar dari master produk.
     const ids = Array.from(new Set(itemsMasuk.map((i) => i.productId).filter(Boolean)));
-    const petaProduk = new Map<string, { name: string; price: number }>();
+    const petaProduk = new Map<
+      string,
+      {
+        name: string;
+        price: number;
+        unit: string;
+        units: Array<{ code: string; label?: string; contains: number; price?: number }>;
+      }
+    >();
 
     if (ids.length > 0) {
       const { data, error } = await supabaseAdmin
         .from('products')
-        .select('id,name,price')
+        .select('id,name,price,unit,raw_data')
         .in('id', ids);
       if (error) throw new Error(error.message);
       for (const p of (data ?? []) as Array<Record<string, unknown>>) {
+        const raw = (p.raw_data && typeof p.raw_data === 'object' ? p.raw_data : {}) as Record<string, unknown>;
+        const unitUtama = String(p.unit ?? raw.unit ?? 'PCS').trim().toUpperCase() || 'PCS';
+        const rawUnits = Array.isArray(raw.units) ? raw.units : [];
+        const unitsMap = new Map<string, { code: string; label?: string; contains: number; price?: number }>();
+
+        unitsMap.set(unitUtama, {
+          code: unitUtama,
+          label: unitUtama,
+          contains: 1,
+          price: Number(p.price ?? 0) || 0,
+        });
+
+        rawUnits
+          .filter((u): u is Record<string, unknown> => !!u && typeof u === 'object')
+          .forEach((u) => {
+            const code = String(u.code ?? u.label ?? '').trim().toUpperCase();
+            if (!code) return;
+            const contains = Number(u.contains ?? 1) || 1;
+            const price = u.price != null && Number(u.price) > 0 ? Number(u.price) : undefined;
+            unitsMap.set(code, {
+              code,
+              label: u.label ? String(u.label).trim() : code,
+              contains,
+              price: price ?? (contains === 1 ? Number(p.price ?? 0) : undefined),
+            });
+          });
+
         petaProduk.set(String(p.id), {
           name: String(p.name ?? 'Produk'),
           price: Number(p.price ?? 0) || 0,
+          unit: unitUtama,
+          units: Array.from(unitsMap.values()),
         });
       }
     }
 
     const items: ItemRetur[] = itemsMasuk.map((item) => {
       const master = petaProduk.get(item.productId);
-      if (!master) return item;
+      if (!master) {
+        return {
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          unit: item.unit ? item.unit.toUpperCase() : undefined,
+          contains: item.contains || 1,
+          availableUnits: item.availableUnits,
+        };
+      }
+
+      // Pastikan satuan yang dipilih terdaftar di produk
+      const requestedUnit = (item.unit || master.unit).trim().toUpperCase();
+      const matchedUnit = master.units.find((u) => u.code === requestedUnit);
+      const validUnit = matchedUnit ? matchedUnit.code : master.unit;
+      const contains = matchedUnit ? matchedUnit.contains : 1;
+
+      // Tentukan harga satuan yang valid
+      let unitPrice = item.price;
+      if (matchedUnit && matchedUnit.price != null && matchedUnit.price > 0) {
+        unitPrice = matchedUnit.price;
+      } else if (matchedUnit && matchedUnit.contains > 1 && master.price > 0) {
+        unitPrice = master.price * matchedUnit.contains;
+      } else if (master.price > 0 && contains === 1) {
+        unitPrice = master.price;
+      }
+
       return {
         productId: item.productId,
         productName: master.name,
         quantity: item.quantity,
-        price: master.price > 0 ? master.price : item.price,
+        price: unitPrice,
+        unit: validUnit,
+        contains,
+        availableUnits: master.units,
       };
     });
 
@@ -208,6 +326,8 @@ export async function buatRetur(input: InputReturBaru): Promise<ActionResult<{ i
       totalValue: totalNilai,
       status: 'PENDING',
       penyelesaian,
+      nomorResi: nomorResi || undefined,
+      ekspedisi: ekspedisi || undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -406,20 +526,23 @@ export async function prosesRetur(
           continue;
         }
 
+        const multiplier = Number(item.contains || 1);
+        const totalBaseQty = Math.max(1, Math.round(item.quantity * multiplier));
+
         if (retur.jenis === 'SALES_RETURN') {
           await addStock({
             productId: item.productId,
-            amount: item.quantity,
+            amount: totalBaseQty,
             reference: `RETUR-${returId}`,
-            notes: `Retur penjualan #${retur.refId || returId}`,
+            notes: `Retur penjualan #${retur.refId || returId}${multiplier > 1 ? ` (${item.quantity} ${item.unit || 'unit'} = ${totalBaseQty} base unit)` : ''}`,
             source: 'MANUAL',
           });
         } else {
           await deductStockFEFO({
             productId: item.productId,
-            amount: item.quantity,
+            amount: totalBaseQty,
             reference: `RETUR-${returId}`,
-            notes: `Retur pembelian #${retur.refId || returId}`,
+            notes: `Retur pembelian #${retur.refId || returId}${multiplier > 1 ? ` (${item.quantity} ${item.unit || 'unit'} = ${totalBaseQty} base unit)` : ''}`,
             source: 'MANUAL',
           });
         }

@@ -304,7 +304,7 @@ describe('buatRetur', () => {
   };
 
   it('memakai nama & harga dari master produk, bukan kiriman klien', async () => {
-    state.productRows = [{ id: 'p1', name: 'Kopi Susu', price: 10000 }];
+    state.productRows = [{ id: 'p1', name: 'Kopi Susu', price: 10000, unit: 'PCS' }];
 
     const hasil = await buatRetur(input);
 
@@ -315,7 +315,15 @@ describe('buatRetur', () => {
     expect(state.insertReturns).toHaveLength(1);
     const payload = state.insertReturns[0].payload;
     expect(payload.items).toEqual([
-      { productId: 'p1', productName: 'Kopi Susu', quantity: 2, price: 10000 },
+      {
+        productId: 'p1',
+        productName: 'Kopi Susu',
+        quantity: 2,
+        price: 10000,
+        unit: 'PCS',
+        contains: 1,
+        availableUnits: [{ code: 'PCS', label: 'PCS', contains: 1, price: 10000 }],
+      },
     ]);
     expect(payload.totalValue).toBe(20000);
     expect(payload.status).toBe('PENDING');
@@ -328,5 +336,44 @@ describe('buatRetur', () => {
     if (hasil.ok) return;
     expect(hasil.code).toBe('INVALID_INPUT');
     expect(state.insertReturns).toHaveLength(0);
+  });
+
+  it('menyesuaikan stok berdasarkan contains ketika retur memakai satuan sekunder (misal CTN)', async () => {
+    state.returRow = {
+      id: 'ret_ctn',
+      created_at: '2026-07-09T18:12:23.403+00:00',
+      raw_data: {
+        type: 'SALES_RETURN',
+        refId: 'ORD-CTN',
+        customerOrSupplierName: 'Toko Makmur',
+        reason: 'kelebihan kirim',
+        status: 'PENDING',
+        penyelesaian: 'TIDAK_DIRINCIKAN',
+        items: [
+          {
+            productId: 'p_indomie',
+            productName: 'Indomie Goreng',
+            quantity: 2,
+            price: 120000,
+            unit: 'CTN',
+            contains: 40,
+          },
+        ],
+        totalValue: 240000,
+        createdAt: '2026-07-09T18:12:23.403Z',
+      },
+    };
+
+    const hasil = await prosesRetur('ret_ctn', 'SETUJUI', 'TIDAK_DIRINCIKAN');
+    expect(hasil.ok).toBe(true);
+    // 2 CTN * 40 pcs = 80 pcs ditambahkan ke stok fisik
+    expect(state.addStockCalls).toEqual([
+      expect.objectContaining({
+        productId: 'p_indomie',
+        amount: 80,
+        reference: 'RETUR-ret_ctn',
+        source: 'MANUAL',
+      }),
+    ]);
   });
 });

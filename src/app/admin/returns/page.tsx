@@ -7,13 +7,23 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
+  ExternalLink,
   Info,
   Loader2,
+  Package,
+  PackageCheck,
   PackageSearch,
+  PackageX,
   Plus,
   RefreshCcw,
+  RotateCcw,
   Search,
   Trash2,
+  TrendingDown,
+  TrendingUp,
+  Truck,
+  X,
   XCircle,
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -71,9 +81,9 @@ const FILTER_STATUS: Array<{ nilai: StatusRetur | 'SEMUA'; label: string }> = [
 ];
 
 const FILTER_JENIS: Array<{ nilai: JenisRetur | 'SEMUA'; label: string }> = [
-  { nilai: 'SEMUA', label: 'Semua tipe' },
-  { nilai: 'SALES_RETURN', label: 'Retur Jual' },
-  { nilai: 'PURCHASE_RETURN', label: 'Retur Beli' },
+  { nilai: 'SEMUA', label: 'Semua Tipe' },
+  { nilai: 'SALES_RETURN', label: 'Retur Penjualan' },
+  { nilai: 'PURCHASE_RETURN', label: 'Retur Pembelian' },
 ];
 
 /** Pilihan penyelesaian dana, dibedakan menurut jenis retur. */
@@ -84,9 +94,9 @@ function opsiPenyelesaian(jenis: JenisRetur): PenyelesaianRetur[] {
 }
 
 const WARNA_STATUS: Record<StatusRetur, string> = {
-  PENDING: 'bg-amber-100 text-amber-700 border-amber-200',
-  APPROVED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  REJECTED: 'bg-rose-100 text-rose-700 border-rose-200',
+  PENDING: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-100',
+  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100',
+  REJECTED: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100',
 };
 
 export default function ReturnsPage() {
@@ -107,6 +117,8 @@ export default function ReturnsPage() {
   const [pihak, setPihak] = useState('');
   const [alasan, setAlasan] = useState('');
   const [penyelesaian, setPenyelesaian] = useState<PenyelesaianRetur>('TIDAK_DIRINCIKAN');
+  const [nomorResi, setNomorResi] = useState('');
+  const [ekspedisi, setEkspedisi] = useState('');
   const [items, setItems] = useState<ItemRetur[]>([]);
   const [cariKata, setCariKata] = useState('');
   const [hasilCari, setHasilCari] = useState<ProdukUntukRetur[]>([]);
@@ -135,7 +147,6 @@ export default function ReturnsPage() {
       setDaftar(hasil.data.daftar);
       setRingkasan(hasil.data.ringkasan);
     } catch (error) {
-      // Server Action bisa gagal sebelum sampai ke server (mis. jaringan).
       const pesan = error instanceof Error ? error.message : 'Gagal memuat data retur.';
       setGalat(pesan);
       notify.admin.error(pesan);
@@ -154,7 +165,6 @@ export default function ReturnsPage() {
   );
 
   const totalItemTanpaProduk = useMemo(() => ringkasRetur(daftar).itemTanpaProduk, [daftar]);
-
   const totalFormulir = useMemo(() => totalDariItems(items), [items]);
 
   // --- Pencarian produk (di server) ---
@@ -180,26 +190,74 @@ export default function ReturnsPage() {
 
   const tambahItem = (produk: ProdukUntukRetur) => {
     setItems((lama) => {
-      const sudahAda = lama.find((i) => i.productId === produk.id);
-      if (sudahAda) {
-        return lama.map((i) => (i.productId === produk.id ? { ...i, quantity: i.quantity + 1 } : i));
+      const opsiSatuan =
+        produk.units && produk.units.length > 0
+          ? produk.units
+          : [{ code: (produk.unit || 'PCS').toUpperCase(), contains: 1, price: produk.price }];
+
+      const unitAwal = opsiSatuan[0];
+      const unitCode = unitAwal.code.toUpperCase();
+      const unitPrice =
+        unitAwal.price != null && unitAwal.price > 0
+          ? unitAwal.price
+          : (unitAwal.contains && unitAwal.contains > 1 ? produk.price * unitAwal.contains : produk.price);
+
+      const sudahAdaIndex = lama.findIndex(
+        (i) => i.productId === produk.id && (i.unit || '').toUpperCase() === unitCode
+      );
+
+      if (sudahAdaIndex >= 0) {
+        return lama.map((i, idx) => (idx === sudahAdaIndex ? { ...i, quantity: i.quantity + 1 } : i));
       }
+
       return [
         ...lama,
-        { productId: produk.id, productName: produk.name, quantity: 1, price: produk.price },
+        {
+          productId: produk.id,
+          productName: produk.name,
+          quantity: 1,
+          price: unitPrice,
+          unit: unitCode,
+          contains: unitAwal.contains || 1,
+          availableUnits: opsiSatuan,
+        },
       ];
     });
     setCariKata('');
     setHasilCari([]);
   };
 
-  const ubahQty = (productId: string, qty: number) => {
+  const ubahQty = (index: number, qty: number) => {
     const jumlah = Math.max(1, Math.floor(qty || 1));
-    setItems((lama) => lama.map((i) => (i.productId === productId ? { ...i, quantity: jumlah } : i)));
+    setItems((lama) => lama.map((i, idx) => (idx === index ? { ...i, quantity: jumlah } : i)));
   };
 
-  const hapusItem = (productId: string) => {
-    setItems((lama) => lama.filter((i) => i.productId !== productId));
+  const ubahUnit = (index: number, newUnitCode: string) => {
+    setItems((lama) =>
+      lama.map((item, idx) => {
+        if (idx !== index) return item;
+        const target = item.availableUnits?.find(
+          (u) => u.code.toUpperCase() === newUnitCode.trim().toUpperCase()
+        );
+        const contains = target?.contains || 1;
+        let newPrice = target?.price != null && target.price > 0 ? target.price : undefined;
+        if (newPrice == null) {
+          const currentContains = item.contains || 1;
+          const basePrice = currentContains > 0 ? item.price / currentContains : item.price;
+          newPrice = Math.round(basePrice * contains);
+        }
+        return {
+          ...item,
+          unit: target?.code.toUpperCase() || newUnitCode.trim().toUpperCase(),
+          contains,
+          price: newPrice,
+        };
+      })
+    );
+  };
+
+  const hapusItem = (index: number) => {
+    setItems((lama) => lama.filter((_, idx) => idx !== index));
   };
 
   const resetFormulir = () => {
@@ -208,6 +266,8 @@ export default function ReturnsPage() {
     setPihak('');
     setAlasan('');
     setPenyelesaian('TIDAK_DIRINCIKAN');
+    setNomorResi('');
+    setEkspedisi('');
     setItems([]);
     setCariKata('');
     setHasilCari([]);
@@ -223,6 +283,8 @@ export default function ReturnsPage() {
         alasan,
         items: normalisasiItems(items),
         penyelesaian,
+        nomorResi,
+        ekspedisi,
       });
 
       if (!hasil.ok) {
@@ -277,90 +339,206 @@ export default function ReturnsPage() {
     }
   };
 
+  // Hitung persentase pending dari total
+  const pctPending =
+    ringkasan.jumlah > 0 ? Math.round((ringkasan.menunggu / ringkasan.jumlah) * 100) : 0;
+  const pctApproved =
+    ringkasan.jumlah > 0 ? Math.round((ringkasan.disetujui / ringkasan.jumlah) * 100) : 0;
+  const pctRejected =
+    ringkasan.jumlah > 0 ? Math.round((ringkasan.ditolak / ringkasan.jumlah) * 100) : 0;
+
   return (
-    <div className="p-3 md:p-4 bg-slate-50/70 text-slate-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50/80">
       <Toaster position="top-center" />
-      <div className="max-w-6xl mx-auto space-y-4">
-        {/* --- Kepala halaman --- */}
-        <div className="flex flex-wrap justify-between items-end gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <RefreshCcw size={22} className="text-purple-600" /> Manajemen Retur
+
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
+
+        {/* ── Header ── */}
+        <div className="flex flex-wrap justify-between items-start gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-2">
+              <span>Admin</span>
+              <ChevronDown size={12} className="-rotate-90" />
+              <span className="text-slate-600 font-bold">Manajemen Retur</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-200">
+                <RotateCcw size={20} className="text-white" />
+              </div>
+              Manajemen Retur
             </h1>
-            <p className="text-[11px] uppercase font-bold text-slate-500 mt-1 tracking-wide">
-              Pengembalian barang dari pelanggan &amp; ke supplier — stok dan jurnal tercatat otomatis saat
-              disetujui.
+            <p className="text-sm text-slate-500 font-medium pl-1">
+              Pengembalian barang dari pelanggan &amp; ke supplier — stok dan jurnal tercatat otomatis.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <button
               onClick={() => void muatData()}
               disabled={memuat}
-              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-50 transition-all"
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all shadow-sm"
             >
-              <RefreshCcw size={14} className={memuat ? 'animate-spin' : ''} /> Muat ulang
+              <RefreshCcw size={14} className={memuat ? 'animate-spin' : ''} />
+              Muat Ulang
             </button>
             <button
               onClick={() => setModalBuat(true)}
-              className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 active:scale-95 transition-all"
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-200 hover:from-violet-700 hover:to-purple-700 active:scale-95 transition-all"
             >
-              <Plus size={15} /> Buat Retur
+              <Plus size={15} />
+              Buat Retur
             </button>
           </div>
         </div>
 
-        {/* --- Ringkasan --- */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KartuRingkasan
-            judul="Menunggu"
-            nilai={String(ringkasan.menunggu)}
-            catatan={formatRupiah(ringkasan.nilaiMenunggu)}
-            warna="amber"
-          />
-          <KartuRingkasan
-            judul="Disetujui"
-            nilai={String(ringkasan.disetujui)}
-            catatan={formatRupiah(ringkasan.nilaiDisetujui)}
-            warna="emerald"
-          />
-          <KartuRingkasan judul="Ditolak" nilai={String(ringkasan.ditolak)} catatan="Tidak mengubah stok" warna="rose" />
-          <KartuRingkasan judul="Total Data" nilai={String(ringkasan.jumlah)} catatan="500 terbaru" warna="slate" />
+        {/* ── Kartu ringkasan ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Menunggu */}
+          <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-50/60 to-transparent pointer-events-none" />
+            <div className="flex items-start justify-between gap-2 relative">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Menunggu</p>
+                <p className="text-3xl font-black text-slate-900">{ringkasan.menunggu}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">{formatRupiah(ringkasan.nilaiMenunggu)}</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Clock size={18} className="text-amber-600" />
+              </div>
+            </div>
+            {ringkasan.jumlah > 0 && (
+              <div className="mt-4 relative">
+                <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-400 rounded-full transition-all"
+                    style={{ width: `${pctPending}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-amber-600 mt-1">{pctPending}% dari total</p>
+              </div>
+            )}
+          </div>
+
+          {/* Disetujui */}
+          <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-5 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent pointer-events-none" />
+            <div className="flex items-start justify-between gap-2 relative">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Disetujui</p>
+                <p className="text-3xl font-black text-slate-900">{ringkasan.disetujui}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">{formatRupiah(ringkasan.nilaiDisetujui)}</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <PackageCheck size={18} className="text-emerald-600" />
+              </div>
+            </div>
+            {ringkasan.jumlah > 0 && (
+              <div className="mt-4 relative">
+                <div className="h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-400 rounded-full transition-all"
+                    style={{ width: `${pctApproved}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-emerald-600 mt-1">{pctApproved}% dari total</p>
+              </div>
+            )}
+          </div>
+
+          {/* Ditolak */}
+          <div className="bg-white rounded-2xl border border-rose-100 shadow-sm p-5 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-50/60 to-transparent pointer-events-none" />
+            <div className="flex items-start justify-between gap-2 relative">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ditolak</p>
+                <p className="text-3xl font-black text-slate-900">{ringkasan.ditolak}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">Stok tidak berubah</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+                <PackageX size={18} className="text-rose-600" />
+              </div>
+            </div>
+            {ringkasan.jumlah > 0 && (
+              <div className="mt-4 relative">
+                <div className="h-1.5 bg-rose-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-rose-400 rounded-full transition-all"
+                    style={{ width: `${pctRejected}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-bold text-rose-600 mt-1">{pctRejected}% dari total</p>
+              </div>
+            )}
+          </div>
+
+          {/* Total */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-50/60 to-transparent pointer-events-none" />
+            <div className="flex items-start justify-between gap-2 relative">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Total Data</p>
+                <p className="text-3xl font-black text-slate-900">{ringkasan.jumlah}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">500 terbaru dimuat</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <Package size={18} className="text-slate-500" />
+              </div>
+            </div>
+            <div className="mt-4 relative">
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 h-1.5 bg-amber-200 rounded-full" style={{ flexBasis: `${pctPending}%` }} />
+                <div className="flex-1 h-1.5 bg-emerald-300 rounded-full" style={{ flexBasis: `${pctApproved}%` }} />
+                <div className="flex-1 h-1.5 bg-rose-300 rounded-full" style={{ flexBasis: `${pctRejected}%` }} />
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 mt-1">Distribusi status</p>
+            </div>
+          </div>
         </div>
 
+        {/* ── Peringatan ── */}
         {totalItemTanpaProduk > 0 && (
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <AlertTriangle size={18} className="text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-xs font-semibold text-amber-800">
-              {totalItemTanpaProduk} item retur menunggu <b>tidak punya ID produk</b> (warisan impor
-              marketplace). Saat disetujui, item seperti itu <b>tidak</b> mengubah stok — sistem menolak
-              menebak produknya.
-            </p>
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={16} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-800">
+                {totalItemTanpaProduk} item retur tanpa ID produk
+              </p>
+              <p className="text-xs font-medium text-amber-700 mt-0.5">
+                Warisan impor marketplace. Saat disetujui, item tersebut <b>tidak</b> mengubah stok — sistem menolak menebak produknya.
+              </p>
+            </div>
           </div>
         )}
 
         {galat && (
           <div className="flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-2xl p-4">
-            <XCircle size={18} className="text-rose-600 mt-0.5 shrink-0" />
-            <p className="text-xs font-semibold text-rose-800">{galat}</p>
+            <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+              <XCircle size={16} className="text-rose-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-rose-800">Gagal memuat data</p>
+              <p className="text-xs font-medium text-rose-700 mt-0.5">{galat}</p>
+            </div>
           </div>
         )}
 
-        {/* --- Penyaring --- */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+        {/* ── Filter & pencarian ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="relative flex-1 min-w-[260px]">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={kataKunci}
                 onChange={(e) => setKataKunci(e.target.value)}
-                placeholder="Cari no. referensi, pelanggan, supplier, atau nama produk…"
-                className="w-full bg-slate-50 border border-transparent focus:border-purple-400 rounded-2xl py-3 pl-11 pr-4 text-xs font-semibold outline-none transition-all"
+                placeholder="Cari referensi, pelanggan, supplier, atau produk…"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium outline-none transition-all placeholder:text-slate-400"
               />
             </div>
             <select
               value={filterJenis}
               onChange={(e) => setFilterJenis(e.target.value as JenisRetur | 'SEMUA')}
-              className="bg-slate-50 border border-transparent rounded-2xl py-3 px-4 text-xs font-black uppercase tracking-wide outline-none"
+              className="bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl py-2.5 px-3 text-sm font-semibold outline-none transition-all cursor-pointer"
             >
               {FILTER_JENIS.map((f) => (
                 <option key={f.nilai} value={f.nilai}>
@@ -368,64 +546,113 @@ export default function ReturnsPage() {
                 </option>
               ))}
             </select>
+            <p className="text-xs font-semibold text-slate-400 ml-auto whitespace-nowrap">
+              {terlihat.length} dari {daftar.length} retur
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {FILTER_STATUS.map((f) => (
-              <button
-                key={f.nilai}
-                onClick={() => setFilterStatus(f.nilai)}
-                className={`px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wide border transition-all ${
-                  filterStatus === f.nilai
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {f.label}
-                {f.nilai !== 'SEMUA' && (
-                  <span className="ml-1.5 opacity-70">
-                    {f.nilai === 'PENDING'
-                      ? ringkasan.menunggu
-                      : f.nilai === 'APPROVED'
-                        ? ringkasan.disetujui
-                        : ringkasan.ditolak}
-                  </span>
-                )}
-              </button>
-            ))}
+            {FILTER_STATUS.map((f) => {
+              const count =
+                f.nilai === 'PENDING'
+                  ? ringkasan.menunggu
+                  : f.nilai === 'APPROVED'
+                    ? ringkasan.disetujui
+                    : f.nilai === 'REJECTED'
+                      ? ringkasan.ditolak
+                      : null;
+              return (
+                <button
+                  key={f.nilai}
+                  onClick={() => setFilterStatus(f.nilai)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filterStatus === f.nilai
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  {f.label}
+                  {count !== null && (
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-black ${
+                        filterStatus === f.nilai ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* --- Daftar retur --- */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* ── Tabel retur ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[880px]">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  {['Tanggal', 'Tipe / Ref', 'Pihak', 'Item', 'Nilai', 'Status', 'Aksi'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      {h}
+            <table className="w-full text-left min-w-[920px]">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {[
+                    { label: 'Tanggal', cls: 'w-36' },
+                    { label: 'Tipe & Referensi', cls: 'w-44' },
+                    { label: 'Pihak', cls: '' },
+                    { label: 'Item', cls: 'w-28' },
+                    { label: 'Nilai', cls: 'w-36' },
+                    { label: 'Status', cls: 'w-28' },
+                    { label: 'Aksi', cls: 'w-28 text-right' },
+                  ].map((h) => (
+                    <th
+                      key={h.label}
+                      className={`px-5 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/80 ${h.cls}`}
+                    >
+                      {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {memuat ? (
-                  Array.from({ length: 4 }).map((_, i) => (
+                  Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`skeleton-${i}`} className="animate-pulse">
-                      <td colSpan={7} className="px-4 py-4">
-                        <div className="h-3 bg-slate-100 rounded-full" />
+                      <td className="px-5 py-4">
+                        <div className="h-3 bg-slate-100 rounded-full w-20" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-3 bg-slate-100 rounded-full w-24" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-3 bg-slate-100 rounded-full w-32" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-3 bg-slate-100 rounded-full w-12" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-3 bg-slate-100 rounded-full w-24" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-5 bg-slate-100 rounded-lg w-20" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="h-7 bg-slate-100 rounded-lg w-20 ml-auto" />
                       </td>
                     </tr>
                   ))
                 ) : terlihat.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center">
-                      <PackageSearch size={28} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <td colSpan={7} className="px-5 py-16 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                        <PackageSearch size={28} className="text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-400">
                         {daftar.length === 0
-                          ? 'Belum ada retur tercatat.'
-                          : 'Tidak ada retur yang cocok dengan filter.'}
+                          ? 'Belum ada retur tercatat'
+                          : 'Tidak ada retur yang cocok dengan filter'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {daftar.length === 0
+                          ? 'Buat retur pertama dengan tombol di atas.'
+                          : 'Coba ubah filter atau kata kunci pencarian.'}
                       </p>
                     </td>
                   </tr>
@@ -455,37 +682,51 @@ export default function ReturnsPage() {
               </tbody>
             </table>
           </div>
-        </div>
 
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-          Disetujui = stok bergerak + jurnal dicatat (bila melibatkan uang) · Ditolak = status saja
-        </p>
+          {/* Footer tabel */}
+          {!memuat && terlihat.length > 0 && (
+            <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/50 flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-400">
+                Menampilkan {terlihat.length} retur
+              </p>
+              <p className="text-xs font-semibold text-slate-400">
+                ✓ Disetujui = stok + jurnal bergerak · ✗ Ditolak = status saja
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ================= Modal: buat retur ================= */}
       {modalBuat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-black text-slate-900">Buat Permintaan Retur</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Stok baru berubah setelah disetujui
-                </p>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[92vh] overflow-hidden">
+            {/* Header modal */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between gap-4 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <RotateCcw size={16} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Buat Permintaan Retur</h2>
+                  <p className="text-xs font-semibold text-slate-400">Stok baru berubah setelah disetujui admin</p>
+                </div>
               </div>
               <button
                 onClick={() => setModalBuat(false)}
-                className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
                 aria-label="Tutup"
               >
-                <XCircle size={22} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-5">
+            {/* Body modal */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Tipe & referensi */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                     Tipe Retur
                   </label>
                   <select
@@ -494,68 +735,92 @@ export default function ReturnsPage() {
                       setJenis(e.target.value as JenisRetur);
                       setPenyelesaian('TIDAK_DIRINCIKAN');
                     }}
-                    className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-purple-400"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition-all"
                   >
-                    <option value="SALES_RETURN">Retur Penjualan (dari pelanggan)</option>
-                    <option value="PURCHASE_RETURN">Retur Pembelian (ke supplier)</option>
+                    <option value="SALES_RETURN">↩ Retur Penjualan (dari pelanggan)</option>
+                    <option value="PURCHASE_RETURN">↪ Retur Pembelian (ke supplier)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                     No. Referensi
                   </label>
                   <input
                     value={refId}
                     onChange={(e) => setRefId(e.target.value)}
-                    placeholder="Order ID / PO number"
-                    className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-purple-400"
+                    placeholder="Order ID / Nomor PO…"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition-all"
                   />
                 </div>
               </div>
 
+              {/* Nama pihak */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                   {jenis === 'SALES_RETURN' ? 'Nama Pelanggan' : 'Nama Supplier'}
                 </label>
                 <input
                   value={pihak}
                   onChange={(e) => setPihak(e.target.value)}
-                  placeholder={jenis === 'SALES_RETURN' ? 'Contoh: Customer TikTok' : 'Contoh: PT Sumber Jaya'}
-                  className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-purple-400"
+                  placeholder={
+                    jenis === 'SALES_RETURN' ? 'Contoh: Customer TikTok Shop' : 'Contoh: PT Sumber Jaya'
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition-all"
                 />
               </div>
 
+              {/* Produk */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                  Produk
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Produk yang Diretur
                 </label>
                 <div className="relative">
-                  <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     value={cariKata}
                     onChange={(e) => setCariKata(e.target.value)}
                     placeholder="Ketik minimal 2 huruf untuk mencari produk…"
-                    className="w-full bg-slate-50 p-3.5 pl-11 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-purple-400"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 pl-10 rounded-xl text-sm font-semibold outline-none transition-all"
                   />
                   {mencari && (
-                    <Loader2
-                      size={15}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-slate-400"
-                    />
+                    <Loader2 size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
                   )}
                 </div>
 
                 {hasilCari.length > 0 && (
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-50">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-sm">
                     {hasilCari.map((p) => (
                       <button
                         key={p.id}
+                        type="button"
                         onClick={() => tambahItem(p)}
-                        className="w-full p-3 text-left hover:bg-slate-50 flex justify-between items-center gap-3"
+                        className="w-full p-3 text-left hover:bg-violet-50 flex justify-between items-center gap-3 transition-colors"
                       >
-                        <span className="text-xs font-black text-slate-800">{p.name}</span>
-                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
-                          {formatRupiah(p.price)} · stok {p.stock}
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="text-sm font-bold text-slate-800 truncate">{p.name}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-semibold text-slate-400">Satuan terdaftar:</span>
+                            {p.units && p.units.length > 0 ? (
+                              p.units.map((u) => (
+                                <span
+                                  key={u.code}
+                                  className="bg-violet-50 border border-violet-200 text-violet-700 font-black px-1.5 py-0.5 rounded text-[10px] uppercase"
+                                >
+                                  {u.code}
+                                  {u.contains > 1 ? ` (${u.contains})` : ''}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="bg-slate-100 text-slate-600 font-black px-1.5 py-0.5 rounded text-[10px] uppercase">
+                                {p.unit || 'PCS'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap flex-shrink-0 flex items-center gap-1.5">
+                          {formatRupiah(p.price)}
+                          <span className="text-slate-300">·</span>
+                          {p.stock} stok
                         </span>
                       </button>
                     ))}
@@ -563,73 +828,190 @@ export default function ReturnsPage() {
                 )}
 
                 {items.length > 0 && (
-                  <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100/60">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase">Produk</th>
-                          <th className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase text-center w-20">
-                            Qty
-                          </th>
-                          <th className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase text-right w-28">
-                            Subtotal
-                          </th>
+                          <th className="px-3.5 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Produk</th>
+                          <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider w-28">Satuan</th>
+                          <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-20">Qty</th>
+                          <th className="px-3 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right w-24">Harga</th>
+                          <th className="px-3.5 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right w-28">Subtotal</th>
                           <th className="w-10" />
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {items.map((item, idx) => (
-                          <tr key={`${item.productId}-${idx}`} className="bg-white">
-                            <td className="px-3 py-2 font-black text-slate-700">{item.productName}</td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                min={1}
-                                value={item.quantity}
-                                onChange={(e) => ubahQty(item.productId, Number(e.target.value))}
-                                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 font-black text-center outline-none focus:ring-1 focus:ring-purple-400"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right font-black text-slate-800">
-                              {formatRupiah(item.price * item.quantity)}
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              <button
-                                onClick={() => hapusItem(item.productId)}
-                                className="p-1.5 text-slate-300 hover:text-rose-500 transition-all"
-                                aria-label="Hapus item"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-slate-50">
+                        {items.map((item, idx) => {
+                          const units = item.availableUnits && item.availableUnits.length > 0
+                            ? item.availableUnits
+                            : [{ code: (item.unit || 'PCS').toUpperCase(), contains: item.contains || 1, price: item.price }];
+
+                          return (
+                            <tr key={`${item.productId}-${idx}`} className="bg-white hover:bg-slate-50/50">
+                              <td className="px-3.5 py-2.5 font-semibold text-slate-800 text-sm">
+                                <div>{item.productName}</div>
+                                {item.contains && item.contains > 1 ? (
+                                  <div className="text-[10px] text-violet-600 font-semibold mt-0.5">
+                                    1 {item.unit} = {item.contains} unit dasar
+                                  </div>
+                                ) : null}
+                              </td>
+                              <td className="px-2 py-2.5">
+                                {units.length > 1 ? (
+                                  <select
+                                    value={(item.unit || 'PCS').toUpperCase()}
+                                    onChange={(e) => ubahUnit(idx, e.target.value)}
+                                    className="w-full bg-violet-50 text-violet-700 border border-violet-200 rounded-lg px-2 py-1.5 text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-violet-300 cursor-pointer"
+                                  >
+                                    {units.map((u) => (
+                                      <option key={u.code} value={u.code}>
+                                        {u.code} {u.contains > 1 ? `(${u.contains})` : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="inline-block bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded text-xs uppercase">
+                                    {item.unit || 'PCS'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2.5">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={item.quantity}
+                                  onChange={(e) => ubahQty(idx, Number(e.target.value))}
+                                  className="w-16 bg-white border border-slate-200 rounded-lg p-1.5 font-bold text-center text-sm outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400"
+                                />
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-medium text-slate-600 text-xs">
+                                {formatRupiah(item.price)}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-right font-bold text-slate-800 text-sm">
+                                {formatRupiah(item.price * item.quantity)}
+                              </td>
+                              <td className="px-2 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => hapusItem(idx)}
+                                  className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                  aria-label="Hapus item"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
+
+                {items.length === 0 && cariKata.length < 2 && (
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <Package size={14} />
+                    Belum ada produk ditambahkan. Cari produk di atas.
+                  </div>
+                )}
               </div>
 
+              {/* Alasan */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                   Alasan Retur
                 </label>
                 <textarea
                   value={alasan}
                   onChange={(e) => setAlasan(e.target.value)}
-                  placeholder="Contoh: barang rusak saat pengiriman / salah kirim model"
-                  className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-semibold outline-none border border-transparent focus:border-purple-400 h-20 resize-none"
+                  placeholder="Contoh: barang rusak saat pengiriman / salah kirim model / tidak sesuai pesanan"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none h-20 resize-none transition-all"
                 />
               </div>
 
+              {/* Resi & ekspedisi */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Truck size={14} className="text-slate-400" />
+                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                    Resi &amp; Ekspedisi Pengiriman Balik
+                  </label>
+                  <span className="text-[10px] font-semibold text-slate-300">(opsional)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Nomor resi — bisa scan barcode */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400 px-1">Nomor Resi</label>
+                    <div className="relative">
+                      <input
+                        id="input-nomor-resi"
+                        type="text"
+                        value={nomorResi}
+                        onChange={(e) => setNomorResi(e.target.value)}
+                        placeholder="Scan barcode atau ketik…"
+                        autoComplete="off"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 pr-10 rounded-xl text-sm font-mono font-semibold outline-none transition-all placeholder:font-sans placeholder:font-normal"
+                      />
+                      {/* Indikator scanner — input ini bisa menerima input barcode scanner langsung */}
+                      <span
+                        title="Arahkan barcode scanner ke sini"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 select-none cursor-default"
+                      >
+                        ▦
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-semibold text-slate-400 px-1 flex items-center gap-1">
+                      <span>⌨</span> Klik field lalu tembak barcode scanner
+                    </p>
+                  </div>
+
+                  {/* Nama ekspedisi */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400 px-1">Nama Ekspedisi</label>
+                    <select
+                      value={ekspedisi}
+                      onChange={(e) => setEkspedisi(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition-all"
+                    >
+                      <option value="">— Pilih ekspedisi —</option>
+                      <option value="JNE">JNE</option>
+                      <option value="J&T">J&amp;T Express</option>
+                      <option value="SiCepat">SiCepat</option>
+                      <option value="TIKI">TIKI</option>
+                      <option value="Pos Indonesia">Pos Indonesia</option>
+                      <option value="Anteraja">Anteraja</option>
+                      <option value="Ninja Xpress">Ninja Xpress</option>
+                      <option value="SAP">SAP Express</option>
+                      <option value="Lion Parcel">Lion Parcel</option>
+                      <option value="Lalamove">Lalamove</option>
+                      <option value="GrabExpress">GrabExpress</option>
+                      <option value="GoSend">GoSend</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Preview jika sudah diisi */}
+                {(nomorResi || ekspedisi) && (
+                  <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl p-3">
+                    <Truck size={14} className="text-violet-500 flex-shrink-0" />
+                    <p className="text-xs font-bold text-violet-700">
+                      {ekspedisi && <span>{ekspedisi} </span>}
+                      {nomorResi && <span className="font-mono">{nomorResi}</span>}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Penyelesaian dana */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                  Penyelesaian Dana (saat disetujui)
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Penyelesaian Dana
                 </label>
                 <select
                   value={penyelesaian}
                   onChange={(e) => setPenyelesaian(e.target.value as PenyelesaianRetur)}
-                  className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-purple-400"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition-all"
                 >
                   {opsiPenyelesaian(jenis).map((p) => (
                     <option key={p} value={p}>
@@ -637,26 +1019,38 @@ export default function ReturnsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="flex items-start gap-1.5 text-[10px] font-semibold text-slate-400 px-1 pt-1">
-                  <Info size={12} className="mt-0.5 shrink-0" />
-                  Jurnal hanya dibuat bila dananya benar-benar bergerak. Retur marketplace (dipotong dari
-                  pencairan) pilih &quot;Tanpa jurnal&quot;.
-                </p>
+                <div className="flex items-start gap-2 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                  <Info size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                  <p className="text-xs font-semibold text-slate-500">
+                    Jurnal hanya dibuat bila dananya benar-benar bergerak. Retur marketplace yang dipotong dari pencairan pilih &quot;Tanpa jurnal&quot;.
+                  </p>
+                </div>
               </div>
+
             </div>
 
-            <div className="p-6 border-t border-slate-100 flex flex-wrap justify-between items-center gap-3">
+            {/* Footer modal */}
+            <div className="p-5 sm:p-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3 flex-shrink-0">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai Retur</p>
-                <p className="text-xl font-black text-slate-900">{formatRupiah(totalFormulir)}</p>
+                <p className="text-2xl font-black text-slate-900">{formatRupiah(totalFormulir)}</p>
               </div>
-              <button
-                onClick={() => void simpanRetur()}
-                disabled={menyimpan}
-                className="flex items-center gap-2 bg-purple-600 text-white px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-purple-100 hover:bg-purple-700 active:scale-95 disabled:opacity-60 transition-all"
-              >
-                {menyimpan && <Loader2 size={15} className="animate-spin" />} Simpan Retur
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setModalBuat(false)}
+                  className="px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => void simpanRetur()}
+                  disabled={menyimpan || items.length === 0}
+                  className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-purple-200 hover:from-violet-700 hover:to-purple-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {menyimpan && <Loader2 size={15} className="animate-spin" />}
+                  Simpan Retur
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -680,41 +1074,6 @@ export default function ReturnsPage() {
 // Komponen kecil
 // ---------------------------------------------------------------------------
 
-const WARNA_KARTU: Record<string, string> = {
-  amber: 'text-amber-600 bg-amber-50 border-amber-100',
-  emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-  rose: 'text-rose-600 bg-rose-50 border-rose-100',
-  slate: 'text-slate-600 bg-slate-50 border-slate-100',
-};
-
-function KartuRingkasan({
-  judul,
-  nilai,
-  catatan,
-  warna,
-}: {
-  judul: string;
-  nilai: string;
-  catatan: string;
-  warna: string;
-}) {
-  return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{judul}</p>
-        <span
-          className={`px-2 py-0.5 rounded-lg border text-[10px] font-black ${
-            WARNA_KARTU[warna] ?? WARNA_KARTU.slate
-          }`}
-        >
-          {nilai}
-        </span>
-      </div>
-      <p className="mt-2 text-xs font-bold text-slate-600">{catatan}</p>
-    </div>
-  );
-}
-
 function BarisRetur({
   retur,
   terbuka,
@@ -730,131 +1089,196 @@ function BarisRetur({
 }) {
   return (
     <>
-      <tr className="hover:bg-slate-50/70 align-top">
-        <td className="px-4 py-3 text-[11px] font-bold text-slate-600 whitespace-nowrap">
-          {formatTanggalRetur(retur.dibuatPada)}
+      <tr className={`hover:bg-slate-50/80 transition-colors align-top ${terbuka ? 'bg-violet-50/30' : ''}`}>
+        {/* Tanggal */}
+        <td className="px-5 py-4">
+          <p className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+            {formatTanggalRetur(retur.dibuatPada)}
+          </p>
         </td>
-        <td className="px-4 py-3">
+
+        {/* Tipe & Ref */}
+        <td className="px-5 py-4">
           <span
-            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${
+            className={`inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-1 rounded-lg border ${
               retur.jenis === 'SALES_RETURN'
                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                 : 'bg-orange-50 text-orange-700 border-orange-200'
             }`}
           >
+            {retur.jenis === 'SALES_RETURN' ? <TrendingDown size={11} /> : <TrendingUp size={11} />}
             {labelJenisPendek(retur.jenis)}
           </span>
-          <div className="mt-1 text-[11px] font-mono font-bold text-slate-500">
+          <div className="mt-1.5 text-[11px] font-mono font-semibold text-slate-400">
             {retur.refId ? `#${retur.refId.slice(-10)}` : '—'}
           </div>
         </td>
-        <td className="px-4 py-3 text-xs font-black text-slate-800">{retur.pihak}</td>
-        <td className="px-4 py-3">
+
+        {/* Pihak */}
+        <td className="px-5 py-4">
+          <p className="text-sm font-bold text-slate-800">{retur.pihak || '—'}</p>
+        </td>
+
+        {/* Item */}
+        <td className="px-5 py-4">
           <button
             onClick={onToggle}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-purple-600 transition-all"
+            className={`flex items-center gap-1.5 text-sm font-bold transition-colors ${
+              terbuka ? 'text-violet-600' : 'text-slate-600 hover:text-violet-600'
+            }`}
           >
-            {retur.items.length} produk
+            <Package size={13} />
+            {retur.items.length} item
             {terbuka ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
           {tanpaId > 0 && (
-            <div className="mt-1 text-[10px] font-black text-amber-600 uppercase">{tanpaId} tanpa ID produk</div>
+            <div className="mt-1 text-[10px] font-bold text-amber-600 flex items-center gap-1">
+              <AlertTriangle size={10} /> {tanpaId} tanpa ID
+            </div>
           )}
         </td>
-        <td className="px-4 py-3 text-xs font-black text-slate-900 whitespace-nowrap">
-          {formatRupiah(retur.totalNilai)}
+
+        {/* Nilai */}
+        <td className="px-5 py-4">
+          <p className="text-sm font-black text-slate-900 whitespace-nowrap">
+            {formatRupiah(retur.totalNilai)}
+          </p>
         </td>
-        <td className="px-4 py-3">
+
+        {/* Status */}
+        <td className="px-5 py-4">
           <span
-            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${WARNA_STATUS[retur.status]}`}
+            className={`inline-flex items-center gap-1.5 text-[11px] font-black uppercase px-2.5 py-1 rounded-lg border ${WARNA_STATUS[retur.status]}`}
           >
+            {retur.status === 'PENDING' && <Clock size={11} />}
+            {retur.status === 'APPROVED' && <CheckCircle2 size={11} />}
+            {retur.status === 'REJECTED' && <XCircle size={11} />}
             {labelStatus(retur.status)}
           </span>
         </td>
-        <td className="px-4 py-3">
+
+        {/* Aksi */}
+        <td className="px-5 py-4">
           {retur.status === 'PENDING' ? (
-            <div className="flex justify-end gap-1.5">
+            <div className="flex justify-end gap-2">
               <button
-                title="Setujui"
+                title="Setujui retur"
                 onClick={() => onProses('SETUJUI')}
-                className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 border border-emerald-200 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all"
               >
-                <CheckCircle2 size={15} />
+                <CheckCircle2 size={13} />
+                Setujui
               </button>
               <button
-                title="Tolak"
+                title="Tolak retur"
                 onClick={() => onProses('TOLAK')}
-                className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 border border-rose-200 transition-all"
+                className="p-1.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-100 transition-all"
               >
-                <XCircle size={15} />
+                <XCircle size={14} />
               </button>
             </div>
           ) : (
-            <div className="text-right text-[10px] font-bold text-slate-400">
+            <div className="text-right text-xs font-semibold text-slate-400">
               {formatTanggalRetur(retur.diprosesPada)}
             </div>
           )}
         </td>
       </tr>
 
+      {/* Baris detail (expandable) */}
       {terbuka && (
-        <tr className="bg-slate-50/60">
-          <td colSpan={7} className="px-4 py-4 space-y-3">
-            <p className="text-[11px] font-bold text-slate-500">
-              <span className="uppercase tracking-widest font-black text-slate-400">Alasan: </span>
-              {retur.alasan || '—'}
-            </p>
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[520px]">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 font-black text-slate-400 uppercase text-[10px]">Produk</th>
-                    <th className="px-3 py-2 font-black text-slate-400 uppercase text-[10px] text-center w-20">
-                      Qty
-                    </th>
-                    <th className="px-3 py-2 font-black text-slate-400 uppercase text-[10px] text-right w-32">
-                      Harga
-                    </th>
-                    <th className="px-3 py-2 font-black text-slate-400 uppercase text-[10px] text-right w-32">
-                      Subtotal
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {retur.items.map((item, idx) => (
-                    <tr key={`${retur.id}-item-${idx}`}>
-                      <td className="px-3 py-2 font-bold text-slate-700">
-                        {item.productName}
-                        {!item.productId && (
-                          <span className="ml-2 text-[9px] font-black text-amber-600 uppercase">tanpa ID</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center font-black">{item.quantity}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-600">
-                        {formatRupiah(item.price)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-black text-slate-800">
-                        {formatRupiah(item.price * item.quantity)}
-                      </td>
+        <tr className="bg-violet-50/20 border-l-2 border-violet-300">
+          <td colSpan={7} className="px-5 py-4">
+            <div className="space-y-3 max-w-4xl">
+              {/* Alasan */}
+              {retur.alasan && (
+                <div className="flex items-start gap-2">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider pt-0.5 whitespace-nowrap">Alasan:</span>
+                  <p className="text-sm font-semibold text-slate-700">{retur.alasan}</p>
+                </div>
+              )}
+
+              {/* Tabel item */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Produk</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-16">Qty</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right w-28">Harga Satuan</th>
+                      <th className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right w-28">Subtotal</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex flex-wrap gap-4 text-[11px] font-semibold text-slate-500">
-              <span>
-                Penyelesaian: <b className="text-slate-700">{labelPenyelesaian(retur.penyelesaian)}</b>
-              </span>
-              {retur.catatanProses && (
-                <span>
-                  Catatan proses: <b className="text-slate-700">{retur.catatanProses}</b>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {retur.items.map((item, idx) => (
+                      <tr key={`${retur.id}-item-${idx}`} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-2.5 font-semibold text-slate-800">
+                          {item.productName}
+                          {item.unit && (
+                            <span className="ml-1.5 text-[10px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase">
+                              {item.unit}
+                            </span>
+                          )}
+                          {!item.productId && (
+                            <span className="ml-2 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 uppercase">
+                              tanpa ID
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-center font-bold text-slate-700">
+                          <span>{item.quantity}</span>
+                          {item.unit && (
+                            <span className="ml-1 text-xs font-semibold text-slate-500 uppercase">{item.unit}</span>
+                          )}
+                          {item.contains && item.contains > 1 ? (
+                            <span className="block text-[10px] font-semibold text-violet-600">
+                              ({item.quantity * item.contains} unit dasar)
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-slate-600">
+                          {formatRupiah(item.price)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-bold text-slate-900">
+                          {formatRupiah(item.price * item.quantity)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Meta */}
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-slate-400">Penyelesaian:</span>
+                  <span className="font-bold text-slate-700">{labelPenyelesaian(retur.penyelesaian)}</span>
                 </span>
-              )}
-              {retur.refId && retur.jenis === 'SALES_RETURN' && (
-                <Link href={`/admin/orders/${retur.refId}`} className="text-blue-600 hover:underline font-black">
-                  Buka pesanan →
-                </Link>
-              )}
+                {retur.catatanProses && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-slate-400">Catatan:</span>
+                    <span className="font-bold text-slate-700">{retur.catatanProses}</span>
+                  </span>
+                )}
+                {(retur.nomorResi || retur.ekspedisi) && (
+                  <span className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1">
+                    <Truck size={12} className="text-violet-500 flex-shrink-0" />
+                    <span className="font-bold text-violet-700">
+                      {retur.ekspedisi && <span>{retur.ekspedisi} </span>}
+                      {retur.nomorResi && <span className="font-mono">{retur.nomorResi}</span>}
+                    </span>
+                  </span>
+                )}
+                {retur.refId && retur.jenis === 'SALES_RETURN' && (
+                  <Link
+                    href={`/admin/orders/${retur.refId}`}
+                    className="flex items-center gap-1 text-violet-600 hover:text-violet-700 font-bold transition-colors"
+                  >
+                    <ExternalLink size={12} />
+                    Lihat pesanan
+                  </Link>
+                )}
+              </div>
             </div>
           </td>
         </tr>
@@ -882,56 +1306,101 @@ function ModalProses({
   const menyetujui = aksi === 'SETUJUI';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-black text-slate-900">
-            {menyetujui ? 'Setujui' : 'Tolak'} {labelJenis(retur.jenis)}
-          </h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-            {retur.pihak} · {retur.refId ? `#${retur.refId}` : 'tanpa referensi'} ·{' '}
-            {formatRupiah(retur.totalNilai)}
-          </p>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className={`p-5 sm:p-6 border-b ${menyetujui ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${menyetujui ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                {menyetujui ? (
+                  <CheckCircle2 size={20} className="text-emerald-600" />
+                ) : (
+                  <XCircle size={20} className="text-rose-600" />
+                )}
+              </div>
+              <div>
+                <h2 className={`text-base font-black ${menyetujui ? 'text-emerald-900' : 'text-rose-900'}`}>
+                  {menyetujui ? 'Setujui' : 'Tolak'} {labelJenis(retur.jenis)}
+                </h2>
+                <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                  {retur.pihak} · {retur.refId ? `#${retur.refId.slice(-10)}` : 'tanpa referensi'} · {formatRupiah(retur.totalNilai)}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onTutup}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white/80 rounded-lg transition-all"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-xs">
-            <p className="font-bold text-slate-600">
+        {/* Body */}
+        <div className="p-5 sm:p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Info dampak */}
+          <div className={`rounded-xl p-4 border ${menyetujui ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+            <p className={`text-sm font-bold mb-2 ${menyetujui ? 'text-emerald-800' : 'text-rose-800'}`}>
               {menyetujui
                 ? retur.jenis === 'SALES_RETURN'
-                  ? 'Barang kembali ke gudang utama (stok bertambah).'
-                  : 'Barang keluar dari gudang (stok berkurang).'
-                : 'Stok & jurnal TIDAK berubah.'}
+                  ? '↩ Barang kembali ke gudang — stok bertambah'
+                  : '↪ Barang keluar dari gudang — stok berkurang'
+                : '✕ Stok & jurnal tidak akan berubah'}
             </p>
-            <ul className="space-y-1 text-[11px] font-semibold text-slate-500 list-disc list-inside">
-              {retur.items.slice(0, 6).map((item, idx) => (
-                <li key={idx}>
-                  {item.productName} — {item.quantity} × {formatRupiah(item.price)}
-                  {!item.productId && <b className="text-amber-600"> (tanpa ID produk)</b>}
+            <ul className="space-y-1">
+              {retur.items.slice(0, 6).map((item, idx) => {
+                const multiplier = Number(item.contains || 1);
+                const totalFisik = item.quantity * multiplier;
+                return (
+                  <li key={idx} className="text-xs font-semibold text-slate-600 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${menyetujui ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      <span className="truncate">{item.productName}</span>
+                      {!item.productId && (
+                        <span className="text-amber-600 font-bold text-[10px]">(tanpa ID)</span>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className="font-bold text-slate-800">
+                        {item.quantity} {item.unit || 'pcs'}
+                        {multiplier > 1 && (
+                          <span className="text-violet-600 font-semibold ml-1">({totalFisik} unit)</span>
+                        )}
+                      </span>
+                      <span className="text-slate-400 font-normal ml-1.5">× {formatRupiah(item.price)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+              {retur.items.length > 6 && (
+                <li className="text-xs font-semibold text-slate-400 pl-3.5">
+                  … dan {retur.items.length - 6} item lainnya
                 </li>
-              ))}
-              {retur.items.length > 6 && <li>… dan {retur.items.length - 6} item lainnya</li>}
+              )}
             </ul>
           </div>
 
+          {/* Peringatan item tanpa ID */}
           {menyetujui && tanpaId.length > 0 && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-2xl p-3">
-              <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
-              <p className="text-[11px] font-semibold text-amber-800">
-                {tanpaId.length} item tidak punya ID produk — stoknya tidak akan disesuaikan.
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <AlertTriangle size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs font-semibold text-amber-800">
+                {tanpaId.length} item tidak punya ID produk — stoknya <strong>tidak akan</strong> disesuaikan.
               </p>
             </div>
           )}
 
+          {/* Penyelesaian dana (hanya saat setujui) */}
           {menyetujui && (
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                 Penyelesaian Dana
               </label>
               <select
                 value={data.penyelesaian}
                 onChange={(e) => onUbah({ penyelesaian: e.target.value as PenyelesaianRetur })}
-                className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-purple-400"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 p-3 rounded-xl text-sm font-semibold outline-none transition-all"
               >
                 {opsiPenyelesaian(retur.jenis).map((p) => (
                   <option key={p} value={p}>
@@ -939,43 +1408,47 @@ function ModalProses({
                   </option>
                 ))}
               </select>
-              <p className="text-[10px] font-bold text-slate-400 px-1 pt-0.5">
+              <div className={`text-xs font-semibold px-1 rounded-lg py-2 ${akun ? 'text-slate-600' : 'text-slate-400'}`}>
                 {akun
-                  ? `Jurnal: Debit ${akun.debit} / Kredit ${akun.kredit} ${formatRupiah(retur.totalNilai)}`
-                  : 'Tanpa jurnal — tidak ada perpindahan uang yang dicatat.'}
-              </p>
+                  ? `📒 Jurnal: Debit ${akun.debit} / Kredit ${akun.kredit} — ${formatRupiah(retur.totalNilai)}`
+                  : '📭 Tanpa jurnal — tidak ada perpindahan uang yang dicatat.'}
+              </div>
             </div>
           )}
 
+          {/* Catatan */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-              Catatan (opsional)
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              Catatan <span className="normal-case font-semibold text-slate-400">(opsional)</span>
             </label>
             <input
               value={data.catatan}
               onChange={(e) => onUbah({ catatan: e.target.value })}
               placeholder={menyetujui ? 'Contoh: barang diterima lengkap' : 'Contoh: barang sudah dipakai'}
-              className="w-full bg-slate-50 p-3.5 rounded-2xl text-xs font-semibold outline-none border border-transparent focus:border-purple-400"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-violet-400 p-3 rounded-xl text-sm font-semibold outline-none transition-all"
             />
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-100 flex justify-end gap-2">
+        {/* Footer */}
+        <div className="p-5 sm:p-6 border-t border-slate-100 flex items-center justify-end gap-2">
           <button
             onClick={onTutup}
-            className="px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all"
+            className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-all"
           >
             Batal
           </button>
           <button
             onClick={onJalankan}
             disabled={busy}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60 transition-all ${
-              menyetujui ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg disabled:opacity-50 active:scale-95 transition-all ${
+              menyetujui
+                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
             }`}
           >
             {busy && <Loader2 size={15} className="animate-spin" />}
-            {menyetujui ? 'Setujui & Sesuaikan Stok' : 'Tolak Retur'}
+            {menyetujui ? '✓ Setujui & Sesuaikan Stok' : '✕ Tolak Retur'}
           </button>
         </div>
       </div>
