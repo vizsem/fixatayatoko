@@ -586,7 +586,9 @@ export default function AdminProducts() {
       // Jika pencarian aktif dan ada varian yang cocok, tampilkan induknya
       filtered = filtered.filter((p) => !p.parentId || matchedParentsFromVariants.has(p.id));
     } else if (viewHierarchy === 'parents_only') {
-      filtered = filtered.filter((p) => !p.parentId && (childrenByParent.get(p.id)?.length || 0) > 0);
+      // Tampilkan semua produk yang BUKAN anak varian (tidak punya parentId)
+      // = produk mandiri + produk yang jadi induk
+      filtered = filtered.filter((p) => !p.parentId);
     } else if (viewHierarchy === 'variants_only') {
       filtered = filtered.filter((p) => Boolean(p.parentId));
     }
@@ -1138,7 +1140,7 @@ export default function AdminProducts() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              Hanya Induk
+              Hanya Induk & Mandiri
             </button>
           </div>
 
