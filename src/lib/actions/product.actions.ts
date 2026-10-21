@@ -19,6 +19,7 @@ import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { addInventoryLog, addStock, type InventoryLogData } from '@/lib/inventory';
 import { sbInsertDoc } from '@/lib/supabase-helpers';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
+import { MARKETPLACE_CATEGORIES, classifyProduct } from '@/lib/marketplace-categories';
 
 /**
  * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
@@ -526,6 +527,15 @@ export async function getCategories() {
       id: c.id,
       name: c.name || c.raw_data?.name || 'Kategori',
       description: c.raw_data?.description || null,
+      code: c.raw_data?.code || null,
+      icon: c.raw_data?.icon || '📁',
+      group: c.raw_data?.group || null,
+      shopeeKat: c.raw_data?.shopeeKat || null,
+      shopeeStarAdmin: c.raw_data?.shopeeStarAdmin ?? null,
+      shopeeMallAdmin: c.raw_data?.shopeeMallAdmin ?? null,
+      tiktokGroup: c.raw_data?.tiktokGroup || null,
+      tiktokKomisi: c.raw_data?.tiktokKomisi ?? null,
+      isMarketplace: Boolean(c.raw_data?.isMarketplace || c.raw_data?.code || c.raw_data?.shopeeKat),
       _count: { products: 0 }
     }));
   } catch (error) {
@@ -602,14 +612,22 @@ export async function addProductFull(payload: {
 
     const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+    let finalCategory = (payload.Kategori || '').trim();
+    if (!finalCategory || ['semua', 'umum', 'pokok', 'lain-lain', 'lainnya'].includes(finalCategory.toLowerCase())) {
+      const autoMatch = classifyProduct(displayName);
+      if (autoMatch.matched) {
+        finalCategory = autoMatch.categoryName;
+      }
+    }
+
     const raw_data = {
       ID: sku,
       Barcode: payload.Barcode || '',
       Parent_ID: payload.Parent_ID || '',
       Nama: displayName,
       name: displayName,
-      Kategori: payload.Kategori || '',
-      category: payload.Kategori || '',
+      Kategori: finalCategory,
+      category: finalCategory,
       Brand: payload.Brand || '',
       Deskripsi: payload.Deskripsi || '',
       description: payload.Deskripsi || '',
@@ -708,24 +726,279 @@ export async function addProductFull(payload: {
   }
 }
 
-export async function createCategory(data: { name: string; description?: string }) {
+export async function createCategory(data: {
+  name: string;
+  description?: string;
+  code?: string;
+  icon?: string;
+  group?: string;
+  shopeeKat?: 'A' | 'B' | 'C' | 'D' | 'E' | 'X';
+  shopeeStarAdmin?: number;
+  shopeeMallAdmin?: number;
+  tiktokGroup?: string;
+  tiktokKomisi?: number;
+}) {
   await requireAdmin();
   try {
     const id = `cat_${Date.now()}`;
     const now = new Date().toISOString();
+    const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const { error } = await supabaseAdmin.from('categories').insert({
       id,
       name: data.name,
-      raw_data: { ...data, createdAt: now },
+      raw_data: { ...data, slug, createdAt: now },
       created_at: now,
       updated_at: now,
     });
     if (error) throw error;
     revalidatePath('/admin/products');
     revalidatePath('/admin/kategori');
-    return { success: true, data: { id, ...data } };
+    return { success: true, data: { id, ...data, slug } };
   } catch (error: any) {
     return { success: false, error: error?.message || 'Gagal membuat kategori' };
+  }
+}
+
+/**
+ * Sinkronisasi Kategori Resmi Marketplace (Shopee & TikTok Shop) ke database.
+ * Mendaftarkan semua kategori resmi beserta komisi dan meng-enrich kategori yang ada.
+ */
+export async function syncMarketplaceCategories() {
+  await requireAdmin();
+  try {
+    const now = new Date().toISOString();
+    const { data: existingRows, error: catErr } = await supabaseAdmin.from('categories').select('*');
+    if (catErr) throw catErr;
+
+    const existingByName = new Map<string, any>();
+    for (const row of existingRows || []) {
+      const name = (row.name || row.raw_data?.name || '').trim().toLowerCase();
+      if (name) existingByName.set(name, row);
+    }
+
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    // 1. Sinkronisasi master katalog marketplace
+    for (const mCat of MARKETPLACE_CATEGORIES) {
+      const existing = existingByName.get(mCat.name.toLowerCase());
+      if (!existing) {
+        const id = `cat_mp_${mCat.id}_${Date.now()}`;
+        const raw_data = {
+          name: mCat.name,
+          slug: mCat.slug,
+          code: mCat.code,
+          icon: mCat.icon,
+          group: mCat.group,
+          shopeeKat: mCat.shopeeKat,
+          shopeeStarAdmin: mCat.shopeeStarAdmin,
+          shopeeMallAdmin: mCat.shopeeMallAdmin,
+          tiktokGroup: mCat.tiktokGroup,
+          tiktokKomisi: mCat.tiktokKomisi,
+          description: mCat.description,
+          isMarketplace: true,
+          createdAt: now
+        };
+        await supabaseAdmin.from('categories').insert({
+          id,
+          name: mCat.name,
+          raw_data,
+          created_at: now,
+          updated_at: now
+        });
+        insertedCount++;
+        existingByName.set(mCat.name.toLowerCase(), { id, name: mCat.name, raw_data });
+      } else {
+        const raw = existing.raw_data || {};
+        if (!raw.shopeeKat || !raw.tiktokKomisi || !raw.code) {
+          await supabaseAdmin.from('categories').update({
+            name: mCat.name,
+            raw_data: {
+              ...raw,
+              code: mCat.code,
+              icon: mCat.icon,
+              group: mCat.group,
+              shopeeKat: mCat.shopeeKat,
+              shopeeStarAdmin: mCat.shopeeStarAdmin,
+              shopeeMallAdmin: mCat.shopeeMallAdmin,
+              tiktokGroup: mCat.tiktokGroup,
+              tiktokKomisi: mCat.tiktokKomisi,
+              description: raw.description || mCat.description,
+              isMarketplace: true,
+              updatedAt: now
+            },
+            updated_at: now
+          }).eq('id', existing.id);
+          updatedCount++;
+        }
+      }
+    }
+
+    // 2. Scan kategori unik yang ada di tabel products
+    let page = 0;
+    const productCategories = new Set<string>();
+    while (true) {
+      const { data: prods } = await supabaseAdmin.from('products').select('category').range(page * 1000, (page + 1) * 1000 - 1);
+      if (!prods || prods.length === 0) break;
+      for (const p of prods) {
+        if (p.category && typeof p.category === 'string') {
+          const trimmed = p.category.trim();
+          if (trimmed && !['semua', 'lain-lain', 'umum', 'pokok'].includes(trimmed.toLowerCase())) {
+            productCategories.add(trimmed);
+          }
+        }
+      }
+      if (prods.length < 1000) break;
+      page++;
+    }
+
+    for (const prodCat of productCategories) {
+      if (!existingByName.has(prodCat.toLowerCase())) {
+        const id = `cat_prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const matchedMp = MARKETPLACE_CATEGORIES.find(m => m.name.toLowerCase() === prodCat.toLowerCase());
+        const codeMatch = prodCat.match(/\((\d+)\)/)?.[1];
+        const raw_data = {
+          name: prodCat,
+          slug: prodCat.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          code: matchedMp?.code || codeMatch || undefined,
+          icon: matchedMp?.icon || '📦',
+          shopeeKat: matchedMp?.shopeeKat || 'A',
+          shopeeStarAdmin: matchedMp?.shopeeStarAdmin || 10.0,
+          shopeeMallAdmin: matchedMp?.shopeeMallAdmin || 11.7,
+          tiktokGroup: matchedMp?.tiktokGroup || '1',
+          tiktokKomisi: matchedMp?.tiktokKomisi || 5.25,
+          description: matchedMp?.description || 'Kategori dari produk marketplace',
+          isMarketplace: true,
+          createdAt: now
+        };
+        await supabaseAdmin.from('categories').insert({
+          id,
+          name: prodCat,
+          raw_data,
+          created_at: now,
+          updated_at: now
+        });
+        insertedCount++;
+        existingByName.set(prodCat.toLowerCase(), { id, name: prodCat, raw_data });
+      }
+    }
+
+    revalidatePath('/admin/kategori');
+    revalidatePath('/admin/products');
+
+    return {
+      success: true,
+      data: {
+        insertedCount,
+        updatedCount,
+        totalCategories: existingByName.size
+      }
+    };
+  } catch (error: any) {
+    console.error('Failed to sync marketplace categories:', error);
+    return { success: false, error: error?.message || 'Gagal sinkronisasi kategori marketplace' };
+  }
+}
+
+/**
+ * Otomatisasi Penempatan Kategori Produk.
+ * Mengklasifikasikan produk secara cerdas berdasarkan nama produk ke kategori marketplace resmi.
+ */
+export async function autoClassifyProductsAction(options?: {
+  onlyGeneric?: boolean;
+  limit?: number;
+}) {
+  await requireAdmin();
+  try {
+    const onlyGeneric = options?.onlyGeneric !== false;
+    const genericSet = new Set(['semua', 'lain-lain', 'umum', 'pokok', 'lainnya', '', 'tanpa kategori', 'null']);
+
+    let totalScanned = 0;
+    let totalUpdated = 0;
+    let totalSkipped = 0;
+    const categoryStats: Record<string, number> = {};
+
+    let page = 0;
+    const pageSize = 500;
+    let stop = false;
+
+    while (!stop) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: prods, error: pErr } = await supabaseAdmin
+        .from('products')
+        .select('id, name, category, raw_data')
+        .range(from, to);
+
+      if (pErr) throw pErr;
+      if (!prods || prods.length === 0) break;
+
+      totalScanned += prods.length;
+
+      for (const prod of prods) {
+        const curCat = (prod.category || '').trim();
+        const isGeneric = !curCat || genericSet.has(curCat.toLowerCase());
+
+        if (onlyGeneric && !isGeneric) {
+          totalSkipped++;
+          continue;
+        }
+
+        const res = classifyProduct(prod.name, prod.category);
+        if (res.matched && res.categoryName !== curCat) {
+          const raw = prod.raw_data || {};
+          const updatedRaw = {
+            ...raw,
+            category: res.categoryName,
+            Kategori: res.categoryName,
+            autoClassifiedAt: new Date().toISOString()
+          };
+
+          const { error: updErr } = await supabaseAdmin
+            .from('products')
+            .update({
+              category: res.categoryName,
+              raw_data: updatedRaw,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', prod.id);
+
+          if (!updErr) {
+            totalUpdated++;
+            categoryStats[res.categoryName] = (categoryStats[res.categoryName] || 0) + 1;
+          } else {
+            totalSkipped++;
+          }
+        } else {
+          totalSkipped++;
+        }
+
+        if (options?.limit && totalUpdated >= options.limit) {
+          stop = true;
+          break;
+        }
+      }
+
+      if (prods.length < pageSize || stop) break;
+      page++;
+    }
+
+    revalidatePath('/admin/kategori');
+    revalidatePath('/admin/products');
+
+    return {
+      success: true,
+      data: {
+        scanned: totalScanned,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        categoryStats
+      }
+    };
+  } catch (error: any) {
+    console.error('Failed to auto-classify products:', error);
+    return { success: false, error: error?.message || 'Gagal klasifikasi otomatis produk' };
   }
 }
 
