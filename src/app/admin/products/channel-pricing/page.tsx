@@ -72,7 +72,7 @@ export default function ChannelPricingPage() {
   const { products: liveProducts, loading } = useProducts(queryOptions);
   
   // Skema Biaya Marketplace & Anti-Boncos (Shopee & TikTok 2026 — dikalibrasi dari settlement nyata)
-  const [pricingScheme, setPricingScheme] = useState<'standard' | 'event' | 'custom'>('standard');
+  const [pricingScheme, setPricingScheme] = useState<'standard' | 'event' | 'event_xbp' | 'event_reg' | 'custom'>('standard');
   const [eventDiscount, setEventDiscount] = useState<number>(10); // Simulasi diskon event 10%
   const [packingOps, setPackingOps] = useState<number>(2000); // Estimasi operasional & packing Rp2.000/pesanan
   const [channelFees, setChannelFees] = useState({
@@ -84,7 +84,7 @@ export default function ChannelPricingPage() {
     tiktok: { pct: 20.0, flat: 1250 }, // 20% pct platform + Rp1.250 proses (tanpa logistik)
   });
 
-  const handleSetScheme = (scheme: 'standard' | 'event') => {
+  const handleSetScheme = (scheme: 'standard' | 'event' | 'event_xbp' | 'event_reg') => {
     setPricingScheme(scheme);
     if (scheme === 'standard') {
       setChannelFees({
@@ -92,9 +92,22 @@ export default function ChannelPricingPage() {
         tiktok: { pct: 20.0, flat: 1250 }, // Skema dasar terverifikasi (tanpa logistik)
       });
     } else if (scheme === 'event') {
+      // Spesial Co-Funded 8% Always On (Beban seller 4.4%) / Free Boost
       setChannelFees({
         shopee: { pct: 21.5, flat: 1250 }, // + Promo XTRA 4.5% saat event
-        tiktok: { pct: 25.5, flat: 1250 }, // + Voucher XTRA 3.5% + Afiliasi 2% saat event
+        tiktok: { pct: 24.4, flat: 1250 }, // 20% dasar + 4.4% voucher co-funded
+      });
+    } else if (scheme === 'event_xbp') {
+      // [XBP] Co-Funded 20% (Platform 65% : Seller 35% -> Beban seller 7.0%)
+      setChannelFees({
+        shopee: { pct: 21.5, flat: 1250 },
+        tiktok: { pct: 27.0, flat: 1250 }, // 20% dasar + 7.0% voucher seller
+      });
+    } else if (scheme === 'event_reg') {
+      // Co-Funded Reguler 20% (Platform 40% : Seller 60% -> Beban seller 12.0%)
+      setChannelFees({
+        shopee: { pct: 21.5, flat: 1250 },
+        tiktok: { pct: 32.0, flat: 1250 }, // 20% dasar + 12.0% voucher seller
       });
     }
   };
@@ -105,7 +118,8 @@ export default function ChannelPricingPage() {
     }
 
     const isMkt = channel === 'shopee' || channel === 'tiktok';
-    const disc = (isMkt && pricingScheme === 'event') ? (eventDiscount || 0) : 0;
+    const isEventScheme = pricingScheme !== 'standard';
+    const disc = (isMkt && isEventScheme) ? (eventDiscount || 0) : 0;
     const effectivePrice = Math.max(0, price * (1 - disc / 100));
 
     const feeConfig = channelFees[channel as 'shopee' | 'tiktok'] || { pct: 0, flat: 0 };
@@ -835,24 +849,46 @@ export default function ChannelPricingPage() {
                 <Calculator size={15} className="text-indigo-600" />
                 Skema Biaya & Simulasi Anti-Boncos (2026):
               </span>
-              <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-indigo-200 shadow-xs">
+              <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-indigo-200 shadow-xs flex-wrap">
                 <button
                   type="button"
                   onClick={() => handleSetScheme('standard')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                     pricingScheme === 'standard' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-indigo-600'
                   }`}
+                  title="Komisi Normal (TTS 20% + Rp1.250)"
                 >
-                  🟢 Hari Biasa (Standar)
+                  🟢 Standar
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSetScheme('event')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    pricingScheme === 'event' ? 'bg-pink-600 text-white shadow-xs' : 'text-gray-600 hover:text-pink-600'
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                    pricingScheme === 'event' ? 'bg-amber-600 text-white shadow-xs' : 'text-gray-600 hover:text-amber-600'
                   }`}
+                  title="Spesial Co-Funded 8% (Beban Seller 4.4% -> Total TTS 24.4%)"
                 >
-                  🎪 Simulasi Ikut Event
+                  🟡 Spesial 8% (TTS 24.4%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetScheme('event_xbp')}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                    pricingScheme === 'event_xbp' ? 'bg-purple-600 text-white shadow-xs' : 'text-gray-600 hover:text-purple-600'
+                  }`}
+                  title="[XBP] Co-Funded 20% (Platform 65% : Seller 35% -> Beban Seller 7.0% -> Total TTS 27.0%)"
+                >
+                  🟣 [XBP] 20% (TTS 27.0%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetScheme('event_reg')}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                    pricingScheme === 'event_reg' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-rose-600'
+                  }`}
+                  title="Co-Funded Reguler 20% (Platform 40% : Seller 60% -> Beban Seller 12.0% -> Total TTS 32.0%)"
+                >
+                  🔴 Reguler 20% (TTS 32.0%)
                 </button>
               </div>
             </div>
@@ -894,7 +930,7 @@ export default function ChannelPricingPage() {
                 />
                 <span className="font-bold text-gray-500">%</span>
                 <span className="text-[10px] text-gray-400 truncate">
-                  {pricingScheme === 'event' ? '(Admin + Ongkir + Promo XTRA)' : '(Admin 9%+Ongkir6%+PPh0.5% ✓)'}
+                  {pricingScheme !== 'standard' ? '(Admin + Ongkir + Promo XTRA)' : '(Admin 9%+Ongkir6%+PPh0.5% ✓)'}
                 </span>
               </div>
             </div>
@@ -917,7 +953,7 @@ export default function ChannelPricingPage() {
                 />
                 <span className="font-bold text-gray-500">%</span>
                 <span className="text-[10px] text-gray-400 truncate">
-                  {pricingScheme === 'event' ? '(+Xtra+Afiliasi saat event)' : '(9.5%+6.5%+3.5%+0.5% PPh22 ✓)'}
+                  {pricingScheme !== 'standard' ? `(+Co-Funded/Xtra ${channelFees.tiktok.pct}%)` : '(9.5%+6.5%+3.5%+0.5% PPh22 ✓)'}
                 </span>
               </div>
             </div>
@@ -939,23 +975,23 @@ export default function ChannelPricingPage() {
 
             {/* Simulasi Diskon Event */}
             <div className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all ${
-              pricingScheme === 'event' ? 'bg-pink-50 border-pink-300 ring-2 ring-pink-400/30' : 'bg-white/90 border-gray-200'
+              pricingScheme !== 'standard' ? 'bg-pink-50 border-pink-300 ring-2 ring-pink-400/30' : 'bg-white/90 border-gray-200'
             }`}>
               <span className="font-bold text-pink-900 flex items-center justify-between">
                 <span>Diskon Event Toko</span>
-                {pricingScheme === 'event' && <span className="text-[10px] bg-pink-600 text-white px-1.5 py-0.2 rounded font-bold">AKTIF</span>}
+                {pricingScheme !== 'standard' && <span className="text-[10px] bg-pink-600 text-white px-1.5 py-0.2 rounded font-bold">AKTIF</span>}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <input
                   type="number"
-                  disabled={pricingScheme !== 'event'}
+                  disabled={pricingScheme === 'standard'}
                   value={eventDiscount}
                   onChange={(e) => setEventDiscount(Number(e.target.value))}
                   className="w-16 px-2 py-1 rounded-lg text-xs font-bold border border-pink-300 outline-none text-right disabled:opacity-50"
                 />
                 <span className="font-bold text-gray-500">%</span>
                 <span className="text-[10px] text-gray-500">
-                  {pricingScheme === 'event' ? 'Simulasi harga coret event' : '(Pilih mode Event)'}
+                  {pricingScheme !== 'standard' ? 'Simulasi harga coret event' : '(Pilih mode Event)'}
                 </span>
               </div>
             </div>

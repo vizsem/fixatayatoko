@@ -175,8 +175,420 @@ const ALL_PROGRAMS = [
   },
 ];
 
+// ── OPSI SKEMA CO-FUNDED VOUCHER TIKTOK SHOP & TOKOPEDIA (Update Gajian & 11.11 2026) ──
+interface CoFundedTier {
+  id: string;
+  group: 'free' | 'xbp' | 'reg' | 'sp';
+  groupLabel: string;
+  label: string;
+  diskonPembeli: number;
+  platformPct: number;
+  sellerPct: number;
+  effectiveSellerPct: number;
+  minBelanja: number;
+  capSeller: number;
+  badge: string;
+  badgeCls: string;
+  channel: string;
+}
+
+const CO_FUNDED_TIERS: CoFundedTier[] = [
+  // ── 1. Bebas Biaya (100% Platform) ──
+  {
+    id: "boost_free",
+    group: "free",
+    groupLabel: "🟢 Bebas Biaya (0% Beban Seller)",
+    label: "Voucher Boost (Voucher Platform s/d 20% XBP / 6% Non-XBP)",
+    diskonPembeli: 20,
+    platformPct: 100,
+    sellerPct: 0,
+    effectiveSellerPct: 0,
+    minBelanja: 0,
+    capSeller: 0,
+    badge: "100% Platform",
+    badgeCls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "growth_deal_free",
+    group: "free",
+    groupLabel: "🟢 Bebas Biaya (0% Beban Seller)",
+    label: "Growth Xtra Special Deal Program (100% Subsidi TikTok Shop)",
+    diskonPembeli: 25,
+    platformPct: 100,
+    sellerPct: 0,
+    effectiveSellerPct: 0,
+    minBelanja: 0,
+    capSeller: 0,
+    badge: "100% Subsidi TikTok",
+    badgeCls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    channel: "TTS by Tokopedia"
+  },
+
+  // ── 2. [XBP] Co-Funded Voucher (Platform 65% : Penjual 35%) ──
+  {
+    id: "xbp_10_60k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 10% (Beban Seller 3.50%) · Min. Belanja Rp60k (TTS Only)",
+    diskonPembeli: 10,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 3.50,
+    minBelanja: 60000,
+    capSeller: 350000,
+    badge: "XBP 3.5%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS Only"
+  },
+  {
+    id: "xbp_10_100k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 10% (Beban Seller 3.50%) · Min. Belanja Rp100k (Toko Only)",
+    diskonPembeli: 10,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 3.50,
+    minBelanja: 100000,
+    capSeller: 420000,
+    badge: "XBP 3.5%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "Toko Only"
+  },
+  {
+    id: "xbp_20_75k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 20% (Beban Seller 7.00%) · Min. Belanja Rp75k (TTS Only)",
+    diskonPembeli: 20,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 7.00,
+    minBelanja: 75000,
+    capSeller: 17500,
+    badge: "XBP 7.0%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS Only"
+  },
+  {
+    id: "xbp_20_100k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 20% (Beban Seller 7.00%) · Min. Belanja Rp100k (TTS & Toko)",
+    diskonPembeli: 20,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 7.00,
+    minBelanja: 100000,
+    capSeller: 35000,
+    badge: "XBP 7.0%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "xbp_20_130k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 20% (Beban Seller 7.00%) · Min. Belanja Rp130k (TTS & Toko)",
+    diskonPembeli: 20,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 7.00,
+    minBelanja: 130000,
+    capSeller: 87500,
+    badge: "XBP 7.0%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "xbp_25_300k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 25% (Beban Seller 8.75%) · Min. Belanja Rp300k (TTS & Toko)",
+    diskonPembeli: 25,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 8.75,
+    minBelanja: 300000,
+    capSeller: 105000,
+    badge: "XBP 8.75%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "xbp_30_500k",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 30% (Beban Seller 10.50%) · Min. Belanja Rp500k (TTS & Toko)",
+    diskonPembeli: 30,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 10.50,
+    minBelanja: 500000,
+    capSeller: 175000,
+    badge: "XBP 10.5%",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "xbp_35_peak",
+    group: "xbp",
+    groupLabel: "🟣 [XBP] Co-Funded (Platform 65% : Seller 35%)",
+    label: "Diskon 35% Peak Day (Beban Seller 12.25%) · Min. Rp1.8jt",
+    diskonPembeli: 35,
+    platformPct: 65,
+    sellerPct: 35,
+    effectiveSellerPct: 12.25,
+    minBelanja: 1800000,
+    capSeller: 350000,
+    badge: "XBP 12.25% Peak",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    channel: "Peak Day TTS & Toko"
+  },
+
+  // ── 3. Co-Funded Voucher Reguler (Platform 40% : Penjual 60%) ──
+  {
+    id: "reg_10_60k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 10% (Beban Seller 6.00%) · Min. Belanja Rp60k (TTS Only)",
+    diskonPembeli: 10,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 6.00,
+    minBelanja: 60000,
+    capSeller: 600000,
+    badge: "Reguler 6.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS Only"
+  },
+  {
+    id: "reg_20_75k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 20% (Beban Seller 12.00%) · Min. Belanja Rp75k (TTS Only)",
+    diskonPembeli: 20,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 12.00,
+    minBelanja: 75000,
+    capSeller: 30000,
+    badge: "Reguler 12.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS Only"
+  },
+  {
+    id: "reg_20_100k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 20% (Beban Seller 12.00%) · Min. Belanja Rp100k (TTS & Toko)",
+    diskonPembeli: 20,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 12.00,
+    minBelanja: 100000,
+    capSeller: 60000,
+    badge: "Reguler 12.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "reg_20_130k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 20% (Beban Seller 12.00%) · Min. Belanja Rp130k (TTS & Toko)",
+    diskonPembeli: 20,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 12.00,
+    minBelanja: 130000,
+    capSeller: 150000,
+    badge: "Reguler 12.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "reg_25_300k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 25% (Beban Seller 15.00%) · Min. Belanja Rp300k (TTS & Toko)",
+    diskonPembeli: 25,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 15.00,
+    minBelanja: 300000,
+    capSeller: 180000,
+    badge: "Reguler 15.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "reg_30_500k",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 30% (Beban Seller 18.00%) · Min. Belanja Rp500k (TTS & Toko)",
+    diskonPembeli: 30,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 18.00,
+    minBelanja: 500000,
+    capSeller: 300000,
+    badge: "Reguler 18.0%",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "TTS & Toko"
+  },
+  {
+    id: "reg_35_peak",
+    group: "reg",
+    groupLabel: "🟠 Co-Funded Reguler (Platform 40% : Seller 60%)",
+    label: "Diskon 35% Peak Day (Beban Seller 21.00%) · Min. Rp1.8jt",
+    diskonPembeli: 35,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 21.00,
+    minBelanja: 1800000,
+    capSeller: 600000,
+    badge: "Reguler 21.0% Peak",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    channel: "Peak Day TTS & Toko"
+  },
+
+  // ── 4. Spesial Co-Funded Voucher (Platform 45% : Penjual 55%) ──
+  {
+    id: "sp_8_50k",
+    group: "sp",
+    groupLabel: "🟡 Spesial Co-Funded (Platform 45% : Seller 55%)",
+    label: "Always On 8% (Beban Seller 4.40%) · Min. Belanja Rp50k",
+    diskonPembeli: 8,
+    platformPct: 45,
+    sellerPct: 55,
+    effectiveSellerPct: 4.40,
+    minBelanja: 50000,
+    capSeller: 660000,
+    badge: "Spesial 4.4%",
+    badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    channel: "Always On"
+  },
+  {
+    id: "sp_20_150k",
+    group: "sp",
+    groupLabel: "🟡 Spesial Co-Funded (Platform 45% : Seller 55%)",
+    label: "Always On 20% (Beban Seller 11.00%) · Min. Belanja Rp150k",
+    diskonPembeli: 20,
+    platformPct: 45,
+    sellerPct: 55,
+    effectiveSellerPct: 11.00,
+    minBelanja: 150000,
+    capSeller: 440000,
+    badge: "Spesial 11.0%",
+    badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    channel: "Always On"
+  },
+  {
+    id: "sp_25_500k",
+    group: "sp",
+    groupLabel: "🟡 Spesial Co-Funded (Platform 45% : Seller 55%)",
+    label: "Jam Puncak 25% (Beban Seller 13.75%) · Min. Belanja Rp500k",
+    diskonPembeli: 25,
+    platformPct: 45,
+    sellerPct: 55,
+    effectiveSellerPct: 13.75,
+    minBelanja: 500000,
+    capSeller: 330000,
+    badge: "Jam Puncak 13.75%",
+    badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    channel: "Jam Puncak"
+  },
+  {
+    id: "sp_35_800k",
+    group: "sp",
+    groupLabel: "🟡 Spesial Co-Funded (Platform 45% : Seller 55%)",
+    label: "Hari Puncak 35% (Beban Seller 19.25%) · Min. Belanja Rp800k",
+    diskonPembeli: 35,
+    platformPct: 45,
+    sellerPct: 55,
+    effectiveSellerPct: 19.25,
+    minBelanja: 800000,
+    capSeller: 440000,
+    badge: "Hari Puncak 19.25%",
+    badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    channel: "Hari Puncak"
+  }
+];
+
 // ── DIREKTORI LENGKAP JENIS CAMPAIGN & PROMOSI TIKTOK SHOP ────
 const CAMPAIGN_TYPES = [
+  {
+    id: "growth_deal",
+    icon: "🌟",
+    nama: "Growth Xtra Special Deal Program",
+    kategori: "100% Platform Funded (Gratis)",
+    badge: "Bebas Biaya Seller",
+    badgeCls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    jadwal: "28/04/2026 - 30/04/2027 (TikTok Shop by Tokopedia)",
+    diskonMin: "Voucher platform hingga 25% didanai 100% oleh TikTok Shop (Seller: Rp0)",
+    manfaat: "Lencana campaign, banner di TikTok/Live/video pendek, voucher platform 100% didanai tanpa biaya sedikit pun dari seller.",
+    kriteria: "Seller terdaftar di program Growth Xtra (XBP), harga memenuhi L30D level T1.",
+    tipsCuan: "✅ Wajib didaftarkan! Beban biaya seller 0% dan conversion rate melonjak tinggi.",
+    color: "from-emerald-600 to-teal-700",
+  },
+  {
+    id: "voucher_boost",
+    icon: "🚀",
+    nama: "Voucher Boost - Gajian Sale & 11.11",
+    kategori: "Platform Funded (Gratis)",
+    badge: "Gratis Tanpa Biaya",
+    badgeCls: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
+    jadwal: "Gajian Sale (23-28/29 Okt) & 11.11 (2-12 Nov)",
+    diskonMin: "Voucher platform s/d 20% (Seller XBP) atau s/d 6% (Non-XBP)",
+    manfaat: "Exposure di Campaign Tab & H5 Main Page, lencana eksklusif, insentif voucher platform gratis.",
+    kriteria: "Semua seller toko buka, harga kompetitif ≤ L30D.",
+    tipsCuan: "✅ Daftarkan seluruh SKU produk aktif untuk menikmati traffic gratis tanpa potongan tambahan.",
+    color: "from-cyan-600 to-blue-700",
+  },
+  {
+    id: "xbp_co_funded",
+    icon: "🟣",
+    nama: "[XBP] Co-Funded Voucher (Platform 65% : Seller 35%)",
+    kategori: "Joint Campaign (Khusus Seller XBP)",
+    badge: "Paling Menguntungkan",
+    badgeCls: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    jadwal: "Gajian Sale (23-28 Okt) & Double Date 11.11 (2-12 Nov)",
+    diskonMin: "Diskon 10% - 35% (Seller hanya menanggung 35% dari nilai voucher!)",
+    manfaat: "Platform menanggung 65%! Beban seller hanya 3.5% (voucher 10%) s/d 7.0% (voucher 20%).",
+    kriteria: "Khusus seller yang terdaftar dalam program XBP / Growth Xtra.",
+    tipsCuan: "Paling direkomendasikan dibanding reguler karena platform menanggung porsi mayoritas (65%).",
+    color: "from-purple-600 to-pink-700",
+  },
+  {
+    id: "reg_co_funded",
+    icon: "🟠",
+    nama: "Co-Funded Voucher Reguler (Platform 40% : Seller 60%)",
+    kategori: "Joint Campaign (Seller Non-XBP)",
+    badge: "Perhatikan Margin!",
+    badgeCls: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    jadwal: "Gajian Sale (23-28 Okt) & Double Date 11.11 (2-12 Nov)",
+    diskonMin: "Diskon 10% - 35% (Seller menanggung 60% dari nilai voucher)",
+    manfaat: "Mendongkrak traffic saat event puncak dengan subsidi platform 40%.",
+    kriteria: "Seller terbuka untuk semua kategori dengan harga kompetitif ≤ L30D.",
+    tipsCuan: "⚠️ Beban seller 6% s/d 12%! Hanya ikuti jika margin kotor produk Anda di atas 25%.",
+    color: "from-orange-600 to-amber-700",
+  },
+  {
+    id: "sp_co_funded",
+    icon: "🟡",
+    nama: "Spesial Co-Funded Voucher (Platform 45% : Seller 55%)",
+    kategori: "Joint Campaign Spesial",
+    badge: "Pilihan Always On",
+    badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    jadwal: "Gajian Sale (23-28 Okt) & Double Date 11.11 (2-12 Nov)",
+    diskonMin: "Always On 8% (Seller 4.4%) & Always On 20% (Seller 11.0%)",
+    manfaat: "Voucher selalu aktif (Always On) sepanjang periode campaign berlangsung.",
+    kriteria: "Produk dengan harga kompetitif di semua platform.",
+    tipsCuan: "Gunakan Always On 8% (beban hanya 4.4%) untuk produk fast-moving agar tidak menguras laba.",
+    color: "from-amber-600 to-yellow-700",
+  },
   {
     id: "mega_sale",
     icon: "🔥",
@@ -401,6 +813,10 @@ export default function App() {
   const [diskonType, setDiskonType] = useState<"pct"|"nominal">("pct");
   const [diskonVal, setDiskonVal] = useState(10); // misal diskon 10%
 
+  // Simulasi Co-Funded Campaign Voucher (Gajian Sale & 11.11 2026)
+  const [selectedCoFunded, setSelectedCoFunded] = useState<string>("none");
+  const activeCoFundedTier = CO_FUNDED_TIERS.find(t => t.id === selectedCoFunded);
+
   const totalOps = ops.reduce((s,o)=>s+o.nominal,0);
 
   // Perhitungan Diskon Seller (mengurangi dasar perhitungan komisi)
@@ -412,6 +828,11 @@ export default function App() {
 
   // Harga setelah diskon seller (Dasar Perhitungan Komisi Platform & Dinamis)
   const hargaSetelahDiskon = Math.max(0, hargaJual - diskonSellerNominal);
+
+  // Subsidi Co-Funded Voucher yang ditanggung Seller (jika aktif)
+  const coFundedNom = activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0
+    ? Math.round(Math.min((activeCoFundedTier.effectiveSellerPct / 100) * hargaSetelahDiskon, activeCoFundedTier.capSeller))
+    : 0;
 
   // GMV Max discount on platform commission
   const gmvDisc = (platform==="tiktok" && active.gmv_max)
@@ -436,14 +857,14 @@ export default function App() {
 
   const totalPlatform = komisiNom + dinNom + prosesNom + pph22Nom + growthXtraNom + logistikNom + mallNom + ongkirNom + voucherNom + poNom + afilNom + gmvNom + topadNom + liveNom + cashNom;
   
-  // Jumlah Penyelesaian Pembayaran = yang masuk ke saldo TikTok/platform
-  const jumlahPenyelesaian = hargaSetelahDiskon - totalPlatform;
+  // Jumlah Penyelesaian Pembayaran = yang masuk ke saldo TikTok/platform (setelah fee platform & subsidi voucher seller)
+  const jumlahPenyelesaian = hargaSetelahDiskon - totalPlatform - coFundedNom;
 
-  // Keuntungan Bersih: Pembeli bayar (Harga Jual - Diskon Seller) - Potongan Platform - Modal Beli - Ops
+  // Keuntungan Bersih: Pembeli bayar (Harga Jual - Diskon Seller) - Potongan Platform - Subsidi Co-Funded - Modal Beli - Ops
   const cuan = jumlahPenyelesaian - hargaBeli - totalOps;
   const marginPct = hargaSetelahDiskon > 0 ? (cuan / hargaSetelahDiskon) * 100 : 0;
   const roiPct = (hargaBeli + totalOps) > 0 ? (cuan / (hargaBeli + totalOps)) * 100 : 0;
-  const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + totalOps) / hargaSetelahDiskon) * 100 : 0;
+  const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + coFundedNom + totalOps) / hargaSetelahDiskon) * 100 : 0;
 
   // Fungsi kalkulasi target harga jual
   function calcH(tm=0){
@@ -467,7 +888,10 @@ export default function App() {
       const tn = (active.topads && platform==="tokopedia") ? Math.round((3 / 100) * hClean) : 0;
       const lvn = (active.live_ads && platform==="tiktok") ? Math.round((liveAdsPct / 100) * hClean) : 0;
       const cn = active.cashback_bonus ? Math.round((2 / 100) * hClean) : 0;
-      const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + gn + tn + lvn + cn;
+      const cfn = activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0
+        ? Math.round(Math.min((activeCoFundedTier.effectiveSellerPct / 100) * hClean, activeCoFundedTier.capSeller))
+        : 0;
+      const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + gn + tn + lvn + cn + cfn;
       if(hClean > 0 && ((hClean - pot - base) / hClean) * 100 >= tm) {
         return Math.ceil(h / 100) * 100;
       }
@@ -498,6 +922,7 @@ export default function App() {
     {label:"TopAds Tokopedia (~3%)", nom:topadNom, show:active.topads && platform==="tokopedia"},
     {label:`LIVE Ads (~${liveAdsPct}%)`, nom:liveNom, show:active.live_ads && platform==="tiktok"},
     {label:"Biaya Layanan Cashback Bonus (~2%)", nom:cashNom, show:active.cashback_bonus},
+    {label:`Subsidi Co-Funded Voucher (${activeCoFundedTier?.badge || 'Event'})`, nom:coFundedNom, show:Boolean(coFundedNom > 0)},
   ].filter(d=>d.show);
 
   const [showAi, setShowAi] = useState(false);
@@ -806,6 +1231,87 @@ export default function App() {
                     <p className="text-[11px] text-pink-300/80 leading-relaxed">
                       💡 Komisi platform & dinamis resmi dihitung dari <strong>(Harga Jual - Diskon Seller)</strong>.
                     </p>
+                  </div>
+                )}
+              </div>
+
+              {/* FITUR KHUSUS: SIMULASI CAMPAIGN CO-FUNDED GAJIAN SALE & 11.11 2026 */}
+              <div className="pt-3 border-t border-gray-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                    <span>🤝</span> Skema Co-Funded Voucher (Gajian & 11.11)
+                  </span>
+                  {selectedCoFunded !== 'none' && (
+                    <button onClick={()=>setSelectedCoFunded('none')} className="text-[10px] text-gray-400 hover:text-white underline">
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                <select
+                  value={selectedCoFunded}
+                  onChange={e=>setSelectedCoFunded(e.target.value)}
+                  className="w-full bg-gray-800 border border-amber-600/70 rounded-xl px-3 py-2.5 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="none">-- Tidak Ikut Co-Funded (Normal / Mandiri) --</option>
+                  <optgroup label="🟢 Bebas Biaya (100% Subsidi Platform / 0% Beban Toko)">
+                    <option value="boost_free">Voucher Boost (Gratis 0% Beban Toko - Platform s/d 20%)</option>
+                    <option value="growth_deal_free">Growth Xtra Special Deal (100% Subsidi TikTok - 0% Toko)</option>
+                  </optgroup>
+                  <optgroup label="🟣 [XBP] Co-Funded (Platform 65% : Toko 35%)">
+                    <option value="xbp_10_60k">Disc 10% (Toko 3.50%) · Min Rp60k (TTS Only)</option>
+                    <option value="xbp_10_100k">Disc 10% (Toko 3.50%) · Min Rp100k (Toko Only)</option>
+                    <option value="xbp_20_75k">Disc 20% (Toko 7.00%) · Min Rp75k (TTS Only)</option>
+                    <option value="xbp_20_100k">Disc 20% (Toko 7.00%) · Min Rp100k (TTS & Toko)</option>
+                    <option value="xbp_20_130k">Disc 20% (Toko 7.00%) · Min Rp130k (TTS & Toko)</option>
+                    <option value="xbp_25_300k">Disc 25% (Toko 8.75%) · Min Rp300k (TTS & Toko)</option>
+                    <option value="xbp_30_500k">Disc 30% (Toko 10.50%) · Min Rp500k (TTS & Toko)</option>
+                    <option value="xbp_35_peak">Disc 35% Peak (Toko 12.25%) · Min Rp1.8jt (Peak Day)</option>
+                  </optgroup>
+                  <optgroup label="🟠 Co-Funded Reguler (Platform 40% : Toko 60%)">
+                    <option value="reg_10_60k">Disc 10% (Toko 6.00%) · Min Rp60k (TTS Only)</option>
+                    <option value="reg_20_75k">Disc 20% (Toko 12.00%) · Min Rp75k (TTS Only)</option>
+                    <option value="reg_20_100k">Disc 20% (Toko 12.00%) · Min Rp100k (TTS & Toko)</option>
+                    <option value="reg_20_130k">Disc 20% (Toko 12.00%) · Min Rp130k (TTS & Toko)</option>
+                    <option value="reg_25_300k">Disc 25% (Toko 15.00%) · Min Rp300k (TTS & Toko)</option>
+                    <option value="reg_30_500k">Disc 30% (Toko 18.00%) · Min Rp500k (TTS & Toko)</option>
+                    <option value="reg_35_peak">Disc 35% Peak (Toko 21.00%) · Min Rp1.8jt (Peak Day)</option>
+                  </optgroup>
+                  <optgroup label="🟡 Spesial Co-Funded (Platform 45% : Toko 55%)">
+                    <option value="sp_8_50k">Always On 8% (Toko 4.40%) · Min Rp50k</option>
+                    <option value="sp_20_150k">Always On 20% (Toko 11.00%) · Min Rp150k</option>
+                    <option value="sp_25_500k">Jam Puncak 25% (Toko 13.75%) · Min Rp500k</option>
+                    <option value="sp_35_800k">Hari Puncak 35% (Toko 19.25%) · Min Rp800k</option>
+                  </optgroup>
+                </select>
+
+                {activeCoFundedTier && (
+                  <div className="mt-2.5 bg-gray-800/90 border border-amber-600/40 rounded-xl p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-300">Proporsi Patungan:</span>
+                      <span className="font-extrabold text-amber-300">
+                        Platform {activeCoFundedTier.platformPct}% : Toko {activeCoFundedTier.sellerPct}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-300">Beban Subsidi Toko:</span>
+                      <span className="font-extrabold text-red-400">
+                        {activeCoFundedTier.effectiveSellerPct > 0 ? `-${activeCoFundedTier.effectiveSellerPct}% (${formatRp(coFundedNom)})` : 'Rp0 (100% Platform)'}
+                      </span>
+                    </div>
+                    {activeCoFundedTier.minBelanja > 0 && (
+                      <div className="pt-2 border-t border-gray-700/60">
+                        {hargaSetelahDiskon >= activeCoFundedTier.minBelanja ? (
+                          <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                            <span>✅</span> Harga satuan memenuhi syarat Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}).
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-amber-300/90 leading-tight">
+                            ⚠️ Harga satuan ({formatRp(hargaSetelahDiskon)}) &lt; Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}). Voucher aktif jika pembeli beli minimal <strong>{Math.ceil(activeCoFundedTier.minBelanja / (hargaSetelahDiskon || 1))} pcs</strong>.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
