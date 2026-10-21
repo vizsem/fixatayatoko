@@ -164,6 +164,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         stockByWarehouse,
         minStock: Number(raw.minStock ?? raw.Min_Stok ?? 5),
         priceEcer,
+        priceSemiGrosir: Number(raw.priceSemiGrosir ?? raw.wholesaleSemiPrice ?? raw.Harga_Semi_Grosir ?? 0),
         priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? priceEcer),
         unit: p.unit || raw.unit || raw.Satuan || 'pcs',
         units: Array.isArray(raw.units) && raw.units.length > 0
@@ -214,6 +215,8 @@ export async function getProductById(id: string) {
       description: p.description || raw.description || null,
       costPrice: Number(p.cost_price ?? raw.costPrice ?? raw.Modal ?? 0),
       sellPrice: Number(p.price ?? raw.sellPrice ?? raw.Ecer ?? 0),
+      priceSemiGrosir: Number(raw.priceSemiGrosir ?? raw.wholesaleSemiPrice ?? raw.Harga_Semi_Grosir ?? 0),
+      priceGrosir: Number(raw.wholesalePrice ?? raw.Harga_Grosir ?? (p.price ?? raw.sellPrice ?? raw.Ecer ?? 0)),
       unit: p.unit || raw.unit || 'pcs',
       stock,
       category: { id: p.category || raw.category || 'Umum', name: p.category || raw.category || 'Umum' },
@@ -232,6 +235,8 @@ export async function createProduct(data: {
   supplierId?: string
   costPrice: number
   sellPrice: number
+  priceSemiGrosir?: number
+  priceGrosir?: number
   unit: string
 }) {
   await requireAdmin();
@@ -246,6 +251,11 @@ export async function createProduct(data: {
       supplierId: data.supplierId || null,
       costPrice: data.costPrice,
       price: data.sellPrice,
+      priceEcer: data.sellPrice,
+      priceSemiGrosir: data.priceSemiGrosir || 0,
+      Harga_Semi_Grosir: data.priceSemiGrosir || 0,
+      priceGrosir: data.priceGrosir || 0,
+      wholesalePrice: data.priceGrosir || 0,
       unit: data.unit,
       stock: 0,
       createdAt: now,
@@ -403,6 +413,8 @@ export async function updateProduct(id: string, data: {
   supplierId?: string
   costPrice?: number
   sellPrice?: number
+  priceSemiGrosir?: number
+  priceGrosir?: number
   unit?: string
 }) {
   await requireAdmin();
@@ -420,6 +432,8 @@ export async function updateProduct(id: string, data: {
       ...(data.supplierId ? { supplierId: data.supplierId } : {}),
       ...(data.costPrice !== undefined ? { costPrice: data.costPrice, Modal: data.costPrice, purchasePrice: data.costPrice } : {}),
       ...(data.sellPrice !== undefined ? { price: data.sellPrice, Ecer: data.sellPrice, priceEcer: data.sellPrice } : {}),
+      ...(data.priceSemiGrosir !== undefined ? { priceSemiGrosir: data.priceSemiGrosir, Harga_Semi_Grosir: data.priceSemiGrosir } : {}),
+      ...(data.priceGrosir !== undefined ? { priceGrosir: data.priceGrosir, wholesalePrice: data.priceGrosir, Grosir: data.priceGrosir } : {}),
       ...(data.unit ? { unit: data.unit, Satuan: data.unit } : {}),
       updatedAt: now,
     };
@@ -569,6 +583,8 @@ export async function addProductFull(payload: {
   Modal: number;
   Ecer: number;
   Harga_Coret?: number;
+  Harga_Semi_Grosir?: number;
+  priceSemiGrosir?: number;
   Grosir?: number;
   Min_Grosir?: number;
   // Satuan multi-unit & penjualan
@@ -645,6 +661,8 @@ export async function addProductFull(payload: {
       price: Number(payload.Ecer || 0),
       priceEcer: Number(payload.Ecer || 0),
       Harga_Coret: Number(payload.Harga_Coret || 0),
+      Harga_Semi_Grosir: Number(payload.Harga_Semi_Grosir || payload.priceSemiGrosir || 0),
+      priceSemiGrosir: Number(payload.priceSemiGrosir || payload.Harga_Semi_Grosir || 0),
       Grosir: Number(payload.Grosir || 0),
       wholesalePrice: Number(payload.Grosir || 0),
       priceGrosir: Number(payload.Grosir || 0),
@@ -1117,6 +1135,7 @@ export async function updateProductPrice(payload: {
   productId: string;
   newCost: number;
   newPrice: number;
+  newSemiGrosir?: number;
   newGrosir: number;
   newMinGrosir: number;
   units?: Array<{ code: string; contains: number; price?: number; minQty?: number; label?: string }>;
@@ -1124,7 +1143,7 @@ export async function updateProductPrice(payload: {
 }): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
   try {
-    const { productId, newCost, newPrice, newGrosir, newMinGrosir, units, isHppLocked } = payload;
+    const { productId, newCost, newPrice, newSemiGrosir, newGrosir, newMinGrosir, units, isHppLocked } = payload;
 
     // Ambil raw_data saat ini untuk di-merge (jangan overwrite field lain)
     const { data: currentProd, error: fetchErr } = await supabaseAdmin
@@ -1155,7 +1174,7 @@ export async function updateProductPrice(payload: {
     const costChanged = Number(currentProd?.cost_price || 0) !== newCost;
     const shouldLock = isHppLocked !== undefined ? isHppLocked : (costChanged ? true : Boolean(existingRaw.isHppLocked));
 
-    const updatedRaw = {
+    const updatedRaw: Record<string, any> = {
       ...existingRaw,
       Modal: newCost,
       purchasePrice: newCost,
@@ -1172,6 +1191,11 @@ export async function updateProductPrice(payload: {
       customHppUpdatedAt: shouldLock ? now : existingRaw.customHppUpdatedAt,
       updatedAt: now,
     };
+
+    if (newSemiGrosir !== undefined) {
+      updatedRaw.priceSemiGrosir = newSemiGrosir;
+      updatedRaw.Harga_Semi_Grosir = newSemiGrosir;
+    }
 
     if (cleanedUnits.length > 0) {
       updatedRaw.units = cleanedUnits;

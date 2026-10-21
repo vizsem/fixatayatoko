@@ -18,6 +18,7 @@ import { getUserAndRole } from '@/lib/supabase-helpers';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
 import type { PricingStrategy } from '@/lib/normalize';
+import { calculateCustomerTierPrices } from '@/lib/customer-pricing';
 import {
   updateProductPrice,
   getAllProductsAvgHpp,
@@ -46,12 +47,13 @@ interface ProductItem {
   category: string;
   unit: string;
   units: ProductUnitItem[];
-    pricingStrategy?: PricingStrategy;
+  pricingStrategy?: PricingStrategy;
   isHppLocked: boolean;
   customHpp?: number;
   stock: number;
   costPrice: number;
   priceEcer: number;
+  priceSemiGrosir: number;
   priceGrosir: number;
   minGrosir: number;
   isActive: boolean;
@@ -118,6 +120,7 @@ export default function PricingHPPPage() {
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [editModalCost, setEditModalCost] = useState<number>(0);
   const [editPriceEcer, setEditPriceEcer] = useState<number>(0);
+  const [editPriceSemiGrosir, setEditPriceSemiGrosir] = useState<number>(0);
   const [editPriceGrosir, setEditPriceGrosir] = useState<number>(0);
   const [editMinGrosir, setEditMinGrosir] = useState<number>(1);
   const [editUnits, setEditUnits] = useState<ProductUnitItem[]>([]);
@@ -225,6 +228,7 @@ export default function PricingHPPPage() {
           stock: stk,
           costPrice: cost,
           priceEcer: ecer,
+          priceSemiGrosir: Number(raw.priceSemiGrosir ?? raw.wholesaleSemiPrice ?? raw.Harga_Semi_Grosir ?? 0),
           priceGrosir: grosir,
           minGrosir: minG,
           isActive: p.is_active !== false,
@@ -662,6 +666,7 @@ export default function PricingHPPPage() {
     setEditingProduct(p);
     setEditModalCost(p.costPrice);
     setEditPriceEcer(p.priceEcer);
+    setEditPriceSemiGrosir(p.priceSemiGrosir || 0);
     setEditPriceGrosir(p.priceGrosir);
     setEditMinGrosir(p.minGrosir);
     setEditIsHppLocked(Boolean(p.isHppLocked));
@@ -688,6 +693,7 @@ export default function PricingHPPPage() {
       const newCost = Number(editModalCost || 0);
       const oldPrice = editingProduct.priceEcer;
       const newPrice = Number(editPriceEcer || 0);
+      const newSemiGrosir = Number(editPriceSemiGrosir || 0);
       const newGrosir = Number(editPriceGrosir || 0);
       const newMinGrosir = Number(editMinGrosir || 1);
 
@@ -703,6 +709,7 @@ export default function PricingHPPPage() {
         productId: editingProduct.id,
         newCost,
         newPrice,
+        newSemiGrosir,
         newGrosir,
         newMinGrosir,
         units: syncedUnits,
@@ -1840,31 +1847,91 @@ export default function PricingHPPPage() {
               </div>
             </div>
 
-            {/* HARGA GROSIR (OPSIONAL) */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400">Harga Grosir (Opsional)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">Rp</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editPriceGrosir}
-                    onChange={e => setEditPriceGrosir(Number(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
+            {/* TIER HARGA PELANGGAN (SEMI-GROSIR & GROSIR) */}
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                    <Tag size={13} className="text-purple-600" />
+                    Tier Harga Pelanggan (Anti-Boncos)
+                  </h4>
+                  <p className="text-[10px] text-slate-400">Harga khusus untuk pelanggan Semi-Grosir (Warung) dan Grosir (Partai)</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tiers = calculateCustomerTierPrices({
+                      costPrice: editModalCost,
+                      priceEcer: editPriceEcer,
+                    });
+                    setEditPriceSemiGrosir(tiers.priceSemiGrosir);
+                    setEditPriceGrosir(tiers.priceGrosir);
+                    notify.success('Tier harga dihitung otomatis dari HPP & Ecer!');
+                  }}
+                  className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-[11px] font-black border border-purple-200 transition-all flex items-center gap-1"
+                >
+                  <Sparkles size={12} /> Hitung Tier Otomatis
+                </button>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400">Min. Qty Grosir ({editingProduct.unit})</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={editMinGrosir}
-                  onChange={e => setEditMinGrosir(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Semi-Grosir */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase text-emerald-700">Semi-Grosir (Warung)</label>
+                    {editModalCost > 0 && editPriceSemiGrosir > 0 && (
+                      <span className="text-[10px] font-black text-emerald-600">
+                        +{(((editPriceSemiGrosir - editModalCost) / editModalCost) * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-emerald-600 text-xs">Rp</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editPriceSemiGrosir}
+                      onChange={e => setEditPriceSemiGrosir(Number(e.target.value))}
+                      placeholder="Diskon warung"
+                      className="w-full pl-9 pr-3 py-2 bg-emerald-50/60 border border-emerald-200 rounded-2xl font-black text-xs text-emerald-950 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Grosir */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase text-purple-700">Grosir (Agen/Partai)</label>
+                    {editModalCost > 0 && editPriceGrosir > 0 && (
+                      <span className="text-[10px] font-black text-purple-600">
+                        +{(((editPriceGrosir - editModalCost) / editModalCost) * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-purple-600 text-xs">Rp</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editPriceGrosir}
+                      onChange={e => setEditPriceGrosir(Number(e.target.value))}
+                      placeholder="Harga partai"
+                      className="w-full pl-9 pr-3 py-2 bg-purple-50/60 border border-purple-200 rounded-2xl font-black text-xs text-purple-950 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Min Qty Grosir */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black uppercase text-slate-500">Min Qty Grosir ({editingProduct.unit})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editMinGrosir}
+                    onChange={e => setEditMinGrosir(Number(e.target.value))}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
 

@@ -19,6 +19,7 @@ import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
+import { calculateCustomerTierPrices } from '@/lib/customer-pricing';
 
 function UnitModalCalculator({
   contains,
@@ -103,6 +104,7 @@ export default function AddProductPage() {
     Modal: 0,
     Ecer: 0,
     Harga_Coret: 0,
+    Harga_Semi_Grosir: 0,
     Grosir: 0,
     Min_Grosir: 1,
     Link_Foto: '',
@@ -953,12 +955,105 @@ export default function AddProductPage() {
                 )}
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Ecer (Jual)</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-black uppercase text-blue-700 ml-2">Harga Ecer (Retail)</label>
+                  {Number(formData.Modal || 0) > 0 && Number(formData.Ecer || 0) > 0 && (
+                    <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-md">
+                      +{(((Number(formData.Ecer) - Number(formData.Modal)) / Number(formData.Modal)) * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
                 <input required type="number" disabled={pricingMode === 'RECOMMENDED'} className="w-full p-4 bg-blue-50 rounded-2xl border-none font-black text-blue-700 focus:ring-2 focus:ring-blue-600 disabled:opacity-70" value={formData.Ecer} onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-gray-400 ml-2">Harga Coret</label>
                 <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-black text-gray-300 line-through" value={formData.Harga_Coret} onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} />
+              </div>
+            </div>
+
+            {/* TIER HARGA PELANGGAN (SEMI-GROSIR & GROSIR) */}
+            <div className="p-4 bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-emerald-50/70 rounded-2xl border border-purple-100 mb-6 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-purple-900 tracking-wider flex items-center gap-1.5">
+                    <Tag size={14} className="text-purple-600" />
+                    Tier Harga Pelanggan (Anti-Boncos)
+                  </h4>
+                  <p className="text-[11px] text-gray-500">Harga khusus untuk jenis pelanggan Semi-Grosir (Warung) dan Grosir (Partai)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tiers = calculateCustomerTierPrices({
+                      costPrice: Number(formData.Modal || 0),
+                      priceEcer: Number(formData.Ecer || 0),
+                    });
+                    setFormData(prev => ({
+                      ...prev,
+                      Harga_Semi_Grosir: tiers.priceSemiGrosir,
+                      Grosir: tiers.priceGrosir,
+                    }));
+                    notify.admin.success('Tier Semi-Grosir & Grosir dihitung proporsional dari HPP!');
+                  }}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0"
+                >
+                  <Sparkles size={13} /> Hitung Tier Otomatis
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                {/* Semi-Grosir */}
+                <div className="space-y-1 bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase text-emerald-800">Semi-Grosir (Warung)</label>
+                    {Number(formData.Modal || 0) > 0 && Number(formData.Harga_Semi_Grosir || 0) > 0 && (
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                        +{(((Number(formData.Harga_Semi_Grosir) - Number(formData.Modal)) / Number(formData.Modal)) * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.Harga_Semi_Grosir}
+                    onChange={e => setFormData({ ...formData, Harga_Semi_Grosir: Number(e.target.value) })}
+                    placeholder="Contoh: 14000"
+                    className="w-full p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-200 font-black text-xs text-emerald-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <p className="text-[10px] text-gray-400">Untuk pelanggan warung kelontong / reseller</p>
+                </div>
+
+                {/* Grosir */}
+                <div className="space-y-1 bg-white p-3 rounded-xl border border-purple-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase text-purple-800">Grosir (Agen/Partai)</label>
+                    {Number(formData.Modal || 0) > 0 && Number(formData.Grosir || 0) > 0 && (
+                      <span className="text-[10px] font-black text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">
+                        +{(((Number(formData.Grosir) - Number(formData.Modal)) / Number(formData.Modal)) * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.Grosir}
+                    onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })}
+                    placeholder="Contoh: 13000"
+                    className="w-full p-2.5 bg-purple-50/50 rounded-xl border border-purple-200 font-black text-xs text-purple-900 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                  <p className="text-[10px] text-gray-400">Untuk pelanggan agen / toko partai besar</p>
+                </div>
+
+                {/* Min Qty Grosir */}
+                <div className="space-y-1 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <label className="text-xs font-black uppercase text-slate-700">Min. Qty Grosir ({baseUnitCode})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.Min_Grosir}
+                    onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })}
+                    className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 font-black text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                  <p className="text-[10px] text-gray-400">Minimal beli eceran agar dapat harga grosir</p>
+                </div>
               </div>
             </div>
 

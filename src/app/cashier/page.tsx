@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
 import { simpanTransaksiKasir } from '@/lib/actions/cashier.actions';
+import { resolveCustomerUnitPrice } from '@/lib/customer-pricing';
 import { enqueueOfflineTx, getOfflineQueue, syncOfflineQueue, removeOfflineTx } from '@/lib/offlineQueue';
 import type { OfflineTx } from '@/lib/offlineQueue';
 import { printToThermal, generateESCReceipt } from '@/lib/printer';
@@ -55,6 +56,9 @@ type Product = {
   stockByWarehouse?: Record<string, number>;
   Kategori?: string;
   kategori?: string;
+  // Customer tier prices
+  priceSemiGrosir?: number;
+  priceGrosir?: number;
   channelPricing?: ChannelPricing | {
     offline?: { price?: number };
     website?: { price?: number };
@@ -73,6 +77,7 @@ type CartItem = {
   unit: string; // unit code (PCS/BOX/CTN)
   contains?: number; // how many pcs per chosen unit
   channel?: ChannelKey; // Add channel to CartItem
+  appliedTier?: 'Retail' | 'Semi-Grosir' | 'Grosir'; // Customer tier applied
 };
 
 type Order = {
@@ -157,10 +162,10 @@ export default function CashierPOS() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('auto');
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
 
-  // State untuk Wallet
-  const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number} | null>(null);
+  // State untuk Wallet & Customer Tier
+  const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number, customerType?: string} | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
-  const [customerResults, setCustomerResults] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number}>>([]);
+  const [customerResults, setCustomerResults] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number, customerType?: string}>>([]);
 
   // Shift States
   const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
@@ -245,6 +250,18 @@ export default function CashierPOS() {
       unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
     }
 
+    // Apply customer tier pricing if customer is selected
+    const customerType = selectedCustomer?.customerType;
+    const tierResult = resolveCustomerUnitPrice({
+      baseEcer: product.price,
+      priceSemiGrosir: product.priceSemiGrosir,
+      priceGrosir: product.priceGrosir,
+      customerType,
+      contains,
+      unitPriceOverride: unitPrice,
+    });
+    const effectiveUnitPrice = tierResult.effectivePrice;
+
     const unitCost = product.cost * contains;
     const unitOriginalPrice = product.price * contains;
 
@@ -266,16 +283,17 @@ export default function CashierPOS() {
       return [...prev, { 
         id: product.id, 
         name: product.name, 
-        price: unitPrice, 
+        price: effectiveUnitPrice, 
         originalPrice: unitOriginalPrice,
         cost: unitCost,
         quantity: 1, 
         unit: code, 
         contains, 
-        channel 
+        channel,
+        appliedTier: tierResult.appliedTier,
       }];
     });
-  }, [transactionType, getChannelKey]);
+  }, [transactionType, getChannelKey, selectedCustomer]);
 
   const addToCart = useCallback((product: Product) => {
     if (product.stock <= 0) return toast.error("Stok habis!");
@@ -304,6 +322,17 @@ export default function CashierPOS() {
        priceToUse = (product.channelPricing as ChannelPricing)['website']![baseCode].price!;
     }
 
+    // Apply customer tier pricing if customer is selected
+    const customerType = selectedCustomer?.customerType;
+    const tierResult = resolveCustomerUnitPrice({
+      baseEcer: product.price,
+      priceSemiGrosir: product.priceSemiGrosir,
+      priceGrosir: product.priceGrosir,
+      customerType,
+      contains: containsBase,
+      unitPriceOverride: priceToUse,
+    });
+
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === baseCode);
       
@@ -319,16 +348,17 @@ export default function CashierPOS() {
       return [...prev, { 
         id: product.id, 
         name: product.name, 
-        price: priceToUse, 
+        price: tierResult.effectivePrice, 
         originalPrice: product.price,
         cost: product.cost,
         quantity: 1, 
         unit: baseCode, 
         contains: containsBase, 
-        channel 
+        channel,
+        appliedTier: tierResult.appliedTier,
       }];
     });
-  }, [transactionType, getChannelKey, addToCartWithUnit]);
+  }, [transactionType, getChannelKey, addToCartWithUnit, selectedCustomer]);
 
   const handleScan = useCallback(async (code: string) => {
     try {
@@ -520,6 +550,7 @@ export default function CashierPOS() {
             name: raw.name || 'Tanpa Nama',
             phone: raw.phone || '',
             walletBalance: Number(raw.walletBalance || raw.wallet_balance || 0),
+            customerType: raw.customerType || raw.type || raw.tipe || 'Retail',
           };
         });
         setCustomerResults(results);
@@ -818,7 +849,9 @@ export default function CashierPOS() {
             Kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
             kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
             stockByWarehouse: raw.stockByWarehouse || {},
-            channelPricing: raw.channelPricing
+            channelPricing: raw.channelPricing,
+            priceSemiGrosir: Number(raw.priceSemiGrosir || 0) || undefined,
+            priceGrosir: Number(raw.priceGrosir || 0) || undefined,
           });
         }
 
@@ -2063,9 +2096,16 @@ export default function CashierPOS() {
                     <div className="flex justify-between items-start">
                     <div className="flex flex-col">
                         <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
-                        <span className="text-xs font-medium text-gray-400">
-                          {item.unit}{item.contains && item.contains > 1 ? ` · Isi ${item.contains}` : ''}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-gray-400">
+                            {item.unit}{item.contains && item.contains > 1 ? ` · Isi ${item.contains}` : ''}
+                          </span>
+                          {item.appliedTier && item.appliedTier !== 'Retail' && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                              item.appliedTier === 'Grosir' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
+                            }`}>{item.appliedTier}</span>
+                          )}
+                        </div>
                       </div>
                       {editingPriceId === item.id ? (
                         <input
@@ -2231,22 +2271,29 @@ export default function CashierPOS() {
                           <div
                             key={c.id}
                             onClick={() => {
-                              setSelectedCustomer({id: c.id, name: c.name, walletBalance: c.walletBalance || 0});
+                              setSelectedCustomer({id: c.id, name: c.name, walletBalance: c.walletBalance || 0, customerType: c.customerType});
                               setCustomerSearch(c.name);
                               setCustomerResults([]);
                             }}
                             className="p-3 hover:bg-gray-100 cursor-pointer text-xs"
                           >
                             <p className="font-bold">{c.name}</p>
-                            <p className="text-gray-500">{c.phone} - Saldo: Rp{(c.walletBalance || 0).toLocaleString()}</p>
+                            <p className="text-gray-500">{c.phone} - Saldo: Rp{(c.walletBalance || 0).toLocaleString()} · {c.customerType || 'Retail'}</p>
                           </div>
                         ))}
                       </div>
                     )}
                     {selectedCustomer && (
-                      <div className="mt-2 p-3 bg-blue-100 border border-blue-200 rounded-lg text-center">
-                        <p className="text-xs font-bold text-blue-800">{selectedCustomer.name}</p>
-                        <p className="text-lg font-black text-blue-800">Rp{selectedCustomer.walletBalance.toLocaleString()}</p>
+                      <div className="mt-2 p-3 bg-blue-100 border border-blue-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-blue-800">{selectedCustomer.name}</p>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            selectedCustomer.customerType === 'Grosir' ? 'bg-purple-200 text-purple-800' :
+                            selectedCustomer.customerType === 'Semi-Grosir' ? 'bg-amber-200 text-amber-800' :
+                            'bg-emerald-200 text-emerald-800'
+                          }`}>{selectedCustomer.customerType || 'Retail'}</span>
+                        </div>
+                        <p className="text-lg font-black text-blue-800 mt-1">Rp{selectedCustomer.walletBalance.toLocaleString()}</p>
                       </div>
                     )}
                   </div>
