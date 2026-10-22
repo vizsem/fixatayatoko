@@ -178,7 +178,7 @@ const ALL_PROGRAMS = [
 // ── OPSI SKEMA CO-FUNDED VOUCHER TIKTOK SHOP & TOKOPEDIA (Update Gajian & 11.11 2026) ──
 interface CoFundedTier {
   id: string;
-  group: 'free' | 'xbp' | 'reg' | 'sp';
+  group: 'free' | 'xbp' | 'reg' | 'sp' | 'live_fest';
   groupLabel: string;
   label: string;
   diskonPembeli: number;
@@ -514,11 +514,147 @@ const CO_FUNDED_TIERS: CoFundedTier[] = [
     badge: "Hari Puncak 19.25%",
     badgeCls: "bg-amber-500/20 text-amber-300 border-amber-500/40",
     channel: "Hari Puncak"
+  },
+
+  // ── 5. ID 2026 LIVE Festival Q3 2026 (Subsidi Platform 40% - 90%) ──
+  {
+    id: "live_50_peak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 90% : Toko 10%)",
+    label: "Diskon 50% Peak (Toko 5.00% · Cap Rp1rb) · Min. Belanja Rp10k",
+    diskonPembeli: 50,
+    platformPct: 90,
+    sellerPct: 10,
+    effectiveSellerPct: 5.00,
+    minBelanja: 10000,
+    capSeller: 1000,
+    badge: "LIVE Fest 50% (Toko 10%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Peak (11 am & 6 pm)"
+  },
+  {
+    id: "live_25_peak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 80% : Toko 20%)",
+    label: "Diskon 25% Peak (Toko 5.00% · Cap Rp75rb) · Min. Belanja Rp1.5jt",
+    diskonPembeli: 25,
+    platformPct: 80,
+    sellerPct: 20,
+    effectiveSellerPct: 5.00,
+    minBelanja: 1500000,
+    capSeller: 75000,
+    badge: "LIVE Fest 25% (Toko 20%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Peak (11 am & 6 pm)"
+  },
+  {
+    id: "live_22_peak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 77% : Toko 23%)",
+    label: "Diskon 22% Peak (Toko 5.06% · Cap Rp92rb) · Min. Belanja Rp500k",
+    diskonPembeli: 22,
+    platformPct: 77,
+    sellerPct: 23,
+    effectiveSellerPct: 5.06,
+    minBelanja: 500000,
+    capSeller: 92000,
+    badge: "LIVE Fest 22% (Toko 23%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Peak (11 am & 6 pm)"
+  },
+  {
+    id: "live_20_peak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 75% : Toko 25%)",
+    label: "Diskon 20% Peak (Toko 5.00% · Cap Rp75rb) · Min. Belanja Rp300k",
+    diskonPembeli: 20,
+    platformPct: 75,
+    sellerPct: 25,
+    effectiveSellerPct: 5.00,
+    minBelanja: 300000,
+    capSeller: 75000,
+    badge: "LIVE Fest 20% (Toko 25%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Peak (11 am & 6 pm)"
+  },
+  {
+    id: "live_17_peak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 71% : Toko 29%)",
+    label: "Diskon 17% Peak (Toko 4.93% · Cap Rp58rb) · Min. Belanja Rp200k",
+    diskonPembeli: 17,
+    platformPct: 71,
+    sellerPct: 29,
+    effectiveSellerPct: 4.93,
+    minBelanja: 200000,
+    capSeller: 58000,
+    badge: "LIVE Fest 17% (Toko 29%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Peak (11 am & 6 pm)"
+  },
+  {
+    id: "live_15_nonpeak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 70% : Toko 30%)",
+    label: "Diskon 15% Non-Peak (Toko 4.50% · Cap Rp45rb) · Min. Belanja Rp150k",
+    diskonPembeli: 15,
+    platformPct: 70,
+    sellerPct: 30,
+    effectiveSellerPct: 4.50,
+    minBelanja: 150000,
+    capSeller: 45000,
+    badge: "LIVE Fest 15% (Toko 30%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Non-Peak"
+  },
+  {
+    id: "live_11_nonpeak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 64% : Toko 36%)",
+    label: "Diskon 11% Non-Peak (Toko 3.96% · Cap Rp36rb) · Min. Belanja Rp100k",
+    diskonPembeli: 11,
+    platformPct: 64,
+    sellerPct: 36,
+    effectiveSellerPct: 3.96,
+    minBelanja: 100000,
+    capSeller: 36000,
+    badge: "LIVE Fest 11% (Toko 36%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Non-Peak"
+  },
+  {
+    id: "live_5_nonpeak",
+    group: "live_fest",
+    groupLabel: "🎙️ LIVE Festival Q3 2026 (Platform 40% : Toko 60%)",
+    label: "Diskon 5% Non-Peak (Toko 3.00% · Cap Rp1.2jt) · Min. Belanja Rp50k",
+    diskonPembeli: 5,
+    platformPct: 40,
+    sellerPct: 60,
+    effectiveSellerPct: 3.00,
+    minBelanja: 50000,
+    capSeller: 1200000,
+    badge: "LIVE Fest 5% (Toko 60%)",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    channel: "LIVE Festival Non-Peak"
   }
 ];
 
 // ── DIREKTORI LENGKAP JENIS CAMPAIGN & PROMOSI TIKTOK SHOP ────
 const CAMPAIGN_TYPES = [
+  {
+    id: "live_fest_q3",
+    icon: "🎙️",
+    nama: "ID 2026 TikTok Shop | LIVE Festival Q3 2026",
+    kategori: "Joint Campaign [Co-funded Voucher] TikTok Shop LIVE",
+    badge: "Subsidi s/d 90%",
+    badgeCls: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+    jadwal: "14/07/2026 - 31/12/2026 (Aktif Setiap Selasa: 14, 21, 28 Jul, 11, 18 Ags, 15, 22, 29 Sep)",
+    diskonMin: "Diskon 5% s/d 50% (Peak Hour 11.00 & 18.00 w/ subsidi TikTok hingga 90%)",
+    manfaat: "Traffic masif penonton LIVE, voucher subsidi platform hingga 90% (diskon 50% beban seller hanya 10% maks Rp1.000), mendorong checkout spontan.",
+    kriteria: "TikTok Shop by Tokopedia saja. Harga produk harus kompetitif dan lebih rendah dari harga 14 hari terakhir (≤ L14D).",
+    tipsCuan: "🔥 Wajib ikuti tier Diskon 50% (Peak Hour)! Beban toko hanya 10% (maks Rp1.000) tapi diskon pembeli 50%, pembeli langsung borong saat LIVE!",
+    color: "from-rose-600 to-red-700",
+  },
   {
     id: "growth_deal",
     icon: "🌟",
@@ -777,9 +913,13 @@ export default function App() {
   const [showKat, setShowKat] = useState(false);
   const [hargaBeli, setHargaBeli] = useState(2900);
   const [hargaJual, setHargaJual] = useState(5000);
+  const [qty, setQty] = useState(1); // Jumlah quantity produk yang dihitung
+  const [opsPerPesanan, setOpsPerPesanan] = useState(true); // true = 1 paket per pesanan (hemat), false = per pcs
+  const [customTargetMargin, setCustomTargetMargin] = useState<number>(15); // Target margin custom (%)
   const [ops, setOps] = useState(INIT_OPS);
   const [mainTab, setMainTab] = useState("kalkulator");
   const [strTab, setStrTab] = useState("campaign_guide");
+  const [matrixFilter, setMatrixFilter] = useState<string>("all");
 
   // Program toggles
   const [active, setActive] = useState({
@@ -804,7 +944,7 @@ export default function App() {
   const [dinamisCap, setDinamisCap] = useState(60000); // Rp60.000 terbaru vs Rp40.000
   const [growthXtraPct, setGrowthXtraPct] = useState(3.5); // 3.5% sesuai settlement
   const [biayaLogistikNom, setBiayaLogistikNom] = useState(1000);
-  const [afiliasiPct, setAfiliasiPct] = useState(5);
+  const [afiliasiPct, setAfiliasiPct] = useState(1); // Default komisi afiliasi 1% (populer untuk sembako/FMCG)
   const [gmvPct, setGmvPct] = useState(3);
   const [liveAdsPct, setLiveAdsPct] = useState(3);
 
@@ -817,22 +957,54 @@ export default function App() {
   const [selectedCoFunded, setSelectedCoFunded] = useState<string>("none");
   const activeCoFundedTier = CO_FUNDED_TIERS.find(t => t.id === selectedCoFunded);
 
-  const totalOps = ops.reduce((s,o)=>s+o.nominal,0);
+  // Simulasi Voucher Tambahan Platform (0% - 25%, misal Voucher Toko/Live TikTok)
+  const [voucherPlatformPct, setVoucherPlatformPct] = useState<number>(0);
 
-  // Perhitungan Diskon Seller (mengurangi dasar perhitungan komisi)
+  const totalOps = ops.reduce((s,o)=>s+o.nominal,0);
+  const totalOpsEffective = opsPerPesanan ? totalOps : totalOps * qty;
+
+  const subtotalKatalog = hargaJual * qty;
+  const subtotalHPP = hargaBeli * qty;
+
+  // Perhitungan Diskon Seller (mengurangi dasar perhitungan komisi platform)
   const diskonSellerNominal = !ikutPromo
     ? 0
     : diskonType === "pct"
-      ? (diskonVal / 100) * hargaJual
-      : Math.min(diskonVal, hargaJual);
+      ? Math.round(((diskonVal / 100) * hargaJual) * qty)
+      : Math.min(diskonVal * qty, subtotalKatalog);
 
   // Harga setelah diskon seller (Dasar Perhitungan Komisi Platform & Dinamis)
-  const hargaSetelahDiskon = Math.max(0, hargaJual - diskonSellerNominal);
+  const hargaSetelahDiskon = Math.max(0, subtotalKatalog - diskonSellerNominal);
 
-  // Subsidi Co-Funded Voucher yang ditanggung Seller (jika aktif)
-  const coFundedNom = activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0
+  // Cek apakah memenuhi syarat Min. Belanja Voucher Co-Funded
+  const isCoFundedMinBelanjaMet = activeCoFundedTier
+    ? (hargaSetelahDiskon >= activeCoFundedTier.minBelanja)
+    : false;
+
+  // Nominal voucher yang dinikmati pembeli dari program Co-Funded / Boost
+  const coFundedDiskonPembeli = (activeCoFundedTier && isCoFundedMinBelanjaMet)
+    ? Math.round((activeCoFundedTier.diskonPembeli / 100) * hargaSetelahDiskon)
+    : 0;
+
+  // Subsidi Co-Funded Voucher yang ditanggung Seller (jika aktif & min belanja terpenuhi)
+  const coFundedNom = (activeCoFundedTier && isCoFundedMinBelanjaMet && activeCoFundedTier.effectiveSellerPct > 0)
     ? Math.round(Math.min((activeCoFundedTier.effectiveSellerPct / 100) * hargaSetelahDiskon, activeCoFundedTier.capSeller))
     : 0;
+
+  // Porsi subsidi voucher yang ditanggung platform
+  const subsidiPlatformCoFunded = Math.max(0, coFundedDiskonPembeli - coFundedNom);
+
+  // Simulasi Voucher Tambahan Platform (100% Platform)
+  const voucherPlatformNominal = voucherPlatformPct > 0
+    ? Math.round((voucherPlatformPct / 100) * hargaSetelahDiskon)
+    : 0;
+
+  // Total Diskon Voucher yang Dinikmati Pembeli
+  const totalVoucherPembeli = coFundedDiskonPembeli + voucherPlatformNominal;
+
+  // ESTIMASI NOMINAL AKHIR YANG DIBAYAR PEMBELI DI KASIR / CHECKOUT
+  const nominalDibayarPembeli = Math.max(0, hargaSetelahDiskon - totalVoucherPembeli);
+  const nominalDibayarPembeliPerPcs = qty > 0 ? Math.round(nominalDibayarPembeli / qty) : 0;
 
   // GMV Max discount on platform commission
   const gmvDisc = (platform==="tiktok" && active.gmv_max)
@@ -840,14 +1012,14 @@ export default function App() {
   
   const komisiBase = kat.komisi * (1 - gmvDisc);
   const komisiNom = Math.round((komisiBase / 100) * hargaSetelahDiskon);
-  const dinNom = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hargaSetelahDiskon, dinamisCap)) : 0;
-  const prosesNom = active.biaya_proses ? 1250 : 0;
+  const dinNom = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hargaSetelahDiskon, dinamisCap * qty)) : 0;
+  const prosesNom = active.biaya_proses ? 1250 : 0; // Flat Rp1.250 per order
   const pph22Nom = active.pph22 ? Math.round((0.5 / 100) * hargaSetelahDiskon) : 0;
   const growthXtraNom = (active.growth_xtra && platform==="tiktok") ? Math.round((growthXtraPct / 100) * hargaSetelahDiskon) : 0;
   const logistikNom = active.biaya_logistik ? biayaLogistikNom : 0;
-  const mallNom = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hargaSetelahDiskon, 50000)) : 0;
+  const mallNom = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hargaSetelahDiskon, 50000 * qty)) : 0;
   const ongkirNom = active.gratis_ongkir ? Math.round((5.5 / 100) * hargaSetelahDiskon) : 0;
-  const voucherNom = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hargaSetelahDiskon, 20000)) : 0;
+  const voucherNom = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hargaSetelahDiskon, 20000 * qty)) : 0;
   const poNom = (active.pre_order && platform==="tiktok") ? Math.round((3 / 100) * hargaSetelahDiskon) : 0;
   const afilNom = active.afiliasi ? Math.round((afiliasiPct / 100) * hargaSetelahDiskon) : 0;
   const gmvNom = (active.gmv_max && platform==="tiktok") ? Math.round((gmvPct / 100) * hargaSetelahDiskon) : 0;
@@ -860,45 +1032,173 @@ export default function App() {
   // Jumlah Penyelesaian Pembayaran = yang masuk ke saldo TikTok/platform (setelah fee platform & subsidi voucher seller)
   const jumlahPenyelesaian = hargaSetelahDiskon - totalPlatform - coFundedNom;
 
-  // Keuntungan Bersih: Pembeli bayar (Harga Jual - Diskon Seller) - Potongan Platform - Subsidi Co-Funded - Modal Beli - Ops
-  const cuan = jumlahPenyelesaian - hargaBeli - totalOps;
+  // Keuntungan Bersih: Pembeli bayar - Potongan Platform - Subsidi Co-Funded - Modal Beli - Ops
+  const cuan = jumlahPenyelesaian - subtotalHPP - totalOpsEffective;
   const marginPct = hargaSetelahDiskon > 0 ? (cuan / hargaSetelahDiskon) * 100 : 0;
-  const roiPct = (hargaBeli + totalOps) > 0 ? (cuan / (hargaBeli + totalOps)) * 100 : 0;
-  const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + coFundedNom + totalOps) / hargaSetelahDiskon) * 100 : 0;
+  const roiPct = (subtotalHPP + totalOpsEffective) > 0 ? (cuan / (subtotalHPP + totalOpsEffective)) * 100 : 0;
+  const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + coFundedNom + totalOpsEffective) / hargaSetelahDiskon) * 100 : 0;
 
-  // Fungsi kalkulasi target harga jual
-  function calcH(tm=0){
-    const base = hargaBeli + totalOps;
-    for(let h = base; h <= 10_000_000; h += 10){
-      const disc = !ikutPromo ? 0 : (diskonType === "pct" ? (diskonVal/100)*h : diskonVal);
-      const hClean = Math.max(0, h - disc);
+  // Nilai Per Pcs
+  const cuanPerPcs = qty > 0 ? Math.round(cuan / qty) : 0;
+  const jumlahPenyelesaianPerPcs = qty > 0 ? Math.round(jumlahPenyelesaian / qty) : 0;
+  const totalPlatformPerPcs = qty > 0 ? Math.round(totalPlatform / qty) : 0;
+
+  // Fungsi kalkulasi target harga jual per pcs untuk mencapai target net margin tertentu
+  function calcH(tm=0, targetQty=qty){
+    const opsEff = opsPerPesanan ? totalOps : totalOps * targetQty;
+    const base = (hargaBeli * targetQty) + opsEff;
+    const startH = Math.max(10, Math.floor(hargaBeli * 0.9));
+    for(let h = startH; h <= 10_000_000; h += 25){
+      const sub = h * targetQty;
+      const disc = !ikutPromo ? 0 : (diskonType === "pct" ? (diskonVal/100)*sub : Math.min(diskonVal * targetQty, sub));
+      const hClean = Math.max(0, sub - disc);
       const kb = kat.komisi * (1 - gmvDisc);
       const kn = Math.round((kb / 100) * hClean);
-      const dn = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hClean, dinamisCap)) : 0;
+      const dn = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hClean, dinamisCap * targetQty)) : 0;
       const pn = active.biaya_proses ? 1250 : 0;
       const ppn = active.pph22 ? Math.round((0.5 / 100) * hClean) : 0;
       const gxn = (active.growth_xtra && platform==="tiktok") ? Math.round((growthXtraPct / 100) * hClean) : 0;
       const ln = active.biaya_logistik ? biayaLogistikNom : 0;
-      const mn = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hClean, 50000)) : 0;
+      const mn = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hClean, 50000 * targetQty)) : 0;
       const on = active.gratis_ongkir ? Math.round((5.5 / 100) * hClean) : 0;
-      const vn = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hClean, 20000)) : 0;
+      const vn = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hClean, 20000 * targetQty)) : 0;
       const po = (active.pre_order && platform==="tiktok") ? Math.round((3 / 100) * hClean) : 0;
       const an = active.afiliasi ? Math.round((afiliasiPct / 100) * hClean) : 0;
       const gn = (active.gmv_max && platform==="tiktok") ? Math.round((gmvPct / 100) * hClean) : 0;
       const tn = (active.topads && platform==="tokopedia") ? Math.round((3 / 100) * hClean) : 0;
       const lvn = (active.live_ads && platform==="tiktok") ? Math.round((liveAdsPct / 100) * hClean) : 0;
       const cn = active.cashback_bonus ? Math.round((2 / 100) * hClean) : 0;
-      const cfn = activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0
+      const cfn = (activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0 && hClean >= activeCoFundedTier.minBelanja)
         ? Math.round(Math.min((activeCoFundedTier.effectiveSellerPct / 100) * hClean, activeCoFundedTier.capSeller))
         : 0;
       const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + gn + tn + lvn + cn + cfn;
       if(hClean > 0 && ((hClean - pot - base) / hClean) * 100 >= tm) {
-        return Math.ceil(h / 100) * 100;
+        return Math.ceil(h / 50) * 50;
       }
     }
-    return base;
+    return hargaBeli;
   }
-  const bep = calcH(0), h20 = calcH(20), h30 = calcH(30);
+  const bep = calcH(0);
+  const h10 = calcH(10); // Penetrasi / Promo Kilat
+  const h15 = calcH(15); // Rekomendasi Seimbang (Logis & Relevan)
+  const h20 = calcH(20); // Margin Sehat
+  const h25 = calcH(25); // Margin Campaign & Ads
+  const h30 = calcH(30); // Margin Tebal
+  const customTargetPrice = calcH(customTargetMargin);
+
+  // ── KALKULASI REKOMENDASI IKUT PROGRAM TIKTOK SHOP / CO-FUNDED ──
+  function getProgramRecommendation(tier: CoFundedTier, currentHpp = hargaBeli, currentQty = qty) {
+    const opsEff = opsPerPesanan ? totalOps : totalOps * currentQty;
+    const baseModal = (currentHpp * currentQty) + opsEff;
+    const minUnitForVoucher = Math.ceil(tier.minBelanja / currentQty);
+
+    let bepPrice = currentHpp;
+    let idealPrice = currentHpp;
+    let maxPrice = currentHpp;
+
+    const startH = Math.max(10, Math.floor(currentHpp * 0.9));
+    for (let h = startH; h <= 10_000_000; h += 25) {
+      const sub = h * currentQty;
+      const hClean = sub;
+      const kb = kat.komisi * (1 - gmvDisc);
+      const kn = Math.round((kb / 100) * hClean);
+      const dn = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hClean, dinamisCap * currentQty)) : 0;
+      const pn = active.biaya_proses ? 1250 : 0;
+      const ppn = active.pph22 ? Math.round((0.5 / 100) * hClean) : 0;
+      const gxn = (active.growth_xtra && platform === "tiktok") ? Math.round((growthXtraPct / 100) * hClean) : 0;
+      const ln = active.biaya_logistik ? biayaLogistikNom : 0;
+      const mn = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hClean, 50000 * currentQty)) : 0;
+      const on = active.gratis_ongkir ? Math.round((5.5 / 100) * hClean) : 0;
+      const vn = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hClean, 20000 * currentQty)) : 0;
+      const po = (active.pre_order && platform === "tiktok") ? Math.round((3 / 100) * hClean) : 0;
+      const an = active.afiliasi ? Math.round((afiliasiPct / 100) * hClean) : 0;
+      const cfn = (tier.effectiveSellerPct > 0 && hClean >= tier.minBelanja)
+        ? Math.round(Math.min((tier.effectiveSellerPct / 100) * hClean, tier.capSeller))
+        : 0;
+      const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + cfn;
+      const margin = hClean > 0 ? ((hClean - pot - baseModal) / hClean) * 100 : 0;
+
+      if (margin >= 0 && bepPrice === currentHpp) {
+        bepPrice = Math.ceil(h / 50) * 50;
+      }
+      if (margin >= 15 && idealPrice === currentHpp) {
+        idealPrice = Math.ceil(h / 50) * 50;
+      }
+      if (margin >= 25 && maxPrice === currentHpp) {
+        maxPrice = Math.ceil(h / 50) * 50;
+        break;
+      }
+    }
+
+    const recMinPrice = Math.max(bepPrice, minUnitForVoucher);
+    const recIdealPrice = Math.max(idealPrice, minUnitForVoucher);
+    const recMaxPrice = Math.max(maxPrice, Math.ceil(recIdealPrice * 1.3));
+
+    const subIdeal = recIdealPrice * currentQty;
+    const kb = kat.komisi * (1 - gmvDisc);
+    const kn = Math.round((kb / 100) * subIdeal);
+    const dn = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * subIdeal, dinamisCap * currentQty)) : 0;
+    const pn = active.biaya_proses ? 1250 : 0;
+    const ppn = active.pph22 ? Math.round((0.5 / 100) * subIdeal) : 0;
+    const gxn = (active.growth_xtra && platform === "tiktok") ? Math.round((growthXtraPct / 100) * subIdeal) : 0;
+    const ln = active.biaya_logistik ? biayaLogistikNom : 0;
+    const mn = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * subIdeal, 50000 * currentQty)) : 0;
+    const on = active.gratis_ongkir ? Math.round((5.5 / 100) * subIdeal) : 0;
+    const vn = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * subIdeal, 20000 * currentQty)) : 0;
+    const po = (active.pre_order && platform === "tiktok") ? Math.round((3 / 100) * subIdeal) : 0;
+    const an = active.afiliasi ? Math.round((afiliasiPct / 100) * subIdeal) : 0;
+    const cfn = (tier.effectiveSellerPct > 0 && subIdeal >= tier.minBelanja)
+      ? Math.round(Math.min((tier.effectiveSellerPct / 100) * subIdeal, tier.capSeller))
+      : 0;
+    const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + cfn;
+    const settlement = subIdeal - pot;
+    const netProfitTotal = settlement - baseModal;
+    const netProfitPerPcs = Math.round(netProfitTotal / currentQty);
+    const netMarginPct = subIdeal > 0 ? (netProfitTotal / subIdeal) * 100 : 0;
+
+    const buyerVoucherNominal = Math.round((tier.diskonPembeli / 100) * subIdeal);
+    const buyerCheckout = Math.max(0, subIdeal - buyerVoucherNominal);
+    const buyerCheckoutPerPcs = Math.round(buyerCheckout / currentQty);
+
+    const hppMin = tier.minBelanja > 0 ? Math.max(500, Math.round((tier.minBelanja * 0.2) / currentQty)) : 1000;
+    const hppMax = tier.minBelanja > 0 ? Math.max(2000, Math.round((tier.minBelanja * 0.75) / currentQty)) : 500000;
+
+    let statusBadge = "🟢 Sangat Cocok";
+    let statusCls = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+    let statusTips = `HPP ${formatRp(currentHpp)} & Qty ${currentQty} pcs sangat ideal untuk program ini.`;
+
+    if (tier.minBelanja > 0 && (currentHpp * currentQty * 1.5) < tier.minBelanja) {
+      const neededQty = Math.ceil(tier.minBelanja / (currentHpp * 1.5 || 1));
+      statusBadge = "📦 Butuh Bundling";
+      statusCls = "bg-amber-500/20 text-amber-300 border-amber-500/40";
+      statusTips = `HPP satuan murah (${formatRp(currentHpp)}). Buat paket isi ${neededQty} pcs agar pembeli memenuhi Min. Belanja ${formatRp(tier.minBelanja)}.`;
+    } else if (tier.minBelanja > 0 && currentHpp > hppMax) {
+      statusBadge = "⚠️ HPP Tinggi";
+      statusCls = "bg-blue-500/20 text-blue-300 border-blue-500/40";
+      statusTips = `HPP (${formatRp(currentHpp)}) cukup besar, Anda bisa ikut tier voucher belanja yang lebih tinggi untuk diskon lebih besar.`;
+    }
+
+    return {
+      hppMin,
+      hppMax,
+      recMinPrice,
+      recIdealPrice,
+      recMaxPrice,
+      netProfitTotal,
+      netProfitPerPcs,
+      netMarginPct,
+      buyerCheckout,
+      buyerCheckoutPerPcs,
+      buyerVoucherNominal,
+      sellerSubsidy: cfn,
+      platformSubsidy: Math.max(0, buyerVoucherNominal - cfn),
+      statusBadge,
+      statusCls,
+      statusTips
+    };
+  }
+
+  const currentProgramRec = activeCoFundedTier ? getProgramRecommendation(activeCoFundedTier) : null;
 
   const status = cuan > 0
     ? {label:"✅ UNTUNG", cls:"text-green-700 bg-green-50 border-green-300"}
@@ -908,14 +1208,14 @@ export default function App() {
 
   const detailPlat = [
     {label:`Komisi Platform Grp ${kat.grp}${gmvDisc>0?` (diskon GMV ${(gmvDisc*100).toFixed(0)}%)`:""} (${komisiBase.toFixed(2)}%)`, nom:komisiNom, show:true, wajib:true},
-    {label:`Komisi Dinamis (${dinamisPct}%, cap Rp${(dinamisCap/1000).toFixed(0)}rb)`, nom:dinNom, show:active.komisi_dinamis, wajib:true},
-    {label:"Biaya Pemrosesan Order (Flat Rp1.250)", nom:prosesNom, show:active.biaya_proses, wajib:true},
+    {label:`Komisi Dinamis (${dinamisPct}%, cap Rp${(dinamisCap/1000).toFixed(0)}rb/item)`, nom:dinNom, show:active.komisi_dinamis, wajib:true},
+    {label:"Biaya Pemrosesan Order (Flat Rp1.250 / order)", nom:prosesNom, show:active.biaya_proses, wajib:true},
     {label:"PPh Pasal 22 (0.5% pajak e-Commerce)", nom:pph22Nom, show:active.pph22, wajib:true},
     {label:`Biaya Layanan Growth Xtra (${growthXtraPct}%)`, nom:growthXtraNom, show:active.growth_xtra && platform==="tiktok"},
     {label:`Biaya Layanan Logistik Platform`, nom:logistikNom, show:active.biaya_logistik},
-    {label:"Biaya Layanan Mall (1.8%, cap Rp50rb)", nom:mallNom, show:(active.mall_fee || isMall)},
+    {label:"Biaya Layanan Mall (1.8%, cap Rp50rb/item)", nom:mallNom, show:(active.mall_fee || isMall)},
     {label:"Gratis Ongkir XTRA (~5.5%)", nom:ongkirNom, show:active.gratis_ongkir},
-    {label:"Voucher XTRA (3.5%, cap Rp20rb)", nom:voucherNom, show:active.voucher_xtra},
+    {label:"Voucher XTRA (3.5%, cap Rp20rb/item)", nom:voucherNom, show:active.voucher_xtra},
     {label:"Pre-Order 3% (TikTok only)", nom:poNom, show:active.pre_order && platform==="tiktok"},
     {label:`Afiliasi Kreator (${afiliasiPct}%)`, nom:afilNom, show:active.afiliasi},
     {label:`GMV Max Ads (${gmvPct}%)`, nom:gmvNom, show:active.gmv_max && platform==="tiktok"},
@@ -950,16 +1250,32 @@ export default function App() {
     let margin = (cuan / hargaSetelahDiskon) * 100;
     let saran = [];
     
+    if (qty > 1) {
+      saran.push(`📦 Simulasi Paket ${qty} Pcs: Biaya proses order flat Rp1.250 & biaya operasional terbagi rata ke ${qty} produk. Margin per unit naik signifikan dibanding jual eceran 1 pcs!`);
+    }
+
+    if (active.afiliasi) {
+      if (afiliasiPct <= 1) {
+        saran.push("🤝 Komisi Afiliasi 1% Aktif: Sangat tepat untuk produk fast-moving/sembako. Kreator bisa sematkan ke keranjang kuning tanpa membebani laba toko.");
+      } else {
+        saran.push(`🤝 Komisi Afiliasi ${afiliasiPct}% Aktif: Nilai komisi yang menggiurkan bagi affiliator dan kreator video/live TikTok.`);
+      }
+    }
+
+    if (totalVoucherPembeli > 0) {
+      saran.push(`🎟️ Simulasi Voucher Aktif: Pembeli checkout di harga ${formatRp(nominalDibayarPembeli)} (diskon ${formatRp(totalVoucherPembeli)}), saldo masuk tokomu tetap aman ${formatRp(jumlahPenyelesaian)}!`);
+    }
+
     if (ikutPromo) {
-      saran.push(`🎯 Simulasi Campaign Aktif: Diskon penjual ${diskonType==="pct"?`${diskonVal}%`:formatRp(diskonVal)}. Mengurangi dasar komisi platform.`);
+      saran.push(`🎯 Diskon Penjual Aktif: Diskon ${diskonType==="pct"?`${diskonVal}%`:formatRp(diskonVal)}. Mengurangi dasar komisi platform secara resmi.`);
     }
 
     if (margin < 10) {
-      saran.push("🔴 Margin Tipis (<10%). Jangan ikut Voucher XTRA atau diskon tinggi bersamaan. Fokus promosi organik & bundling paket!");
+      saran.push("🔴 Margin Tipis (<10%). Rekomendasi: Gunakan tombol '🎯 Rekomendasi (15%)' di atas untuk menaikkan harga jual secara proporsional agar tidak berisiko boncos saat ada retur!");
     } else if (margin >= 10 && margin <= 25) {
-      saran.push("🟡 Margin Sehat (10-25%). Waktunya scale-up! Pasang Afiliasi kreator (5-8%) atau aktifkan Gratis Ongkir.");
+      saran.push("🟢 Margin Sehat (10-25%). Skema harga sangat ideal! Toko aman dari rugi, harga tidak kemahalan bagi pembeli, dan konversi checkout tinggi.");
     } else {
-      saran.push("🟢 Margin Tebal (>25%). Sangat aman ikut Mega Sale / Co-Funded Campaign dan push LIVE Ads serta komisi afiliasi 10-15%.");
+      saran.push("💎 Margin Tebal (>25%). Sangat aman ikut Joint Campaign Co-Funded (diskon 20-35%) atau push GMV Max Ads.");
     }
 
     if (platform === "tiktok") {
@@ -1025,7 +1341,7 @@ export default function App() {
                   onClick={() => {
                     // Quick test: Bakpia Rp14.892 → target Rp10.750
                     setKat(KATEGORI.find(k=>k.id==="snack_bakpia") || KATEGORI[0]);
-                    setHargaBeli(0); setHargaJual(14892);
+                    setHargaBeli(0); setHargaJual(14892); setQty(1);
                     setActive(prev=>({...prev, komisi_dinamis:true, biaya_proses:true, pph22:true, growth_xtra:true, biaya_logistik:false, gratis_ongkir:false, voucher_xtra:false, afiliasi:true}));
                     setDinamisPct(6.5); setAfiliasiPct(0.48);
                     setGrowthXtraPct(3.5);
@@ -1086,15 +1402,16 @@ export default function App() {
 
       {/* NAVIGATION TABS */}
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 bg-gray-900/80 border border-gray-800 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-5 bg-gray-900/80 border border-gray-800 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
           {[
             ["kalkulator", "🧮 Kalkulator Cuan"],
+            ["matriks_program", "🎯 Rekomendasi Program & HPP"],
             ["campaign", "🎪 Jenis Campaign & Promo"],
             ["semua_program", "📋 Semua Program Biaya"],
             ["strategi", "💡 Panduan Strategi"],
           ].map(([t,l])=>(
             <button key={t} onClick={()=>setMainTab(t)}
-              className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${mainTab===t?"bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md":"text-gray-400 hover:text-white hover:bg-gray-800/50"}`}>
+              className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${mainTab===t?"bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md":"text-gray-400 hover:text-white hover:bg-gray-800/50"}`}>
               {l}
             </button>
           ))}
@@ -1152,12 +1469,14 @@ export default function App() {
               )}
             </div>
 
-            {/* Modal & Harga Jual */}
+            {/* Modal & Menu Jumlah Quantity & Harga Jual */}
             <div className="bg-gray-900/90 rounded-2xl p-4 border border-gray-800 shadow-md space-y-4">
+              
+              {/* Modal HPP Satuan */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Modal / Harga Beli (HPP Produk)</p>
-                  <span className="text-xs font-bold text-gray-300">{formatRp(hargaBeli)}</span>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">1. Modal / Harga Beli (HPP per Unit/Pcs)</p>
+                  <span className="text-xs font-bold text-gray-300">{formatRp(hargaBeli)} / pcs</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <input type="range" min={100} max={2000000} step={100} value={hargaBeli}
@@ -1170,10 +1489,95 @@ export default function App() {
                 </div>
               </div>
 
+              {/* FITUR BARU: MENU JUMLAH QUANTITY (Qty) YANG DIHITUNG */}
+              <div className="bg-gradient-to-r from-purple-950/40 via-pink-950/30 to-gray-900 border border-pink-500/40 rounded-2xl p-3.5 space-y-3 shadow-inner">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-pink-600/80 text-white flex items-center justify-center text-xs font-bold shadow">📦</span>
+                    <div>
+                      <p className="text-xs font-black text-white tracking-wide">Jumlah Quantity (Qty) yang Dihitung</p>
+                      <p className="text-[11px] text-pink-300/80">Simulasi pesanan satuan, grosir, atau paket bundling</p>
+                    </div>
+                  </div>
+                  
+                  {/* Stepper Counter */}
+                  <div className="flex items-center gap-1.5 bg-gray-900/90 border border-pink-500/60 rounded-xl p-1 self-start sm:self-auto">
+                    <button
+                      onClick={() => setQty(Math.max(1, qty - 1))}
+                      className="w-7 h-7 flex items-center justify-center bg-gray-800 hover:bg-pink-600 text-white rounded-lg text-sm font-black transition-all active:scale-95"
+                      title="Kurangi 1"
+                    >
+                      -
+                    </button>
+                    <div className="flex items-center px-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        value={qty}
+                        onChange={e => setQty(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-12 bg-transparent text-center font-black text-sm text-pink-300 outline-none"
+                      />
+                      <span className="text-xs text-gray-400 font-bold ml-0.5">pcs</span>
+                    </div>
+                    <button
+                      onClick={() => setQty(qty + 1)}
+                      className="w-7 h-7 flex items-center justify-center bg-gray-800 hover:bg-pink-600 text-white rounded-lg text-sm font-black transition-all active:scale-95"
+                      title="Tambah 1"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preset Qty Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-semibold text-gray-400 mr-1">Pilihan Cepat:</span>
+                  {[1, 2, 3, 4, 5, 10, 20, 50, 100].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => setQty(q)}
+                      className={`text-xs px-2.5 py-1 rounded-lg font-bold border transition-all ${
+                        qty === q
+                          ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-400 shadow-md scale-105"
+                          : "bg-gray-800/80 text-gray-300 border-gray-700 hover:border-pink-500/50 hover:text-white"
+                      }`}
+                    >
+                      {q} pcs
+                    </button>
+                  ))}
+                </div>
+
+                {/* Subtotal Bar & Packing Mode */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-pink-900/30 text-xs">
+                  <div className="bg-gray-900/70 p-2 rounded-xl border border-gray-800">
+                    <p className="text-[10px] text-gray-400 font-medium uppercase">Total Modal (HPP × {qty} pcs):</p>
+                    <p className="font-extrabold text-white text-sm mt-0.5">{formatRp(subtotalHPP)}</p>
+                  </div>
+                  <div className="bg-gray-900/70 p-2 rounded-xl border border-gray-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-medium uppercase">Biaya Packing Operasional:</p>
+                      <p className="font-bold text-pink-300 text-xs mt-0.5">{formatRp(totalOpsEffective)}</p>
+                    </div>
+                    <button
+                      onClick={() => setOpsPerPesanan(!opsPerPesanan)}
+                      className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-2 py-1 rounded-lg font-semibold transition-all"
+                      title="Klik untuk ganti mode hitung biaya packing"
+                    >
+                      {opsPerPesanan ? "📦 1 Paket (Hemat)" : "🛍️ Per Pcs"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Harga Jual Normal Satuan */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Harga Jual Normal (Katalog Toko)</p>
-                  <span className="text-xs font-bold text-pink-400">{formatRp(hargaJual)}</span>
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">2. Harga Jual Normal (Katalog Toko per Unit)</p>
+                    <p className="text-[11px] text-gray-500">Subtotal Katalog: <strong className="text-pink-300">{formatRp(subtotalKatalog)}</strong> ({qty} pcs)</p>
+                  </div>
+                  <span className="text-xs font-bold text-pink-400">{formatRp(hargaJual)} / pcs</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <input type="range" min={Math.max(bep,100)} max={Math.max(hargaBeli*4, 1000000)} step={100}
@@ -1184,21 +1588,125 @@ export default function App() {
                       className="w-24 bg-transparent text-pink-300 font-bold text-xs outline-none"/>
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-3 gap-2 mt-2.5">
-                  <button onClick={()=>setHargaJual(bep)} className="text-xs bg-red-950/70 border border-red-800 text-red-300 rounded-xl py-2 font-bold hover:bg-red-900 transition-all">
-                    BEP {formatRp(bep)}
+              {/* FITUR BARU: SKEMA UNTUNG LOGIS & RELEVAN (CEGAH RUGI & TIDAK KEMAHALAN) */}
+              <div className="bg-gray-950/70 border border-gray-800 rounded-2xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎯</span>
+                    <div>
+                      <p className="text-xs font-black text-white">Skema Untung Logis & Relevan</p>
+                      <p className="text-[10px] text-gray-400">Pilih target harga jual agar tidak kemahalan di TikTok tapi tidak sampai rugi</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full font-bold border border-pink-500/30">
+                    Otomatis Hitung
+                  </span>
+                </div>
+
+                {/* Grid 6 Tombol Skema Margin */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {/* BEP */}
+                  <button
+                    onClick={() => setHargaJual(bep)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-red-950/40 border-red-800/80 hover:bg-red-950/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-red-300">🛑 BEP (Impas 0%)</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(bep)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Batas modal balik 100%</p>
                   </button>
-                  <button onClick={()=>setHargaJual(h20)} className="text-xs bg-yellow-950/70 border border-yellow-800 text-yellow-300 rounded-xl py-2 font-bold hover:bg-yellow-900 transition-all">
-                    Margin 20% ({formatRp(h20)})
+
+                  {/* Penetrasi 10% */}
+                  <button
+                    onClick={() => setHargaJual(h10)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-amber-950/40 border-amber-800/80 hover:bg-amber-950/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-amber-300">⚡ Penetrasi (10%)</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h10)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Murah, kejar volume & FYP</p>
                   </button>
-                  <button onClick={()=>setHargaJual(h30)} className="text-xs bg-green-950/70 border border-green-800 text-green-300 rounded-xl py-2 font-bold hover:bg-green-900 transition-all">
-                    Margin 30% ({formatRp(h30)})
+
+                  {/* Rekomendasi Seimbang 15% (Highlight) */}
+                  <button
+                    onClick={() => setHargaJual(h15)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-emerald-950/70 to-teal-950/70 border-emerald-500/80 hover:border-emerald-400 shadow-md relative overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-emerald-300">🎯 Rekomendasi (15%)</span>
+                      <span className="text-[9px] bg-emerald-500 text-gray-950 px-1 rounded font-black">IDEAL</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-emerald-100 mt-1">{formatRp(h15)}</p>
+                    <p className="text-[10px] text-emerald-300/80 mt-0.5">Pas di pembeli, cuan aman</p>
+                  </button>
+
+                  {/* Margin Sehat 20% */}
+                  <button
+                    onClick={() => setHargaJual(h20)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-blue-950/40 border-blue-800/80 hover:bg-blue-950/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-blue-300">🛡️ Margin Sehat (20%)</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h20)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Cover retur & operasional</p>
+                  </button>
+
+                  {/* Campaign & Ads 25% */}
+                  <button
+                    onClick={() => setHargaJual(h25)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-purple-950/40 border-purple-800/80 hover:bg-purple-950/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-purple-300">🎪 Campaign (25%)</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h25)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Ruang diskon voucher & ads</p>
+                  </button>
+
+                  {/* Margin Tebal 30% */}
+                  <button
+                    onClick={() => setHargaJual(h30)}
+                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-pink-950/40 border-pink-800/80 hover:bg-pink-950/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-pink-300">💎 Premium (30%)</span>
+                    </div>
+                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h30)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Produk unik / tanpa saingan</p>
+                  </button>
+                </div>
+
+                {/* Custom Target Margin Input */}
+                <div className="pt-2 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-[11px]">Ketik Margin Custom:</span>
+                    <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-2 py-0.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={80}
+                        value={customTargetMargin}
+                        onChange={e => setCustomTargetMargin(Math.max(1, Number(e.target.value)))}
+                        className="w-10 bg-transparent text-white font-bold text-xs outline-none text-right"
+                      />
+                      <span className="text-gray-400 font-bold text-xs">%</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setHargaJual(customTargetPrice)}
+                    className="bg-gray-800 hover:bg-pink-600 text-pink-300 hover:text-white px-3 py-1 rounded-xl font-bold transition-all border border-pink-500/40 text-[11px] self-end sm:self-auto"
+                  >
+                    Terapkan Harga {formatRp(customTargetPrice)} ({customTargetMargin}%) →
                   </button>
                 </div>
               </div>
 
-              {/* FITUR BARU: Simulasi Diskon Campaign Seller */}
+              {/* FITUR: Simulasi Diskon Campaign Seller */}
               <div className="pt-3 border-t border-gray-800">
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1209,7 +1717,7 @@ export default function App() {
                   {ikutPromo && (
                     <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5 border border-gray-700">
                       <button onClick={()=>setDiskonType("pct")} className={`text-[10px] font-bold px-2 py-0.5 rounded ${diskonType==="pct"?"bg-pink-600 text-white":"text-gray-400"}`}>%</button>
-                      <button onClick={()=>setDiskonType("nominal")} className={`text-[10px] font-bold px-2 py-0.5 rounded ${diskonType==="nominal"?"bg-pink-600 text-white":"text-gray-400"}`}>Rp</button>
+                      <button onClick={()=>setDiskonType("nominal")} className={`text-[10px] font-bold px-2 py-0.5 rounded ${diskonType==="nominal"?"bg-pink-600 text-white":"text-gray-400"}`}>Rp/pcs</button>
                     </div>
                   )}
                 </div>
@@ -1217,19 +1725,23 @@ export default function App() {
                 {ikutPromo && (
                   <div className="mt-2.5 bg-pink-950/30 border border-pink-800/50 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-gray-300 font-medium">Besaran Diskon:</span>
+                      <span className="text-xs text-gray-300 font-medium">Besaran Diskon Penjual:</span>
                       <div className="flex items-center gap-1.5">
                         <input type="number" value={diskonVal} onChange={e=>setDiskonVal(Math.max(0, Number(e.target.value)))}
                           className="w-20 bg-gray-800 border border-pink-500 rounded-lg px-2 py-1 text-right text-xs font-bold text-white outline-none"/>
-                        <span className="text-xs font-bold text-pink-400">{diskonType==="pct"?"%":"Rp"}</span>
+                        <span className="text-xs font-bold text-pink-400">{diskonType==="pct"?"%":"Rp/pcs"}</span>
                       </div>
                     </div>
                     <div className="flex justify-between items-center text-xs text-gray-300 pt-1 border-t border-pink-900/40">
-                      <span>Harga Bersih Pembeli (Basis Komisi):</span>
+                      <span>Total Diskon Penjual ({qty} pcs):</span>
+                      <span className="font-extrabold text-pink-400">-{formatRp(diskonSellerNominal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-gray-300">
+                      <span>Subtotal Bersih Penjual (Basis Komisi Platform):</span>
                       <span className="font-extrabold text-white text-sm">{formatRp(hargaSetelahDiskon)}</span>
                     </div>
                     <p className="text-[11px] text-pink-300/80 leading-relaxed">
-                      💡 Komisi platform & dinamis resmi dihitung dari <strong>(Harga Jual - Diskon Seller)</strong>.
+                      💡 Komisi resmi TikTok Shop dihitung dari <strong>(Harga Jual × Qty - Diskon Seller)</strong>.
                     </p>
                   </div>
                 )}
@@ -1277,6 +1789,16 @@ export default function App() {
                     <option value="reg_30_500k">Disc 30% (Toko 18.00%) · Min Rp500k (TTS & Toko)</option>
                     <option value="reg_35_peak">Disc 35% Peak (Toko 21.00%) · Min Rp1.8jt (Peak Day)</option>
                   </optgroup>
+                  <optgroup label="🎙️ [ID 2026] LIVE Festival Q3 2026 (Platform 40% - 90% : Toko 10% - 60%)">
+                    <option value="live_50_peak">🔥 Disc 50% Peak (Toko 5.00% · Cap Rp1rb) · Min Rp10k (Plat 90% : Toko 10%)</option>
+                    <option value="live_25_peak">⚡ Disc 25% Peak (Toko 5.00% · Cap Rp75rb) · Min Rp1.5jt (Plat 80% : Toko 20%)</option>
+                    <option value="live_22_peak">⚡ Disc 22% Peak (Toko 5.06% · Cap Rp92rb) · Min Rp500k (Plat 77% : Toko 23%)</option>
+                    <option value="live_20_peak">⚡ Disc 20% Peak (Toko 5.00% · Cap Rp75rb) · Min Rp300k (Plat 75% : Toko 25%)</option>
+                    <option value="live_17_peak">⚡ Disc 17% Peak (Toko 4.93% · Cap Rp58rb) · Min Rp200k (Plat 71% : Toko 29%)</option>
+                    <option value="live_15_nonpeak">🎙️ Disc 15% Non-Peak (Toko 4.50% · Cap Rp45rb) · Min Rp150k (Plat 70% : Toko 30%)</option>
+                    <option value="live_11_nonpeak">🎙️ Disc 11% Non-Peak (Toko 3.96% · Cap Rp36rb) · Min Rp100k (Plat 64% : Toko 36%)</option>
+                    <option value="live_5_nonpeak">🎙️ Disc 5% Non-Peak (Toko 3.00% · Cap Rp1.2jt) · Min Rp50k (Plat 40% : Toko 60%)</option>
+                  </optgroup>
                   <optgroup label="🟡 Spesial Co-Funded (Platform 45% : Toko 55%)">
                     <option value="sp_8_50k">Always On 8% (Toko 4.40%) · Min Rp50k</option>
                     <option value="sp_20_150k">Always On 20% (Toko 11.00%) · Min Rp150k</option>
@@ -1288,32 +1810,176 @@ export default function App() {
                 {activeCoFundedTier && (
                   <div className="mt-2.5 bg-gray-800/90 border border-amber-600/40 rounded-xl p-3 space-y-2 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-gray-300">Proporsi Patungan:</span>
+                      <span className="text-[11px] font-bold text-gray-300">Proporsi Patungan Voucher:</span>
                       <span className="font-extrabold text-amber-300">
                         Platform {activeCoFundedTier.platformPct}% : Toko {activeCoFundedTier.sellerPct}%
                       </span>
                     </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-300">Voucher yang Diterima Pembeli:</span>
+                      <span className="font-extrabold text-emerald-400">
+                        {isCoFundedMinBelanjaMet ? `${activeCoFundedTier.diskonPembeli}% (-${formatRp(coFundedDiskonPembeli)})` : `Belum Aktif (Min. ${formatRp(activeCoFundedTier.minBelanja)})`}
+                      </span>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-gray-300">Beban Subsidi Toko:</span>
                       <span className="font-extrabold text-red-400">
-                        {activeCoFundedTier.effectiveSellerPct > 0 ? `-${activeCoFundedTier.effectiveSellerPct}% (${formatRp(coFundedNom)})` : 'Rp0 (100% Platform)'}
+                        {activeCoFundedTier.effectiveSellerPct > 0
+                          ? (isCoFundedMinBelanjaMet ? `-${activeCoFundedTier.effectiveSellerPct}% (-${formatRp(coFundedNom)})` : 'Rp0 (Syarat Belanja Belum Cukup)')
+                          : 'Rp0 (100% Ditanggung Platform)'}
                       </span>
                     </div>
+
                     {activeCoFundedTier.minBelanja > 0 && (
                       <div className="pt-2 border-t border-gray-700/60">
-                        {hargaSetelahDiskon >= activeCoFundedTier.minBelanja ? (
+                        {isCoFundedMinBelanjaMet ? (
                           <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                            <span>✅</span> Harga satuan memenuhi syarat Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}).
+                            <span>✅</span> Subtotal pesanan ({formatRp(hargaSetelahDiskon)} untuk {qty} pcs) memenuhi syarat Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}).
                           </p>
                         ) : (
-                          <p className="text-[11px] text-amber-300/90 leading-tight">
-                            ⚠️ Harga satuan ({formatRp(hargaSetelahDiskon)}) &lt; Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}). Voucher aktif jika pembeli beli minimal <strong>{Math.ceil(activeCoFundedTier.minBelanja / (hargaSetelahDiskon || 1))} pcs</strong>.
-                          </p>
+                          <div className="bg-amber-950/40 border border-amber-700/60 rounded-lg p-2 space-y-1">
+                            <p className="text-[11px] text-amber-300 font-bold flex items-center gap-1">
+                              <span>⚠️</span> Subtotal pesanan ({formatRp(hargaSetelahDiskon)}) &lt; Min. Belanja ({formatRp(activeCoFundedTier.minBelanja)}).
+                            </p>
+                            <p className="text-[10px] text-gray-300">
+                              Voucher akan aktif jika pembeli memesan minimal <strong>{Math.ceil(activeCoFundedTier.minBelanja / (hargaSetelahDiskon/qty || 1))} pcs</strong>.
+                              <button
+                                onClick={() => setQty(Math.ceil(activeCoFundedTier.minBelanja / (hargaSetelahDiskon/qty || 1)))}
+                                className="ml-2 underline text-amber-400 font-bold hover:text-white"
+                              >
+                                Set Qty ke {Math.ceil(activeCoFundedTier.minBelanja / (hargaSetelahDiskon/qty || 1))} pcs →
+                              </button>
+                            </p>
+                          </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Interactive Program Recommendation Box */}
+                    {currentProgramRec && (
+                      <div className="mt-3 bg-gradient-to-br from-indigo-950/70 via-gray-900 to-purple-950/60 border border-indigo-500/50 rounded-xl p-3.5 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">🎯</span>
+                            <div>
+                              <h4 className="text-xs font-black text-white">Rekomendasi Ikut Program Ini</h4>
+                              <p className="text-[10px] text-indigo-300">Analisis margin & simulasi harga untuk {qty} pcs</p>
+                            </div>
+                          </div>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${currentProgramRec.statusCls}`}>
+                            {currentProgramRec.statusBadge}
+                          </span>
+                        </div>
+
+                        {/* Saran Strategi / Tips */}
+                        <div className="text-[11px] text-gray-200 bg-black/40 p-2.5 rounded-lg border border-white/10 flex items-start gap-2">
+                          <span className="text-amber-400 text-sm mt-0.5">💡</span>
+                          <div className="leading-snug">{currentProgramRec.statusTips}</div>
+                        </div>
+
+                        {/* Grid Rekomendasi HPP, Harga Jual, Cuan & Bayar Pembeli */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          {/* 1. Rekomendasi HPP Modal */}
+                          <div className="bg-gray-900/90 p-2.5 rounded-xl border border-gray-700/70">
+                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                              <span>📦 Rekomendasi HPP:</span>
+                              <span className="font-semibold text-gray-300">Modal Satuan</span>
+                            </div>
+                            <div className="font-black text-white text-sm">
+                              {formatRp(currentProgramRec.hppMin)} – {formatRp(currentProgramRec.hppMax)}
+                            </div>
+                            <div className="text-[10px] mt-1 text-gray-400">
+                              Modal Anda: <strong className={hargaBeli >= currentProgramRec.hppMin && hargaBeli <= currentProgramRec.hppMax ? "text-emerald-400" : "text-amber-400"}>{formatRp(hargaBeli)}</strong>
+                            </div>
+                          </div>
+
+                          {/* 2. Rekomendasi Harga Jual */}
+                          <div className="bg-gray-900/90 p-2.5 rounded-xl border border-indigo-500/50 shadow-inner">
+                            <div className="flex items-center justify-between text-[10px] text-indigo-300 mb-1">
+                              <span>🏷️ Rekomendasi Harga Jual:</span>
+                              <span className="font-semibold text-indigo-200">Per Pcs</span>
+                            </div>
+                            <div className="font-black text-indigo-300 text-sm">
+                              {formatRp(currentProgramRec.recIdealPrice)}
+                            </div>
+                            <div className="text-[10px] mt-1 text-gray-400">
+                              Rentang: <span className="text-gray-300">{formatRp(currentProgramRec.recMinPrice)} (BEP)</span> s/d <span className="text-gray-300">{formatRp(currentProgramRec.recMaxPrice)}</span>
+                            </div>
+                          </div>
+
+                          {/* 3. Estimasi Dibayar Pembeli di Checkout */}
+                          <div className="bg-gray-900/90 p-2.5 rounded-xl border border-pink-500/50">
+                            <div className="flex items-center justify-between text-[10px] text-pink-300 mb-1">
+                              <span>🛒 Dibayar Pembeli:</span>
+                              <span className="font-semibold text-pink-200">{qty} Pcs</span>
+                            </div>
+                            <div className="font-black text-pink-200 text-sm">
+                              {formatRp(currentProgramRec.buyerCheckoutPerPcs)} <span className="text-[10px] font-normal text-pink-300">/ pcs</span>
+                            </div>
+                            <div className="text-[10px] mt-1 text-gray-400">
+                              Total Checkout: <strong className="text-white">{formatRp(currentProgramRec.buyerCheckout)}</strong> (Hemat {formatRp(currentProgramRec.buyerVoucherNominal)})
+                            </div>
+                          </div>
+
+                          {/* 4. Kisaran Keuntungan Bersih (Profit) */}
+                          <div className="bg-gray-900/90 p-2.5 rounded-xl border border-emerald-500/50">
+                            <div className="flex items-center justify-between text-[10px] text-emerald-300 mb-1">
+                              <span>💰 Estimasi Profit Bersih:</span>
+                              <span className="font-semibold text-emerald-200">Margin {currentProgramRec.netMarginPct}%</span>
+                            </div>
+                            <div className="font-black text-emerald-400 text-sm">
+                              +{formatRp(currentProgramRec.netProfitPerPcs)} <span className="text-[10px] font-normal text-emerald-300">/ pcs</span>
+                            </div>
+                            <div className="text-[10px] mt-1 text-gray-400">
+                              Total Order: <strong className="text-emerald-300">+{formatRp(currentProgramRec.netProfitTotal)}</strong> (sudah potong fee & subsidi)
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tombol Terapkan Cepat & Keterangan Patungan */}
+                        <div className="pt-2 border-t border-gray-700/60 flex flex-col sm:flex-row items-center justify-between gap-2">
+                          <div className="text-[10px] text-gray-400 text-center sm:text-left">
+                            Porsi Subsidi: Platform <span className="text-emerald-400 font-bold">{formatRp(currentProgramRec.platformSubsidy)}</span> | Toko <span className="text-amber-400 font-bold">{formatRp(currentProgramRec.sellerSubsidy)}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setHargaJual(currentProgramRec.recIdealPrice)}
+                            className="w-full sm:w-auto px-3.5 py-1.5 bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                          >
+                            <span>🎯 Terapkan Harga Rekomendasi ({formatRp(currentProgramRec.recIdealPrice)}) →</span>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
+
+                {/* Simulasi Tambahan Voucher Platform 100% */}
+                <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] text-gray-400">Voucher Platform Tambahan:</span>
+                    {[0, 5, 10, 15, 20].map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setVoucherPlatformPct(p)}
+                        className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                          voucherPlatformPct === p
+                            ? "bg-cyan-600 text-white border-cyan-400"
+                            : "bg-gray-800 text-cyan-300 border-gray-700"
+                        }`}
+                      >
+                        {p === 0 ? "0%" : `${p}%`}
+                      </button>
+                    ))}
+                  </div>
+                  {voucherPlatformNominal > 0 && (
+                    <span className="text-[10px] text-cyan-300 font-bold">
+                      -{formatRp(voucherPlatformNominal)} (100% Platform)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1481,20 +2147,60 @@ export default function App() {
                 )}
 
                 {/* Afiliasi Kreator */}
-                <div className="bg-gray-800/60 border border-gray-700/60 rounded-xl p-2.5">
-                  <div className="flex items-start gap-2">
-                    <input type="checkbox" checked={active.afiliasi} onChange={e=>setActive(p=>({...p,afiliasi:e.target.checked}))} className="accent-pink-500 w-3.5 h-3.5 mt-0.5"/>
-                    <div>
-                      <p className="text-xs text-gray-200 font-semibold">Komisi Afiliasi Kreator</p>
-                      <p className="text-[11px] text-gray-400">Promosi via video/live kreator</p>
-                    </div>
+                <div className="bg-gray-800/60 border border-gray-700/60 rounded-xl p-2.5 col-span-1 sm:col-span-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <label className="flex items-start gap-2 cursor-pointer flex-1">
+                      <input type="checkbox" checked={active.afiliasi} onChange={e=>setActive(p=>({...p,afiliasi:e.target.checked}))} className="accent-pink-500 w-3.5 h-3.5 mt-0.5"/>
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs text-gray-200 font-bold">Komisi Afiliasi Kreator</p>
+                          <span className="text-[10px] bg-pink-500/20 text-pink-300 border border-pink-500/40 px-1.5 py-0.2 rounded font-bold">
+                            Tersedia Pilihan 1%
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400">Promosi via video keranjang kuning, showcase profil, & LIVE kreator</p>
+                      </div>
+                    </label>
+                    {active.afiliasi && (
+                      <span className="text-xs font-black text-pink-400">
+                        {afiliasiPct}% (-{formatRp(afilNom)})
+                      </span>
+                    )}
                   </div>
                   {active.afiliasi && (
-                    <div className="flex items-center gap-1 mt-2 pl-5">
-                      {[3, 5, 8, 10, 15].map(v=>(
-                        <button key={v} onClick={()=>setAfiliasiPct(v)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${afiliasiPct===v?"bg-pink-600 text-white border-pink-500":"bg-gray-800 text-pink-300 border-gray-700"}`}>{v}%</button>
-                      ))}
+                    <div className="mt-2 pl-5 space-y-1.5 pt-2 border-t border-gray-700/50">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-gray-400 font-medium">Pilihan Tarif:</span>
+                        {[1, 2, 3, 5, 8, 10, 15].map(v=>(
+                          <button
+                            key={v}
+                            onClick={()=>setAfiliasiPct(v)}
+                            className={`text-xs px-2 py-0.5 rounded-lg font-bold border transition-all ${
+                              afiliasiPct===v
+                                ? (v===1 ? "bg-amber-500 text-gray-950 border-amber-400 shadow-md font-black" : "bg-pink-600 text-white border-pink-400 shadow-md")
+                                : "bg-gray-800 text-pink-300 border-gray-700 hover:border-pink-500"
+                            }`}
+                          >
+                            {v}%{v===1?" ⭐":""}
+                          </button>
+                        ))}
+                        <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-1.5 py-0.5 ml-1">
+                          <span className="text-[10px] text-gray-400">Custom:</span>
+                          <input
+                            type="number"
+                            min={0.1}
+                            max={50}
+                            step={0.1}
+                            value={afiliasiPct}
+                            onChange={e=>setAfiliasiPct(Math.max(0, Number(e.target.value)))}
+                            className="w-12 bg-transparent text-xs font-bold text-white text-right outline-none"
+                          />
+                          <span className="text-xs text-pink-400 font-bold">%</span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-300/90 leading-relaxed bg-amber-950/30 border border-amber-800/40 rounded-lg p-1.5">
+                        ⭐ <strong>Komisi 1% Afiliasi:</strong> Skema paling aman untuk produk FMCG, sembako, dan snack margin tipis. Kreator tetap bisa memasukkan produk ke Showcase etalase keranjang kuning tanpa menggerus keuntungan pokok toko!
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1525,23 +2231,29 @@ export default function App() {
             </div>
           </div>
 
-          {/* KOLOM KANAN (Hasil Perhitungan & Ringkasan Cuan) */}
+          {/* KOLOM KANAN (Hasil Perhitungan, Struk Pembeli & Ringkasan Cuan) */}
           <div className="lg:col-span-5 space-y-4">
             
-            {/* Box Hasil Utama */}
+            {/* Box Hasil Utama (Aware Quantity & Per Pcs) */}
             <div className={`rounded-2xl p-5 border-2 shadow-2xl ${status.cls}`}>
               <div className="flex justify-between items-center mb-3">
                 <div>
-                  <p className="font-extrabold text-base text-gray-900">Hasil Akhir Per Pesanan</p>
-                  <p className="text-xs text-gray-600">{platform==="tiktok"?"TikTok Shop":"Tokopedia"} · {isMall?"Official Store / Mall":"Regular Merchant"}</p>
+                  <p className="font-black text-base text-gray-900 flex items-center gap-1.5">
+                    <span>📊</span> Hasil Transaksi ({qty} Pcs)
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {platform==="tiktok"?"TikTok Shop":"Tokopedia"} · {qty} unit dlm 1 pesanan
+                  </p>
                 </div>
-                <span className={`font-extrabold text-xs px-3 py-1 rounded-full border-2 ${status.cls}`}>{status.label}</span>
+                <span className={`font-black text-xs px-3 py-1 rounded-full border-2 ${status.cls}`}>
+                  {status.label}
+                </span>
               </div>
 
               <div className="space-y-1.5 text-xs text-gray-800">
                 <div className="flex justify-between font-bold text-sm text-gray-900">
-                  <span>Harga Jual Normal</span>
-                  <span>{formatRp(hargaJual)}</span>
+                  <span>Subtotal Normal ({qty} pcs)</span>
+                  <span>{formatRp(subtotalKatalog)} <span className="text-[11px] font-normal text-gray-500">({formatRp(hargaJual)}/pcs)</span></span>
                 </div>
                 {ikutPromo && diskonSellerNominal > 0 && (
                   <div className="flex justify-between text-pink-700 font-semibold">
@@ -1550,7 +2262,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="flex justify-between font-extrabold text-gray-900 pb-1 border-b border-gray-300">
-                  <span>Harga Bersih (Diterima Pembeli)</span>
+                  <span>Subtotal Bersih (Basis Komisi)</span>
                   <span>{formatRp(hargaSetelahDiskon)}</span>
                 </div>
 
@@ -1561,67 +2273,212 @@ export default function App() {
                   </div>
                 ))}
 
-                {/* Jumlah Penyelesaian Pembayaran (Saldo TikTok/Platform) */}
-                <div className="flex justify-between text-blue-800 font-bold pt-1 border-t border-blue-200 bg-blue-50/50 px-2 py-1.5 rounded-lg -mx-1">
+                {/* Jumlah Penyelesaian Pembayaran (Saldo Masuk ke Toko) */}
+                <div className="flex justify-between items-center text-blue-900 font-bold pt-1.5 pb-1 border-t border-blue-200 bg-blue-100/60 px-2.5 py-1.5 rounded-xl -mx-1">
                   <div>
-                    <span className="text-xs">💳 Jumlah Penyelesaian (Masuk Saldo {platform==="tiktok"?"TikTok":"Tokopedia"})</span>
-                    {platform==="tiktok" && hargaSetelahDiskon >= 14000 && hargaSetelahDiskon <= 15500 && (
-                      <p className="text-[10px] text-blue-600">Settlement nyata Bakpia Rp14.892 → Rp10.750</p>
-                    )}
+                    <span className="text-xs font-black">💳 Saldo Masuk ({platform==="tiktok"?"TikTok":"Tokopedia"})</span>
+                    <p className="text-[10px] text-blue-700 font-medium">
+                      Rata-rata: <strong>{formatRp(jumlahPenyelesaianPerPcs)}</strong> / pcs
+                    </p>
                   </div>
-                  <span className="font-black text-sm">{formatRp(jumlahPenyelesaian)}</span>
+                  <span className="font-black text-base text-blue-950">{formatRp(jumlahPenyelesaian)}</span>
                 </div>
 
                 <div className="flex justify-between text-orange-800 font-semibold border-t border-gray-200 pt-1">
-                  <span>Total Biaya Operasional / Packing</span>
-                  <span>-{formatRp(totalOps)}</span>
+                  <span>Biaya Operasional & Packing</span>
+                  <span>-{formatRp(totalOpsEffective)} <span className="text-[10px] text-gray-500">({opsPerPesanan ? "1 paket" : `${formatRp(totalOps)} × ${qty}`})</span></span>
                 </div>
                 <div className="flex justify-between text-red-700 font-semibold">
-                  <span>Modal Produk (HPP)</span>
-                  <span>-{formatRp(hargaBeli)}</span>
+                  <span>Modal HPP Produk ({qty} pcs)</span>
+                  <span>-{formatRp(subtotalHPP)} <span className="text-[10px] text-gray-500">({formatRp(hargaBeli)}/pcs)</span></span>
                 </div>
 
+                {/* Keuntungan Bersih Akhir */}
                 <div className="border-t-2 border-gray-900 pt-2.5 mt-2 flex justify-between items-center">
                   <div>
                     <span className="text-sm font-black text-gray-950 uppercase tracking-wide">Keuntungan Bersih Toko</span>
-                    <p className="text-[10px] text-gray-600">Setelah saldo masuk dikurangi HPP & operasional</p>
+                    <p className="text-[11px] text-gray-700 font-bold">
+                      Rata-rata per pcs: <span className={cuan>=0?"text-green-800":"text-red-800"}>{cuan>=0?"+":""}{formatRp(cuanPerPcs)} / pcs</span>
+                    </p>
                   </div>
-                  <span className={`text-xl font-black ${cuan>=0?"text-green-700":"text-red-700"}`}>
-                    {cuan>=0?"+":""}{formatRp(cuan)}
-                  </span>
+                  <div className="text-right">
+                    <span className={`text-2xl font-black ${cuan>=0?"text-green-700":"text-red-700"}`}>
+                      {cuan>=0?"+":""}{formatRp(cuan)}
+                    </span>
+                    <span className="text-[10px] text-gray-600 block font-semibold">Total {qty} pcs</span>
+                  </div>
                 </div>
               </div>
 
+              {/* KPI Metrics */}
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {[
                   {label:"Net Margin", val:marginPct, d:marginPct.toFixed(1)+"%"},
                   {label:"ROI Modal", val:roiPct, d:roiPct.toFixed(1)+"%"},
-                  {label:"Total Potongan", val:potPct, d:potPct.toFixed(1)+"%"},
+                  {label:"Total Beban", val:potPct, d:potPct.toFixed(1)+"%"},
                 ].map(s=>(
-                  <div key={s.label} className="bg-white/80 backdrop-blur rounded-xl p-2.5 text-center shadow-sm border border-gray-200">
+                  <div key={s.label} className="bg-white/90 backdrop-blur rounded-xl p-2.5 text-center shadow-sm border border-gray-200">
                     <p className="text-[10px] font-bold text-gray-500 uppercase">{s.label}</p>
-                    <p className={`font-black text-sm ${s.label==="Total Potongan"?"text-gray-900":(s.val>=20?"text-green-700":s.val>=10?"text-orange-600":"text-red-600")}`}>{s.d}</p>
+                    <p className={`font-black text-sm ${s.label==="Total Beban"?"text-gray-900":(s.val>=20?"text-green-700":s.val>=10?"text-orange-600":"text-red-600")}`}>{s.d}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Rekomendasi Target Harga */}
+            {/* FITUR BARU: KARTU ESTIMASI STRUK NOMINAL YANG DIBAYAR PEMBELI (CAMPAIGN & VOUCHER) */}
+            <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl p-4 border border-cyan-500/40 shadow-xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center text-xs font-bold border border-cyan-500/40">🛒</span>
+                  <div>
+                    <p className="text-xs font-black text-white">Struk Checkout Pembeli (Campaign & Voucher)</p>
+                    <p className="text-[10px] text-gray-400">Estimasi nominal yang keluar dari dompet pembeli</p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold border border-cyan-500/30">
+                  Aplikasi TikTok
+                </span>
+              </div>
+
+              <div className="space-y-1.5 text-xs text-gray-300">
+                <div className="flex justify-between">
+                  <span>Harga Normal Katalog ({qty} pcs):</span>
+                  <span className="font-bold text-white">{formatRp(subtotalKatalog)}</span>
+                </div>
+
+                {ikutPromo && diskonSellerNominal > 0 && (
+                  <div className="flex justify-between text-pink-400">
+                    <span>Diskon Campaign Penjual:</span>
+                    <span className="font-bold">-{formatRp(diskonSellerNominal)}</span>
+                  </div>
+                )}
+
+                {coFundedDiskonPembeli > 0 ? (
+                  <div className="bg-purple-950/40 border border-purple-800/60 rounded-xl p-2 space-y-1">
+                    <div className="flex justify-between text-purple-300 font-bold">
+                      <span>Voucher Campaign ({activeCoFundedTier?.label.split("·")[0] || "Co-Funded"}):</span>
+                      <span className="text-emerald-400 font-black">-{formatRp(coFundedDiskonPembeli)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-400 pt-0.5 border-t border-purple-900/40">
+                      <span>Subsidi TikTok Platform: <strong className="text-cyan-300">{formatRp(subsidiPlatformCoFunded)}</strong></span>
+                      <span>Beban Toko: <strong className="text-amber-400">{formatRp(coFundedNom)}</strong></span>
+                    </div>
+                  </div>
+                ) : activeCoFundedTier && !isCoFundedMinBelanjaMet ? (
+                  <div className="text-[11px] text-amber-300/90 bg-amber-950/30 border border-amber-800/40 rounded-lg p-2">
+                    ⚠️ Voucher Co-Funded belum aktif karena belanja &lt; {formatRp(activeCoFundedTier.minBelanja)}.
+                  </div>
+                ) : null}
+
+                {voucherPlatformNominal > 0 && (
+                  <div className="flex justify-between text-cyan-400 font-semibold">
+                    <span>Voucher Tambahan Platform ({voucherPlatformPct}%):</span>
+                    <span className="font-bold">-{formatRp(voucherPlatformNominal)}</span>
+                  </div>
+                )}
+
+                {/* TOTAL DIBAYAR PEMBELI */}
+                <div className="pt-2 border-t border-gray-700/80 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-white uppercase tracking-wider block">
+                      Total Dibayar Pembeli:
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold">
+                      Rata-rata: {formatRp(nominalDibayarPembeliPerPcs)} / pcs
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-black text-emerald-400">
+                      {formatRp(nominalDibayarPembeli)}
+                    </span>
+                    {subtotalKatalog > nominalDibayarPembeli && (
+                      <span className="text-[10px] text-gray-400 block">
+                        Hemat {formatRp(subtotalKatalog - nominalDibayarPembeli)} ({(((subtotalKatalog - nominalDibayarPembeli)/subtotalKatalog)*100).toFixed(0)}%)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ringkasan Win-Win */}
+                <div className="pt-2 border-t border-gray-800 bg-gray-900/70 -mx-4 -mb-4 p-3 rounded-b-2xl flex items-center justify-between text-[11px]">
+                  <div>
+                    <span className="text-gray-400 block">Pembeli Puas:</span>
+                    <strong className="text-cyan-300">{formatRp(nominalDibayarPembeli)}</strong>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-gray-400 block">Saldo Masuk:</span>
+                    <strong className="text-blue-300">{formatRp(jumlahPenyelesaian)}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 block">Laba Bersih Toko:</span>
+                    <strong className={cuan>=0?"text-emerald-400":"text-red-400"}>
+                      {cuan>=0?"+":""}{formatRp(cuan)}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rekomendasi Target Harga Ideal (6 Skema) */}
             <div className="bg-gray-900/90 rounded-2xl p-4 border border-gray-800 shadow-md">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">🎯 Rekomendasi Harga Jual Ideal</p>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">🎯 6 Skema Harga Logis ({qty} Pcs)</p>
+                <span className="text-[10px] text-pink-400 font-semibold">Klik untuk set harga</span>
+              </div>
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-gray-800/80 p-2.5 rounded-xl border border-gray-700">
-                  <p className="text-[11px] text-red-400 font-bold">Impas (BEP)</p>
-                  <p className="text-sm font-extrabold text-white mt-0.5">{formatRp(bep)}</p>
-                </div>
-                <div className="bg-gray-800/80 p-2.5 rounded-xl border border-gray-700">
-                  <p className="text-[11px] text-yellow-400 font-bold">Margin 20%</p>
-                  <p className="text-sm font-extrabold text-white mt-0.5">{formatRp(h20)}</p>
-                </div>
-                <div className="bg-gray-800/80 p-2.5 rounded-xl border border-gray-700">
-                  <p className="text-[11px] text-green-400 font-bold">Margin 30%</p>
-                  <p className="text-sm font-extrabold text-white mt-0.5">{formatRp(h30)}</p>
-                </div>
+                <button
+                  onClick={() => setHargaJual(bep)}
+                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                >
+                  <p className="text-[10px] text-red-400 font-bold truncate">Impas (BEP 0%)</p>
+                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(bep)}</p>
+                  <p className="text-[9px] text-gray-400">Modal balik</p>
+                </button>
+
+                <button
+                  onClick={() => setHargaJual(h10)}
+                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                >
+                  <p className="text-[10px] text-amber-400 font-bold truncate">Penetrasi 10%</p>
+                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h10)}</p>
+                  <p className="text-[9px] text-gray-400">Volume FYP</p>
+                </button>
+
+                <button
+                  onClick={() => setHargaJual(h15)}
+                  className="bg-emerald-950/60 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-500/60 transition-all text-left shadow-sm"
+                >
+                  <p className="text-[10px] text-emerald-300 font-black truncate">⭐ Ideal 15%</p>
+                  <p className="text-xs font-extrabold text-emerald-100 mt-0.5">{formatRp(h15)}</p>
+                  <p className="text-[9px] text-emerald-300/80">Logis & aman</p>
+                </button>
+
+                <button
+                  onClick={() => setHargaJual(h20)}
+                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                >
+                  <p className="text-[10px] text-blue-400 font-bold truncate">Sehat 20%</p>
+                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h20)}</p>
+                  <p className="text-[9px] text-gray-400">Cover retur</p>
+                </button>
+
+                <button
+                  onClick={() => setHargaJual(h25)}
+                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                >
+                  <p className="text-[10px] text-purple-400 font-bold truncate">Campaign 25%</p>
+                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h25)}</p>
+                  <p className="text-[9px] text-gray-400">Buffer voucher</p>
+                </button>
+
+                <button
+                  onClick={() => setHargaJual(h30)}
+                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                >
+                  <p className="text-[10px] text-pink-400 font-bold truncate">Premium 30%</p>
+                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h30)}</p>
+                  <p className="text-[9px] text-gray-400">Margin tebal</p>
+                </button>
               </div>
             </div>
 
@@ -1639,6 +2496,253 @@ export default function App() {
                 Buka Panduan & Jenis Campaign →
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: MATRIKS REKOMENDASI PROGRAM & HPP ── */}
+      {mainTab === "matriks_program" && (
+        <div className="max-w-7xl mx-auto px-4 pb-8 space-y-5">
+          {/* Header Card with interactive HPP & Qty Quick Tweak */}
+          <div className="bg-gradient-to-r from-gray-900 via-indigo-950/60 to-purple-950/50 rounded-2xl p-5 border border-indigo-500/40 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">🎯</span>
+                  <h2 className="text-xl font-black text-white">
+                    Matriks Rekomendasi Program, HPP & Harga Jual
+                  </h2>
+                </div>
+                <p className="text-xs text-indigo-200">
+                  Rekomendasi otomatis HPP ideal, rentang harga jual aman (BEP s/d Ideal Cuan), dan estimasi profit untuk seluruh program campaign (LIVE Festival Q3 2026, XBP Gajian & 11.11, Bebas Biaya Komisi, Always On).
+                </p>
+              </div>
+
+              {/* Quick Input Bar: Modal HPP & Qty */}
+              <div className="flex flex-wrap items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/10">
+                <div>
+                  <label className="text-[10px] text-gray-400 block font-semibold mb-0.5">Modal HPP Satuan</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1.5 text-xs text-gray-400 font-bold">Rp</span>
+                    <input
+                      type="number"
+                      value={hargaBeli}
+                      onChange={(e) => setHargaBeli(Math.max(1, Number(e.target.value)))}
+                      className="w-28 pl-8 pr-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded-lg text-white font-bold focus:ring-1 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 block font-semibold mb-0.5">Jumlah Qty</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      value={qty}
+                      onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+                      className="w-16 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded-lg text-white font-bold text-center focus:ring-1 focus:ring-pink-500"
+                    />
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 5].map(q => (
+                        <button
+                          key={q}
+                          onClick={() => setQty(q)}
+                          className={`px-1.5 py-1 text-[10px] rounded font-bold transition-all ${qty === q ? "bg-pink-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+                        >
+                          {q}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="mt-4 pt-4 border-t border-gray-800 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-400 font-bold mr-1">Filter Program:</span>
+              {[
+                ["all", "Semua Program"],
+                ["live_fest", "🎙️ LIVE Festival Q3 2026 (8 Tier)"],
+                ["xbp_gajian", "⭐ XBP Gajian & 11.11 (4 Tier)"],
+                ["bebas_biaya", "🛡️ Bebas Biaya Komisi (3 Tier)"],
+                ["reg_spesial", "🟠 Reguler & Spesial (8 Tier)"],
+              ].map(([filterKey, label]) => (
+                <button
+                  key={filterKey}
+                  onClick={() => setMatrixFilter(filterKey)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    matrixFilter === filterKey
+                      ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md"
+                      : "bg-gray-800/80 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700/60"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Grid Program Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {CO_FUNDED_TIERS
+              .filter(tier => {
+                if (matrixFilter === "all") return true;
+                if (matrixFilter === "live_fest") return tier.group === "live_fest";
+                if (matrixFilter === "xbp_gajian") return tier.group === "xbp";
+                if (matrixFilter === "bebas_biaya") return tier.group === "free";
+                if (matrixFilter === "reg_spesial") return tier.group === "reg" || tier.group === "sp";
+                return true;
+              })
+              .map(tier => {
+                const rec = getProgramRecommendation(tier);
+                const isSelected = selectedCoFunded === tier.id;
+                const isHppMatch = hargaBeli >= rec.hppMin && hargaBeli <= rec.hppMax;
+
+                return (
+                  <div
+                    key={tier.id}
+                    className={`bg-gray-900/90 rounded-2xl p-4 border transition-all shadow-md flex flex-col justify-between ${
+                      isSelected
+                        ? "border-pink-500/80 ring-2 ring-pink-500/30"
+                        : "border-gray-800 hover:border-gray-700"
+                    }`}
+                  >
+                    <div>
+                      {/* Header Card */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm">
+                              {tier.group === "live_fest" ? "🎙️" : tier.group === "xbp" ? "⭐" : tier.group === "free" ? "🛡️" : "🤝"}
+                            </span>
+                            <span className="font-extrabold text-white text-sm">
+                              {tier.label.split("·")[0]}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {tier.group === "live_fest"
+                              ? "TikTok Shop LIVE Festival Q3 2026"
+                              : tier.group === "xbp"
+                              ? "XBP Extra Voucher Gajian Sale & 11.11"
+                              : tier.group === "free"
+                              ? "Program Bebas Biaya Komisi Extra"
+                              : "Co-Funded Campaign Reguler / Spesial"}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${rec.statusCls}`}>
+                            {rec.statusBadge}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-semibold">
+                            Min. Belanja: <strong className="text-white">{formatRp(tier.minBelanja)}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Info Proporsi & Voucher */}
+                      <div className="bg-black/30 rounded-xl p-2.5 mb-3 border border-white/5 grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Proporsi Patungan:</span>
+                          <span className="font-bold text-amber-300">
+                            Plat. {tier.platformPct}% : Toko {tier.sellerPct}%
+                          </span>
+                          <span className="text-[9px] text-gray-500 block">
+                            Beban Seller: {tier.effectiveSellerPct}% (Cap {formatRp(tier.capSeller)})
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Voucher Pembeli:</span>
+                          <span className="font-bold text-emerald-400">
+                            Diskon {tier.diskonPembeli}%
+                          </span>
+                          <span className="text-[9px] text-gray-400 block">
+                            Min. Belanja: {formatRp(tier.minBelanja)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tips Kelayakan */}
+                      <div className="text-[11px] text-gray-300 bg-gray-800/60 p-2 rounded-lg border border-gray-700/60 mb-3 flex items-start gap-1.5">
+                        <span className="text-amber-400 text-xs">💡</span>
+                        <div className="leading-snug text-[10px] sm:text-[11px]">{rec.statusTips}</div>
+                      </div>
+
+                      {/* 4 Kolom Rekomendasi Utama */}
+                      <div className="grid grid-cols-2 gap-2 text-[11px] mb-3">
+                        {/* 1. Rekomendasi HPP */}
+                        <div className="bg-gray-800/40 p-2 rounded-lg border border-gray-700/50">
+                          <span className="text-gray-400 text-[10px] block">Rekomendasi HPP:</span>
+                          <span className="font-bold text-white text-xs block">
+                            {formatRp(rec.hppMin)} – {formatRp(rec.hppMax)}
+                          </span>
+                          <span className={`text-[9px] font-semibold block mt-0.5 ${isHppMatch ? "text-emerald-400" : "text-amber-400"}`}>
+                            {isHppMatch ? "✅ Modal Anda Pas" : hargaBeli < rec.hppMin ? "📦 Perlu Bundling" : "⚠️ HPP Tinggi"}
+                          </span>
+                        </div>
+
+                        {/* 2. Rekomendasi Harga Jual */}
+                        <div className="bg-indigo-950/30 p-2 rounded-lg border border-indigo-700/40">
+                          <span className="text-indigo-300 text-[10px] block">Rekomendasi Jual:</span>
+                          <span className="font-extrabold text-indigo-200 text-xs block">
+                            {formatRp(rec.recIdealPrice)} <span className="text-[9px] font-normal text-indigo-300">/ pcs</span>
+                          </span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">
+                            Rentang: {formatRp(rec.recMinPrice)} (BEP) s/d {formatRp(rec.recMaxPrice)}
+                          </span>
+                        </div>
+
+                        {/* 3. Estimasi Dibayar Pembeli */}
+                        <div className="bg-pink-950/30 p-2 rounded-lg border border-pink-700/40">
+                          <span className="text-pink-300 text-[10px] block">Bayar Pembeli:</span>
+                          <span className="font-extrabold text-pink-200 text-xs block">
+                            {formatRp(rec.buyerCheckoutPerPcs)} <span className="text-[9px] font-normal text-pink-300">/ pcs</span>
+                          </span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">
+                            Total: {formatRp(rec.buyerCheckout)} (Hemat {formatRp(rec.buyerVoucherNominal)})
+                          </span>
+                        </div>
+
+                        {/* 4. Estimasi Keuntungan Bersih */}
+                        <div className="bg-emerald-950/30 p-2 rounded-lg border border-emerald-700/40">
+                          <span className="text-emerald-300 text-[10px] block">Profit Bersih:</span>
+                          <span className="font-extrabold text-emerald-300 text-xs block">
+                            +{formatRp(rec.netProfitPerPcs)} <span className="text-[9px] font-normal text-emerald-400">/ pcs</span>
+                          </span>
+                          <span className="text-[9px] text-emerald-400/80 block mt-0.5">
+                            Total +{formatRp(rec.netProfitTotal)} ({rec.netMarginPct}% Margin)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Action */}
+                    <div className="pt-2 border-t border-gray-800 flex items-center justify-between gap-2">
+                      <div className="text-[10px] text-gray-400">
+                        Subsidi Toko: <strong className="text-amber-300">{formatRp(rec.sellerSubsidy)}</strong>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedCoFunded(tier.id);
+                          setHargaJual(rec.recIdealPrice);
+                          setMainTab("kalkulator");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow active:scale-95 flex items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                            : "bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white"
+                        }`}
+                      >
+                        <span>{isSelected ? "✅ Sedang Dipilih" : "🎯 Pilih & Pasang Harga Ini"}</span>
+                        <span>→</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
