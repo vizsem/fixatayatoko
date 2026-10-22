@@ -916,6 +916,9 @@ export default function App() {
   const [qty, setQty] = useState(1); // Jumlah quantity produk yang dihitung
   const [opsPerPesanan, setOpsPerPesanan] = useState(true); // true = 1 paket per pesanan (hemat), false = per pcs
   const [customTargetMargin, setCustomTargetMargin] = useState<number>(15); // Target margin custom (%)
+  const [targetProfitMode, setTargetProfitMode] = useState<"percent" | "nominal">("percent"); // Mode target profit: persen (%) vs nominal (Rp)
+  const [customTargetNominal, setCustomTargetNominal] = useState<number>(5000); // Target profit nominal custom (Rp)
+  const [targetNominalScope, setTargetNominalScope] = useState<"per_pcs" | "per_order">("per_pcs"); // per_pcs vs per_order
   const [ops, setOps] = useState(INIT_OPS);
   const [mainTab, setMainTab] = useState("kalkulator");
   const [strTab, setStrTab] = useState("campaign_guide");
@@ -1085,6 +1088,55 @@ export default function App() {
   const h25 = calcH(25); // Margin Campaign & Ads
   const h30 = calcH(30); // Margin Tebal
   const customTargetPrice = calcH(customTargetMargin);
+
+  // Fungsi kalkulasi target harga jual per pcs untuk mencapai target profit nominal bersih (Rp)
+  function calcHNominal(targetProfitPerPcs = 5000, targetQty = qty) {
+    const opsEff = opsPerPesanan ? totalOps : totalOps * targetQty;
+    const base = (hargaBeli * targetQty) + opsEff;
+    const targetNetTotal = targetProfitPerPcs * targetQty;
+    const startH = Math.max(10, Math.floor(hargaBeli * 0.9));
+    for (let h = startH; h <= 20_000_000; h += 25) {
+      const sub = h * targetQty;
+      const disc = !ikutPromo ? 0 : (diskonType === "pct" ? (diskonVal / 100) * sub : Math.min(diskonVal * targetQty, sub));
+      const hClean = Math.max(0, sub - disc);
+      const kb = kat.komisi * (1 - gmvDisc);
+      const kn = Math.round((kb / 100) * hClean);
+      const dn = active.komisi_dinamis ? Math.round(Math.min((dinamisPct / 100) * hClean, dinamisCap * targetQty)) : 0;
+      const pn = active.biaya_proses ? 1250 : 0;
+      const ppn = active.pph22 ? Math.round((0.5 / 100) * hClean) : 0;
+      const gxn = (active.growth_xtra && platform === "tiktok") ? Math.round((growthXtraPct / 100) * hClean) : 0;
+      const ln = active.biaya_logistik ? biayaLogistikNom : 0;
+      const mn = (active.mall_fee || isMall) ? Math.round(Math.min((1.8 / 100) * hClean, 50000 * targetQty)) : 0;
+      const on = active.gratis_ongkir ? Math.round((5.5 / 100) * hClean) : 0;
+      const vn = active.voucher_xtra ? Math.round(Math.min((3.5 / 100) * hClean, 20000 * targetQty)) : 0;
+      const po = (active.pre_order && platform === "tiktok") ? Math.round((3 / 100) * hClean) : 0;
+      const an = active.afiliasi ? Math.round((afiliasiPct / 100) * hClean) : 0;
+      const gn = (active.gmv_max && platform === "tiktok") ? Math.round((gmvPct / 100) * hClean) : 0;
+      const tn = (active.topads && platform === "tokopedia") ? Math.round((3 / 100) * hClean) : 0;
+      const lvn = (active.live_ads && platform === "tiktok") ? Math.round((liveAdsPct / 100) * hClean) : 0;
+      const cn = active.cashback_bonus ? Math.round((2 / 100) * hClean) : 0;
+      const cfn = (activeCoFundedTier && activeCoFundedTier.effectiveSellerPct > 0 && hClean >= activeCoFundedTier.minBelanja)
+        ? Math.round(Math.min((activeCoFundedTier.effectiveSellerPct / 100) * hClean, activeCoFundedTier.capSeller))
+        : 0;
+      const pot = kn + dn + pn + ppn + gxn + ln + mn + on + vn + po + an + gn + tn + lvn + cn + cfn;
+      const netProfit = hClean - pot - base;
+      if (netProfit >= targetNetTotal) {
+        return Math.ceil(h / 50) * 50;
+      }
+    }
+    return Math.max(hargaBeli + targetProfitPerPcs, 1000);
+  }
+
+  // Preset kalkulasi harga nominal target cuan bersih per pcs
+  const effTargetNominalPerPcs = targetNominalScope === "per_order" ? Math.max(1, Math.round(customTargetNominal / (qty || 1))) : customTargetNominal;
+  const customTargetNominalPrice = calcHNominal(effTargetNominalPerPcs);
+
+  const n2k = calcHNominal(2000);
+  const n5k = calcHNominal(5000);
+  const n10k = calcHNominal(10000);
+  const n15k = calcHNominal(15000);
+  const n25k = calcHNominal(25000);
+  const n50k = calcHNominal(50000);
 
   // ── KALKULASI REKOMENDASI IKUT PROGRAM TIKTOK SHOP / CO-FUNDED ──
   function getProgramRecommendation(tier: CoFundedTier, currentHpp = hargaBeli, currentQty = qty) {
@@ -1590,120 +1642,312 @@ export default function App() {
                 </div>
               </div>
 
-              {/* FITUR BARU: SKEMA UNTUNG LOGIS & RELEVAN (CEGAH RUGI & TIDAK KEMAHALAN) */}
+              {/* FITUR BARU: SKEMA UNTUNG LOGIS & RELEVAN (DUAL MODE: PERSEN % & NOMINAL RP) */}
               <div className="bg-gray-950/70 border border-gray-800 rounded-2xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🎯</span>
                     <div>
-                      <p className="text-xs font-black text-white">Skema Untung Logis & Relevan</p>
-                      <p className="text-[10px] text-gray-400">Pilih target harga jual agar tidak kemahalan di TikTok tapi tidak sampai rugi</p>
+                      <p className="text-xs font-black text-white">Target Profit & Skema Harga Logis</p>
+                      <p className="text-[10px] text-gray-400">Tentukan target untung dalam <span className="text-pink-400 font-semibold">Persen (%)</span> atau <span className="text-emerald-400 font-semibold">Nominal Bersih (Rp)</span></p>
                     </div>
                   </div>
-                  <span className="text-[10px] bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full font-bold border border-pink-500/30">
-                    Otomatis Hitung
-                  </span>
+
+                  {/* Switcher Mode: Persen vs Nominal */}
+                  <div className="flex bg-gray-900 p-0.5 rounded-xl border border-gray-800 text-[11px] font-bold self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfitMode("percent")}
+                      className={`py-1 px-2.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                        targetProfitMode === "percent"
+                          ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <span>📊</span> Persen (%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfitMode("nominal")}
+                      className={`py-1 px-2.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                        targetProfitMode === "nominal"
+                          ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <span>💵</span> Nominal (Rp)
+                    </button>
+                  </div>
                 </div>
 
-                {/* Grid 6 Tombol Skema Margin */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {/* BEP */}
-                  <button
-                    onClick={() => setHargaJual(bep)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-red-950/40 border-red-800/80 hover:bg-red-950/70"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-red-300">🛑 BEP (Impas 0%)</span>
-                    </div>
-                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(bep)}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Batas modal balik 100%</p>
-                  </button>
+                {/* KONTEN JIKA MODE: PERSEN (%) */}
+                {targetProfitMode === "percent" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {/* BEP */}
+                      <button
+                        onClick={() => setHargaJual(bep)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-red-950/40 border-red-800/80 hover:bg-red-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-red-300">🛑 BEP (Impas 0%)</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(bep)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Batas modal balik 100%</p>
+                      </button>
 
-                  {/* Penetrasi 10% */}
-                  <button
-                    onClick={() => setHargaJual(h10)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-amber-950/40 border-amber-800/80 hover:bg-amber-950/70"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-amber-300">⚡ Penetrasi (10%)</span>
-                    </div>
-                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h10)}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Murah, kejar volume & FYP</p>
-                  </button>
+                      {/* Penetrasi 10% */}
+                      <button
+                        onClick={() => setHargaJual(h10)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-amber-950/40 border-amber-800/80 hover:bg-amber-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-300">⚡ Penetrasi (10%)</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(h10)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Murah, kejar volume & FYP</p>
+                      </button>
 
-                  {/* Rekomendasi Seimbang 15% (Highlight) */}
-                  <button
-                    onClick={() => setHargaJual(h15)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-emerald-950/70 to-teal-950/70 border-emerald-500/80 hover:border-emerald-400 shadow-md relative overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-emerald-300">🎯 Rekomendasi (15%)</span>
-                      <span className="text-[9px] bg-emerald-500 text-gray-950 px-1 rounded font-black">IDEAL</span>
-                    </div>
-                    <p className="text-xs font-extrabold text-emerald-100 mt-1">{formatRp(h15)}</p>
-                    <p className="text-[10px] text-emerald-300/80 mt-0.5">Pas di pembeli, cuan aman</p>
-                  </button>
+                      {/* Rekomendasi Seimbang 15% (Highlight) */}
+                      <button
+                        onClick={() => setHargaJual(h15)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-emerald-950/70 to-teal-950/70 border-emerald-500/80 hover:border-emerald-400 shadow-md relative overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-emerald-300">🎯 Rekomendasi (15%)</span>
+                          <span className="text-[9px] bg-emerald-500 text-gray-950 px-1 rounded font-black">IDEAL</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-emerald-100 mt-1">{formatRp(h15)}</p>
+                        <p className="text-[10px] text-emerald-300/80 mt-0.5">Pas di pembeli, cuan aman</p>
+                      </button>
 
-                  {/* Margin Sehat 20% */}
-                  <button
-                    onClick={() => setHargaJual(h20)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-blue-950/40 border-blue-800/80 hover:bg-blue-950/70"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-blue-300">🛡️ Margin Sehat (20%)</span>
-                    </div>
-                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h20)}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Cover retur & operasional</p>
-                  </button>
+                      {/* Margin Sehat 20% */}
+                      <button
+                        onClick={() => setHargaJual(h20)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-blue-950/40 border-blue-800/80 hover:bg-blue-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-blue-300">🛡️ Margin Sehat (20%)</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(h20)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Cover retur & operasional</p>
+                      </button>
 
-                  {/* Campaign & Ads 25% */}
-                  <button
-                    onClick={() => setHargaJual(h25)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-purple-950/40 border-purple-800/80 hover:bg-purple-950/70"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-purple-300">🎪 Campaign (25%)</span>
-                    </div>
-                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h25)}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Ruang diskon voucher & ads</p>
-                  </button>
+                      {/* Campaign & Ads 25% */}
+                      <button
+                        onClick={() => setHargaJual(h25)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-purple-950/40 border-purple-800/80 hover:bg-purple-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-purple-300">🎪 Campaign (25%)</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(h25)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Ruang diskon voucher & ads</p>
+                      </button>
 
-                  {/* Margin Tebal 30% */}
-                  <button
-                    onClick={() => setHargaJual(h30)}
-                    className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-pink-950/40 border-pink-800/80 hover:bg-pink-950/70"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-pink-300">💎 Premium (30%)</span>
+                      {/* Margin Tebal 30% */}
+                      <button
+                        onClick={() => setHargaJual(h30)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-pink-950/40 border-pink-800/80 hover:bg-pink-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-pink-300">💎 Premium (30%)</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(h30)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Produk unik / tanpa saingan</p>
+                      </button>
                     </div>
-                    <p className="text-xs font-extrabold text-white mt-1">{formatRp(h30)}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Produk unik / tanpa saingan</p>
-                  </button>
-                </div>
 
-                {/* Custom Target Margin Input */}
-                <div className="pt-2 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-[11px]">Ketik Margin Custom:</span>
-                    <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-2 py-0.5">
-                      <input
-                        type="number"
-                        min={1}
-                        max={80}
-                        value={customTargetMargin}
-                        onChange={e => setCustomTargetMargin(Math.max(1, Number(e.target.value)))}
-                        className="w-10 bg-transparent text-white font-bold text-xs outline-none text-right"
-                      />
-                      <span className="text-gray-400 font-bold text-xs">%</span>
+                    {/* Custom Target Margin Input */}
+                    <div className="pt-2 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-[11px]">Ketik Margin Custom:</span>
+                        <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-2 py-0.5">
+                          <input
+                            type="number"
+                            min={1}
+                            max={80}
+                            value={customTargetMargin}
+                            onChange={e => setCustomTargetMargin(Math.max(1, Number(e.target.value)))}
+                            className="w-12 bg-transparent text-white font-bold text-xs outline-none text-right"
+                          />
+                          <span className="text-gray-400 font-bold text-xs">%</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setHargaJual(customTargetPrice)}
+                        className="bg-gray-800 hover:bg-pink-600 text-pink-300 hover:text-white px-3 py-1 rounded-xl font-bold transition-all border border-pink-500/40 text-[11px] self-end sm:self-auto"
+                      >
+                        Terapkan Harga {formatRp(customTargetPrice)} ({customTargetMargin}%) →
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setHargaJual(customTargetPrice)}
-                    className="bg-gray-800 hover:bg-pink-600 text-pink-300 hover:text-white px-3 py-1 rounded-xl font-bold transition-all border border-pink-500/40 text-[11px] self-end sm:self-auto"
-                  >
-                    Terapkan Harga {formatRp(customTargetPrice)} ({customTargetMargin}%) →
-                  </button>
-                </div>
+                )}
+
+                {/* KONTEN JIKA MODE: NOMINAL (RP / RIBUAN) */}
+                {targetProfitMode === "nominal" && (
+                  <div className="space-y-3">
+                    {/* Sub-header Scope (Per Pcs vs Per Pesanan) */}
+                    <div className="flex items-center justify-between bg-gray-900/80 px-2.5 py-1.5 rounded-xl border border-gray-800 text-xs">
+                      <span className="text-[11px] text-gray-400 font-medium">Hitung target cuan untuk:</span>
+                      <div className="flex items-center gap-1 bg-gray-950 p-0.5 rounded-lg border border-gray-700">
+                        <button
+                          type="button"
+                          onClick={() => setTargetNominalScope("per_pcs")}
+                          className={`px-2 py-0.5 text-[10px] rounded font-bold transition-all ${
+                            targetNominalScope === "per_pcs"
+                              ? "bg-emerald-600 text-white"
+                              : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          Per Pcs
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTargetNominalScope("per_order")}
+                          className={`px-2 py-0.5 text-[10px] rounded font-bold transition-all ${
+                            targetNominalScope === "per_order"
+                              ? "bg-teal-600 text-white"
+                              : "text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          Per Pesanan ({qty} Pcs)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Grid 6 Tombol Preset Nominal Cuan */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {/* +Rp2.000 */}
+                      <button
+                        onClick={() => setHargaJual(n2k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-amber-950/40 border-amber-800/80 hover:bg-amber-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-300">⚡ +Rp2.000 / pcs</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(n2k)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Volume cepat, harga kompetitif</p>
+                      </button>
+
+                      {/* +Rp5.000 (Ideal) */}
+                      <button
+                        onClick={() => setHargaJual(n5k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-emerald-950/70 to-teal-950/70 border-emerald-500/80 hover:border-emerald-400 shadow-md relative overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-emerald-300">🎯 +Rp5.000 / pcs</span>
+                          <span className="text-[9px] bg-emerald-500 text-gray-950 px-1 rounded font-black">IDEAL</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-emerald-100 mt-1">{formatRp(n5k)}</p>
+                        <p className="text-[10px] text-emerald-300/80 mt-0.5">Standar logis paling seimbang</p>
+                      </button>
+
+                      {/* +Rp10.000 */}
+                      <button
+                        onClick={() => setHargaJual(n10k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-blue-950/40 border-blue-800/80 hover:bg-blue-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-blue-300">🛡️ +Rp10.000 / pcs</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(n10k)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Nyaman, aman biaya retur</p>
+                      </button>
+
+                      {/* +Rp15.000 */}
+                      <button
+                        onClick={() => setHargaJual(n15k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-purple-950/40 border-purple-800/80 hover:bg-purple-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-purple-300">🎪 +Rp15.000 / pcs</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(n15k)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Tebal, siap bakar voucher ads</p>
+                      </button>
+
+                      {/* +Rp25.000 */}
+                      <button
+                        onClick={() => setHargaJual(n25k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-pink-950/40 border-pink-800/80 hover:bg-pink-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-pink-300">💎 +Rp25.000 / pcs</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(n25k)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Cocok fashion / elektronik</p>
+                      </button>
+
+                      {/* +Rp50.000 */}
+                      <button
+                        onClick={() => setHargaJual(n50k)}
+                        className="p-2.5 rounded-xl border text-left transition-all hover:scale-[1.02] bg-indigo-950/40 border-indigo-800/80 hover:bg-indigo-950/70"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-indigo-300">👑 +Rp50.000 / pcs</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-white mt-1">{formatRp(n50k)}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Produk eksklusif / margin jumbo</p>
+                      </button>
+                    </div>
+
+                    {/* Custom Target Nominal Input */}
+                    <div className="pt-2 border-t border-gray-800 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 text-[11px]">Ketik Nominal Cuan:</span>
+                          <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-2 py-0.5">
+                            <span className="text-emerald-400 font-bold text-xs">Rp</span>
+                            <input
+                              type="number"
+                              min={100}
+                              step={500}
+                              value={customTargetNominal}
+                              onChange={e => setCustomTargetNominal(Math.max(0, Number(e.target.value)))}
+                              className="w-24 bg-transparent text-white font-bold text-xs outline-none"
+                            />
+                            <span className="text-gray-500 text-[10px]">/{targetNominalScope === "per_pcs" ? "pcs" : "order"}</span>
+                          </div>
+                        </div>
+
+                        {/* Preset Chips */}
+                        <div className="flex items-center gap-1">
+                          {[3000, 7500, 12000, 20000].map(v => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setCustomTargetNominal(v)}
+                              className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${
+                                customTargetNominal === v
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-gray-800 text-gray-400 hover:text-white"
+                              }`}
+                            >
+                              +{v >= 1000 ? `${v / 1000}rb` : v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Baris Ringkasan & Tombol Terapkan */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
+                        <p className="text-[11px] text-emerald-300">
+                          Target bersih: <strong className="text-white">{formatRp(effTargetNominalPerPcs)}/pcs</strong>
+                          {qty > 1 && (
+                            <span className="text-gray-400"> (Total {formatRp(effTargetNominalPerPcs * qty)} untuk {qty} pcs)</span>
+                          )}
+                        </p>
+                        <button
+                          onClick={() => setHargaJual(customTargetNominalPrice)}
+                          className="bg-emerald-950 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1 rounded-xl font-bold transition-all border border-emerald-500/50 text-[11px] self-end sm:self-auto shadow-sm"
+                        >
+                          Terapkan Harga {formatRp(customTargetNominalPrice)} (+{formatRp(effTargetNominalPerPcs)}) →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* FITUR: Simulasi Diskon Campaign Seller */}
@@ -2419,67 +2663,148 @@ export default function App() {
               </div>
             </div>
 
-            {/* Rekomendasi Target Harga Ideal (6 Skema) */}
+            {/* Rekomendasi Target Harga Ideal (6 Skema - Persen & Nominal) */}
             <div className="bg-gray-900/90 rounded-2xl p-4 border border-gray-800 shadow-md">
               <div className="flex items-center justify-between mb-2.5">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">🎯 6 Skema Harga Logis ({qty} Pcs)</p>
-                <span className="text-[10px] text-pink-400 font-semibold">Klik untuk set harga</span>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  🎯 6 Skema Harga ({targetProfitMode === "percent" ? "%" : "Rp"})
+                </p>
+                <div className="flex items-center gap-1 bg-gray-800 p-0.5 rounded-lg border border-gray-700 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setTargetProfitMode("percent")}
+                    className={`px-2 py-0.5 rounded font-bold transition-all ${
+                      targetProfitMode === "percent" ? "bg-pink-600 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    %
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTargetProfitMode("nominal")}
+                    className={`px-2 py-0.5 rounded font-bold transition-all ${
+                      targetProfitMode === "nominal" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Rp
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <button
-                  onClick={() => setHargaJual(bep)}
-                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
-                >
-                  <p className="text-[10px] text-red-400 font-bold truncate">Impas (BEP 0%)</p>
-                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(bep)}</p>
-                  <p className="text-[9px] text-gray-400">Modal balik</p>
-                </button>
 
-                <button
-                  onClick={() => setHargaJual(h10)}
-                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
-                >
-                  <p className="text-[10px] text-amber-400 font-bold truncate">Penetrasi 10%</p>
-                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h10)}</p>
-                  <p className="text-[9px] text-gray-400">Volume FYP</p>
-                </button>
+              {/* Grid 6 Tombol Sesuai Mode */}
+              {targetProfitMode === "percent" ? (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <button
+                    onClick={() => setHargaJual(bep)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-red-400 font-bold truncate">Impas (BEP 0%)</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(bep)}</p>
+                    <p className="text-[9px] text-gray-400">Modal balik</p>
+                  </button>
 
-                <button
-                  onClick={() => setHargaJual(h15)}
-                  className="bg-emerald-950/60 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-500/60 transition-all text-left shadow-sm"
-                >
-                  <p className="text-[10px] text-emerald-300 font-black truncate">⭐ Ideal 15%</p>
-                  <p className="text-xs font-extrabold text-emerald-100 mt-0.5">{formatRp(h15)}</p>
-                  <p className="text-[9px] text-emerald-300/80">Logis & aman</p>
-                </button>
+                  <button
+                    onClick={() => setHargaJual(h10)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-amber-400 font-bold truncate">Penetrasi 10%</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h10)}</p>
+                    <p className="text-[9px] text-gray-400">Volume FYP</p>
+                  </button>
 
-                <button
-                  onClick={() => setHargaJual(h20)}
-                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
-                >
-                  <p className="text-[10px] text-blue-400 font-bold truncate">Sehat 20%</p>
-                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h20)}</p>
-                  <p className="text-[9px] text-gray-400">Cover retur</p>
-                </button>
+                  <button
+                    onClick={() => setHargaJual(h15)}
+                    className="bg-emerald-950/60 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-500/60 transition-all text-left shadow-sm"
+                  >
+                    <p className="text-[10px] text-emerald-300 font-black truncate">⭐ Ideal 15%</p>
+                    <p className="text-xs font-extrabold text-emerald-100 mt-0.5">{formatRp(h15)}</p>
+                    <p className="text-[9px] text-emerald-300/80">Logis & aman</p>
+                  </button>
 
-                <button
-                  onClick={() => setHargaJual(h25)}
-                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
-                >
-                  <p className="text-[10px] text-purple-400 font-bold truncate">Campaign 25%</p>
-                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h25)}</p>
-                  <p className="text-[9px] text-gray-400">Buffer voucher</p>
-                </button>
+                  <button
+                    onClick={() => setHargaJual(h20)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-blue-400 font-bold truncate">Sehat 20%</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h20)}</p>
+                    <p className="text-[9px] text-gray-400">Cover retur</p>
+                  </button>
 
-                <button
-                  onClick={() => setHargaJual(h30)}
-                  className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
-                >
-                  <p className="text-[10px] text-pink-400 font-bold truncate">Premium 30%</p>
-                  <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h30)}</p>
-                  <p className="text-[9px] text-gray-400">Margin tebal</p>
-                </button>
-              </div>
+                  <button
+                    onClick={() => setHargaJual(h25)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-purple-400 font-bold truncate">Campaign 25%</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h25)}</p>
+                    <p className="text-[9px] text-gray-400">Buffer voucher</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(h30)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-pink-400 font-bold truncate">Premium 30%</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(h30)}</p>
+                    <p className="text-[9px] text-gray-400">Margin tebal</p>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <button
+                    onClick={() => setHargaJual(n2k)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-amber-400 font-bold truncate">+Rp2.000/pcs</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(n2k)}</p>
+                    <p className="text-[9px] text-gray-400">Volume cepat</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(n5k)}
+                    className="bg-emerald-950/60 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-500/60 transition-all text-left shadow-sm"
+                  >
+                    <p className="text-[10px] text-emerald-300 font-black truncate">⭐ +Rp5.000</p>
+                    <p className="text-xs font-extrabold text-emerald-100 mt-0.5">{formatRp(n5k)}</p>
+                    <p className="text-[9px] text-emerald-300/80">Standar ideal</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(n10k)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-blue-400 font-bold truncate">+Rp10.000/pcs</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(n10k)}</p>
+                    <p className="text-[9px] text-gray-400">Aman retur</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(n15k)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-purple-400 font-bold truncate">+Rp15.000/pcs</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(n15k)}</p>
+                    <p className="text-[9px] text-gray-400">Siap promo</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(n25k)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-pink-400 font-bold truncate">+Rp25.000/pcs</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(n25k)}</p>
+                    <p className="text-[9px] text-gray-400">Fashion/gadget</p>
+                  </button>
+
+                  <button
+                    onClick={() => setHargaJual(n50k)}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700 transition-all text-left"
+                  >
+                    <p className="text-[10px] text-indigo-400 font-bold truncate">+Rp50.000/pcs</p>
+                    <p className="text-xs font-extrabold text-white mt-0.5">{formatRp(n50k)}</p>
+                    <p className="text-[9px] text-gray-400">Super cuan</p>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Shortcut ke Tab Campaign */}
