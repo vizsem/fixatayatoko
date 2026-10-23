@@ -164,3 +164,147 @@ export async function createReturnRequest(
     return { ok: false, error: described.message };
   }
 }
+
+export type PrintOrderData = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone?: string;
+  items: Array<{
+    productId?: string;
+    name: string;
+    quantity: number;
+    price: number;
+    unit?: string;
+  }>;
+  total: number;
+  subtotal?: number;
+  shippingCost?: number;
+  discount?: number;
+  voucher?: number;
+  pointsUsed?: number;
+  walletUsed?: number;
+  status: string;
+  paymentMethod: string;
+  deliveryMethod?: string;
+  deliveryAddress?: string;
+  createdAt: string | null;
+  dueDate?: string;
+  notes?: string;
+  channel?: string;
+  storeSettings: {
+    name: string;
+    address: string;
+    phone: string;
+    email?: string;
+    footerMsg?: string;
+    logoUrl?: string;
+  };
+};
+
+/** Ambil data pesanan dan profil toko secara aman di server untuk dicetak (A4 / Thermal) */
+export async function getOrderForPrint(id: string): Promise<ActionResult<PrintOrderData>> {
+  await requireStaff();
+
+  try {
+    const cleanId = decodeURIComponent(id || '').trim();
+    if (!cleanId) {
+      return { ok: false, error: 'ID pesanan tidak valid' };
+    }
+
+    // 1. Cari pesanan di tabel `orders`
+    let orderRow: any = null;
+    const { data: byId } = await supabaseAdmin.from('orders').select('*').eq('id', cleanId).maybeSingle();
+    if (byId) {
+      orderRow = byId;
+    } else {
+      const { data: byOrderId } = await supabaseAdmin.from('orders').select('*').eq('order_id', cleanId).maybeSingle();
+      if (byOrderId) {
+        orderRow = byOrderId;
+      } else {
+        const { data: byRawOrderId } = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .filter('raw_data->>orderId', 'eq', cleanId)
+          .maybeSingle();
+        if (byRawOrderId) {
+          orderRow = byRawOrderId;
+        } else {
+          const { data: byRawExtId } = await supabaseAdmin
+            .from('orders')
+            .select('*')
+            .filter('raw_data->>externalOrderId', 'eq', cleanId)
+            .maybeSingle();
+          orderRow = byRawExtId;
+        }
+      }
+    }
+
+    if (!orderRow) {
+      return { ok: false, error: `Pesanan dengan ID "${cleanId}" tidak ditemukan` };
+    }
+
+    // 2. Ambil profil toko dari tabel `settings`
+    const { data: settingsRow } = await supabaseAdmin
+      .from('settings')
+      .select('*')
+      .eq('key', 'system')
+      .maybeSingle();
+
+    const raw = (orderRow.raw_data && typeof orderRow.raw_data === 'object') ? orderRow.raw_data : {};
+    const s = (settingsRow?.value && typeof settingsRow.value === 'object') ? settingsRow.value : {};
+
+    const rawItems = Array.isArray(orderRow.items)
+      ? orderRow.items
+      : (Array.isArray(raw.items) ? raw.items : []);
+
+    const items = rawItems.map((item: any) => ({
+      productId: String(item.productId || item.id || ''),
+      name: String(item.name || item.product?.name || item.title || 'Produk'),
+      quantity: Number(item.quantity || item.qty || 1),
+      price: Number(item.price || item.unitPrice || 0),
+      unit: item.unit ? String(item.unit) : undefined,
+    }));
+
+    const orderNumber = String(orderRow.order_id || raw.orderId || orderRow.id || cleanId);
+
+    const result: PrintOrderData = {
+      id: String(orderRow.id),
+      orderNumber,
+      customerName: String(orderRow.customer_name || raw.customerName || 'Pelanggan'),
+      customerPhone: raw.customerPhone || raw.phone || undefined,
+      items,
+      total: Number(orderRow.total ?? raw.total ?? 0),
+      subtotal: raw.subtotal !== undefined ? Number(raw.subtotal) : undefined,
+      shippingCost: raw.shippingCost !== undefined ? Number(raw.shippingCost) : undefined,
+      discount: raw.discount !== undefined ? Number(raw.discount) : undefined,
+      voucher: raw.voucher !== undefined ? Number(raw.voucher) : undefined,
+      pointsUsed: raw.pointsUsed !== undefined ? Number(raw.pointsUsed) : undefined,
+      walletUsed: raw.walletUsed !== undefined ? Number(raw.walletUsed) : undefined,
+      status: String(orderRow.status || raw.status || 'SELESAI'),
+      paymentMethod: String(raw.paymentMethod || 'TUNAI'),
+      deliveryMethod: raw.deliveryMethod ? String(raw.deliveryMethod) : undefined,
+      deliveryAddress: raw.deliveryAddress ? String(raw.deliveryAddress) : undefined,
+      createdAt: orderRow.created_at ? String(orderRow.created_at) : (raw.createdAt ? String(raw.createdAt) : null),
+      dueDate: raw.dueDate ? String(raw.dueDate) : undefined,
+      notes: raw.notes ? String(raw.notes) : (orderRow.notes ? String(orderRow.notes) : undefined),
+      channel: raw.source ? String(raw.source) : (raw.channel ? String(raw.channel) : undefined),
+      storeSettings: {
+        name: String(s.name || 'ATAYATOKO').toUpperCase(),
+        address: String(s.address || 'Jl. Pandan 98, Semen, Kediri'),
+        phone: String(s.phone || '0858-5316-1174'),
+        email: s.email ? String(s.email) : 'atayatoko2@gmail.com',
+        footerMsg: s.footerMsg ? String(s.footerMsg) : 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan',
+        logoUrl: s.logoUrl ? String(s.logoUrl) : undefined,
+      },
+    };
+
+    return {
+      ok: true,
+      data: toPlainRow(result) as PrintOrderData,
+    };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Gagal memuat pesanan untuk dicetak' };
+  }
+}
+

@@ -1,50 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Printer, FileText, Receipt } from 'lucide-react';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { getUserAndRole } from '@/lib/supabase-helpers';
-import { Suspense } from 'react';
-
-type OrderItem = {
-  productId?: string;
-  name: string;
-  quantity: number;
-  price: number;
-  unit?: string;
-};
-
-type Order = {
-  id: string;
-  customerName: string;
-  customerPhone?: string;
-  items: OrderItem[];
-  total: number;
-  subtotal?: number;
-  shippingCost?: number;
-  discount?: number;
-  voucher?: number;
-  pointsUsed?: number;
-  walletUsed?: number;
-  status: string;
-  paymentMethod: string;
-  deliveryMethod?: string;
-  deliveryAddress?: string;
-  createdAt: string | null;
-  dueDate?: string;
-  notes?: string;
-  channel?: string;
-};
-
-type StoreSettings = {
-  name: string;
-  address: string;
-  phone: string;
-  email?: string;
-  footerMsg?: string;
-  logoUrl?: string;
-};
+import { ArrowLeft, Printer, FileText, Receipt, Download, Loader2, AlertCircle } from 'lucide-react';
+import { getOrderForPrint, type PrintOrderData } from '@/lib/actions/order-admin.actions';
 
 type PrintMode = 'a4' | 'thermal';
 type PaperWidth = '58mm' | '80mm';
@@ -53,164 +12,206 @@ function PrintOrderPageInner({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
-    name: 'ATAYATOKO',
-    address: 'Jl. Pandan 98, Semen, Kediri',
-    phone: '0858-5316-1174',
-    email: 'atayatoko2@gmail.com',
-    footerMsg: 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan',
-  });
+  const [order, setOrder] = useState<PrintOrderData | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [printMode, setPrintMode] = useState<PrintMode>(
     (searchParams.get('mode') as PrintMode) || 'a4'
   );
   const [paperWidth, setPaperWidth] = useState<PaperWidth>('80mm');
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [autoPrinted, setAutoPrinted] = useState(false);
+  const printTriggeredRef = useRef(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/admin/login'); return; }
-      const { isStaff } = await getUserAndRole();
-      if (!isStaff) { router.push('/profil'); return; }
-      setAuthChecked(true);
-    };
-    checkAuth();
-  }, [router]);
-
-  useEffect(() => {
-    if (!authChecked || !id) return;
-    const fetchData = async () => {
+    let isMounted = true;
+    async function fetchOrder() {
+      setLoading(true);
+      setErrorMessage(null);
       try {
-        const { data: orderRow } = await supabaseAdmin
-          .from('orders')
-          .select('*')
-          .or(`id.eq.${id},order_id.eq.${id}`)
-          .maybeSingle();
+        const res = await getOrderForPrint(id);
+        if (!isMounted) return;
+        if (!res.ok) {
+          setErrorMessage(res.error);
+          setOrder(null);
+        } else {
+          setOrder(res.data);
 
-        if (orderRow) {
-          const raw = orderRow.raw_data || {};
-          setOrder({
-            id: orderRow.id,
-            customerName: orderRow.customer_name || raw.customerName || 'Pelanggan',
-            customerPhone: raw.customerPhone || raw.phone,
-            items: orderRow.items || raw.items || [],
-            total: orderRow.total || raw.total || 0,
-            subtotal: raw.subtotal,
-            shippingCost: raw.shippingCost,
-            discount: raw.discount,
-            voucher: raw.voucher,
-            pointsUsed: raw.pointsUsed,
-            walletUsed: raw.walletUsed,
-            status: orderRow.status || raw.status,
-            paymentMethod: raw.paymentMethod || 'TUNAI',
-            deliveryMethod: raw.deliveryMethod,
-            deliveryAddress: raw.deliveryAddress,
-            createdAt: orderRow.created_at || null,
-            dueDate: raw.dueDate,
-            notes: raw.notes || orderRow.notes,
-            channel: raw.source || raw.channel,
-          });
-        }
+          // Auto-print logic:
+          // Jika mode=thermal atau ada query autoprint=true, dan autoprint!=false
+          const isThermal = (searchParams.get('mode') as PrintMode) === 'thermal';
+          const autoprintParam = searchParams.get('autoprint');
+          const shouldAutoPrint = autoprintParam === 'true' || (isThermal && autoprintParam !== 'false');
 
-        const { data: settingsRow } = await supabaseAdmin
-          .from('settings')
-          .select('*')
-          .eq('key', 'system')
-          .maybeSingle();
-        if (settingsRow?.value) {
-          const s = settingsRow.value;
-          setStoreSettings(prev => ({
-            name: (s.name || prev.name).toUpperCase(),
-            address: s.address || prev.address,
-            phone: s.phone || prev.phone,
-            email: s.email || prev.email,
-            footerMsg: s.footerMsg || prev.footerMsg,
-            logoUrl: s.logoUrl || prev.logoUrl,
-          }));
+          if (shouldAutoPrint && !printTriggeredRef.current) {
+            printTriggeredRef.current = true;
+            setAutoPrinted(true);
+            setTimeout(() => {
+              window.print();
+            }, 550);
+          }
         }
       } catch (err) {
-        console.error(err);
+        if (!isMounted) return;
+        setErrorMessage(err instanceof Error ? err.message : 'Gagal memuat pesanan');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
-    };
-    fetchData();
-  }, [id, authChecked]);
+    }
 
-  if (loading || !authChecked) {
+    if (id) {
+      fetchOrder();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [id, searchParams]);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const targetId = printMode === 'a4' ? 'invoice-a4' : 'thermal-receipt-container';
+      const el = document.getElementById(targetId);
+      if (!el) {
+        window.print();
+        return;
+      }
+
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const isA4 = printMode === 'a4';
+      const targetWidthMm = isA4 ? 210 : paperWidth === '58mm' ? 58 : 80;
+      const targetHeightMm = (canvas.height * targetWidthMm) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: isA4 ? 'a4' : [targetWidthMm, Math.max(80, targetHeightMm)],
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, targetWidthMm, targetHeightMm);
+      const safeNum = (order?.orderNumber || order?.id || 'dokumen').replace(/[^a-zA-Z0-9_-]/g, '_');
+      pdf.save(`${isA4 ? 'Invoice' : 'Struk'}_${safeNum}.pdf`);
+    } catch (err) {
+      console.error('Gagal generate PDF:', err);
+      window.print();
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Memuat dokumen...</p>
+        <div className="text-center p-8 bg-white rounded-2xl border border-gray-100 shadow-sm max-w-sm">
+          <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mx-auto mb-3" />
+          <p className="text-sm font-black text-gray-800 uppercase tracking-wider">Memuat Dokumen Pesanan</p>
+          <p className="text-xs text-gray-400 mt-1">Mengambil rincian transaksi & profil toko...</p>
         </div>
       </div>
     );
   }
 
-  if (!order) {
+  if (errorMessage || !order) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-2xl font-black text-red-500 mb-2">404</p>
-          <p className="text-sm font-bold text-gray-500">Data pesanan tidak ditemukan</p>
-          <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold">
-            Kembali
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center bg-white p-8 rounded-2xl border border-gray-200 shadow-sm max-w-md w-full">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3">
+            <AlertCircle size={24} />
+          </div>
+          <h2 className="text-lg font-black text-gray-900 mb-1">Data Pesanan Tidak Ditemukan</h2>
+          <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+            {errorMessage || `Pesanan "${id}" tidak ditemukan dalam database atau Anda belum memiliki izin akses.`}
+          </p>
+          <button
+            onClick={() => router.back()}
+            className="w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
+          >
+            Kembali ke Daftar Pesanan
           </button>
         </div>
       </div>
     );
   }
 
+  const storeSettings = order.storeSettings;
   const subtotal = order.subtotal ?? order.items?.reduce((s, i) => s + i.price * i.quantity, 0) ?? 0;
   const shippingCost = order.shippingCost ?? 0;
-  const discountTotal = (order.discount || 0) + (order.voucher || 0) + (order.pointsUsed || 0) + (order.walletUsed || 0);
-  const orderNum = `#ORD-${order.id.slice(-8).toUpperCase()}`;
+  const discountTotal =
+    (order.discount || 0) +
+    (order.voucher || 0) +
+    (order.pointsUsed || 0) +
+    (order.walletUsed || 0);
+
+  const orderNum = order.orderNumber.startsWith('#')
+    ? order.orderNumber
+    : `#${order.orderNumber}`;
 
   const dateStr = order.createdAt
     ? new Date(order.createdAt).toLocaleString('id-ID', {
-        day: '2-digit', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       })
     : '-';
 
   const shortDate = order.createdAt
     ? new Date(order.createdAt).toLocaleString('id-ID', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       })
     : '-';
 
   const isDebt = order.status === 'BELUM_LUNAS';
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white">
-      {/* ===== TOOLBAR (hidden on print) ===== */}
-      <div className="no-print sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+    <div className="min-h-screen bg-gray-100 print:bg-white text-gray-900">
+      {/* ===== TOOLBAR (Hidden when printed) ===== */}
+      <div className="no-print sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
           <button
             onClick={() => router.back()}
             className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition text-gray-600"
+            title="Kembali"
           >
             <ArrowLeft size={18} />
           </button>
 
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-black text-gray-900 uppercase tracking-tight">
-              {printMode === 'a4' ? 'Invoice A4' : 'Struk Thermal'} — {orderNum}
-            </p>
-            <p className="text-xs text-gray-400">{order.customerName}</p>
+          <div className="flex-1 min-w-[200px]">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-black text-gray-900 uppercase tracking-tight truncate">
+                {printMode === 'a4' ? 'Invoice A4' : 'Struk Thermal'} — {orderNum}
+              </p>
+              {order.channel && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase">
+                  {order.channel}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 truncate">{order.customerName}</p>
           </div>
 
           {/* Mode Switcher */}
           <div className="flex bg-gray-100 p-1 rounded-xl gap-1">
             <button
               onClick={() => setPrintMode('a4')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 printMode === 'a4'
-                  ? 'bg-white text-blue-700 shadow-sm border border-blue-100'
+                  ? 'bg-white text-blue-700 shadow-xs border border-blue-100'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -218,9 +219,9 @@ function PrintOrderPageInner({ id }: { id: string }) {
             </button>
             <button
               onClick={() => setPrintMode('thermal')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 printMode === 'thermal'
-                  ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                  ? 'bg-white text-gray-900 shadow-xs border border-gray-200'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -228,15 +229,15 @@ function PrintOrderPageInner({ id }: { id: string }) {
             </button>
           </div>
 
-          {/* Thermal size selector */}
+          {/* Thermal Paper Width Switcher */}
           {printMode === 'thermal' && (
             <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold gap-1">
               {(['58mm', '80mm'] as PaperWidth[]).map((w) => (
                 <button
                   key={w}
                   onClick={() => setPaperWidth(w)}
-                  className={`px-3 py-2 rounded-lg transition-all ${
-                    paperWidth === w ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    paperWidth === w ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500'
                   }`}
                 >
                   {w}
@@ -245,12 +246,29 @@ function PrintOrderPageInner({ id }: { id: string }) {
             </div>
           )}
 
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-lg shadow-blue-200"
-          >
-            <Printer size={15} /> Cetak
-          </button>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-gray-200"
+              title="Unduh file PDF"
+            >
+              {downloadingPdf ? (
+                <Loader2 size={14} className="animate-spin text-gray-600" />
+              ) : (
+                <Download size={14} />
+              )}
+              <span className="hidden sm:inline">Unduh PDF</span>
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-sm active:scale-95"
+            >
+              <Printer size={15} /> Cetak
+            </button>
+          </div>
         </div>
       </div>
 
@@ -262,8 +280,8 @@ function PrintOrderPageInner({ id }: { id: string }) {
             className="bg-white shadow-xl print:shadow-none"
             style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
           >
-            {/* Invoice Header Band */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-700 print:bg-slate-900 px-10 py-8 print:px-8 print:py-7 text-white">
+            {/* Header Band */}
+            <div className="bg-slate-900 px-10 py-8 print:px-8 print:py-7 text-white">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-3xl font-black tracking-tight">{storeSettings.name}</h1>
@@ -311,6 +329,12 @@ function PrintOrderPageInner({ id }: { id: string }) {
                       <span className="text-slate-500 font-medium">Metode Bayar</span>
                       <span className="font-black text-slate-800 uppercase">{order.paymentMethod}</span>
                     </div>
+                    {order.channel && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500 font-medium">Saluran / Channel</span>
+                        <span className="font-bold text-indigo-700 uppercase">{order.channel}</span>
+                      </div>
+                    )}
                     {order.deliveryMethod && (
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500 font-medium">Pengiriman</span>
@@ -319,13 +343,15 @@ function PrintOrderPageInner({ id }: { id: string }) {
                     )}
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500 font-medium">Status</span>
-                      <span className={`font-black text-xs px-2.5 py-1 rounded-lg uppercase ${
-                        isDebt
-                          ? 'bg-orange-100 text-orange-700'
-                          : order.status === 'SELESAI' || order.status === 'COMPLETED'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
+                      <span
+                        className={`font-black text-xs px-2.5 py-1 rounded-lg uppercase ${
+                          isDebt
+                            ? 'bg-orange-100 text-orange-700'
+                            : order.status === 'SELESAI' || order.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
                         {isDebt ? 'BELUM LUNAS' : order.status}
                       </span>
                     </div>
@@ -333,7 +359,11 @@ function PrintOrderPageInner({ id }: { id: string }) {
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500 font-medium">Jatuh Tempo</span>
                         <span className="font-black text-red-600 text-xs">
-                          {new Date(order.dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          {new Date(order.dueDate).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
                         </span>
                       </div>
                     )}
@@ -409,7 +439,12 @@ function PrintOrderPageInner({ id }: { id: string }) {
                         <p className="text-xs font-black text-orange-700 uppercase tracking-wider">⚠ BELUM LUNAS — TEMPO</p>
                         {order.dueDate && (
                           <p className="text-xs text-orange-600 mt-0.5">
-                            Harap bayar sebelum {new Date(order.dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            Harap bayar sebelum{' '}
+                            {new Date(order.dueDate).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
                           </p>
                         )}
                       </div>
@@ -446,7 +481,7 @@ function PrintOrderPageInner({ id }: { id: string }) {
             </div>
 
             {/* Bottom accent bar */}
-            <div className="h-2 bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 print:block" />
+            <div className="h-2 bg-slate-900 print:block" />
           </div>
         </div>
       )}
@@ -455,32 +490,50 @@ function PrintOrderPageInner({ id }: { id: string }) {
       {printMode === 'thermal' && (
         <div className="flex justify-center py-8 print:py-0">
           <div
+            id="thermal-receipt-container"
             className={`thermal-receipt bg-white border border-dashed border-slate-300 print:border-none shadow-md print:shadow-none mx-auto ${
               paperWidth === '58mm' ? 'w-[58mm] max-w-[58mm]' : 'w-[80mm] max-w-[80mm]'
             }`}
             style={{
               fontFamily: "'Courier New', Courier, monospace",
-              padding: paperWidth === '58mm' ? '4px 3px' : '6px 6px',
+              padding: paperWidth === '58mm' ? '5px 4px' : '8px 8px',
               fontSize: paperWidth === '58mm' ? '11px' : '12px',
-              lineHeight: '1.25'
+              lineHeight: '1.25',
+              color: '#000000',
             }}
           >
             <div className="text-center pb-1">
               <div className="font-black text-sm uppercase tracking-tight">{storeSettings.name}</div>
               <div className="text-[10px] text-neutral-700">{storeSettings.address}</div>
               <div className="text-[10px] text-neutral-700">Telp: {storeSettings.phone}</div>
+              {order.channel && (
+                <div className="text-[9.5px] font-bold uppercase mt-0.5 border border-black inline-block px-1.5 py-0.2 rounded-xs">
+                  ORDER {order.channel}
+                </div>
+              )}
               <div className="border-b border-black border-dashed my-1.5" />
             </div>
 
             <div className="space-y-0.5 text-[10.5px]">
-              <div className="flex justify-between"><span>Tgl:</span><span>{shortDate}</span></div>
-              <div className="flex justify-between"><span>No:</span><span className="font-bold">{orderNum}</span></div>
+              <div className="flex justify-between">
+                <span>Tgl:</span>
+                <span>{shortDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>No:</span>
+                <span className="font-bold break-all text-right">{orderNum}</span>
+              </div>
               <div className="flex justify-between">
                 <span>Plg:</span>
-                <span className="font-bold uppercase truncate max-w-[140px] text-right">{order.customerName || 'Umum'}</span>
+                <span className="font-bold uppercase truncate max-w-[140px] text-right">
+                  {order.customerName || 'Umum'}
+                </span>
               </div>
               {order.customerPhone && (
-                <div className="flex justify-between"><span>Hp:</span><span>{order.customerPhone}</span></div>
+                <div className="flex justify-between">
+                  <span>Hp:</span>
+                  <span>{order.customerPhone}</span>
+                </div>
               )}
             </div>
 
@@ -491,7 +544,9 @@ function PrintOrderPageInner({ id }: { id: string }) {
                 <div key={idx} className="leading-tight">
                   <div className="font-bold uppercase text-[11px] break-words">{item.name}</div>
                   <div className="flex justify-between text-[10.5px]">
-                    <span>{item.quantity} {item.unit || 'pcs'} x {item.price.toLocaleString('id-ID')}</span>
+                    <span>
+                      {item.quantity} {item.unit || 'pcs'} x {item.price.toLocaleString('id-ID')}
+                    </span>
                     <span className="font-semibold">{(item.quantity * item.price).toLocaleString('id-ID')}</span>
                   </div>
                 </div>
@@ -501,17 +556,25 @@ function PrintOrderPageInner({ id }: { id: string }) {
             <div className="border-b border-black border-dashed my-1.5" />
 
             <div className="space-y-0.5 text-[10.5px]">
-              <div className="flex justify-between"><span>Subtotal</span><span>Rp{subtotal.toLocaleString('id-ID')}</span></div>
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>Rp{subtotal.toLocaleString('id-ID')}</span>
+              </div>
               {shippingCost > 0 && (
-                <div className="flex justify-between"><span>Ongkir</span><span>Rp{shippingCost.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between">
+                  <span>Ongkir</span>
+                  <span>Rp{shippingCost.toLocaleString('id-ID')}</span>
+                </div>
               )}
               {discountTotal > 0 && (
                 <div className="flex justify-between text-neutral-700">
-                  <span>Diskon/Voucher</span><span>-Rp{discountTotal.toLocaleString('id-ID')}</span>
+                  <span>Diskon/Voucher</span>
+                  <span>-Rp{discountTotal.toLocaleString('id-ID')}</span>
                 </div>
               )}
               <div className="flex justify-between font-black text-xs pt-1 border-t border-black border-dotted mt-1">
-                <span>TOTAL</span><span>Rp{order.total.toLocaleString('id-ID')}</span>
+                <span>TOTAL</span>
+                <span>Rp{order.total.toLocaleString('id-ID')}</span>
               </div>
             </div>
 
@@ -520,7 +583,7 @@ function PrintOrderPageInner({ id }: { id: string }) {
             <div className="space-y-0.5 text-[10px]">
               <div className="flex justify-between">
                 <span>Metode Bayar:</span>
-                <span className="font-bold uppercase">{order.paymentMethod || '-'}</span>
+                <span className="font-bold uppercase">{order.paymentMethod || 'TUNAI'}</span>
               </div>
               {order.deliveryMethod && (
                 <div className="flex justify-between">
@@ -562,23 +625,44 @@ function PrintOrderPageInner({ id }: { id: string }) {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
         @media print {
-          .no-print { display: none !important; }
-          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+          .no-print {
+            display: none !important;
+          }
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
 
         /* A4 Print Styles */
-        ${printMode === 'a4' ? `
+        ${printMode === 'a4'
+          ? `
           @media print {
-            @page { size: A4 portrait; margin: 12mm 15mm; }
+            @page { size: A4 portrait; margin: 10mm 12mm; }
             #invoice-a4 { box-shadow: none !important; }
           }
-        ` : `
+        `
+          : `
           @media print {
-            @page { size: ${paperWidth} auto; margin: 0mm !important; }
-            html, body { width: ${paperWidth} !important; }
+            @page {
+              size: ${paperWidth} auto;
+              margin: 0mm !important;
+            }
+            html, body {
+              width: ${paperWidth} !important;
+              max-width: ${paperWidth} !important;
+              overflow: visible !important;
+            }
             .thermal-receipt {
-              border: none !important; box-shadow: none !important;
-              width: ${paperWidth} !important; max-width: ${paperWidth} !important;
+              border: none !important;
+              box-shadow: none !important;
+              width: ${paperWidth} !important;
+              max-width: ${paperWidth} !important;
               margin: 0 !important;
               padding: ${paperWidth === '58mm' ? '2mm 1mm' : '3mm 2mm'} !important;
             }
@@ -592,11 +676,13 @@ function PrintOrderPageInner({ id }: { id: string }) {
 export default function PrintOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <PrintOrderPageInner id={resolvedParams.id} />
     </Suspense>
   );
