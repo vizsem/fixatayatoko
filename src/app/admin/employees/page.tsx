@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Search, Edit, Trash2,
   UserCog, Loader2, Clock, CheckCircle2,
-  X, Save, ShieldCheck, Calendar, FileText, Download, Target, Briefcase, Wallet
+  X, Save, ShieldCheck, Calendar, FileText, Download, Target, Briefcase, Wallet,
+  Phone, MessageSquare, Users, AlertCircle, ArrowRight
 } from 'lucide-react';
 
 // import Link from 'next/link';
@@ -1076,17 +1077,32 @@ export default function EmployeesPage() {
     emp.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const formatEmployeeWaLink = (phone?: string, name?: string) => {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    if (!cleaned) return null;
+    const international = cleaned.startsWith('0')
+      ? '62' + cleaned.slice(1)
+      : cleaned.startsWith('62')
+      ? cleaned
+      : '62' + cleaned;
+    const text = encodeURIComponent(
+      `Halo ${name || 'Rekan'}, kami dari manajemen AtayaToko ingin mengonfirmasi terkait jadwal dan operasional toko.`
+    );
+    return `https://wa.me/${international}?text=${text}`;
+  };
+
   const visibleTabs = useMemo(() => {
     const base: Array<{ key: typeof activeTab; label: string }> = [
-      { key: 'STAFF', label: 'STAFF' },
-      { key: 'SHIFT', label: 'SHIFT' },
-      { key: 'ABSENSI', label: 'ABSENSI' },
-      { key: 'PAYROLL', label: 'PAYROLL' },
-      { key: 'CUTI', label: 'CUTI' },
+      { key: 'STAFF', label: 'Daftar Karyawan' },
+      { key: 'SHIFT', label: 'Jadwal Shift' },
+      { key: 'ABSENSI', label: 'Presensi Harian' },
+      { key: 'PAYROLL', label: 'Penggajian (Payroll)' },
+      { key: 'CUTI', label: 'Cuti & Izin' },
     ];
-    if (canManagePayroll) base.push({ key: 'KPI', label: 'KPI' });
-    if (canManageRecruitment) base.push({ key: 'REKRUTMEN', label: 'REKRUTMEN' });
-    if (canManagePettyCash) base.push({ key: 'PETTY_CASH', label: 'PETTY CASH' });
+    if (canManagePayroll) base.push({ key: 'KPI', label: 'KPI & Bonus' });
+    if (canManageRecruitment) base.push({ key: 'REKRUTMEN', label: 'Rekrutmen' });
+    if (canManagePettyCash) base.push({ key: 'PETTY_CASH', label: 'Kas Kecil' });
     return base;
   }, [canManagePayroll, canManageRecruitment, canManagePettyCash, activeTab]);
 
@@ -1417,62 +1433,116 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className="bg-[#FBFBFE] font-sans">
+    <div className="bg-[#FBFBFE] font-sans pb-10">
       <Toaster position="top-right" />
 
       {/* Hero Header */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-2 py-3 md:px-4 md:py-3">
-           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                 <div className="p-2 bg-black text-white rounded-xl shadow-sm">
-                    <UserCog size={18} />
+      <div className="bg-white border-b border-gray-100 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                 <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                    <UserCog size={20} />
                  </div>
                  <div>
-                    <h1 className="text-lg font-black text-gray-800 tracking-tighter leading-none">Human Capital</h1>
-                    <p className="text-xs font-black uppercase tracking-widest text-gray-400 mt-0.5">Staff & Payroll Engine</p>
+                    <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight leading-none">Manajemen Karyawan (HR)</h1>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mt-1">Staff, Presensi, Jadwal Shift & Penggajian</p>
                  </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 md:w-56">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="relative flex-1 sm:w-60">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input
                     type="text"
-                    placeholder="Search Staff..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border-none rounded-lg text-xs font-bold outline-none"
+                    placeholder="Cari nama, jabatan, status..."
+                    className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <button
                   onClick={() => { resetForm(); setIsModalOpen(true); }}
-                  className="bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-sm transition-transform active:scale-95"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 shrink-0"
                 >
-                  <Plus size={12} /> NEW STAFF
+                  <Plus size={14} /> Tambah Staf
                 </button>
              </div>
            </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-2 py-3 md:px-4 md:py-4">
+      <main className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-5 space-y-4">
+        {/* MINI KPI STATS BAR */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Users size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider truncate">Total Karyawan</p>
+              <p className="text-base sm:text-xl font-black text-gray-900 tracking-tight">
+                {employees.length} <span className="text-xs font-semibold text-gray-400">({employees.filter(e => e.status === 'AKTIF').length} Aktif)</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider truncate">Hadir Hari Ini</p>
+              <p className="text-base sm:text-xl font-black text-gray-900 tracking-tight">
+                {employees.filter(e => attendanceByEmployeeId.get(e.id)?.status === 'HADIR').length} <span className="text-xs font-semibold text-emerald-600">Staf</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <X size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider truncate">Alpha / Belum Hadir</p>
+              <p className="text-base sm:text-xl font-black text-gray-900 tracking-tight">
+                {employees.filter(e => attendanceByEmployeeId.get(e.id)?.status === 'ALPHA').length} <span className="text-xs font-semibold text-rose-600">Staf</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Calendar size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider truncate">Cuti & Izin Hari Ini</p>
+              <p className="text-base sm:text-xl font-black text-gray-900 tracking-tight">
+                {employees.filter(e => ['CUTI', 'IZIN', 'SAKIT'].includes(attendanceByEmployeeId.get(e.id)?.status || '')).length} <span className="text-xs font-semibold text-amber-600">Staf</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {!authorized ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
             <p className="text-xs font-black uppercase tracking-widest text-gray-400">Verifying session...</p>
           </div>
         ) : loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-600" size={20} /></div>
+          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-600" size={24} /></div>
         ) : (
-          <div className="space-y-3">
-            <div className="bg-white rounded-xl border border-gray-50 shadow-sm p-1 overflow-x-auto no-scrollbar">
-              <div className="flex gap-1 min-w-max">
+          <div className="space-y-4">
+            {/* TABS NAVIGATION */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-2xs p-1.5 overflow-x-auto no-scrollbar">
+              <div className="flex gap-1.5 min-w-max">
                 {visibleTabs.map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setActiveTab(t.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-                      activeTab === t.key ? 'bg-black text-white shadow-sm' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                      activeTab === t.key
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-800'
                     }`}
                   >
                     {t.label}
@@ -1481,105 +1551,260 @@ export default function EmployeesPage() {
               </div>
             </div>
 
+            {/* TAB CONTENT: STAFF */}
             {activeTab === 'STAFF' && (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left min-w-[640px]">
-                    <thead className="bg-gray-50/50 border-b border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-2xs overflow-hidden">
+                {/* 1. MOBILE VIEW: TOUCH-FRIENDLY CARD VIEW */}
+                <div className="block sm:hidden p-3.5 space-y-3">
+                  {filteredEmployees.length === 0 ? (
+                    <div className="py-10 text-center text-gray-400 text-xs font-bold">
+                      Belum ada data staf yang sesuai
+                    </div>
+                  ) : (
+                    filteredEmployees.map((emp) => {
+                      const waUrl = formatEmployeeWaLink(emp.phone, emp.name);
+                      return (
+                        <div
+                          key={emp.id}
+                          className="bg-white border border-gray-200/80 rounded-2xl p-4 shadow-2xs space-y-3"
+                        >
+                          {/* Top: Avatar, Name, Role & Status */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-10 h-10 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl flex items-center justify-center font-black text-sm shrink-0">
+                                {emp.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="font-bold text-gray-900 text-sm truncate">{emp.name}</h3>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold">
+                                    <ShieldCheck size={11} /> {emp.role}
+                                  </span>
+                                  <span
+                                    className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                      emp.status === 'AKTIF'
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                        : 'bg-rose-50 text-rose-700 border-rose-100'
+                                    }`}
+                                  >
+                                    {emp.status}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Edit & Delete Buttons with Safe Touch Area */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleEdit(emp)}
+                                className="p-2 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"
+                                title="Edit Staf"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(emp.id)}
+                                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                                title="Hapus Staf"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Contact Info (WhatsApp & Call) */}
+                          <div className="text-xs text-gray-600 space-y-1 bg-gray-50/70 p-2.5 rounded-xl border border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">Kontak:</span>
+                              <div className="flex items-center gap-2">
+                                {emp.phone ? (
+                                  <>
+                                    <a
+                                      href={`tel:${emp.phone}`}
+                                      className="font-semibold text-gray-800 hover:text-emerald-700 flex items-center gap-1"
+                                    >
+                                      <Phone size={11} className="text-gray-400" />
+                                      <span>{emp.phone}</span>
+                                    </a>
+                                    {waUrl && (
+                                      <a
+                                        href={waUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      >
+                                        <MessageSquare size={10} />
+                                        WA
+                                      </a>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400 italic text-[11px]">-</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-gray-100/60">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">Jadwal:</span>
+                              <span className="font-semibold text-gray-700 flex items-center gap-1">
+                                <Clock size={11} className="text-gray-400" />
+                                {emp.workSchedule}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Salary & Attendance */}
+                          <div className="flex items-center justify-between text-xs px-1">
+                            <div>
+                              <span className="text-[10px] text-gray-400 block font-bold uppercase">Gaji Pokok</span>
+                              <span className="font-black text-gray-900">Rp {emp.manualSalary?.toLocaleString('id-ID')}</span>
+                              {emp.dailySalary > 0 && (
+                                <span className="block text-[10px] text-indigo-600 font-bold">Harian: Rp {emp.dailySalary.toLocaleString('id-ID')}</span>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] text-gray-400 block font-bold uppercase">Kehadiran</span>
+                              <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                                <CheckCircle2 size={12} /> {emp.totalAttendance || 0} hari
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick Attendance Buttons (LARGE & SAFE TO TOUCH) */}
+                          <div className="pt-2 border-t border-gray-100 flex items-center gap-2">
+                            <button
+                              onClick={() => handlePresent(emp)}
+                              className="flex-1 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-emerald-200 transition-colors active:scale-95"
+                            >
+                              <CheckCircle2 size={14} /> Hadir
+                            </button>
+                            <button
+                              onClick={() => handleAlpha(emp)}
+                              className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-rose-200 transition-colors active:scale-95"
+                            >
+                              <X size={14} /> Alpha
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* 2. DESKTOP VIEW: CLEAN TABLE */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left min-w-[720px]">
+                    <thead className="bg-gray-50/70 border-b border-gray-100">
                       <tr>
-                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Profile</th>
-                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Position</th>
-                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Schedule & Auth</th>
-                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400">Salary & Attendance</th>
-                        <th className="px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400">Profil Staf</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400">Posisi & Jabatan</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400">Jadwal & Status</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400">Gaji & Kehadiran</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 text-right">Aksi Cepat</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-gray-100">
                       {filteredEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-3 py-8 text-center text-gray-300 text-xs font-black uppercase tracking-widest">
-                            No matching records
+                          <td colSpan={5} className="px-4 py-12 text-center text-gray-400 text-xs font-bold uppercase tracking-wider">
+                            Belum ada data staf yang sesuai
                           </td>
                         </tr>
                       ) : (
-                        filteredEmployees.map((emp) => (
-                          <tr key={emp.id} className="group hover:bg-gray-50/50 transition-colors">
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-black text-xs border border-blue-100 shrink-0">
-                                  {emp.name.charAt(0).toUpperCase()}
+                        filteredEmployees.map((emp) => {
+                          const waUrl = formatEmployeeWaLink(emp.phone, emp.name);
+                          return (
+                            <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-black text-xs border border-emerald-100 shrink-0">
+                                    {emp.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-black text-gray-900 uppercase truncate">{emp.name}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="text-xs text-gray-500 font-medium truncate">{emp.phone || '-'}</span>
+                                      {waUrl && (
+                                        <a
+                                          href={waUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-emerald-600 hover:text-emerald-700 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.2 rounded"
+                                        >
+                                          WA
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black text-gray-800 uppercase leading-none truncate">{emp.name}</p>
-                                  <p className="text-xs text-gray-400 font-bold mt-0.5 tracking-tighter truncate">{emp.phone || '-'}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-indigo-100 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-tighter">
-                                <ShieldCheck size={8} /> {emp.role}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-tighter">
-                                  <Clock size={10} className="text-gray-300" />
-                                  {emp.workSchedule}
-                                </div>
-                                <span className={`inline-flex self-start px-1 py-0.5 rounded text-xs font-black uppercase tracking-widest ${
-                                  emp.status === 'AKTIF'
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                    : 'bg-rose-50 text-rose-600 border border-rose-100'
-                                }`}>
-                                  {emp.status}
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 text-xs font-bold">
+                                  <ShieldCheck size={12} /> {emp.role}
                                 </span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="space-y-0.5">
-                                <p className="text-xs font-black text-gray-800 leading-none">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
-                                {emp.dailySalary > 0 && (
-                                  <p className="text-xs font-black text-indigo-600 uppercase tracking-tighter leading-none">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
-                                )}
-                                <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-tighter">
-                                  <CheckCircle2 size={8} className="text-emerald-500" />
-                                  Att: {emp.totalAttendance || 0}d
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1 text-xs font-bold text-gray-600">
+                                    <Clock size={12} className="text-gray-400" />
+                                    {emp.workSchedule}
+                                  </div>
+                                  <span className={`inline-flex self-start px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                                    emp.status === 'AKTIF'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                                  }`}>
+                                    {emp.status}
+                                  </span>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => handlePresent(emp)}
-                                  title="Absen Hadir"
-                                  className="p-1 bg-emerald-50 text-emerald-600 rounded border border-emerald-100 active:scale-95"
-                                >
-                                  <CheckCircle2 size={12} />
-                                </button>
-                                <button
-                                  onClick={() => handleAlpha(emp)}
-                                  title="Absen Alpha"
-                                  className="p-1 bg-rose-50 text-rose-600 rounded border border-rose-100 active:scale-95"
-                                >
-                                  <X size={12} />
-                                </button>
-                                <div className="w-[1px] h-3 bg-gray-200 mx-0.5"></div>
-                                <button
-                                  onClick={() => handleEdit(emp)}
-                                  className="p-1 text-gray-400 hover:text-black transition-all"
-                                >
-                                  <Edit size={12} />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(emp.id)}
-                                  className="p-1 text-gray-400 hover:text-red-600 transition-all"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <div className="space-y-0.5">
+                                  <p className="text-xs font-black text-gray-900 leading-tight">Rp {emp.manualSalary?.toLocaleString('id-ID')}</p>
+                                  {emp.dailySalary > 0 && (
+                                    <p className="text-[11px] font-bold text-indigo-600 leading-tight">Day: Rp {emp.dailySalary.toLocaleString('id-ID')}</p>
+                                  )}
+                                  <div className="flex items-center gap-1 text-xs font-bold text-gray-400 pt-0.5">
+                                    <CheckCircle2 size={12} className="text-emerald-500" />
+                                    Hadir: {emp.totalAttendance || 0} hari
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handlePresent(emp)}
+                                    title="Tandai Hadir Hari Ini"
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition-colors"
+                                  >
+                                    <CheckCircle2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleAlpha(emp)}
+                                    title="Tandai Alpha Hari Ini"
+                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg border border-rose-200 transition-colors"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                  <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+                                  <button
+                                    onClick={() => handleEdit(emp)}
+                                    title="Edit Profil"
+                                    className="p-1.5 text-gray-500 hover:text-emerald-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(emp.id)}
+                                    title="Hapus Karyawan"
+                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -1591,12 +1816,12 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Calendar size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Calendar size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Shift Manager</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Daily Rostering & Rules</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Jadwal Shift Kerja</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Roster Harian & Aturan Shift</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1604,14 +1829,14 @@ export default function EmployeesPage() {
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-bold outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => { fetchShiftTemplates(); fetchShiftAssignmentsByDate(selectedDate); }}
-                      className="px-4 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 shadow-xs"
                     >
-                      REFRESH
+                      Perbarui
                     </button>
                   </div>
                 </div>
@@ -1682,12 +1907,12 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Calendar size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Calendar size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Daily Presence</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Auditing Logs & Alpha Penalties</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Presensi Harian</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Log Kehadiran & Potongan Alpha</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1820,12 +2045,12 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <FileText size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <FileText size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Payroll Engine</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Monthly Slips & Adjustments</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Penggajian (Payroll)</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Slip Gaji, BPJS & PPh21</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1833,7 +2058,7 @@ export default function EmployeesPage() {
                       type="month"
                       value={payrollMonth}
                       onChange={(e) => setPayrollMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-bold outline-none"
                     />
                     <span className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border ${
                       payrollRun?.status === 'APPROVED'
@@ -1847,15 +2072,15 @@ export default function EmployeesPage() {
                       {payrollRun?.status || 'DRAFT'}
                     </span>
                     <label className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 cursor-pointer active:scale-95">
-                      <input type="checkbox" checked={includeTHR} onChange={(e) => setIncludeTHR(e.target.checked)} className="rounded border-gray-300 text-black focus:ring-black" />
+                      <input type="checkbox" checked={includeTHR} onChange={(e) => setIncludeTHR(e.target.checked)} className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                       <span className="text-xs font-black uppercase tracking-widest text-gray-400">THR</span>
                     </label>
                     <button
                       type="button"
                       onClick={savePayrollRunOptions}
-                      className="px-3 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 shadow-xs"
                     >
-                      SAVE
+                      Simpan
                     </button>
                     <button
                       type="button"
@@ -2008,20 +2233,20 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Calendar size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Calendar size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Leave Board</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Approvals & Archive</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Pengajuan Cuti & Izin</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Persetujuan & Arsip Permohonan</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setLeaveModalOpen(true)}
-                    className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold active:scale-95 flex items-center gap-1.5 shadow-xs"
                   >
-                    <Plus size={14} /> NEW REQUEST
+                    <Plus size={14} /> Ajukan Cuti/Izin
                   </button>
                 </div>
 
@@ -2110,12 +2335,12 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Target size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Target size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Performance Score</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Monthly KPIs & Bonuses</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Penilaian Kinerja (KPI)</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Pencapaian Target & Bonus Bulanan</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2123,14 +2348,14 @@ export default function EmployeesPage() {
                       type="month"
                       value={kpiMonth}
                       onChange={(e) => setKpiMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-bold outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => fetchKpiInputs(kpiMonth)}
-                      className="px-3 py-2 rounded-xl text-xs font-black bg-black text-white active:scale-95"
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 shadow-xs"
                     >
-                      REFRESH
+                      Perbarui
                     </button>
                   </div>
                 </div>
@@ -2210,20 +2435,20 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Briefcase size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Briefcase size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Talent Pipeline</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Candidates & Hiring Stages</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Rekrutmen & Pelamar</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Tahapan Seleksi Calon Karyawan</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setCandidateModalOpen(true)}
-                    className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold active:scale-95 flex items-center gap-1.5 shadow-xs"
                   >
-                    <Plus size={14} /> ADD CANDIDATE
+                    <Plus size={14} /> Tambah Pelamar
                   </button>
                 </div>
 
@@ -2293,12 +2518,12 @@ export default function EmployeesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-black text-white rounded-xl">
-                      <Wallet size={16} />
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <Wallet size={18} />
                     </div>
                     <div>
-                      <h2 className="text-xs font-black text-gray-800 tracking-tight uppercase">Petty Cash</h2>
-                      <p className="text-xs font-black text-gray-300 uppercase tracking-widest leading-none">Balances & History</p>
+                      <h2 className="text-sm font-black text-gray-900 tracking-tight uppercase">Kas Kecil (Petty Cash)</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-none">Beban & Pengeluaran Harian Kantor</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2306,14 +2531,14 @@ export default function EmployeesPage() {
                       type="month"
                       value={pettyCashMonth}
                       onChange={(e) => setPettyCashMonth(e.target.value)}
-                      className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black outline-none"
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-bold outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => setPettyModalOpen(true)}
-                      className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black active:scale-95 flex items-center gap-1.5"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold active:scale-95 flex items-center gap-1.5 shadow-xs"
                     >
-                      <Plus size={14} /> NEW RECORD
+                      <Plus size={14} /> Catat Biaya
                     </button>
                   </div>
                 </div>
@@ -2560,7 +2785,7 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs flex items-center justify-center gap-2">
                 <Save size={14} /> {editingId ? 'COMMIT CHANGES' : 'EXECUTE REGISTRATION'}
               </button>
             </form>
@@ -2661,7 +2886,7 @@ export default function EmployeesPage() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs flex items-center justify-center gap-2">
                 <Save size={14} /> COMMIT REQUEST
               </button>
             </form>
@@ -2772,7 +2997,7 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs flex items-center justify-center gap-2">
                 <Save size={14} /> REGISTER CANDIDATE
               </button>
             </form>
@@ -2863,7 +3088,7 @@ export default function EmployeesPage() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 shadow-lg flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 shadow-xs flex items-center justify-center gap-2">
                 <Save size={14} /> EXECUTE TRANSACTION
               </button>
             </form>

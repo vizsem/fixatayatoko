@@ -161,24 +161,24 @@ describe('EmployeesPage', () => {
   it('should render employees page with main sections', async () => {
     render(<EmployeesPage />);
     
-    expect(await screen.findByText('Human Capital', {}, { timeout: 15000 })).toBeInTheDocument();
-    expect(screen.getByText('Staff & Payroll Engine')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search Staff...')).toBeInTheDocument();
-    expect(screen.getByText(/NEW STAFF/i)).toBeInTheDocument();
+    expect(await screen.findByText('Manajemen Karyawan (HR)', {}, { timeout: 15000 })).toBeInTheDocument();
+    expect(screen.getByText('Staff, Presensi, Jadwal Shift & Penggajian')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Cari nama, jabatan, status...')).toBeInTheDocument();
+    expect(screen.getByText(/Tambah Staf/i)).toBeInTheDocument();
   }, 15000);
 
   it('should show loading state initially', async () => {
     render(<EmployeesPage />);
     
     await waitFor(() => {
-      expect(screen.getByText('Human Capital')).toBeInTheDocument();
+      expect(screen.getByText('Manajemen Karyawan (HR)')).toBeInTheDocument();
     });
   });
 
   it('should handle search input', async () => {
     render(<EmployeesPage />);
     
-    const searchInput = await screen.findByPlaceholderText('Search Staff...');
+    const searchInput = await screen.findByPlaceholderText('Cari nama, jabatan, status...');
     fireEvent.change(searchInput, { target: { value: 'john doe' } });
     
     await waitFor(() => {
@@ -189,17 +189,19 @@ describe('EmployeesPage', () => {
   it('should render employee card after data load', async () => {
     render(<EmployeesPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
-      expect(screen.getByText(/Kasir/i)).toBeInTheDocument();
-      expect(screen.getByText(/Att:\s*5\s*d/i)).toBeInTheDocument();
-    });
-  });
+    // Both mobile card and desktop table render the name and role
+    const names = await screen.findAllByText('Budi Santoso', {}, { timeout: 10000 });
+    expect(names.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Kasir/i).length).toBeGreaterThan(0);
+    // Mobile card shows totalAttendance as "5 hari" (no prefix); desktop shows "Hadir: 5 hari"
+    expect(screen.getAllByText(/5\s*hari/i).length).toBeGreaterThan(0);
+  }, 15000);
 
   it('should show success notification when marking employee present', async () => {
     render(<EmployeesPage />);
 
-    const presentButton = await screen.findByTitle('Absen Hadir');
+    // Desktop table has title="Tandai Hadir Hari Ini"; mobile buttons have no title
+    const presentButton = await screen.findByTitle('Tandai Hadir Hari Ini', {}, { timeout: 10000 });
     fireEvent.click(presentButton);
 
     await waitFor(() => {
