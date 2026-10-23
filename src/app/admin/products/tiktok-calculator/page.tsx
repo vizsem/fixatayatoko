@@ -963,6 +963,11 @@ export default function App() {
   const [testRoas, setTestRoas] = useState<number>(6.2);
   const [targetNetProfitGoal, setTargetNetProfitGoal] = useState<number>(5); // Target laba bersih yang diinginkan (%)
 
+  // State Simulasi Tabel Produk Database Aktif
+  const [simFilterKat, setSimFilterKat] = useState<string>("all");
+  const [simSearch, setSimSearch] = useState<string>("");
+  const [simShowAll, setSimShowAll] = useState<boolean>(false);
+
   // Program toggles
   const [active, setActive] = useState({
     komisi_dinamis: true,
@@ -1086,6 +1091,29 @@ export default function App() {
   const totalPlatformPerPcs = qty > 0 ? Math.round(totalPlatform / qty) : 0;
 
   // ── LOGIKA PEMILIHAN PRODUK DATABASE TOKO ──
+  // Muat produk aktif dari database secara otomatis saat halaman dimuat
+  useEffect(() => {
+    let isMounted = true;
+    const fetchActiveProducts = async () => {
+      if (productList.length > 0) return;
+      try {
+        setProductLoading(true);
+        const data = await getProducts({ isActive: true, limit: 300 });
+        if (isMounted && data && data.length > 0) {
+          setProductList(data);
+        }
+      } catch (err) {
+        console.error("Gagal memuat produk aktif dari database:", err);
+      } finally {
+        if (isMounted) setProductLoading(false);
+      }
+    };
+    fetchActiveProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleOpenProductModal = async () => {
     setIsProductModalOpen(true);
     if (productList.length === 0) {
@@ -1189,6 +1217,274 @@ export default function App() {
   const testAdSpend = testRoas > 0 ? Math.round(hargaSetelahDiskon / testRoas) : 0;
   const testNetProfit = cuanPraIklan - testAdSpend;
   const testNetMarginPct = hargaSetelahDiskon > 0 ? (testNetProfit / hargaSetelahDiskon) * 100 : 0;
+
+  // Data fallback sembako toko jika database sedang dimuat
+  const DEFAULT_SEMBAKO_ITEMS = useMemo(() => [
+    {
+      id: "prod_filma_2l",
+      name: "FILMA 2 LITER",
+      priceEcer: 41000,
+      costPrice: 39467,
+      unit: "pouch",
+      category: "Minyak Goreng",
+      units: [
+        { code: "PCS", name: "1 Pouch 2L", price: 41000, costPrice: 39467, contains: 1 },
+        { code: "CTN", name: "1 Dus (6 Pouch x 2L)", price: 248700, costPrice: 236802, contains: 6 }
+      ]
+    },
+    {
+      id: "prod_sunco_2l",
+      name: "SUNCO REFILL 2LT",
+      priceEcer: 47000,
+      costPrice: 43597,
+      unit: "pouch",
+      category: "Minyak Goreng",
+      units: [
+        { code: "PCS", name: "1 Pouch 2L", price: 47000, costPrice: 43597, contains: 1 },
+        { code: "CTN", name: "1 Dus (6 Pouch x 2L)", price: 282000, costPrice: 261582, contains: 6 }
+      ]
+    },
+    {
+      id: "prod_beras_lahap_5kg",
+      name: "BERAS LAHAP LELE 5KG",
+      priceEcer: 82000,
+      costPrice: 77796,
+      unit: "sak",
+      category: "Beras",
+      units: [
+        { code: "PCS", name: "1 Sak 5kg", price: 82000, costPrice: 77796, contains: 1 },
+        { code: "KRG", name: "1 Karung (5 Sak x 5kg)", price: 420000, costPrice: 388980, contains: 5 }
+      ]
+    },
+    {
+      id: "prod_koi_hijau_5kg",
+      name: "KOI HIJAU 5KG",
+      priceEcer: 82000,
+      costPrice: 75570,
+      unit: "sak",
+      category: "Beras",
+      units: [
+        { code: "PCS", name: "1 Sak 5kg", price: 82000, costPrice: 75570, contains: 1 },
+        { code: "KARTON", name: "1 Bal/Karton (5 Sak)", price: 410000, costPrice: 377850, contains: 5 }
+      ]
+    },
+    {
+      id: "prod_gula_rosebrand_1kg",
+      name: "ROSE BRAND GULA KRISTAL TEBU (KUNING) 1KG",
+      priceEcer: 19000,
+      costPrice: 17443,
+      unit: "pcs",
+      category: "Gula",
+      units: [
+        { code: "PCS", name: "1 Bungkus 1kg", price: 19000, costPrice: 17443, contains: 1 },
+        { code: "CTN", name: "1 Dus (20 Bungkus x 1kg)", price: 366000, costPrice: 348860, contains: 20 }
+      ]
+    },
+    {
+      id: "prod_indomie_goreng",
+      name: "INDOMIE GORENG 80GR (40)",
+      priceEcer: 3200,
+      costPrice: 2863,
+      unit: "pcs",
+      category: "Mie Instan",
+      units: [
+        { code: "PCS", name: "1 Bungkus 80gr", price: 3200, costPrice: 2863, contains: 1 },
+        { code: "CTN", name: "1 Karton (40 Bungkus)", price: 233600, costPrice: 114520, contains: 40 }
+      ]
+    },
+    {
+      id: "prod_segitiga_1kg",
+      name: "SEGITIGA 1KG TEPUNG",
+      priceEcer: 12000,
+      costPrice: 11500,
+      unit: "pcs",
+      category: "Tepung",
+      units: [
+        { code: "PCS", name: "1 Bungkus 1kg", price: 12000, costPrice: 11500, contains: 1 },
+        { code: "CTN", name: "1 Dus (12 Bungkus)", price: 162000, costPrice: 138000, contains: 12 }
+      ]
+    },
+    {
+      id: "prod_paket_komplit_sembako",
+      name: "PAKET KOMPLIT SEMBAKO BERKAH",
+      priceEcer: 165000,
+      costPrice: 130000,
+      unit: "paket",
+      category: "Bundling",
+      units: [
+        { code: "PAKET", name: "Beras 5kg + Minyak 2L + Gula 1kg + Teh", price: 165000, costPrice: 130000, contains: 1 }
+      ]
+    }
+  ], []);
+
+  // ── KALKULASI SIMULASI PRODUK AKTIF DATABASE DI TABEL ──
+  const simulatedProductRows = useMemo(() => {
+    const rawList = productList.length > 0 ? productList.filter((p) => p.isActive !== false) : DEFAULT_SEMBAKO_ITEMS;
+    const rows: any[] = [];
+
+    rawList.forEach((p) => {
+      const units = Array.isArray(p.units) && p.units.length > 0
+        ? p.units
+        : (p.raw_data?.units && Array.isArray(p.raw_data.units) && p.raw_data.units.length > 0 ? p.raw_data.units : null);
+
+      const processUnit = (unit?: any) => {
+        const isGrosir = Boolean(
+          unit && (
+            ['CTN', 'DUS', 'BAL', 'KRG', 'KARTON', 'PACK', 'BOX', 'RTG'].includes((unit.code || unit.name || '').toUpperCase()) ||
+            (unit.contains && Number(unit.contains) > 1)
+          )
+        );
+
+        const price = unit
+          ? Number(unit.price || unit.priceGrosir || p.priceEcer || p.price || 0)
+          : Number(p.channelPricing?.tiktok?.price || p.priceEcer || p.price || 0);
+
+        const cost = unit
+          ? Number(unit.costPrice || unit.purchasePrice || unit.modal || (p.costPrice ? p.costPrice * (unit.multiplier || unit.contains || 1) : 0))
+          : Number(p.costPrice || p.purchasePrice || 0);
+
+        if (price <= 0) return; // lewati produk yang belum punya harga jual
+
+        const unitLabel = unit
+          ? (unit.name || unit.label || unit.code || 'Unit') + (unit.contains && Number(unit.contains) > 1 ? ` (${unit.contains} ${p.unit || 'pcs'})` : '')
+          : (p.unit || 'pcs');
+
+        // Komisi Sembako TikTok Shop:
+        // Komisi dasar: 5.25%
+        // Dinamis: 6.5% (max Rp60.000)
+        // PPh 22: 0.5%
+        // Biaya proses pesanan: Rp1.250
+        // Biaya packing operasional: Rp1.500 (eceran) vs Rp3.500 (grosir/karton/bal/karung)
+        const komisi = price * 0.0525;
+        const dinamis = Math.min(60000, price * 0.065);
+        const pph22 = price * 0.005;
+        const proses = 1250;
+        const packing = isGrosir || price >= 100000 ? 3500 : 1500;
+        const feeAndPacking = Math.round(komisi + dinamis + pph22 + proses + packing);
+
+        const marginPraIklan = Math.round(price - cost - feeAndPacking);
+        const marginPraIklanPct = price > 0 ? (marginPraIklan / price) * 100 : 0;
+
+        // ROAS 4.5x (22.2%)
+        const adSpend45 = price / 4.5;
+        const netProfit45 = Math.round(marginPraIklan - adSpend45);
+
+        // ROAS 6.2x (16.1%)
+        const adSpend62 = price / 6.2;
+        const netProfit62 = Math.round(marginPraIklan - adSpend62);
+
+        // ROAS 7.2x (13.9%)
+        const adSpend72 = price / 7.2;
+        const netProfit72 = Math.round(marginPraIklan - adSpend72);
+
+        // Break-Even ROAS
+        const breakEvenRoas = marginPraIklan > 0 ? Number((price / marginPraIklan).toFixed(2)) : null;
+
+        let badge = "Eceran Satuan";
+        let badgeType: "danger" | "warning" | "success" | "neutral" | "info" = "neutral";
+        if (marginPraIklan <= 0) {
+          badge = isGrosir ? "Grosir - Margin Tipis" : "Eceran Satuan - Bahaya";
+          badgeType = "danger";
+        } else if (isGrosir) {
+          badge = `Grosir Kartonan (${unitLabel})`;
+          badgeType = "info";
+        } else if (price >= 150000) {
+          badge = "Paket Bundling Nilai Tinggi";
+          badgeType = "success";
+        } else {
+          badge = `Kemasan Sak/Ecer (${unitLabel})`;
+          badgeType = "neutral";
+        }
+
+        let recommendation = { label: "Dilarang Iklan", bg: "bg-rose-900/60 border-rose-800/80", text: "text-rose-300" };
+        if (marginPraIklan <= 0) {
+          recommendation = { label: "Dilarang Iklan", bg: "bg-rose-900/60 border-rose-800/80", text: "text-rose-300" };
+        } else if (breakEvenRoas && breakEvenRoas > 15) {
+          recommendation = { label: "Hanya Organik/GMV Max", bg: "bg-amber-900/60 border-amber-800/80", text: "text-amber-300" };
+        } else if (breakEvenRoas && breakEvenRoas >= 9) {
+          recommendation = { label: `Target ROAS ${Math.ceil(breakEvenRoas)}x+`, bg: "bg-indigo-900/60 border-indigo-800/80", text: "text-indigo-300" };
+        } else {
+          recommendation = { label: `Aman Iklan (${Math.ceil(breakEvenRoas || 4)}x+)`, bg: "bg-emerald-900/60 border-emerald-800/80", text: "text-emerald-300" };
+        }
+
+        rows.push({
+          id: `${p.id}_${unit ? (unit.code || unit.name || 'unit') : 'base'}`,
+          rawProduct: p,
+          unitObj: unit,
+          name: p.name || p.raw_data?.name || 'Produk',
+          category: p.category || p.raw_data?.category || '',
+          badge,
+          badgeType,
+          unitName: unitLabel,
+          isGrosir,
+          price,
+          cost,
+          feeAndPacking,
+          marginPraIklan,
+          marginPraIklanPct,
+          netProfit45,
+          netProfit62,
+          netProfit72,
+          breakEvenRoas,
+          recommendation,
+        });
+      };
+
+      if (units && units.length > 0) {
+        units.forEach((u: any) => processUnit(u));
+      } else {
+        processUnit();
+      }
+    });
+
+    // Urutkan: Skenario dengan HPP terisi dan sembako utama didahulukan
+    rows.sort((a, b) => {
+      if (a.cost > 0 && b.cost === 0) return -1;
+      if (a.cost === 0 && b.cost > 0) return 1;
+      return 0;
+    });
+
+    // Filter pencarian
+    let result = rows;
+    if (simSearch.trim()) {
+      const q = simSearch.toLowerCase().trim();
+      result = result.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.unitName.toLowerCase().includes(q) ||
+          r.category.toLowerCase().includes(q) ||
+          (r.rawProduct.sku && r.rawProduct.sku.toLowerCase().includes(q))
+      );
+    }
+
+    // Filter kategori chip
+    if (simFilterKat !== "all") {
+      if (simFilterKat === "minyak") {
+        result = result.filter((r) => r.name.toLowerCase().includes("minyak") || r.name.toLowerCase().includes("filma") || r.name.toLowerCase().includes("sunco") || r.name.toLowerCase().includes("fortune"));
+      } else if (simFilterKat === "beras") {
+        result = result.filter((r) => r.name.toLowerCase().includes("beras") || r.name.toLowerCase().includes("lahap") || r.name.toLowerCase().includes("koi"));
+      } else if (simFilterKat === "gula") {
+        result = result.filter((r) => r.name.toLowerCase().includes("gula") || r.name.toLowerCase().includes("rose brand"));
+      } else if (simFilterKat === "mie") {
+        result = result.filter((r) => r.name.toLowerCase().includes("mie") || r.name.toLowerCase().includes("indomie") || r.name.toLowerCase().includes("sedaap") || r.name.toLowerCase().includes("sukses"));
+      } else if (simFilterKat === "tepung") {
+        result = result.filter((r) => r.name.toLowerCase().includes("tepung") || r.name.toLowerCase().includes("segitiga"));
+      } else if (simFilterKat === "kopi") {
+        result = result.filter((r) => r.name.toLowerCase().includes("kopi") || r.name.toLowerCase().includes("teh") || r.name.toLowerCase().includes("good day") || r.name.toLowerCase().includes("susu") || r.name.toLowerCase().includes("indomilk") || r.name.toLowerCase().includes("energen"));
+      } else if (simFilterKat === "grosir") {
+        result = result.filter((r) => r.isGrosir);
+      } else if (simFilterKat === "eceran") {
+        result = result.filter((r) => !r.isGrosir);
+      }
+    }
+
+    return result;
+  }, [productList, DEFAULT_SEMBAKO_ITEMS, simSearch, simFilterKat]);
+
+  const displayedSimRows = useMemo(() => {
+    if (simShowAll) return simulatedProductRows;
+    return simulatedProductRows.slice(0, 15);
+  }, [simulatedProductRows, simShowAll]);
 
   // Fungsi kalkulasi target harga jual per pcs untuk mencapai target net margin tertentu
   function calcH(tm=0, targetQty=qty){
@@ -3514,15 +3810,77 @@ export default function App() {
             </div>
           </div>
 
-          {/* TABEL SIMULASI NYATA UNTUK PRODUK SEMBAKO (STUDI KASUS) */}
+          {/* TABEL SIMULASI NYATA UNTUK PRODUK SEMBAKO (STUDI KASUS DARI DATABASE AKTIF) */}
           <div className="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 shadow-md space-y-4">
-            <div>
-              <h3 className="text-sm font-black text-white flex items-center gap-2">
-                <span>📋</span> Tabel Simulasi Nyata Produk Sembako: Kenapa ROAS 4.5 & 6.2 Masih Boncos?
-              </h3>
-              <p className="text-xs text-gray-400 mt-1">
-                Membandingkan skenario penjualan eceran vs kartonan/bundling pada berbagai Target ROI di TikTok Shop
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>📋</span> Tabel Simulasi Nyata Produk Sembako: Kenapa ROAS 4.5 &amp; 6.2 Masih Boncos?
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Membandingkan skenario penjualan eceran vs kartonan/bundling dari database produk toko aktif pada berbagai Target ROI di TikTok Shop
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-start md:self-auto">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {productLoading ? "Memuat DB..." : `${productList.length > 0 ? `${productList.length} Produk Aktif DB` : "8 Produk Sembako Siap"}`}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter & Kontrol Pencarian Database Produk Aktif */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-gray-950/70 p-3 rounded-xl border border-gray-800">
+              <div className="flex items-center gap-2 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <span className="absolute left-3 top-2.5 text-gray-500 text-xs">🔍</span>
+                  <input
+                    type="text"
+                    value={simSearch}
+                    onChange={(e) => setSimSearch(e.target.value)}
+                    placeholder="Cari nama produk sembako aktif di database..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-pink-500"
+                  />
+                  {simSearch && (
+                    <button
+                      onClick={() => setSimSearch("")}
+                      className="absolute right-2.5 top-2 text-gray-400 hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <span className="text-[11px] text-gray-400 hidden sm:inline whitespace-nowrap">
+                  ({simulatedProductRows.length} skenario)
+                </span>
+              </div>
+
+              {/* Kategori filter chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 text-[11px]">
+                {[
+                  { id: "all", label: "Semua Sembako" },
+                  { id: "minyak", label: "Minyak" },
+                  { id: "beras", label: "Beras" },
+                  { id: "gula", label: "Gula" },
+                  { id: "mie", label: "Mie Instan" },
+                  { id: "tepung", label: "Tepung" },
+                  { id: "kopi", label: "Kopi/Minuman" },
+                  { id: "grosir", label: "Kartonan" },
+                  { id: "eceran", label: "Eceran" },
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => setSimFilterKat(chip.id)}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap text-[11px] ${
+                      simFilterKat === chip.id
+                        ? "bg-pink-600 text-white font-bold shadow-sm"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-gray-800">
@@ -3532,94 +3890,167 @@ export default function App() {
                     <th className="p-3">Skenario Produk Sembako</th>
                     <th className="p-3 text-right">Harga Jual</th>
                     <th className="p-3 text-right">Modal HPP</th>
-                    <th className="p-3 text-right">Fee & Packing</th>
+                    <th className="p-3 text-right">Fee &amp; Packing</th>
                     <th className="p-3 text-right">Margin Pra-Iklan</th>
                     <th className="p-3 text-center">ROAS 4.5x (22.2%)</th>
                     <th className="p-3 text-center">ROAS 6.2x (16.1%)</th>
                     <th className="p-3 text-center">ROAS 7.2x (13.9%)</th>
                     <th className="p-3 text-right">Break-Even ROAS</th>
                     <th className="p-3 text-center">Rekomendasi</th>
+                    <th className="p-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60 font-medium">
-                  {/* Row 1: Minyak Goreng 2L Eceran */}
-                  <tr className="hover:bg-gray-800/40">
-                    <td className="p-3">
-                      <p className="font-bold text-white">Minyak Goreng 2L (1 Pouch)</p>
-                      <span className="text-[10px] text-rose-400 font-bold">Eceran Satuan - Bahaya</span>
-                    </td>
-                    <td className="p-3 text-right text-white">Rp36.000</td>
-                    <td className="p-3 text-right text-amber-300">Rp33.000</td>
-                    <td className="p-3 text-right text-red-300">Rp6.620</td>
-                    <td className="p-3 text-right font-black text-rose-400">-Rp3.620</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp11.620</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp9.426</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp8.620</td>
-                    <td className="p-3 text-right text-rose-500 font-black">🚨 MINUS</td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-rose-900/60 text-rose-300 font-bold">Dilarang Iklan</span>
-                    </td>
-                  </tr>
+                  {displayedSimRows.map((r, idx) => (
+                    <tr
+                      key={r.id || idx}
+                      className={`hover:bg-gray-800/40 transition ${
+                        r.isGrosir
+                          ? "bg-indigo-950/20"
+                          : r.price >= 150000
+                          ? "bg-emerald-950/20"
+                          : ""
+                      }`}
+                    >
+                      <td className="p-3 max-w-xs">
+                        <p className="font-bold text-white line-clamp-2">{r.name}</p>
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              r.badgeType === "danger"
+                                ? "bg-rose-950/80 text-rose-300 border border-rose-800/60"
+                                : r.badgeType === "info"
+                                ? "bg-indigo-950/80 text-indigo-300 border border-indigo-800/60"
+                                : r.badgeType === "success"
+                                ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60"
+                                : "bg-gray-800 text-gray-300 border border-gray-700"
+                            }`}
+                          >
+                            {r.badge}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right text-white font-bold">
+                        {formatRp(r.price)}
+                      </td>
+                      <td className="p-3 text-right text-amber-300 font-mono">
+                        {r.cost > 0 ? (
+                          formatRp(r.cost)
+                        ) : (
+                          <span className="text-gray-500 italic text-[11px]">Belum diisi</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right text-red-300 font-mono">
+                        {formatRp(r.feeAndPacking)}
+                      </td>
+                      <td
+                        className={`p-3 text-right font-black ${
+                          r.marginPraIklan < 0 ? "text-rose-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {r.marginPraIklan < 0 ? "-" : "+"}
+                        {formatRp(Math.abs(r.marginPraIklan))}
+                        <span className="block text-[10px] font-normal opacity-80">
+                          ({r.marginPraIklanPct.toFixed(1)}%)
+                        </span>
+                      </td>
+                      <td
+                        className={`p-3 text-center font-bold ${
+                          r.netProfit45 < 0 ? "text-rose-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {r.netProfit45 < 0 ? `Rugi -${formatRp(Math.abs(r.netProfit45))}` : `+${formatRp(r.netProfit45)}`}
+                      </td>
+                      <td
+                        className={`p-3 text-center font-bold ${
+                          r.netProfit62 < 0 ? "text-rose-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {r.netProfit62 < 0 ? `Rugi -${formatRp(Math.abs(r.netProfit62))}` : `+${formatRp(r.netProfit62)}`}
+                      </td>
+                      <td
+                        className={`p-3 text-center font-bold ${
+                          r.netProfit72 < 0 ? "text-rose-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {r.netProfit72 < 0 ? `Rugi -${formatRp(Math.abs(r.netProfit72))}` : `+${formatRp(r.netProfit72)}`}
+                      </td>
+                      <td className="p-3 text-right font-black">
+                        {r.marginPraIklan <= 0 ? (
+                          <span className="text-rose-500 font-black">🚨 MINUS</span>
+                        ) : (
+                          <span
+                            className={
+                              (r.breakEvenRoas || 0) > 15
+                                ? "text-amber-400"
+                                : (r.breakEvenRoas || 0) > 8
+                                ? "text-indigo-300"
+                                : "text-emerald-400"
+                            }
+                          >
+                            {r.breakEvenRoas}x
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block ${r.recommendation.bg} ${r.recommendation.text}`}
+                        >
+                          {r.recommendation.label}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => {
+                            handleSelectProduct(r.rawProduct, r.unitObj);
+                            window.scrollTo({ top: 350, behavior: "smooth" });
+                          }}
+                          title="Simulasikan produk ini di kalkulator atas"
+                          className="px-2.5 py-1 rounded bg-indigo-600/80 hover:bg-indigo-500 text-white text-[10px] font-bold transition flex items-center gap-1 mx-auto shadow-sm"
+                        >
+                          <span>⚡</span>
+                          <span>Hitung</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
 
-                  {/* Row 2: Minyak Goreng 1 Dus (6 Pouch) */}
-                  <tr className="hover:bg-gray-800/40 bg-indigo-950/20">
-                    <td className="p-3">
-                      <p className="font-bold text-white">Minyak Goreng 1 Dus (6 Pouch x 2L)</p>
-                      <span className="text-[10px] text-indigo-400 font-bold">Grosir Kartonan Markup</span>
-                    </td>
-                    <td className="p-3 text-right text-white">Rp238.000</td>
-                    <td className="p-3 text-right text-amber-300">Rp198.000</td>
-                    <td className="p-3 text-right text-red-300">Rp29.835</td>
-                    <td className="p-3 text-right font-black text-emerald-400">+Rp10.165 (4.3%)</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp42.723</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp28.222</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp22.890</td>
-                    <td className="p-3 text-right text-amber-400 font-black">23.41x</td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-amber-900/60 text-amber-300 font-bold">Hanya Organik/GMV Max</span>
-                    </td>
-                  </tr>
-
-                  {/* Row 3: Beras Premium 5kg Eceran */}
-                  <tr className="hover:bg-gray-800/40">
-                    <td className="p-3">
-                      <p className="font-bold text-white">Beras Premium 5 kg</p>
-                      <span className="text-[10px] text-gray-400">Kemasan Sak Ecer</span>
-                    </td>
-                    <td className="p-3 text-right text-white">Rp75.000</td>
-                    <td className="p-3 text-right text-amber-300">Rp68.000</td>
-                    <td className="p-3 text-right text-red-300">Rp11.312</td>
-                    <td className="p-3 text-right font-black text-rose-400">-Rp4.312</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp20.978</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp16.408</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp14.728</td>
-                    <td className="p-3 text-right text-rose-500 font-black">🚨 MINUS</td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-rose-900/60 text-rose-300 font-bold">Dilarang Iklan</span>
-                    </td>
-                  </tr>
-
-                  {/* Row 4: Paket Komplit Sembako Keluarga (Bundling) */}
-                  <tr className="hover:bg-gray-800/40 bg-emerald-950/20">
-                    <td className="p-3">
-                      <p className="font-bold text-emerald-300">Paket Komplit Sembako Berkah</p>
-                      <span className="text-[10px] text-emerald-400 font-bold">Beras 5kg + Minyak 2L + Gula 1kg + Teh</span>
-                    </td>
-                    <td className="p-3 text-right text-white font-bold">Rp165.000</td>
-                    <td className="p-3 text-right text-amber-300">Rp130.000</td>
-                    <td className="p-3 text-right text-red-300">Rp21.487</td>
-                    <td className="p-3 text-right font-black text-emerald-400">+Rp13.513 (8.2%)</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp23.153</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp13.099</td>
-                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp9.403</td>
-                    <td className="p-3 text-right text-emerald-400 font-black">12.21x</td>
-                    <td className="p-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-900/60 text-emerald-300 font-bold">Target ROAS 12x+</span>
-                    </td>
-                  </tr>
+                  {displayedSimRows.length === 0 && (
+                    <tr>
+                      <td colSpan={11} className="p-8 text-center text-gray-400">
+                        <p className="text-sm font-semibold">
+                          Tidak ada produk aktif yang cocok dengan pencarian &quot;{simSearch}&quot;
+                        </p>
+                        <button
+                          onClick={() => {
+                            setSimSearch("");
+                            setSimFilterKat("all");
+                          }}
+                          className="mt-2 text-xs text-pink-400 underline hover:text-pink-300"
+                        >
+                          Reset Filter
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination / Toggle Tampilkan Semua */}
+            {simulatedProductRows.length > 15 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-400 px-1 pt-1">
+                <span>
+                  Menampilkan {displayedSimRows.length} dari {simulatedProductRows.length} skenario produk aktif database
+                </span>
+                <button
+                  onClick={() => setSimShowAll(!simShowAll)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-bold transition text-xs border border-gray-700 shadow-sm"
+                >
+                  {simShowAll ? "Tampilkan Lebih Sedikit (15 Skenario)" : `Lihat Semua (${simulatedProductRows.length} Skenario)`}
+                </button>
+              </div>
+            )}
 
             <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl p-3 text-xs text-amber-200 space-y-1">
               <p className="font-bold flex items-center gap-1.5">
