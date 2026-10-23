@@ -1140,12 +1140,19 @@ export default function App() {
     );
   }, [productList, productSearch]);
 
-  const handleSelectProduct = (prod: any, unitOption?: any) => {
+  // closeModal=true saat dipanggil dari modal pilih produk,
+  // closeModal=false saat dipanggil dari tombol satuan di panel aktif
+  const handleSelectProduct = (prod: any, unitOption?: any, closeModal = true) => {
     setSelectedProduct(prod);
-    setSelectedUnitName(unitOption ? unitOption.name || unitOption.unit : (prod.unit || 'pcs'));
+
+    // Prioritas label satuan: code → label → name → fallback
+    const unitLabel = unitOption
+      ? (unitOption.code || unitOption.label || unitOption.name || unitOption.unit || prod.unit || 'PCS')
+      : (prod.unit || 'PCS');
+    setSelectedUnitName(unitLabel);
 
     const cost = unitOption
-      ? (unitOption.costPrice || unitOption.purchasePrice || unitOption.modal || (prod.costPrice * (unitOption.multiplier || 1)))
+      ? (unitOption.costPrice || unitOption.purchasePrice || unitOption.modal || (prod.costPrice > 0 ? prod.costPrice * (unitOption.multiplier || unitOption.contains || 1) : 0))
       : prod.costPrice;
     const price = unitOption
       ? (unitOption.price || unitOption.priceGrosir || prod.priceEcer)
@@ -1186,7 +1193,7 @@ export default function App() {
       if (makananKat) setKat(makananKat);
     }
 
-    setIsProductModalOpen(false);
+    if (closeModal) setIsProductModalOpen(false);
   };
 
   // ── KALKULASI IKLAN ANTI-BONCOS (TARGET ROAS & CAC) ──
@@ -1979,32 +1986,35 @@ export default function App() {
                   {Array.isArray(selectedProduct.units) && selectedProduct.units.length > 0 && (
                     <div className="pt-2 border-t border-gray-800 flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Satuan Hitung:</span>
+                      {/* Tombol satuan dasar (1 PCS / satuan unit produk) */}
                       <button
                         type="button"
-                        onClick={() => handleSelectProduct(selectedProduct)}
+                        onClick={() => handleSelectProduct(selectedProduct, undefined, false)}
                         className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition ${
-                          !selectedUnitName || selectedUnitName.toLowerCase() === (selectedProduct.unit || 'pcs').toLowerCase()
+                          selectedUnitName.toUpperCase() === (selectedProduct.unit || 'PCS').toUpperCase()
                             ? "bg-indigo-600 text-white border-indigo-400"
                             : "bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
                         }`}
                       >
                         1 {selectedProduct.unit || 'PCS'} ({formatRp(selectedProduct.priceEcer)})
                       </button>
+                      {/* Tombol per unit multi-satuan dari DB (CTN, DUS, BAL, dll) */}
                       {selectedProduct.units.map((u: any, idx: number) => {
-                        const uName = u.name || u.unit || `Satuan ${idx + 1}`;
-                        const isSelected = selectedUnitName.toLowerCase() === uName.toLowerCase();
+                        const uCode = (u.code || u.label || u.name || u.unit || `Satuan ${idx + 1}`);
+                        const uPrice = u.price || u.priceGrosir || selectedProduct.priceEcer;
+                        const isSelected = selectedUnitName.toUpperCase() === uCode.toUpperCase();
                         return (
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => handleSelectProduct(selectedProduct, u)}
+                            onClick={() => handleSelectProduct(selectedProduct, u, false)}
                             className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition ${
                               isSelected
                                 ? "bg-indigo-600 text-white border-indigo-400"
                                 : "bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
                             }`}
                           >
-                            1 {uName} ({formatRp(u.price || u.priceGrosir || selectedProduct.priceEcer)})
+                            1 {uCode}{u.contains && Number(u.contains) > 1 ? ` (${u.contains} ${selectedProduct.unit || 'pcs'})` : ''} – {formatRp(uPrice)}
                           </button>
                         );
                       })}
@@ -2111,7 +2121,7 @@ export default function App() {
                                       onClick={() => handleSelectProduct(p, u)}
                                       className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-indigo-300 rounded-lg text-xs font-bold border border-gray-700 transition"
                                     >
-                                      {u.name || u.unit}
+                                      {u.code || u.label || u.name || u.unit || `Satuan ${idx + 1}`}
                                     </button>
                                   ))}
                                 </div>
