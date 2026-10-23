@@ -1,24 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireStaff } from '@/lib/actions/session';
-
-/**
- * Aksi server untuk data pelanggan.
- *
- * CATATAN PERBAIKAN (2026-10-01)
- * Seluruh fungsi di berkas ini sebelumnya memakai klien `supabase` (kunci
- * anon). Di server, klien itu tidak membawa sesi pengguna, sehingga RLS
- * memperlakukannya sebagai `anon` dan menolak akses ke tabel `customers` —
- * daftar pelanggan selalu kosong dan penyimpanan selalu gagal.
- *
- * Karena itu dipakai `supabaseAdmin` (kunci service role) yang memang
- * tersedia di server, dengan syarat setiap fungsi memverifikasi peran
- * pemanggilnya lebih dulu lewat `requireStaff()`. Tanpa syarat itu, berkas ini
- * akan menjadi jalur tanpa otorisasi ke seluruh data pelanggan.
- */
 
 export interface CustomerSummary {
   id: string;
@@ -31,6 +15,8 @@ export interface CustomerSummary {
   totalSpent: number;
   points: number;
   walletBalance: number;
+  creditLimit: number;
+  notes: string;
   createdAt: Date;
   _count: { salesOrders: number };
 }
@@ -54,17 +40,26 @@ function toSummary(row: CustomerRow): CustomerSummary {
   const raw = (row.raw_data ?? {}) as Record<string, unknown>;
   const pick = (a: unknown, b: unknown, c?: unknown) => a ?? b ?? c ?? null;
 
+  const rawType = String(pick(row.type, raw.type) ?? 'Retail');
+  // Normalisasi type ke format yang konsisten (Retail / Grosir / Semi-Grosir)
+  let normalizedType = 'Retail';
+  if (rawType.toLowerCase().includes('semi')) normalizedType = 'Semi-Grosir';
+  else if (rawType.toLowerCase().includes('grosir')) normalizedType = 'Grosir';
+  else normalizedType = 'Retail';
+
   return {
     id: String(row.id),
     name: String(pick(row.name, raw.name, raw.Nama) ?? 'Pelanggan'),
     phone: (pick(row.phone, raw.phone, raw.HP) as string | null) ?? null,
     email: (pick(row.email, raw.email) as string | null) ?? null,
     address: (pick(row.address, raw.address, raw.Alamat) as string | null) ?? null,
-    type: String(pick(row.type, raw.type) ?? 'RETAIL'),
-    totalOrders: Number(row.total_orders ?? raw.totalOrders ?? 0),
-    totalSpent: Number(row.total_spent ?? raw.totalSpent ?? 0),
+    type: normalizedType,
+    totalOrders: Number(row.total_orders ?? raw.totalOrders ?? raw.total_orders ?? 0),
+    totalSpent: Number(row.total_spent ?? raw.totalSpent ?? raw.total_spent ?? 0),
     points: Number(row.points ?? raw.points ?? 0),
     walletBalance: Number(row.wallet_balance ?? raw.walletBalance ?? 0),
+    creditLimit: Number(raw.creditLimit ?? raw.limitKredit ?? 0),
+    notes: String(raw.notes ?? ''),
     createdAt: row.created_at ? new Date(row.created_at) : new Date(),
     _count: { salesOrders: Number(row.total_orders ?? raw.totalOrders ?? 0) },
   };
@@ -104,7 +99,6 @@ export async function getCustomerById(id: string): Promise<CustomerSummary | nul
   }
 }
 
-/** Bentuk data yang dipakai halaman edit pelanggan. */
 export interface CustomerEditData {
   id: string;
   name: string;
@@ -130,13 +124,18 @@ export async function getCustomerForEdit(id: string): Promise<CustomerEditData |
     const raw = ((data as CustomerRow).raw_data ?? {}) as Record<string, unknown>;
     const text = (v: unknown) => (v === null || v === undefined ? '' : String(v));
 
+    let typeVal = text((data as CustomerRow).type ?? raw.type);
+    if (!typeVal || typeVal.toLowerCase() === 'ecer') typeVal = 'Retail';
+    else if (typeVal.toLowerCase() === 'grosir') typeVal = 'Grosir';
+    else if (typeVal.toLowerCase().includes('semi')) typeVal = 'Semi-Grosir';
+
     return {
       id: String((data as CustomerRow).id),
       name: text((data as CustomerRow).name ?? raw.name),
       phone: text((data as CustomerRow).phone ?? raw.phone),
       email: text((data as CustomerRow).email ?? raw.email),
       address: text((data as CustomerRow).address ?? raw.address),
-      type: text((data as CustomerRow).type ?? raw.type) || 'ecer',
+      type: typeVal,
       creditLimit: Number(raw.creditLimit ?? 0),
       notes: text(raw.notes),
     };
@@ -146,12 +145,6 @@ export async function getCustomerForEdit(id: string): Promise<CustomerEditData |
   }
 }
 
-/**
- * Simpan perubahan pelanggan.
- *
- * `raw_data` digabung dengan isi sebelumnya supaya kunci yang tidak dikirim
- * formulir (mis. `createdAt`, `totalOrders`) tidak ikut hilang.
- */
 export async function saveCustomer(
   id: string,
   data: {
@@ -190,6 +183,7 @@ export async function saveCustomer(
         phone: data.phone || null,
         email: data.email || null,
         address: data.address || null,
+        type: data.type || null,
         raw_data: mergedRaw,
         updated_at: now,
       })
@@ -212,11 +206,25 @@ export async function createCustomer(data: {
   email?: string;
   address?: string;
   type?: string;
+  creditLimit?: number;
+  notes?: string;
 }) {
   await requireStaff();
   try {
     const now = new Date().toISOString();
     const id = `cust_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const raw_data = {
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+      points: 0,
+      walletBalance: 0,
+      totalOrders: 0,
+      totalSpent: 0,
+      creditLimit: Number(data.creditLimit || 0),
+      notes: data.notes || '',
+    };
 
     const { error } = await supabaseAdmin.from('customers').insert({
       id,
@@ -224,15 +232,8 @@ export async function createCustomer(data: {
       phone: data.phone || null,
       email: data.email || null,
       address: data.address || null,
-      raw_data: {
-        ...data,
-        createdAt: now,
-        updatedAt: now,
-        points: 0,
-        walletBalance: 0,
-        totalOrders: 0,
-        totalSpent: 0,
-      },
+      type: data.type || 'Retail',
+      raw_data,
       created_at: now,
       updated_at: now,
     });
@@ -247,13 +248,18 @@ export async function createCustomer(data: {
   }
 }
 
-export async function updateCustomer(id: string, data: {
-  name?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  type?: string;
-}) {
+export async function updateCustomer(
+  id: string,
+  data: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    type?: string;
+    creditLimit?: number;
+    notes?: string;
+  }
+) {
   await requireStaff();
   try {
     const now = new Date().toISOString();
@@ -277,6 +283,7 @@ export async function updateCustomer(id: string, data: {
         phone: data.phone,
         email: data.email,
         address: data.address,
+        type: data.type,
         raw_data: mergedRaw,
         updated_at: now,
       })
