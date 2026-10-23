@@ -1,7 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { sbGetDoc } from '@/lib/supabase-helpers';
+import { getProducts } from '@/lib/actions/product.actions';
+import {
+  Search,
+  Package,
+  Check,
+  X,
+  Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  ShieldCheck,
+  DollarSign,
+  Target,
+  Calculator,
+  ArrowRight,
+  Layers,
+  HelpCircle,
+  ChevronRight,
+  RefreshCw,
+  Info,
+  ShoppingBag,
+  ExternalLink,
+  Flame,
+  CheckCircle2,
+  Sliders,
+  Store,
+  Tag,
+} from 'lucide-react';
 
 // ── KATEGORI & KOMISI (Update Terbaru 2026 - Tokopedia & TikTok Shop) ──
 const KATEGORI = [
@@ -924,6 +951,18 @@ export default function App() {
   const [strTab, setStrTab] = useState("campaign_guide");
   const [matrixFilter, setMatrixFilter] = useState<string>("all");
 
+  // State Pilihan Produk Database Toko
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productList, setProductList] = useState<any[]>([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [selectedUnitName, setSelectedUnitName] = useState<string>("");
+
+  // State Simulasi Target ROAS Anti-Boncos
+  const [testRoas, setTestRoas] = useState<number>(6.2);
+  const [targetNetProfitGoal, setTargetNetProfitGoal] = useState<number>(5); // Target laba bersih yang diinginkan (%)
+
   // Program toggles
   const [active, setActive] = useState({
     komisi_dinamis: true,
@@ -1045,6 +1084,111 @@ export default function App() {
   const cuanPerPcs = qty > 0 ? Math.round(cuan / qty) : 0;
   const jumlahPenyelesaianPerPcs = qty > 0 ? Math.round(jumlahPenyelesaian / qty) : 0;
   const totalPlatformPerPcs = qty > 0 ? Math.round(totalPlatform / qty) : 0;
+
+  // ── LOGIKA PEMILIHAN PRODUK DATABASE TOKO ──
+  const handleOpenProductModal = async () => {
+    setIsProductModalOpen(true);
+    if (productList.length === 0) {
+      setProductLoading(true);
+      try {
+        const data = await getProducts({ isActive: true, limit: 300 });
+        setProductList(data || []);
+      } catch (err) {
+        console.error("Gagal memuat produk dari database:", err);
+      } finally {
+        setProductLoading(false);
+      }
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return productList;
+    const q = productSearch.toLowerCase().trim();
+    return productList.filter((p) =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [productList, productSearch]);
+
+  const handleSelectProduct = (prod: any, unitOption?: any) => {
+    setSelectedProduct(prod);
+    setSelectedUnitName(unitOption ? unitOption.name || unitOption.unit : (prod.unit || 'pcs'));
+
+    const cost = unitOption
+      ? (unitOption.costPrice || unitOption.purchasePrice || unitOption.modal || (prod.costPrice * (unitOption.multiplier || 1)))
+      : prod.costPrice;
+    const price = unitOption
+      ? (unitOption.price || unitOption.priceGrosir || prod.priceEcer)
+      : (prod.channelPricing?.tiktok?.price || prod.priceEcer);
+
+    if (cost > 0) setHargaBeli(cost);
+    if (price > 0) setHargaJual(price);
+
+    // Auto-detect kategori sembako/makanan jika nama produk mengandung kata kunci
+    const nameLower = (prod.name || "").toLowerCase();
+    if (
+      nameLower.includes("beras") ||
+      nameLower.includes("minyak") ||
+      nameLower.includes("gula") ||
+      nameLower.includes("tepung") ||
+      nameLower.includes("garam") ||
+      nameLower.includes("bumbu")
+    ) {
+      const sembakoKat = KATEGORI.find((k) => k.id === "sembako");
+      if (sembakoKat) setKat(sembakoKat);
+    } else if (
+      nameLower.includes("snack") ||
+      nameLower.includes("kue") ||
+      nameLower.includes("roti") ||
+      nameLower.includes("bakpia") ||
+      nameLower.includes("biskuit")
+    ) {
+      const snackKat = KATEGORI.find((k) => k.id === "snack_bakpia");
+      if (snackKat) setKat(snackKat);
+    } else if (
+      nameLower.includes("mie") ||
+      nameLower.includes("kopi") ||
+      nameLower.includes("susu") ||
+      nameLower.includes("teh") ||
+      nameLower.includes("minuman")
+    ) {
+      const makananKat = KATEGORI.find((k) => k.id === "makanan");
+      if (makananKat) setKat(makananKat);
+    }
+
+    setIsProductModalOpen(false);
+  };
+
+  // ── KALKULASI IKLAN ANTI-BONCOS (TARGET ROAS & CAC) ──
+  // Biaya platform dasar di luar iklan langsung
+  const platformFeeNonAds = komisiNom + dinNom + prosesNom + pph22Nom + growthXtraNom + logistikNom + mallNom + ongkirNom + voucherNom + poNom + afilNom + cashNom;
+  // Margin Pra-Iklan (Sisa kas yang tersedia untuk dibakar ke iklan dan laba bersih)
+  const cuanPraIklan = (hargaSetelahDiskon - platformFeeNonAds - coFundedNom) - subtotalHPP - totalOpsEffective;
+  const marginPraIklanPct = hargaSetelahDiskon > 0 ? (cuanPraIklan / hargaSetelahDiskon) * 100 : 0;
+
+  // 1. Break-Even ROAS (Titik Impas: Laba Bersih = Rp0)
+  const breakEvenRoas = cuanPraIklan > 0 ? (hargaSetelahDiskon / cuanPraIklan) : null;
+
+  // 2. Safe Target ROAS untuk Net Margin 3%, 5%, 8%
+  const calcTargetRoas = (targetNetPct: number) => {
+    const targetNetNom = (targetNetPct / 100) * hargaSetelahDiskon;
+    const sisaBuatIklan = cuanPraIklan - targetNetNom;
+    if (sisaBuatIklan <= 0) return null;
+    return hargaSetelahDiskon / sisaBuatIklan;
+  };
+
+  const targetRoas3Pct = calcTargetRoas(3);
+  const targetRoas5Pct = calcTargetRoas(5);
+  const targetRoas8Pct = calcTargetRoas(8);
+  const targetRoasCustom = calcTargetRoas(targetNetProfitGoal);
+  const maxAdSpendPerOrder = Math.max(0, cuanPraIklan);
+
+  // Nilai simulasi dari input testRoas
+  const testAdSpend = testRoas > 0 ? Math.round(hargaSetelahDiskon / testRoas) : 0;
+  const testNetProfit = cuanPraIklan - testAdSpend;
+  const testNetMarginPct = hargaSetelahDiskon > 0 ? (testNetProfit / hargaSetelahDiskon) * 100 : 0;
 
   // Fungsi kalkulasi target harga jual per pcs untuk mencapai target net margin tertentu
   function calcH(tm=0, targetQty=qty){
@@ -1454,12 +1598,13 @@ export default function App() {
 
       {/* NAVIGATION TABS */}
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-5 bg-gray-900/80 border border-gray-800 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 bg-gray-900/80 border border-gray-800 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
           {[
             ["kalkulator", "🧮 Kalkulator Cuan"],
-            ["matriks_program", "🎯 Rekomendasi Program & HPP"],
-            ["campaign", "🎪 Jenis Campaign & Promo"],
-            ["semua_program", "📋 Semua Program Biaya"],
+            ["iklan_anti_boncos", "🎯 Iklan Anti-Boncos"],
+            ["matriks_program", "📊 Rekomendasi & HPP"],
+            ["campaign", "🎪 Campaign & Promo"],
+            ["semua_program", "📋 Semua Program"],
             ["strategi", "💡 Panduan Strategi"],
           ].map(([t,l])=>(
             <button key={t} onClick={()=>setMainTab(t)}
@@ -1475,6 +1620,236 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 pb-8 grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* KOLOM KIRI (Input & Konfigurasi) */}
           <div className="lg:col-span-7 space-y-4">
+
+            {/* FITUR BARU: PILIH PRODUK DARI DATABASE */}
+            <div className="bg-gradient-to-r from-gray-900 via-gray-900 to-gray-950 rounded-2xl p-4 border border-indigo-500/40 shadow-xl space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/40 flex items-center justify-center font-bold">
+                    <Package size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                      Hubungkan Produk Toko
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Database Aktif
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      Otomatis tarik HPP (Modal Beli) dan Harga Jual dari database produk aktif
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenProductModal}
+                  className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white rounded-xl text-xs font-extrabold shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <Search size={14} />
+                  <span>{selectedProduct ? "Ganti Produk Toko" : "Pilih dari Database"}</span>
+                </button>
+              </div>
+
+              {/* Status Produk yang Terpilih */}
+              {selectedProduct && (
+                <div className="p-3 bg-gray-950/80 rounded-xl border border-indigo-500/30 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-white truncate">{selectedProduct.name}</span>
+                        <span className="text-[10px] px-2 py-0.2 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 font-bold shrink-0">
+                          SKU: {selectedProduct.sku || '-'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Kategori: <strong className="text-gray-300">{selectedProduct.category || 'Umum'}</strong> · Stok: <strong className="text-emerald-400">{selectedProduct.stock || 0} {selectedProduct.unit || 'pcs'}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct(null);
+                        setSelectedUnitName("");
+                      }}
+                      className="text-gray-500 hover:text-rose-400 text-xs p-1"
+                      title="Lepas keterhubungan produk"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  {/* Pilihan Multi-Satuan jika produk memiliki satuan grosir (misal PCS vs DUS) */}
+                  {Array.isArray(selectedProduct.units) && selectedProduct.units.length > 0 && (
+                    <div className="pt-2 border-t border-gray-800 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Satuan Hitung:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectProduct(selectedProduct)}
+                        className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition ${
+                          !selectedUnitName || selectedUnitName.toLowerCase() === (selectedProduct.unit || 'pcs').toLowerCase()
+                            ? "bg-indigo-600 text-white border-indigo-400"
+                            : "bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
+                        }`}
+                      >
+                        1 {selectedProduct.unit || 'PCS'} ({formatRp(selectedProduct.priceEcer)})
+                      </button>
+                      {selectedProduct.units.map((u: any, idx: number) => {
+                        const uName = u.name || u.unit || `Satuan ${idx + 1}`;
+                        const isSelected = selectedUnitName.toLowerCase() === uName.toLowerCase();
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectProduct(selectedProduct, u)}
+                            className={`text-[10px] px-2.5 py-1 rounded-lg font-bold border transition ${
+                              isSelected
+                                ? "bg-indigo-600 text-white border-indigo-400"
+                                : "bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
+                            }`}
+                          >
+                            1 {uName} ({formatRp(u.price || u.priceGrosir || selectedProduct.priceEcer)})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* MODAL PENCARIAN PRODUK */}
+            {isProductModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+                  {/* Modal Header */}
+                  <div className="p-4 border-b border-gray-800 flex items-center justify-between gap-3 bg-gray-950">
+                    <div className="flex items-center gap-2">
+                      <Package className="text-indigo-400" size={18} />
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                        Pilih Produk Toko dari Database
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsProductModalOpen(false)}
+                      className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="p-3 border-b border-gray-800 bg-gray-900/90">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                      <input
+                        type="text"
+                        placeholder="Ketik nama produk, SKU, barcode, atau kategori..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 bg-gray-950 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition"
+                        autoFocus
+                      />
+                      {productSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setProductSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Product List */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2 divide-y divide-gray-800/50">
+                    {productLoading ? (
+                      <div className="py-12 text-center text-gray-400 space-y-2">
+                        <RefreshCw className="animate-spin mx-auto text-indigo-400" size={24} />
+                        <p className="text-xs font-bold">Memuat daftar produk aktif...</p>
+                      </div>
+                    ) : filteredProducts.length === 0 ? (
+                      <div className="py-12 text-center text-gray-500">
+                        <p className="text-xs font-bold">Tidak ada produk yang cocok dengan pencarian &quot;{productSearch}&quot;</p>
+                        <p className="text-[11px] text-gray-600 mt-1">Coba kata kunci lain atau periksa status produk di menu Produk.</p>
+                      </div>
+                    ) : (
+                      filteredProducts.map((p) => {
+                        const hasUnits = Array.isArray(p.units) && p.units.length > 0;
+                        return (
+                          <div
+                            key={p.id}
+                            className="pt-2 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 hover:bg-gray-800/60 rounded-xl transition-all"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white text-xs truncate">{p.name}</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-800 text-gray-400 font-mono">
+                                  {p.sku || '-'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
+                                <span>Kategori: <strong className="text-gray-300">{p.category || 'Umum'}</strong></span>
+                                <span>Stok: <strong className="text-emerald-400">{p.stock || 0} {p.unit || 'pcs'}</strong></span>
+                                <span>Modal (HPP): <strong className="text-amber-300">{formatRp(p.costPrice || 0)}</strong></span>
+                                <span>Jual Ecer: <strong className="text-white">{formatRp(p.priceEcer || 0)}</strong></span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                              {hasUnits ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectProduct(p)}
+                                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition"
+                                  >
+                                    Pilih {p.unit || 'PCS'}
+                                  </button>
+                                  {p.units.slice(0, 2).map((u: any, idx: number) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => handleSelectProduct(p, u)}
+                                      className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-indigo-300 rounded-lg text-xs font-bold border border-gray-700 transition"
+                                    >
+                                      {u.name || u.unit}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectProduct(p)}
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1"
+                                >
+                                  <span>Pilih</span>
+                                  <ChevronRight size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-3 border-t border-gray-800 bg-gray-950 flex items-center justify-between text-xs text-gray-500">
+                    <span>Menampilkan {filteredProducts.length} produk aktif</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsProductModalOpen(false)}
+                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-bold"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Kategori */}
             <div className="bg-gray-900/90 rounded-2xl p-4 border border-gray-800 shadow-md">
@@ -2807,6 +3182,68 @@ export default function App() {
               )}
             </div>
 
+            {/* FITUR BARU: RINGKASAN IKLAN ANTI-BONCOS (ROAS) */}
+            <div className="bg-gradient-to-br from-indigo-950/80 via-purple-950/60 to-gray-900 rounded-2xl p-4 border border-indigo-500/40 shadow-xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-xs font-bold border border-indigo-500/40">🎯</span>
+                  <div>
+                    <p className="text-xs font-black text-white">Target Iklan Anti-Boncos (ROAS)</p>
+                    <p className="text-[10px] text-gray-400">Batas minimal ROI agar iklan tidak rugi</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${cuanPraIklan > 0 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-rose-500/20 text-rose-300 border-rose-500/30"}`}>
+                  {cuanPraIklan > 0 ? "Bisa Diiklankan" : "Jangan Diiklankan"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-900/90 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] font-bold text-gray-400">Margin Pra-Iklan:</p>
+                  <p className="text-sm font-black text-white mt-0.5">{formatRp(cuanPraIklan)}</p>
+                  <p className="text-[10px] text-gray-400 font-semibold">{marginPraIklanPct.toFixed(1)}% dari omzet</p>
+                </div>
+                <div className="bg-gray-900/90 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] font-bold text-amber-300">Break-Even ROAS:</p>
+                  <p className={`text-sm font-black mt-0.5 ${breakEvenRoas ? "text-amber-400" : "text-rose-400"}`}>
+                    {breakEvenRoas ? `${breakEvenRoas.toFixed(2)}x` : "🚨 MINUS"}
+                  </p>
+                  <p className="text-[10px] text-gray-400">Batas impas modal</p>
+                </div>
+              </div>
+
+              {cuanPraIklan <= 0 ? (
+                <div className="p-2.5 bg-rose-950/40 border border-rose-800/60 rounded-xl text-[11px] text-rose-300 space-y-1">
+                  <p className="font-bold flex items-center gap-1">
+                    <AlertTriangle size={13} className="shrink-0" />
+                    Peringatan Ahli Sembako:
+                  </p>
+                  <p className="leading-relaxed">
+                    Margin produk ini minus atau habis terpotong fee admin & packing sebelum iklan. <strong>Jangan jalankan iklan berbayar</strong> pada harga & kuantiti ini! Buat paket bundling atau naikkan harga jual.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2.5 bg-gray-900/90 border border-indigo-500/30 rounded-xl text-[11px] text-gray-300 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Maks. Budget Iklan:</span>
+                    <strong className="text-white">{formatRp(maxAdSpendPerOrder)} / order</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Safe ROAS (Untung 5%):</span>
+                    <strong className="text-emerald-400">{targetRoas5Pct ? `${targetRoas5Pct.toFixed(2)}x` : "Perlu Margin > 5%"}</strong>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setMainTab("iklan_anti_boncos")}
+                className="w-full py-2 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <span>Buka Simulator Iklan Anti-Boncos →</span>
+              </button>
+            </div>
+
             {/* Shortcut ke Tab Campaign */}
             <div className="rounded-2xl p-4 shadow-lg text-white" style={{background:"linear-gradient(135deg,#130a1c,#2b091e)"}}>
               <div className="flex items-center justify-between mb-2">
@@ -2820,6 +3257,452 @@ export default function App() {
                 className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs py-2 rounded-xl transition-all shadow-md">
                 Buka Panduan & Jenis Campaign →
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB KHUSUS: SKEMA IKLAN & TARGET ROAS ANTI-BONCOS ── */}
+      {mainTab === "iklan_anti_boncos" && (
+        <div className="max-w-7xl mx-auto px-4 pb-8 space-y-5 animate-in fade-in duration-200">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-gray-900 via-indigo-950 to-purple-950 rounded-2xl p-5 border border-indigo-500/40 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="p-2 rounded-xl bg-pink-600/30 text-pink-300 border border-pink-500/40 font-bold">
+                    <Target size={20} />
+                  </span>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      Kalkulator Iklan & Target ROAS Anti-Boncos
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                        Ahli Sembako FMCG
+                      </span>
+                    </h2>
+                    <p className="text-xs text-gray-400">
+                      Tentukan angka batas aman Target ROAS di TikTok Ads Manager agar toko grosir sembako tidak rugi terbakar biaya iklan
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ringkasan Parameter Aktif */}
+                <div className="mt-3 flex items-center gap-2 flex-wrap text-xs text-gray-300 bg-gray-900/80 p-2.5 rounded-xl border border-gray-800">
+                  <span>Produk: <strong className="text-white">{selectedProduct ? selectedProduct.name : "Simulasi Manual"}</strong></span>
+                  <span className="text-gray-600">|</span>
+                  <span>Qty: <strong className="text-pink-300">{qty} unit</strong></span>
+                  <span className="text-gray-600">|</span>
+                  <span>Harga Jual: <strong className="text-white">{formatRp(hargaSetelahDiskon)}</strong></span>
+                  <span className="text-gray-600">|</span>
+                  <span>HPP (Modal): <strong className="text-amber-300">{formatRp(subtotalHPP)}</strong></span>
+                  <span className="text-gray-600">|</span>
+                  <span>Platform Fee & Ops: <strong className="text-red-300">{formatRp(platformFeeNonAds + coFundedNom + totalOpsEffective)}</strong></span>
+                </div>
+              </div>
+
+              <div className="flex sm:flex-col gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenProductModal}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5"
+                >
+                  <Package size={14} />
+                  <span>Pilih Produk Toko</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMainTab("kalkulator")}
+                  className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-bold border border-gray-700 transition flex items-center justify-center gap-1.5"
+                >
+                  <span>Ubah Harga di Kalkulator</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 AMBANG BATAS UTAMA (KPI CARDS) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Card 1: Margin Pra-Iklan */}
+            <div className="bg-gray-900/90 rounded-2xl p-4 border border-gray-800 shadow-md">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>1. Margin Kas Pra-Iklan</span>
+                <DollarSign size={14} className="text-blue-400" />
+              </div>
+              <p className={`text-xl font-black ${cuanPraIklan > 0 ? "text-blue-400" : "text-rose-400"}`}>
+                {formatRp(cuanPraIklan)}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Rasio: <strong className={marginPraIklanPct > 0 ? "text-blue-300" : "text-rose-400"}>{marginPraIklanPct.toFixed(1)}%</strong> dari omzet kotor
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                Sisa uang per pesanan sebelum dibakar ke iklan.
+              </p>
+            </div>
+
+            {/* Card 2: Break-Even ROAS */}
+            <div className="bg-gray-900/90 rounded-2xl p-4 border border-amber-500/40 shadow-md">
+              <div className="flex items-center justify-between text-xs text-amber-300 mb-1">
+                <span className="font-bold">2. Break-Even ROAS</span>
+                <Flame size={14} className="text-amber-400" />
+              </div>
+              <p className={`text-xl font-black ${breakEvenRoas ? "text-amber-400" : "text-rose-500"}`}>
+                {breakEvenRoas ? `${breakEvenRoas.toFixed(2)}x` : "🚨 TIDAK BISA"}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Batas Impas: <strong className="text-amber-300">Laba = Rp0</strong>
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                Jika ROAS iklan di bawah angka ini, toko <strong className="text-rose-400">PASTI RUGI/BONCOS</strong>!
+              </p>
+            </div>
+
+            {/* Card 3: Safe Target ROAS (5% Net Profit) */}
+            <div className="bg-gray-900/90 rounded-2xl p-4 border border-emerald-500/40 shadow-md">
+              <div className="flex items-center justify-between text-xs text-emerald-300 mb-1">
+                <span className="font-bold">3. Safe Target ROAS (Untung 5%)</span>
+                <ShieldCheck size={14} className="text-emerald-400" />
+              </div>
+              <p className={`text-xl font-black ${targetRoas5Pct ? "text-emerald-400" : "text-rose-400"}`}>
+                {targetRoas5Pct ? `${targetRoas5Pct.toFixed(2)}x` : "Margin < 5%"}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Target Aman: <strong className="text-emerald-300">Kunci Cuan Bersih 5%</strong>
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                Angka minimal yang wajib diisi di dashboard iklan TikTok.
+              </p>
+            </div>
+
+            {/* Card 4: Max Ad Spend Per Order */}
+            <div className="bg-gray-900/90 rounded-2xl p-4 border border-purple-500/40 shadow-md">
+              <div className="flex items-center justify-between text-xs text-purple-300 mb-1">
+                <span className="font-bold">4. Maks. Biaya Iklan (CAC)</span>
+                <TrendingUp size={14} className="text-purple-400" />
+              </div>
+              <p className="text-xl font-black text-purple-400">
+                {formatRp(maxAdSpendPerOrder)}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Per pesanan: <strong className="text-purple-300">Maks. 1 transaksi</strong>
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                Biaya konversi iklan per pembeli tidak boleh melampaui ini.
+              </p>
+            </div>
+          </div>
+
+          {/* SIMULATOR TESTER TARGET ROAS INTERAKTIF */}
+          <div className="bg-gray-900/90 rounded-2xl p-5 border border-indigo-500/40 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-800">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Sliders size={16} className="text-pink-400" />
+                  Simulator Uji Coba Target ROAS (misal 3.5x, 4.5x, 6.2x, atau 7.2x)
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Lihat secara langsung apakah target ROAS yang Anda incar menghasilkan cuan atau malah membuat toko boncos
+                </p>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Preset Cepat:</span>
+                {[3.5, 4.5, 6.2, 7.2, 10.0, 15.0].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTestRoas(r)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                      testRoas === r
+                        ? "bg-pink-600 text-white border-pink-400 shadow-sm"
+                        : "bg-gray-800 text-gray-300 border-gray-700 hover:border-pink-500"
+                    }`}
+                  >
+                    {r}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input Slider & Box */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+              <div className="md:col-span-7 space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-300">Target ROAS Iklan yang Ditetapkan:</span>
+                  <div className="flex items-center gap-1 bg-gray-950 border border-gray-700 px-3 py-1 rounded-xl">
+                    <input
+                      type="number"
+                      step={0.1}
+                      min={1}
+                      max={50}
+                      value={testRoas}
+                      onChange={(e) => setTestRoas(Math.max(0.5, Number(e.target.value)))}
+                      className="w-14 bg-transparent text-white font-black text-sm text-right outline-none"
+                    />
+                    <span className="text-pink-400 font-bold text-xs">x (ROI)</span>
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min={1}
+                  max={25}
+                  step={0.1}
+                  value={testRoas}
+                  onChange={(e) => setTestRoas(Number(e.target.value))}
+                  className="w-full accent-pink-500 cursor-pointer"
+                />
+
+                <div className="flex justify-between text-[10px] text-gray-500">
+                  <span>1.0x (100% omzet)</span>
+                  <span>5.0x (20% omzet)</span>
+                  <span>10.0x (10% omzet)</span>
+                  <span>20.0x (5% omzet)</span>
+                </div>
+              </div>
+
+              {/* Hasil Simulasi ROAS */}
+              <div className={`md:col-span-5 p-4 rounded-xl border-2 space-y-2.5 ${
+                testNetProfit < 0
+                  ? "bg-rose-950/40 border-rose-500/60 text-rose-200"
+                  : testNetMarginPct < 3
+                  ? "bg-amber-950/40 border-amber-500/60 text-amber-200"
+                  : "bg-emerald-950/40 border-emerald-500/60 text-emerald-200"
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider">Hasil Simulasi Iklan:</span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase border ${
+                    testNetProfit < 0
+                      ? "bg-rose-900/60 text-rose-200 border-rose-700"
+                      : testNetMarginPct < 3
+                      ? "bg-amber-900/60 text-amber-200 border-amber-700"
+                      : "bg-emerald-900/60 text-emerald-200 border-emerald-700"
+                  }`}>
+                    {testNetProfit < 0 ? "🚨 BONCOS / RUGI" : testNetMarginPct < 3 ? "⚠️ TIPIS / RAWAN" : "🟢 AMAN & CUAN"}
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Biaya Iklan per Order ({testRoas > 0 ? (100 / testRoas).toFixed(1) : 0}%):</span>
+                    <strong className="text-white">-{formatRp(testAdSpend)}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">Margin Pra-Iklan:</span>
+                    <strong className="text-white">+{formatRp(cuanPraIklan)}</strong>
+                  </div>
+                  <div className="pt-1.5 border-t border-white/20 flex justify-between items-center">
+                    <span className="font-bold">Laba Bersih Akhir Toko:</span>
+                    <span className={`text-base font-black ${testNetProfit < 0 ? "text-rose-400" : testNetMarginPct < 3 ? "text-amber-300" : "text-emerald-300"}`}>
+                      {testNetProfit >= 0 ? "+" : ""}{formatRp(testNetProfit)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px] opacity-90">
+                    <span>Persentase Net Margin Bersih:</span>
+                    <strong className="font-bold">{testNetMarginPct.toFixed(1)}%</strong>
+                  </div>
+                </div>
+
+                <p className="text-[10px] pt-1 border-t border-white/10 leading-relaxed opacity-80">
+                  {testNetProfit < 0
+                    ? `⚠️ BONCOS: Pada Target ROAS ${testRoas}x, biaya iklan (${formatRp(testAdSpend)}) lebih besar dari sisa margin produk (${formatRp(cuanPraIklan)}). Setiap ada 1 pesanan yang masuk, toko Anda justru tekor ${formatRp(Math.abs(testNetProfit))}!`
+                    : testNetMarginPct < 3
+                    ? `⚠️ PERINGATAN: Pada ROAS ${testRoas}x toko tidak rugi, namun margin bersih hanya ${testNetMarginPct.toFixed(1)}%. Jika ada retur barang (RTS/COD ditolak), keuntungan akan langsung lenyap.`
+                    : `✓ AMAN: Pada ROAS ${testRoas}x Anda masih mengamankan laba bersih ${formatRp(testNetProfit)} (${testNetMarginPct.toFixed(1)}%) per transaksi.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* TABEL SIMULASI NYATA UNTUK PRODUK SEMBAKO (STUDI KASUS) */}
+          <div className="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 shadow-md space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <span>📋</span> Tabel Simulasi Nyata Produk Sembako: Kenapa ROAS 4.5 & 6.2 Masih Boncos?
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Membandingkan skenario penjualan eceran vs kartonan/bundling pada berbagai Target ROI di TikTok Shop
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <table className="w-full text-xs text-left text-gray-300">
+                <thead className="bg-gray-950 text-gray-400 uppercase text-[10px] font-black tracking-wider border-b border-gray-800">
+                  <tr>
+                    <th className="p-3">Skenario Produk Sembako</th>
+                    <th className="p-3 text-right">Harga Jual</th>
+                    <th className="p-3 text-right">Modal HPP</th>
+                    <th className="p-3 text-right">Fee & Packing</th>
+                    <th className="p-3 text-right">Margin Pra-Iklan</th>
+                    <th className="p-3 text-center">ROAS 4.5x (22.2%)</th>
+                    <th className="p-3 text-center">ROAS 6.2x (16.1%)</th>
+                    <th className="p-3 text-center">ROAS 7.2x (13.9%)</th>
+                    <th className="p-3 text-right">Break-Even ROAS</th>
+                    <th className="p-3 text-center">Rekomendasi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60 font-medium">
+                  {/* Row 1: Minyak Goreng 2L Eceran */}
+                  <tr className="hover:bg-gray-800/40">
+                    <td className="p-3">
+                      <p className="font-bold text-white">Minyak Goreng 2L (1 Pouch)</p>
+                      <span className="text-[10px] text-rose-400 font-bold">Eceran Satuan - Bahaya</span>
+                    </td>
+                    <td className="p-3 text-right text-white">Rp36.000</td>
+                    <td className="p-3 text-right text-amber-300">Rp33.000</td>
+                    <td className="p-3 text-right text-red-300">Rp6.620</td>
+                    <td className="p-3 text-right font-black text-rose-400">-Rp3.620</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp11.620</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp9.426</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp8.620</td>
+                    <td className="p-3 text-right text-rose-500 font-black">🚨 MINUS</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-rose-900/60 text-rose-300 font-bold">Dilarang Iklan</span>
+                    </td>
+                  </tr>
+
+                  {/* Row 2: Minyak Goreng 1 Dus (6 Pouch) */}
+                  <tr className="hover:bg-gray-800/40 bg-indigo-950/20">
+                    <td className="p-3">
+                      <p className="font-bold text-white">Minyak Goreng 1 Dus (6 Pouch x 2L)</p>
+                      <span className="text-[10px] text-indigo-400 font-bold">Grosir Kartonan Markup</span>
+                    </td>
+                    <td className="p-3 text-right text-white">Rp238.000</td>
+                    <td className="p-3 text-right text-amber-300">Rp198.000</td>
+                    <td className="p-3 text-right text-red-300">Rp29.835</td>
+                    <td className="p-3 text-right font-black text-emerald-400">+Rp10.165 (4.3%)</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp42.723</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp28.222</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp22.890</td>
+                    <td className="p-3 text-right text-amber-400 font-black">23.41x</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-amber-900/60 text-amber-300 font-bold">Hanya Organik/GMV Max</span>
+                    </td>
+                  </tr>
+
+                  {/* Row 3: Beras Premium 5kg Eceran */}
+                  <tr className="hover:bg-gray-800/40">
+                    <td className="p-3">
+                      <p className="font-bold text-white">Beras Premium 5 kg</p>
+                      <span className="text-[10px] text-gray-400">Kemasan Sak Ecer</span>
+                    </td>
+                    <td className="p-3 text-right text-white">Rp75.000</td>
+                    <td className="p-3 text-right text-amber-300">Rp68.000</td>
+                    <td className="p-3 text-right text-red-300">Rp11.312</td>
+                    <td className="p-3 text-right font-black text-rose-400">-Rp4.312</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp20.978</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp16.408</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp14.728</td>
+                    <td className="p-3 text-right text-rose-500 font-black">🚨 MINUS</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-rose-900/60 text-rose-300 font-bold">Dilarang Iklan</span>
+                    </td>
+                  </tr>
+
+                  {/* Row 4: Paket Komplit Sembako Keluarga (Bundling) */}
+                  <tr className="hover:bg-gray-800/40 bg-emerald-950/20">
+                    <td className="p-3">
+                      <p className="font-bold text-emerald-300">Paket Komplit Sembako Berkah</p>
+                      <span className="text-[10px] text-emerald-400 font-bold">Beras 5kg + Minyak 2L + Gula 1kg + Teh</span>
+                    </td>
+                    <td className="p-3 text-right text-white font-bold">Rp165.000</td>
+                    <td className="p-3 text-right text-amber-300">Rp130.000</td>
+                    <td className="p-3 text-right text-red-300">Rp21.487</td>
+                    <td className="p-3 text-right font-black text-emerald-400">+Rp13.513 (8.2%)</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp23.153</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp13.099</td>
+                    <td className="p-3 text-center text-rose-400 font-bold">Rugi -Rp9.403</td>
+                    <td className="p-3 text-right text-emerald-400 font-black">12.21x</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-900/60 text-emerald-300 font-bold">Target ROAS 12x+</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl p-3 text-xs text-amber-200 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <span>💡</span> Kesimpulan Finansial Penting:
+              </p>
+              <p className="leading-relaxed">
+                Di kategori sembako, <strong>ROAS 4.5, 6.2, atau 7.2 masih membuat toko Anda boncos puluhan ribu rupiah per order</strong> karena margin kotor sembako hanya 5%–10%, sedangkan ROAS 6.2 menyedot biaya iklan sebesar 16.1% dari omzet! Iklan TikTok baru benar-benar aman jika:
+                <br />1) Anda membuat <strong>Paket Bundling bernilai tinggi (AOV &gt; Rp150.000)</strong>, dan
+                <br />2) Target ROAS dipasang minimal <strong>12.0x s/d 15.0x</strong> di TikTok Ads Manager.
+              </p>
+            </div>
+          </div>
+
+          {/* PANDUAN PRAKTIS LANGKAH DEMI LANGKAH SETTING IKLAN TIKTOK SHOP */}
+          <div className="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 shadow-md space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <span>🎯</span> Panduan Praktis Menentukan Angka Target ROI di Dashboard Iklan TikTok
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Langkah-demi-langkah setup iklan TikTok Shop (GMV Max / Product GMV) yang aman dari pembengkakan biaya
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Langkah 1 & 2 */}
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-xs">1</span>
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wide">Pilih Kampanye Product Sales (TikTok Shop)</h4>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed pl-8">
+                  Di TikTok Ads Manager, pilih Advertising Objective <strong>&quot;Product Sales&quot;</strong> dengan tipe toko <strong>TikTok Shop</strong>. Pilih optimasi pada <strong>&quot;Complete Payment&quot;</strong> (pembayaran tuntas).
+                </p>
+              </div>
+
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-xs">2</span>
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wide">Bidding Strategy: Wajib Pilih &quot;Target ROAS&quot;</h4>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed pl-8">
+                  <strong>JANGAN PERNAH pilih &quot;Maximize GMV&quot; atau &quot;Lowest Cost&quot;</strong> untuk produk sembako! Pilihan itu akan menghabiskan saldo harian Anda tanpa batas ROAS. Selalu centang opsi <strong>&quot;Set Target ROAS&quot;</strong>.
+                </p>
+              </div>
+
+              {/* Langkah 3 & 4 */}
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-xs">3</span>
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wide">Masukkan Angka dari Nilai Safe Target ROAS</h4>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed pl-8">
+                  Ketik angka dari baris <strong>Safe Target ROAS</strong> kalkulator ini (misal <strong>12.0</strong> atau <strong>15.0</strong>). Algoritma TikTok akan membatasi lelang agar hanya melayani pembeli yang memenuhi rasio penjualan tersebut.
+                </p>
+              </div>
+
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-xs">4</span>
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wide">Sistem Rem Otomatis (Budget Protection)</h4>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed pl-8">
+                  Jika audiens TikTok pada hari itu terlalu mahal dan tidak mampu memberikan ROAS yang Anda tentukan, <strong>TikTok otomatis mengerem pengeluaran iklan Anda</strong>. Saldo Anda tidak akan tersedot sia-sia!
+                </p>
+              </div>
+            </div>
+
+            {/* Formula Cheat Sheet */}
+            <div className="bg-gradient-to-r from-gray-950 to-indigo-950/40 p-4 rounded-xl border border-indigo-500/30 space-y-2">
+              <p className="text-xs font-black text-indigo-300 uppercase tracking-wide">
+                📐 Rumus Cepat Matematika untuk Digital Marketer:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                <div className="bg-gray-900/90 p-2.5 rounded-lg border border-gray-800">
+                  <span className="text-gray-400 block text-[10px]">Titik Impas (Break-Even):</span>
+                  <span className="text-amber-400 font-bold">Break-Even ROAS = 1 / (Margin Pra-Iklan %)</span>
+                </div>
+                <div className="bg-gray-900/90 p-2.5 rounded-lg border border-gray-800">
+                  <span className="text-gray-400 block text-[10px]">Target Kunci Profit Bersih:</span>
+                  <span className="text-emerald-400 font-bold">Safe ROAS = 1 / (Margin Pra-Iklan % - Target Net Profit %)</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
