@@ -10,7 +10,8 @@ import {
   UsersRound, Wallet, History, BarChart3, TrendingUp, CreditCard,
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
   Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
-  DollarSign, AlertTriangle, ClipboardCheck, UploadCloud, Store
+  DollarSign, AlertTriangle, ClipboardCheck, UploadCloud, Store,
+  Calculator
 } from 'lucide-react';
 
 import AdminMobileHeader from '@/components/AdminMobileHeader';
@@ -136,6 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Modal & Saldo Kas', href: '/admin/capital', icon: Wallet },
         { name: 'Pengeluaran Toko', href: '/admin/operational-expenses', icon: Banknote },
         { name: 'Rekonsiliasi Bank', href: '/admin/finance/bank-reconciliation', icon: CreditCard },
+        { name: 'Kalkulator Pajak & HPP', href: '/admin/tax-calculator', icon: Calculator },
         { name: 'Laporan Bisnis & Pajak', href: '/admin/reports', icon: BarChart3 },
         { name: 'Laporan Penjualan', href: '/admin/reports/sales', icon: TrendingUp },
         { name: 'Hutang & Piutang', href: '/admin/reports/hutang', icon: CreditCard },

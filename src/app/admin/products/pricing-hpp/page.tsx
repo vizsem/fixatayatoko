@@ -9,12 +9,14 @@ import {
   History, ArrowLeft, RefreshCw, X, Save, Layers,
   ChevronRight, Percent, Sparkles, AlertCircle, RotateCcw,
   CheckSquare, Square, CheckCircle2, Info, Zap, Split,
-  Lock, Unlock, Plus, Trash2, Tag, ShieldCheck
+  Lock, Unlock, Plus, Trash2, Tag, ShieldCheck, Calculator,
+  Receipt, Building2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
-import { getUserAndRole } from '@/lib/supabase-helpers';
+import { getUserAndRole, sbGetDocs } from '@/lib/supabase-helpers';
+import { isCategoryTaxExempt, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
 import type { PricingStrategy } from '@/lib/normalize';
@@ -63,6 +65,9 @@ interface ProductItem {
   inventoryValue: number;
   potentialRevenue: number;
   potentialProfit: number;
+  taxStatus: 'TAXABLE' | 'EXEMPT' | 'PPH22';
+  taxLabel: string;
+  isTaxExempt: boolean;
 }
 
 interface AvgHppInfo {
@@ -99,6 +104,8 @@ export default function PricingHPPPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
+  const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [sortBy, setSortBy] = useState<'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('name');
 
   // Multi-select States
@@ -162,6 +169,20 @@ export default function PricingHPPPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // Fetch system tax settings
+      let currentTaxSettings = DEFAULT_TAX_SETTINGS;
+      try {
+        const settingsSnap = await sbGetDocs({ table: 'settings' });
+        settingsSnap.docs.forEach(d => {
+          if (d.id === 'system' && d.data()?.tax) {
+            currentTaxSettings = { ...DEFAULT_TAX_SETTINGS, ...d.data().tax };
+          }
+        });
+        setTaxSettings(currentTaxSettings);
+      } catch (err) {
+        console.warn('Gagal membaca pengaturan pajak:', err);
+      }
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -184,6 +205,28 @@ export default function PricingHPPPage() {
         const invVal = stk * cost;
         const potRev = stk * ecer;
         const potProf = stk * marginRp;
+
+        // Evaluasi Status Wajib Pajak vs Bebas Pajak
+        const categoryStr = (p.category || raw.Kategori || 'UMUM').trim();
+        const nameUpper = (p.name || raw.Nama || '').toUpperCase();
+        const catUpper = categoryStr.toUpperCase();
+
+        const manualExempt = raw.isTaxExempt === true || p.is_tax_exempt === true;
+        const isPph22Industry = catUpper.includes('SEMEN') || nameUpper.includes('SEMEN') || catUpper.includes('BAJA') || nameUpper.includes('BAJA') || catUpper.includes('KERTAS') || nameUpper.includes('KERTAS') || catUpper.includes('BESI');
+
+        let taxStatus: 'TAXABLE' | 'EXEMPT' | 'PPH22' = 'TAXABLE';
+        let taxLabel = 'Wajib PPN 11%';
+
+        if (isPph22Industry) {
+          taxStatus = 'PPH22';
+          taxLabel = 'PPh 22 Industri';
+        } else if (manualExempt || isCategoryTaxExempt(categoryStr, currentTaxSettings.nonTaxableCategories)) {
+          taxStatus = 'EXEMPT';
+          taxLabel = 'Bebas PPN (0% Sembako)';
+        } else {
+          taxStatus = 'TAXABLE';
+          taxLabel = 'Wajib PPN 11%';
+        }
 
         // Parse list semua satuan produk
         let unitsList: ProductUnitItem[] = [];
@@ -238,6 +281,9 @@ export default function PricingHPPPage() {
           inventoryValue: invVal,
           potentialRevenue: potRev,
           potentialProfit: potProf,
+          taxStatus,
+          taxLabel,
+          isTaxExempt: taxStatus === 'EXEMPT',
         };
       });
 
@@ -283,6 +329,9 @@ export default function PricingHPPPage() {
     let totalMarginPctSum = 0;
     let validMarginCount = 0;
     let avgDriftCount = 0; // products where costPrice != avgCost significantly
+    let taxableCount = 0;
+    let exemptCount = 0;
+    let pph22Count = 0;
 
     products.forEach(p => {
       totalStockValue += Math.max(0, p.inventoryValue);
@@ -296,6 +345,10 @@ export default function PricingHPPPage() {
       if (avg && avg.avgCost > 0 && Math.abs(avg.avgCost - p.costPrice) > 100) {
         avgDriftCount++;
       }
+
+      if (p.taxStatus === 'TAXABLE') taxableCount++;
+      else if (p.taxStatus === 'EXEMPT') exemptCount++;
+      else if (p.taxStatus === 'PPH22') pph22Count++;
     });
 
     const avgMarginPct = validMarginCount > 0 ? totalMarginPctSum / validMarginCount : 0;
@@ -307,6 +360,9 @@ export default function PricingHPPPage() {
       totalPotentialProfit,
       avgMarginPct,
       avgDriftCount,
+      taxableCount,
+      exemptCount,
+      pph22Count,
     };
   }, [products, avgHppMap]);
 
@@ -333,7 +389,13 @@ export default function PricingHPPPage() {
         else if (marginFilter === 'CRITICAL') matchMargin = p.marginPct > 0 && p.marginPct < 8;
         else if (marginFilter === 'NEGATIVE') matchMargin = p.marginPct <= 0;
         else if (marginFilter === 'NEEDS_REVIEW') matchMargin = (priceReviewByProduct.get(p.id)?.length || 0) > 0;
-        return matchSearch && matchCat && matchMargin;
+
+        let matchTax = true;
+        if (taxFilter === 'TAXABLE') matchTax = p.taxStatus === 'TAXABLE';
+        else if (taxFilter === 'EXEMPT') matchTax = p.taxStatus === 'EXEMPT';
+        else if (taxFilter === 'PPH22') matchTax = p.taxStatus === 'PPH22';
+
+        return matchSearch && matchCat && matchMargin && matchTax;
       })
       .sort((a, b) => {
         if (sortBy === 'marginPct_desc') return b.marginPct - a.marginPct;
@@ -348,7 +410,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, marginFilter, sortBy, avgHppMap, priceReviewByProduct]);
+  }, [products, search, selectedCategory, marginFilter, taxFilter, sortBy, avgHppMap, priceReviewByProduct]);
 
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
@@ -831,6 +893,13 @@ export default function PricingHPPPage() {
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
+            <Link
+              href="/admin/tax-calculator"
+              className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm shadow-indigo-200"
+            >
+              <Calculator size={16} />
+              Kalkulator Pajak Anti-Boncos
+            </Link>
             <button
               onClick={handleExportExcel}
               disabled={filteredProducts.length === 0}
@@ -843,7 +912,7 @@ export default function PricingHPPPage() {
         </div>
 
         {/* METRICS CARDS */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
             <div className="flex items-center justify-between text-blue-600">
               <span className="text-xs font-black uppercase tracking-wider text-slate-400">Produk Aktif</span>
@@ -851,6 +920,17 @@ export default function PricingHPPPage() {
             </div>
             <p className="text-2xl md:text-3xl font-black text-slate-900">{kpis.totalCount}</p>
             <p className="text-xs font-bold text-slate-400">Siap dijual</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+            <div className="flex items-center justify-between text-indigo-600">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status Pajak</span>
+              <div className="p-2 bg-indigo-50 rounded-xl"><Receipt size={18} /></div>
+            </div>
+            <p className="text-2xl md:text-3xl font-black text-indigo-700">{kpis.taxableCount}</p>
+            <p className="text-xs font-bold text-slate-400">
+              <span className="text-indigo-600 font-extrabold">{kpis.taxableCount} PPN</span> · <span className="text-emerald-600 font-extrabold">{kpis.exemptCount} Bebas</span>
+            </p>
           </div>
 
           <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
@@ -969,6 +1049,20 @@ export default function PricingHPPPage() {
                   <option value="CRITICAL">🟠 Margin Tipis (1 - 7%)</option>
                   <option value="NEGATIVE">🔴 Margin Nol / Rugi (≤ 0%)</option>
                   <option value="NEEDS_REVIEW">Perlu penyesuaian harga ({productsNeedingPriceReview})</option>
+                </select>
+
+                <select
+                  value={taxFilter}
+                  onChange={e => {
+                    setTaxFilter(e.target.value as any);
+                    setSelectedIds(new Set());
+                  }}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="ALL">Semua Status Pajak</option>
+                  <option value="TAXABLE">📋 Wajib Pajak (PPN 11%) ({kpis.taxableCount})</option>
+                  <option value="EXEMPT">🟢 Bebas Pajak (0% Sembako) ({kpis.exemptCount})</option>
+                  <option value="PPH22">🏗️ PPh 22 Industri ({kpis.pph22Count})</option>
                 </select>
 
                 <select
@@ -1184,10 +1278,39 @@ export default function PricingHPPPage() {
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-slate-400 font-mono text-[10px]">
+                                <div className="flex flex-wrap items-center gap-1.5 text-slate-400 font-mono text-[10px] mt-0.5">
                                   <span>SKU: {p.sku}</span>
                                   {p.barcode && <span>• {p.barcode}</span>}
-                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded font-sans text-slate-500 font-bold">{p.category}</span>
+                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded font-sans text-slate-600 font-bold">{p.category}</span>
+                                  
+                                  {/* TAX STATUS BADGES */}
+                                  {p.taxStatus === 'TAXABLE' && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                      title="Produk Tercentang Wajib Pajak: Barang Kena Pajak (BKP) tarif PPN 11%"
+                                    >
+                                      <CheckCircle2 size={9} className="text-indigo-600" />
+                                      Wajib PPN 11%
+                                    </span>
+                                  )}
+                                  {p.taxStatus === 'EXEMPT' && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      title="Bebas Pajak: Kebutuhan Pokok / Strategis Fasilitas 0% UU HPP"
+                                    >
+                                      <ShieldCheck size={9} className="text-emerald-600" />
+                                      Bebas PPN (0%)
+                                    </span>
+                                  )}
+                                  {p.taxStatus === 'PPH22' && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-amber-50 text-amber-800 border border-amber-200"
+                                      title="Kategori Industri: Kena PPh Pasal 22 Pabrik"
+                                    >
+                                      <Building2 size={9} className="text-amber-600" />
+                                      PPh 22
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -1338,6 +1461,14 @@ export default function PricingHPPPage() {
                                 }`}>
                                   {p.marginPct.toFixed(1)}%
                                 </span>
+                                {p.taxStatus === 'TAXABLE' && p.marginPct < 11 && p.marginPct > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 mt-1"
+                                    title="Peringatan Boncos: Produk Wajib Pajak ini memiliki margin kotor di bawah 11% (terancam tergerus PPN)!"
+                                  >
+                                    <AlertTriangle size={8} /> Margin &lt; PPN 11%
+                                  </span>
+                                )}
                               </div>
                             </td>
 

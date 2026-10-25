@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import * as XLSX from 'xlsx';
 import {
@@ -16,7 +17,8 @@ import {
   HelpCircle,
   TrendingUp,
   ShieldCheck,
-  FileText
+  FileText,
+  Calculator
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { sbGetDocs } from '@/lib/supabase-helpers';
@@ -198,6 +200,13 @@ export default function TaxReportPage() {
               onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
           </div>
+
+          <Link
+            href="/admin/tax-calculator"
+            className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-wider transition-all"
+          >
+            <Calculator size={16} className="text-emerald-600" /> Kalkulator HPP Pabrik
+          </Link>
 
           <button
             onClick={handleExportSTPCortex}

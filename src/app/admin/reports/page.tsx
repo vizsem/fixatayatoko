@@ -25,7 +25,8 @@ import {
   ArrowRight,
   RefreshCw,
   CheckCircle2,
-  Clock
+  Clock,
+  Calculator
 } from 'lucide-react';
 import notify from '@/lib/notify';
 
@@ -124,6 +125,15 @@ const REPORT_ITEMS: ReportItem[] = [
     icon: Receipt,
     href: '/admin/reports/tax',
     category: 'finance'
+  },
+  {
+    id: 'tax-calc',
+    title: 'Kalkulator Pajak B2B & HPP',
+    desc: 'Simulasi modal bersih, PPN pabrik, PPh 22, landed cost & harga aman',
+    icon: Calculator,
+    href: '/admin/tax-calculator',
+    category: 'finance',
+    badge: 'Anti-Boncos'
   },
   // Stok & Operasional
   {
