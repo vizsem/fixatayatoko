@@ -374,6 +374,12 @@ export default function App() {
   const [diskonType, setDiskonType] = useState<"pct"|"nominal">("pct");
   const [diskonVal, setDiskonVal] = useState(10); // misal diskon 10%
 
+  // State Simulasi Iklan Shopee & Target ROAS Anti-Boncos
+  const [testRoas, setTestRoas] = useState<number>(5.0);
+  const [adMode, setAdMode] = useState<"MANUAL_BIDDING" | "GMV_MAX">("MANUAL_BIDDING");
+  const [dailyBudget, setDailyBudget] = useState<number>(30000);
+  const [maxCpc, setMaxCpc] = useState<number>(250);
+
   // Toggle program (disesuaikan dengan default toko aktif: Ongkir Xtra + Promo Xtra + PPh 22)
   const [active, setActive] = useState<Record<string, boolean>>({
     proses: true,
@@ -469,6 +475,39 @@ export default function App() {
   const marginPct = hargaSetelahDiskon > 0 ? (cuan / hargaSetelahDiskon) * 100 : 0;
   const roiPct = (hargaBeli + totalOps) > 0 ? (cuan / (hargaBeli + totalOps)) * 100 : 0;
   const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + totalOps) / hargaSetelahDiskon) * 100 : 0;
+
+  // ── KALKULASI IKLAN ANTI-BONCOS (TARGET ROAS SHOPEE) ──
+  // Laba kotor sebelum dikurangi biaya iklan (jika toggle program iklan aktif, kembalikan agar tidak double deduct)
+  const marginPraIklan = cuan + (active.ads ? Math.round(0.03 * hargaSetelahDiskon) : 0);
+  const marginPraIklanPct = hargaSetelahDiskon > 0 ? (marginPraIklan / hargaSetelahDiskon) * 100 : 0;
+
+  // 1. Break-Even ROAS (Titik Impas: Laba Bersih = Rp0)
+  // Rumus: Harga Jual / Laba Sebelum Iklan
+  const breakEvenRoas = marginPraIklan > 0 ? Number((hargaSetelahDiskon / marginPraIklan).toFixed(2)) : null;
+
+  // 2. Safe Target ROAS untuk Net Margin 5% & 10%
+  const calcTargetRoas = (targetNetPct: number) => {
+    const sisaLaba = marginPraIklan - (targetNetPct / 100) * hargaSetelahDiskon;
+    if (sisaLaba <= 0) return null;
+    return Number((hargaSetelahDiskon / sisaLaba).toFixed(2));
+  };
+  const targetRoas5Pct = calcTargetRoas(5);
+  const targetRoas10Pct = calcTargetRoas(10);
+
+  // Nilai simulasi dari input testRoas
+  const testAdSpend = testRoas > 0 ? Math.round(hargaSetelahDiskon / testRoas) : 0;
+  const netCuanSetelahIklan = marginPraIklan - testAdSpend;
+  const netMarginSetelahIklanPct = hargaSetelahDiskon > 0 ? (netCuanSetelahIklan / hargaSetelahDiskon) * 100 : 0;
+
+  // Status visual efektivitas iklan
+  let adStatus = { label: "✅ AMAN CUAN", color: "text-emerald-700 bg-emerald-50 border-emerald-300" };
+  if (netCuanSetelahIklan < 0) {
+    adStatus = { label: "🚨 BONCOS / RUGI", color: "text-red-700 bg-red-100 border-red-300" };
+  } else if (netMarginSetelahIklanPct < 4) {
+    adStatus = { label: "⚠️ MARGIN TIPIS", color: "text-yellow-700 bg-yellow-100 border-yellow-300" };
+  } else {
+    adStatus = { label: "🟢 CUAN AMAN", color: "text-green-700 bg-green-100 border-green-300" };
+  }
 
   // Kalkulasi target harga jual ideal
   function calcH(tm=0){
@@ -654,9 +693,10 @@ export default function App() {
 
       {/* NAVIGATION TABS */}
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 bg-white border border-orange-200 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 bg-white border border-orange-200 rounded-2xl p-1 gap-1 mb-4 shadow-sm">
           {[
             ["kalkulator", "🧮 Kalkulator Cuan"],
+            ["iklan", "🎯 Iklan Shopee & ROAS"],
             ["campaign", "🎪 Jenis Campaign Shopee"],
             ["semua_program", "📋 Semua Program Biaya"],
             ["strategi", "💡 Panduan Strategi"],
@@ -1022,6 +1062,35 @@ export default function App() {
               </div>
             </div>
 
+            {/* Shortcut ke Simulator Iklan Anti-Boncos */}
+            <div className="bg-gradient-to-br from-red-600 via-orange-600 to-amber-600 rounded-2xl p-4 shadow-lg text-white">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎯</span>
+                  <p className="font-extrabold text-sm">Target Iklan Anti-Boncos (ROAS)</p>
+                </div>
+                <span className="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-bold">ROAS Safety</span>
+              </div>
+              <p className="text-xs text-orange-100 leading-relaxed mb-3">
+                Titik Impas Iklan (Break-Even ROAS): <strong className="text-white underline font-black">{breakEvenRoas ? `${breakEvenRoas}x` : "Margin Minus"}</strong>.
+                {breakEvenRoas ? ` Jika ROAS iklan < ${breakEvenRoas}x, toko dipastikan rugi/boncos!` : " Margin sebelum iklan minus, naikkan harga sebelum beriklan!"}
+              </p>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-white/10 rounded-xl p-2 text-center backdrop-blur">
+                  <span className="text-[10px] opacity-80 block font-medium">Break-Even ROAS</span>
+                  <strong className="text-sm font-black text-white">{breakEvenRoas ? `${breakEvenRoas}x` : "🚨 TIDAK AMAN"}</strong>
+                </div>
+                <div className="bg-white/10 rounded-xl p-2 text-center backdrop-blur">
+                  <span className="text-[10px] opacity-80 block font-medium">Safe ROAS (Untung 5%)</span>
+                  <strong className="text-sm font-black text-amber-200">{targetRoas5Pct ? `${targetRoas5Pct}x` : "Margin <5%"}</strong>
+                </div>
+              </div>
+              <button onClick={()=>setMainTab("iklan")}
+                className="w-full bg-white text-orange-700 hover:bg-orange-50 font-black text-xs py-2 rounded-xl transition-all shadow-md">
+                Buka Simulator Iklan & ROAS Shopee →
+              </button>
+            </div>
+
             {/* Shortcut ke Tab Campaign */}
             <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-2xl p-4 shadow-lg text-white">
               <div className="flex items-center justify-between mb-2">
@@ -1040,7 +1109,405 @@ export default function App() {
         </div>
       )}
 
-      {/* ── TAB 2: JENIS CAMPAIGN SHOPEE ── */}
+      {/* ── TAB KHUSUS: IKLAN SHOPEE & TARGET ROAS ANTI-BONCOS ── */}
+      {mainTab==="iklan" && (
+        <div className="max-w-7xl mx-auto px-4 pb-8 space-y-5">
+          {/* BANNER STATUS SALDO IKLAN SHOPEE */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl p-5 text-white shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">
+                  ⚠️
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-black text-base md:text-lg">Akun Iklan Aktif — Saldo Iklan Saat Ini Rp0</h3>
+                    <span className="bg-red-900/60 text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold border border-red-300/40">
+                      Iklan Belum Bisa Berjalan
+                    </span>
+                  </div>
+                  <p className="text-xs md:text-sm text-orange-100 leading-relaxed">
+                    Shopee memerlukan saldo iklan minimum terisi sebelum kampanye iklan dapat ditayangkan. Isi saldo terlebih dahulu melalui Seller Centre agar iklan produk dapat langsung aktif dan tampil di hasil pencarian.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://seller.shopee.co.id/portal/marketing/pas"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-white text-orange-700 font-black text-xs md:text-sm px-5 py-3 rounded-xl hover:bg-orange-50 transition-all shadow-md flex-shrink-0"
+              >
+                <span>💳</span> Top Up Saldo di Seller Centre
+              </a>
+            </div>
+          </div>
+
+          {/* 3 KARTU INDIKATOR KRUSIAL ANTI-BONCOS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Margin Sebelum Iklan */}
+            <div className="bg-white rounded-2xl p-5 border border-orange-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-gray-500">1. Margin Sebelum Iklan</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold">
+                  Gross Profit
+                </span>
+              </div>
+              <p className={`text-2xl font-black ${marginPraIklan > 0 ? "text-gray-900" : "text-red-600"}`}>
+                {formatRp(marginPraIklan)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Margin: <strong className="text-orange-600">{marginPraIklanPct.toFixed(1)}%</strong> dari harga jual bersih.
+              </p>
+              <p className="text-[11px] text-gray-400 mt-2">
+                Laba bersih toko setelah dikurangi HPP, packing, dan seluruh admin/layanan Shopee sebelum alokasi biaya iklan.
+              </p>
+            </div>
+
+            {/* Card 2: Break-Even ROAS */}
+            <div className="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100 rounded-bl-full opacity-40 pointer-events-none"></div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-amber-800">2. Titik Impas (Break-Even ROAS)</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+                  Batas Boncos
+                </span>
+              </div>
+              <p className={`text-2xl font-black ${breakEvenRoas ? "text-amber-600" : "text-red-600"}`}>
+                {breakEvenRoas ? `${breakEvenRoas}x` : "🚨 TIDAK AMAN"}
+              </p>
+              <p className="text-xs text-amber-900 font-medium mt-1">
+                {breakEvenRoas ? `Maksimal alokasi iklan: ${(100 / breakEvenRoas).toFixed(1)}% omzet` : "Margin minus"}
+              </p>
+              <p className="text-[11px] text-red-600 mt-2 font-semibold">
+                ⚠️ Jika performa iklan di Shopee di bawah angka ini, toko Anda <span className="underline">PASTI RUGI/BONCOS</span>!
+              </p>
+            </div>
+
+            {/* Card 3: Safe Target ROAS */}
+            <div className="bg-white rounded-2xl p-5 border border-green-200 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-green-800">3. Target ROAS Aman (Untung Bersih)</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-bold">
+                  Rekomendasi
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <p className={`text-2xl font-black ${targetRoas5Pct ? "text-green-700" : "text-gray-400"}`}>
+                  {targetRoas5Pct ? `${targetRoas5Pct}x` : "—"}
+                </p>
+                <span className="text-xs text-gray-500 font-medium">(Target Untung 5%)</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Target Untung 10%: <strong className="text-green-700 font-bold">{targetRoas10Pct ? `${targetRoas10Pct}x` : "Perlu Margin > 10%"}</strong>
+              </p>
+              <p className="text-[11px] text-gray-400 mt-2">
+                Gunakan target ROAS ini saat mengatur Iklan Produk GMV Max atau evaluasi kata kunci manual.
+              </p>
+            </div>
+          </div>
+
+          {/* SIMULATOR INTERAKTIF UJI COBA ROAS ANTI-BONCOS */}
+          <div className="bg-white rounded-2xl p-6 border border-orange-100 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                  <span>🎛️</span> Simulator Uji Coba Target ROAS (Cuan vs Boncos)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Geser slider atau klik preset ROAS untuk melihat langsung sisa keuntungan bersih setelah dipotong biaya iklan.
+                </p>
+              </div>
+              <div className={`px-4 py-1.5 rounded-xl text-xs font-black border ${adStatus.color}`}>
+                Status: {adStatus.label}
+              </div>
+            </div>
+
+            {/* Presets & Slider */}
+            <div className="space-y-4 mb-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-gray-600 mr-2">Preset Cepat:</span>
+                {[3.0, 4.0, 5.0, 6.5, 8.0, 10.0, 15.0].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setTestRoas(r)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      testRoas === r
+                        ? "bg-orange-600 text-white shadow-md"
+                        : "bg-orange-50 text-orange-700 hover:bg-orange-100"
+                    }`}
+                  >
+                    {r}x {breakEvenRoas && r < breakEvenRoas ? "🚨" : r >= (targetRoas5Pct || 99) ? "✨" : ""}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-bold text-gray-700">Target ROAS yang Diuji:</span>
+                  <span className="text-base font-black text-orange-600">{testRoas.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="1.5"
+                  max="20"
+                  step="0.1"
+                  value={testRoas}
+                  onChange={(e) => setTestRoas(parseFloat(e.target.value) || 1.5)}
+                  className="w-full accent-orange-600 cursor-pointer h-2 bg-gray-200 rounded-lg"
+                />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                  <span>1.5x (Boncos Berat)</span>
+                  <span>5.0x (Standar FMCG)</span>
+                  <span>10.0x (Sembako Margin Tipis)</span>
+                  <span>20.0x (Organik / Super Efisien)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Hasil Uji Coba */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-orange-50/60 rounded-2xl border border-orange-100">
+              <div className="bg-white p-3.5 rounded-xl border border-orange-100 shadow-xs">
+                <p className="text-[11px] font-bold text-gray-500">Biaya Iklan per Pcs Terjual</p>
+                <p className="text-lg font-black text-red-600 mt-0.5">{formatRp(testAdSpend)}</p>
+                <p className="text-[10px] text-gray-400">({((testAdSpend / (hargaSetelahDiskon || 1)) * 100).toFixed(1)}% dari harga produk)</p>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-orange-100 shadow-xs">
+                <p className="text-[11px] font-bold text-gray-500">Sisa Laba Bersih Toko (Net)</p>
+                <p className={`text-lg font-black mt-0.5 ${netCuanSetelahIklan >= 0 ? "text-green-700" : "text-red-600"}`}>
+                  {formatRp(netCuanSetelahIklan)}
+                </p>
+                <p className="text-[10px] text-gray-400">Net Margin: {netMarginSetelahIklanPct.toFixed(1)}%</p>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-orange-100 shadow-xs flex flex-col justify-center">
+                <p className="text-[11px] font-bold text-gray-500 mb-1">Keputusan Bisnis</p>
+                {netCuanSetelahIklan > 0 ? (
+                  <p className="text-xs font-bold text-green-700 leading-snug">
+                    ✅ Aman di-scale up! Menghasilkan keuntungan bersih {formatRp(netCuanSetelahIklan)} per transaksi.
+                  </p>
+                ) : (
+                  <p className="text-xs font-bold text-red-600 leading-snug">
+                    🚨 Stop iklan ini! Setiap transaksi rugi {formatRp(Math.abs(netCuanSetelahIklan))}. Naikkan ROAS atau bid manual!
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* PERBANDINGAN: GMV MAX VS BIDDING MANUAL */}
+          <div className="bg-white rounded-2xl p-6 border border-orange-100 shadow-sm">
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 mb-2">
+              <span>⚖️</span> Perbandingan: Iklan Produk GMV Max vs Bidding Manual
+            </h3>
+            <p className="text-xs text-gray-500 mb-5">
+              Pahami karakteristik keduanya agar modal iklan Anda tidak habis sia-sia karena salah memilih mode.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kolom GMV Max */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 border border-orange-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-extrabold text-orange-900 text-sm md:text-base flex items-center gap-2">
+                    <span>🤖</span> Iklan Produk GMV Max
+                  </h4>
+                  <span className="text-[10px] bg-orange-200 text-orange-800 font-bold px-2 py-0.5 rounded-full">
+                    Otomatis AI Shopee
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mb-3 leading-relaxed">
+                  Sistem AI Shopee otomatis mengoptimalkan penempatan di Pencarian, Rekomendasi Utama, dan <em>Kamu Mungkin Juga Suka</em> untuk mengejar total omzet (GMV) maksimal.
+                </p>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 font-bold">✓</span>
+                    <span className="text-gray-700"><strong>Sangat Praktis:</strong> Tidak perlu riset kata kunci satu per satu atau memantau bid setiap jam.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 font-bold">✓</span>
+                    <span className="text-gray-700"><strong>Jangkauan Luas:</strong> Otomatis tayang di seluruh penempatan strategis Shopee.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-500 font-bold">✕</span>
+                    <span className="text-gray-700"><strong>Kontrol Biaya Terbatas:</strong> Shopee bisa menghabiskan budget dengan cepat saat jam ramai.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-500 font-bold">✕</span>
+                    <span className="text-gray-700"><strong>Risiko Boncos Margin Tipis:</strong> Kurang cocok untuk sembako/FMCG dengan margin &lt;10% jika algoritma menawar di bid tinggi.</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-orange-200">
+                  <p className="text-[11px] font-bold text-orange-900">
+                    💡 Kapan Menggunakannya?
+                  </p>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    Gunakan pada saat Mega Campaign (9.9, 11.11, Payday) untuk produk dengan margin &gt;20% dan riwayat penjualan yang sudah stabil.
+                  </p>
+                </div>
+              </div>
+
+              {/* Kolom Bidding Manual */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-extrabold text-blue-900 text-sm md:text-base flex items-center gap-2">
+                    <span>🎯</span> Bidding Manual (Pencarian Kata Kunci)
+                  </h4>
+                  <span className="text-[10px] bg-blue-200 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                    Kontrol Seller 100%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mb-3 leading-relaxed">
+                  Seller sendiri yang memilih kata kunci spesifik, menentukan jenis pencocokan (Luas vs Spesifik), serta membatasi biaya per klik (Max CPC) secara presisi.
+                </p>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 font-bold">✓</span>
+                    <span className="text-gray-700"><strong>Anti-Boncos Teruji:</strong> Biaya per klik dibatasi ketat (misal Rp150 - Rp300/klik). Budget harian tidak jebol.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 font-bold">✓</span>
+                    <span className="text-gray-700"><strong>Buyer Intent Tinggi:</strong> Membidik pembeli yang sudah siap beli lewat kata kunci spesifik (Long-tail).</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-yellow-600 font-bold">!</span>
+                    <span className="text-gray-700"><strong>Butuh Waktu Evaluasi:</strong> Perlu riset kata kunci dan mematikan keyword yang tidak konversi setiap 3–5 hari.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-600 font-bold">✓</span>
+                    <span className="text-gray-700"><strong>Cocok untuk Grosir & Sembako:</strong> Paling aman untuk produk bermargin 5%–15% agar tetap mencetak profit.</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-blue-200">
+                  <p className="text-[11px] font-bold text-blue-900">
+                    💡 Kapan Menggunakannya?
+                  </p>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    <strong>Sangat direkomendasikan untuk iklan produk pertama</strong> dan untuk seluruh toko grosir/sembako ATAYATOKO agar modal aman terlindungi.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 FORMAT IKLAN RESMI SHOPEE */}
+          <div className="bg-white rounded-2xl p-6 border border-orange-100 shadow-sm">
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 mb-2">
+              <span>💡</span> Direktori 4 Jenis Iklan Resmi Shopee
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Pilihan format iklan yang tersedia di Shopee Seller Centre beserta posisi penempatan dan peruntukannya.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                {
+                  icon: "📦",
+                  nama: "Iklan Produk GMV Max",
+                  posisi: "Hasil Pencarian, Kolom Rekomendasi, & Kamu Mungkin Juga Suka",
+                  tujuan: "Meningkatkan penjualan & omzet produk secara otomatis dengan algoritma Shopee.",
+                  badge: "Paling Populer",
+                  badgeCls: "bg-orange-100 text-orange-800",
+                },
+                {
+                  icon: "🏪",
+                  nama: "Iklan Toko",
+                  posisi: "Baris Paling Atas Hasil Pencarian (Slot Eksklusif Banner Toko)",
+                  tujuan: "Menampilkan nama toko, voucher diskon, dan produk unggulan saat pembeli mencari brand/kategori.",
+                  badge: "Branding Toko",
+                  badgeCls: "bg-blue-100 text-blue-800",
+                },
+                {
+                  icon: "🔴",
+                  nama: "Iklan Live",
+                  posisi: "Halaman Shopee Live Streaming & Tab Live",
+                  tujuan: "Mendorong penonton masuk ke sesi livestream Anda untuk meningkatkan interaksi dan checkout keranjang oranye.",
+                  badge: "Interaksi Tinggi",
+                  badgeCls: "bg-rose-100 text-rose-800",
+                },
+                {
+                  icon: "🖼️",
+                  nama: "Iklan Banner",
+                  posisi: "Banner Visual Halaman Utama, Rekomendasi, & Pencarian",
+                  tujuan: "Eksposur visual maksimal untuk peluncuran produk baru, promo musiman, atau Official Store Mall.",
+                  badge: "Eksposur Masif",
+                  badgeCls: "bg-purple-100 text-purple-800",
+                },
+              ].map((item, idx) => (
+                <div key={idx} className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">{item.icon}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.badgeCls}`}>
+                        {item.badge}
+                      </span>
+                    </div>
+                    <h4 className="font-extrabold text-sm text-gray-900 mb-1">{item.nama}</h4>
+                    <p className="text-[11px] text-orange-800 font-semibold mb-2">📍 {item.posisi}</p>
+                    <p className="text-xs text-gray-600 leading-relaxed">{item.tujuan}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PANDUAN LANGKAH MEMBUAT IKLAN PRODUK PERTAMA */}
+          <div className="bg-white rounded-2xl p-6 border border-orange-100 shadow-sm">
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 mb-2">
+              <span>📋</span> Panduan Langkah Membuat Iklan Pertama (Anti-Boncos Checklist)
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Ikuti alur terstruktur ini di Seller Centre agar budget harian Anda efektif dan menghasilkan ROAS positif:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                {
+                  step: "1",
+                  title: "Isi Saldo Iklan Terlebih Dahulu",
+                  desc: "Masuk ke Seller Centre > Menu Iklan Shopee > Isi Saldo. Mulai dari nominal kecil terjangkau (misal Rp25.000 - Rp50.000) untuk masa percobaan 3-5 hari.",
+                },
+                {
+                  step: "2",
+                  title: "Pilih Produk 'Winning' Siap Jual",
+                  desc: "Jangan iklankan produk kosong ulasan. Pilih produk yang sudah memiliki minimal 5-10 ulasan bintang 5, foto jelas menarik, dan harga kompetitif sesuai kalkulator.",
+                },
+                {
+                  step: "3",
+                  title: "Pilih Mode Bidding Manual (Kata Kunci)",
+                  desc: "Hindari Auto-Bidding di awal. Pilih opsi Bidding Manual agar Anda memiliki hak penuh menentukan kata kunci dan membatasi biaya per klik.",
+                },
+                {
+                  step: "4",
+                  title: "Gunakan Kata Kunci Spesifik (Long-tail Keywords)",
+                  desc: "Hindari kata kunci umum seperti 'Minyak' atau 'Beras' karena terlalu mahal. Gunakan kata spesifik seperti 'Minyak Goreng SunCo 2L' atau 'Beras Setra Ramos 5kg' dengan niat beli tinggi.",
+                },
+                {
+                  step: "5",
+                  title: "Pasang Modal Harian (Daily Budget)",
+                  desc: "Kunci modal harian di Rp20.000 - Rp30.000 per hari per produk dan set periode 'Tanpa Batas Waktu' agar budget tidak jebol jika ditinggal.",
+                },
+                {
+                  step: "6",
+                  title: "Evaluasi Rutin Tiap 3–5 Hari Berdasarkan BEP ROAS",
+                  desc: `Bandingkan ROAS di dashboard Shopee dengan Titik Impas (${breakEvenRoas ? `${breakEvenRoas}x` : "kalkulator"}). Matikan kata kunci yang menghabiskan klik tanpa ada pembelian.`,
+                },
+              ].map((step, idx) => (
+                <div key={idx} className="flex gap-3 p-3.5 rounded-xl bg-orange-50/40 border border-orange-100">
+                  <div className="w-7 h-7 rounded-xl bg-orange-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
+                    {step.step}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{step.title}</h4>
+                    <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{step.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 3: JENIS CAMPAIGN SHOPEE ── */}
       {mainTab==="campaign" && (
         <div className="max-w-7xl mx-auto px-4 pb-8 space-y-5">
           <div className="bg-white rounded-2xl p-5 border border-orange-100 shadow-sm">
