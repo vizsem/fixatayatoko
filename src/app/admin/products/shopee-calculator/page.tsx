@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { sbGetDoc } from '@/lib/supabase-helpers';
+import { getProducts } from '@/lib/actions/product.actions';
+import { Search, Package, X, RefreshCw } from 'lucide-react';
 
 // ── KATEGORI & BIAYA ADMIN SHOPEE (Update Terbaru 2026) ────────
 const KATEGORI = [
@@ -369,6 +371,92 @@ export default function App() {
   const [mainTab, setMainTab] = useState("kalkulator");
   const [strTab, setStrTab] = useState("campaign_shopee");
 
+  // ── STATE PRODUK DATABASE ──
+  const [productList, setProductList] = useState<any[]>([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [selectedUnitName, setSelectedUnitName] = useState("");
+
+  // ── STATE QUANTITY ──
+  const [qty, setQty] = useState<number>(1);
+
+  // Buka modal & muat produk dari DB
+  const handleOpenProductModal = async () => {
+    setIsProductModalOpen(true);
+    if (productList.length === 0) {
+      setProductLoading(true);
+      try {
+        const data = await getProducts({ isActive: true, limit: 500 });
+        setProductList(data || []);
+      } catch (err) {
+        console.error("Gagal memuat produk:", err);
+      } finally {
+        setProductLoading(false);
+      }
+    }
+  };
+
+  // Filter produk sesuai pencarian
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return productList;
+    const q = productSearch.toLowerCase().trim();
+    return productList.filter((p) =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [productList, productSearch]);
+
+  // Pilih produk + opsi satuan (unitOption = null berarti satuan terkecil/base)
+  const handleSelectProduct = (prod: any, unitOption?: any, closeModal = true) => {
+    setSelectedProduct(prod);
+    setQty(1);
+
+    const unitLabel = unitOption
+      ? (unitOption.code || unitOption.label || unitOption.unit || prod.unit || 'PCS')
+      : (prod.unit || 'PCS');
+    setSelectedUnitName(unitLabel);
+
+    // HPP: satuan besar = HPP base × isi (contains)
+    const contains = unitOption ? (Number(unitOption.contains) || 1) : 1;
+    const baseCost = prod.costPrice || 0;
+    const cost = contains > 1 ? baseCost * contains : baseCost;
+
+    // Harga Jual: ambil dari Shopee channel pricing jika ada, fallback ke harga unit atau ecer
+    const baseUnitUpper = (prod.unit || 'PCS').toUpperCase();
+    const shopeePriceUnit = prod.channelPricing?.shopee?.[baseUnitUpper]?.price;
+    const price = unitOption
+      ? (unitOption.price || unitOption.priceGrosir || (shopeePriceUnit ? shopeePriceUnit * contains : prod.priceEcer * contains))
+      : (prod.channelPricing?.shopee?.[baseUnitUpper]?.price || prod.priceShopee || prod.priceEcer);
+
+    if (cost > 0) setHargaBeli(cost);
+    if (price > 0) setHargaJual(price);
+
+    // Auto-detect kategori Shopee berdasarkan nama/kategori produk
+    const nameLower = (prod.name || '').toLowerCase();
+    const catLower = (prod.category || '').toLowerCase();
+    if (nameLower.includes('beras') || nameLower.includes('minyak') || nameLower.includes('gula') ||
+        nameLower.includes('tepung') || nameLower.includes('garam') || catLower.includes('sembako')) {
+      const k = KATEGORI.find(k => k.id === 'sembako');
+      if (k) setKat(k);
+    } else if (nameLower.includes('roti') || nameLower.includes('bakpia') || nameLower.includes('snack') ||
+               nameLower.includes('kue') || nameLower.includes('biskuit')) {
+      const k = KATEGORI.find(k => k.id === 'snack_bakpia');
+      if (k) setKat(k);
+    } else if (catLower.includes('fashion') || catLower.includes('pakaian') || catLower.includes('baju')) {
+      const k = KATEGORI.find(k => k.id === 'fashion_w');
+      if (k) setKat(k);
+    } else if (catLower.includes('elektronik') || catLower.includes('gadget')) {
+      const k = KATEGORI.find(k => k.id === 'elektronik');
+      if (k) setKat(k);
+    }
+
+    if (closeModal) setIsProductModalOpen(false);
+  };
+
   // Simulasi Diskon Campaign Seller
   const [ikutPromo, setIkutPromo] = useState(false);
   const [diskonType, setDiskonType] = useState<"pct"|"nominal">("pct");
@@ -470,11 +558,18 @@ export default function App() {
   // Penghasilan Masuk Saldo Shopee (persis seperti laporan Shopee)
   const penghasilanShopee = hargaSetelahDiskon - totalPlatform;
 
-  // Laba Bersih Toko (setelah modal HPP dan biaya packing/ops)
+  // Laba Bersih Toko per 1 pcs/satuan (setelah modal HPP dan biaya packing/ops)
   const cuan = penghasilanShopee - hargaBeli - totalOps;
   const marginPct = hargaSetelahDiskon > 0 ? (cuan / hargaSetelahDiskon) * 100 : 0;
   const roiPct = (hargaBeli + totalOps) > 0 ? (cuan / (hargaBeli + totalOps)) * 100 : 0;
   const potPct = hargaSetelahDiskon > 0 ? ((totalPlatform + totalOps) / hargaSetelahDiskon) * 100 : 0;
+
+  // ── KALKULASI MULTI-QUANTITY (Akumulasi qty unit sekaligus) ──
+  const safeQty = Math.max(1, qty || 1);
+  const totalRevenuePenjualan  = hargaJual * safeQty;
+  const totalModalQty          = (hargaBeli + totalOps) * safeQty;
+  const totalPotonganPlatform  = totalPlatform * safeQty;
+  const totalCuanQty           = cuan * safeQty;
 
   // ── KALKULASI IKLAN ANTI-BONCOS (TARGET ROAS SHOPEE) ──
   // Laba kotor sebelum dikurangi biaya iklan (jika toggle program iklan aktif, kembalikan agar tidak double deduct)
@@ -715,8 +810,173 @@ export default function App() {
           {/* KOLOM KIRI (Input & Konfigurasi) */}
           <div className="lg:col-span-7 space-y-4">
 
+            {/* ── PILIH PRODUK DARI DATABASE + QUANTITY ── */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-orange-200">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <Package size={16} className="text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">Pilih Produk dari Database</p>
+                    <p className="text-[11px] text-gray-400">Otomatis isi HPP & harga jual dari stok aktif toko</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenProductModal}
+                  className="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  <Search size={13} />
+                  {selectedProduct ? "Ganti Produk" : "Cari Produk"}
+                </button>
+              </div>
+
+              {/* Produk terpilih */}
+              {selectedProduct ? (
+                <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-extrabold text-gray-900 truncate">{selectedProduct.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] bg-orange-200 text-orange-800 font-bold px-1.5 py-0.5 rounded">
+                          SKU: {selectedProduct.sku || '-'}
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          Kategori: <strong className="text-gray-700">{selectedProduct.category || 'Umum'}</strong>
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          Stok: <strong className="text-green-700">{selectedProduct.stock || 0} {selectedProduct.unit || 'pcs'}</strong>
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedProduct(null); setSelectedUnitName(""); setQty(1); }}
+                      className="text-gray-400 hover:text-red-500 p-1 flex-shrink-0"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  {/* Pilihan Satuan: dari satuan terkecil ke terbesar */}
+                  <div className="pt-2 border-t border-orange-200">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Satuan (terkecil → terbesar):
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* Satuan terkecil / base */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectProduct(selectedProduct, undefined, false)}
+                        className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                          selectedUnitName.toUpperCase() === (selectedProduct.unit || 'PCS').toUpperCase()
+                            ? 'bg-orange-600 text-white border-orange-600 shadow-md'
+                            : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50'
+                        }`}
+                      >
+                        1 {(selectedProduct.unit || 'PCS').toUpperCase()}
+                        <span className="ml-1 font-normal opacity-75">({formatRp(selectedProduct.priceEcer || 0)})</span>
+                      </button>
+
+                      {/* Satuan grosir/multi dari DB (sudah diurutkan berdasarkan `contains` dari kecil ke besar) */}
+                      {(Array.isArray(selectedProduct.units) ? [...selectedProduct.units].sort((a: any, b: any) => (Number(a.contains) || 1) - (Number(b.contains) || 1)) : [])
+                        .filter((u: any) => u.code && u.code.toUpperCase() !== (selectedProduct.unit || 'PCS').toUpperCase())
+                        .map((u: any, idx: number) => {
+                          const uCode = u.code || u.label || `Satuan ${idx + 2}`;
+                          const contains = Number(u.contains) || 1;
+                          const uPrice = u.price || u.priceGrosir || selectedProduct.priceEcer * contains;
+                          const isSelected = selectedUnitName.toUpperCase() === uCode.toUpperCase();
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectProduct(selectedProduct, u, false)}
+                              className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                                isSelected
+                                  ? 'bg-orange-600 text-white border-orange-600 shadow-md'
+                                  : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50'
+                              }`}
+                            >
+                              1 {uCode.toUpperCase()}
+                              {contains > 1 && <span className="text-[10px] font-normal ml-1 opacity-80">({contains} {selectedProduct.unit || 'pcs'})</span>}
+                              <span className="ml-1 font-normal opacity-75">({formatRp(uPrice)})</span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Satuan aktif yang dipilih */}
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-orange-200">
+                    <span className="text-[11px] text-gray-500">Menghitung per:</span>
+                    <span className="text-xs font-extrabold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-lg">
+                      1 {selectedUnitName.toUpperCase() || (selectedProduct.unit || 'PCS').toUpperCase()} = {formatRp(hargaBeli)} HPP · {formatRp(hargaJual)} Jual
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 py-4 bg-orange-50/50 rounded-xl border border-dashed border-orange-200 text-gray-400">
+                  <Package size={18} className="text-orange-300" />
+                  <p className="text-xs text-gray-500">
+                    Belum ada produk dipilih — masukkan HPP & harga manual di bawah, atau
+                    <button onClick={handleOpenProductModal} className="text-orange-600 font-bold underline ml-1">pilih dari database</button>
+                  </p>
+                </div>
+              )}
+
+              {/* Input Quantity */}
+              <div className="mt-3 pt-3 border-t border-orange-100">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-gray-600">📦 Jumlah Unit Dihitung (Quantity)</p>
+                  <span className="text-xs text-orange-600 font-bold">{safeQty} {selectedUnitName || 'pcs'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setQty(q => Math.max(1, (q || 1) - 1))}
+                    className="w-8 h-8 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-700 font-black text-lg flex items-center justify-center transition-all select-none">−</button>
+                  <input
+                    type="number" min={1} max={99999} value={qty || 1}
+                    onChange={e => setQty(Math.max(1, Number(e.target.value) || 1))}
+                    className="flex-1 text-center text-sm font-black text-gray-900 bg-orange-50 border border-orange-200 rounded-xl py-1.5 outline-none focus:border-orange-400"
+                  />
+                  <button onClick={() => setQty(q => (q || 1) + 1)}
+                    className="w-8 h-8 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-lg flex items-center justify-center transition-all select-none">+</button>
+                  <div className="flex gap-1">
+                    {[1, 5, 10, 12, 24, 48].map(v => (
+                      <button key={v} onClick={() => setQty(v)}
+                        className={`text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-all ${qty === v ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-orange-700 border-orange-200 hover:bg-orange-50'}`}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {safeQty > 1 && (
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-orange-50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-gray-500">Total Omzet</p>
+                      <p className="text-xs font-black text-orange-700">{formatRp(totalRevenuePenjualan)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-gray-500">Total Modal</p>
+                      <p className="text-xs font-black text-gray-700">{formatRp(totalModalQty)}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-gray-500">Total Potongan Shopee</p>
+                      <p className="text-xs font-black text-red-700">{formatRp(totalPotonganPlatform)}</p>
+                    </div>
+                    <div className={`rounded-xl p-2 text-center ${totalCuanQty >= 0 ? 'bg-green-50' : 'bg-red-100'}`}>
+                      <p className="text-[10px] text-gray-500">Total Laba Bersih</p>
+                      <p className={`text-xs font-black ${totalCuanQty >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatRp(totalCuanQty)}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Kategori Produk */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-orange-100">
+
               <div className="flex justify-between items-center mb-2">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Kategori Produk Shopee</p>
                 <span className="text-xs font-bold text-orange-600">{kat.label.replace(/^[^\s]+\s/,"")}</span>
@@ -1108,8 +1368,155 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ── MODAL PENCARIAN PRODUK DATABASE ── */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden border border-orange-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-orange-100 bg-orange-50">
+              <div className="flex items-center gap-2">
+                <Package className="text-orange-600" size={18} />
+                <h3 className="text-sm font-extrabold text-gray-900">Pilih Produk dari Database Toko</h3>
+                {productList.length > 0 && (
+                  <span className="text-[10px] bg-orange-200 text-orange-800 font-bold px-2 py-0.5 rounded-full">
+                    {filteredProducts.length} produk
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-3 border-b border-orange-100 bg-white">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                <input
+                  type="text"
+                  placeholder="Ketik nama produk, SKU, barcode, atau kategori..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs font-semibold text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400 transition"
+                  autoFocus
+                />
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProductSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Product List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+              {productLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <RefreshCw className="animate-spin mx-auto text-orange-500" size={28} />
+                  <p className="text-xs font-bold text-gray-500">Memuat produk aktif dari database...</p>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-16 text-center text-gray-400">
+                  <Package size={36} className="mx-auto mb-3 text-orange-200" />
+                  <p className="text-sm font-bold">Tidak ada produk cocok</p>
+                  <p className="text-xs mt-1 text-gray-400">
+                    {productSearch ? `Coba kata kunci lain atau periksa ejaan` : 'Tidak ada produk aktif di database'}
+                  </p>
+                </div>
+              ) : (
+                filteredProducts.map((p) => {
+                  const hasUnits = Array.isArray(p.units) && p.units.length > 0;
+                  // Sort units dari terkecil ke terbesar berdasarkan 'contains'
+                  const sortedUnits = hasUnits
+                    ? [...p.units]
+                        .sort((a: any, b: any) => (Number(a.contains) || 1) - (Number(b.contains) || 1))
+                        .filter((u: any) => u.code && u.code.toUpperCase() !== (p.unit || 'PCS').toUpperCase())
+                    : [];
+
+                  return (
+                    <div key={p.id} className="p-3 rounded-xl border border-orange-100 hover:border-orange-300 hover:bg-orange-50/50 transition-all">
+                      {/* Info Produk */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-gray-900 text-xs">{p.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">{p.sku || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500 flex-wrap">
+                            <span>Kategori: <strong className="text-gray-700">{p.category || 'Umum'}</strong></span>
+                            <span>Stok: <strong className="text-green-700">{p.stock || 0} {p.unit || 'pcs'}</strong></span>
+                            <span>HPP: <strong className="text-amber-700">{formatRp(p.costPrice || 0)}</strong></span>
+                            <span>Jual Ecer: <strong className="text-orange-700">{formatRp(p.priceEcer || 0)}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tombol Pilih Satuan: terkecil → terbesar */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Pilih satuan:</span>
+
+                        {/* Satuan terkecil (base) */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectProduct(p)}
+                          className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[11px] font-bold transition"
+                        >
+                          {(p.unit || 'PCS').toUpperCase()}
+                          <span className="ml-1 font-normal opacity-80">({formatRp(p.priceEcer || 0)})</span>
+                        </button>
+
+                        {/* Satuan lebih besar (dari kecil ke besar) */}
+                        {sortedUnits.map((u: any, idx: number) => {
+                          const uCode = (u.code || u.label || `Satuan ${idx + 2}`).toUpperCase();
+                          const contains = Number(u.contains) || 1;
+                          const uPrice = u.price || u.priceGrosir || (p.priceEcer * contains);
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectProduct(p, u)}
+                              className="px-2.5 py-1.5 bg-white border border-orange-300 hover:bg-orange-50 text-orange-800 rounded-lg text-[11px] font-bold transition"
+                            >
+                              {uCode}
+                              {contains > 1 && <span className="text-[10px] font-normal ml-1 opacity-70">({contains} {p.unit || 'pcs'})</span>}
+                              <span className="ml-1 font-normal opacity-70">({formatRp(uPrice)})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 py-3 border-t border-orange-100 bg-orange-50 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-500">
+                💡 Klik satuan yang ingin dihitung — dari <strong>terkecil (PCS/pcs)</strong> hingga <strong>terbesar (DUS/BAL/KRAT)</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="text-xs font-bold text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── TAB KHUSUS: IKLAN SHOPEE & TARGET ROAS ANTI-BONCOS ── */}
+
       {mainTab==="iklan" && (
         <div className="max-w-7xl mx-auto px-4 pb-8 space-y-5">
           {/* BANNER STATUS SALDO IKLAN SHOPEE */}
