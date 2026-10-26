@@ -26,6 +26,7 @@ import {
   getProductVariantsAction,
   batchAddVariantsAction,
   quickUpdateVariantAction,
+  syncVariantUnitsFromParentAction,
   deleteProduct,
   type ProductVariantItem,
 } from '@/lib/actions/product.actions';
@@ -40,6 +41,7 @@ export interface QuickVariantModalProps {
     barcode?: string;
     category?: string;
     unit?: string;
+    units?: Array<{ code: string; contains?: number; price?: number; label?: string }>;
     price?: number;
     priceEcer?: number;
     costPrice?: number;
@@ -111,6 +113,33 @@ export default function QuickVariantModal({
   }>({ price: 0, costPrice: 0, stock: 0, barcode: '' });
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [syncingUnits, setSyncingUnits] = useState(false);
+
+  const parentUnits = useMemo(() => {
+    return Array.isArray(product?.units) && product.units.length > 0 ? product.units : [];
+  }, [product?.units]);
+
+  const handleSyncUnitsToAllVariants = async () => {
+    if (!product?.id) return;
+    if (!confirm(`Salin satuan bertingkat (${parentUnits.map(u => u.code).join(', ')}) dari produk induk ke seluruh varian?`)) {
+      return;
+    }
+    setSyncingUnits(true);
+    try {
+      const res = await syncVariantUnitsFromParentAction(product.id);
+      if (res.success) {
+        notify.admin.success(`Sukses! Satuan bertingkat berhasil disalin ke ${res.updatedCount || variants.length} varian.`);
+        await loadVariants();
+        onSuccess?.();
+      } else {
+        notify.admin.error(res.error || 'Gagal menyinkronkan satuan varian');
+      }
+    } catch (err: any) {
+      notify.admin.error('Gagal: ' + (err.message || 'Error'));
+    } finally {
+      setSyncingUnits(false);
+    }
+  };
 
   const parentName = product?.name || '';
   const parentSku = product?.sku || product?.id || 'PROD';
@@ -470,6 +499,36 @@ export default function QuickVariantModal({
           </button>
         </div>
 
+        {/* BANNER SATUAN INDUK & SINKRONISASI */}
+        {parentUnits.length > 0 && (
+          <div className="px-6 py-2.5 bg-violet-50/80 border-b border-violet-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-violet-950 font-bold flex-wrap">
+              <span className="text-violet-600 font-extrabold flex items-center gap-1">
+                <Layers size={13} /> Satuan Induk:
+              </span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {parentUnits.map((u: any) => (
+                  <span key={u.code} className="px-2 py-0.5 bg-white border border-violet-200 text-violet-800 font-black rounded-lg text-[11px] shadow-xs">
+                    1 {u.code} {Number(u.contains || 1) > 1 ? `(${u.contains} ${product?.unit || 'PCS'})` : '(Ecer/Terkecil)'}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {variants.length > 0 && (
+              <button
+                type="button"
+                onClick={handleSyncUnitsToAllVariants}
+                disabled={syncingUnits}
+                className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-black text-[11px] shadow-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 flex-shrink-0"
+                title="Salin satuan bertingkat (PCS, RTG, CTN, dll) dari produk induk ke seluruh varian"
+              >
+                <RefreshCw size={12} className={syncingUnits ? "animate-spin" : ""} />
+                <span>{syncingUnits ? 'Menyinkronkan...' : 'Salin Satuan Induk ke Semua Varian'}</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* TABS NAVIGATION */}
         <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2 overflow-x-auto">
           <div className="flex items-center gap-1.5 p-1 bg-slate-200/60 rounded-2xl">
@@ -600,14 +659,29 @@ export default function QuickVariantModal({
                                 isEditing ? 'bg-violet-50/40' : ''
                               }`}
                             >
-                              {/* Nama */}
+                              {/* Nama & Satuan */}
                               <td className="py-3 px-4">
                                 <div className="font-black text-slate-800 text-xs">
                                   {v.name}
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  ID: {v.id}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    ID: {v.id}
+                                  </span>
+                                  {v.units && v.units.length > 1 ? (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {v.units.map((u: any) => (
+                                        <span key={u.code} className="text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 px-1.5 py-0.2 rounded">
+                                          {u.code} {Number(u.contains || 1) > 1 ? `(${u.contains})` : ''}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-medium">
+                                      1 Satuan ({v.unit || 'PCS'})
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               {/* SKU & Barcode */}

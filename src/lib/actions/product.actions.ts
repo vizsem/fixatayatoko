@@ -20,6 +20,7 @@ import { addInventoryLog, addStock, type InventoryLogData } from '@/lib/inventor
 import { sbInsertDoc } from '@/lib/supabase-helpers';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
 import { MARKETPLACE_CATEGORIES, classifyProduct } from '@/lib/marketplace-categories';
+import { inheritParentUnits } from '@/lib/normalize';
 
 /**
  * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
@@ -628,6 +629,33 @@ export async function addProductFull(payload: {
 
     const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+    // Jika produk ini adalah varian (memiliki Parent_ID) dan belum punya units bertingkat, warisi dari induk
+    if (payload.Parent_ID && (!payload.units || payload.units.length <= 1)) {
+      try {
+        const { data: pData } = await supabaseAdmin
+          .from('products')
+          .select('unit, price, cost_price, raw_data')
+          .eq('id', payload.Parent_ID)
+          .maybeSingle();
+        if (pData) {
+          const pRaw = (pData.raw_data && typeof pData.raw_data === 'object') ? pData.raw_data : {};
+          const pUnits = Array.isArray(pRaw.units) && pRaw.units.length > 0 ? pRaw.units : [];
+          if (pUnits.length > 0) {
+            payload.units = inheritParentUnits(
+              pUnits,
+              baseUnit,
+              Number(payload.Ecer || 0),
+              Number(payload.Modal || 0),
+              Number(pData.price || pRaw.Ecer || 0),
+              Number(pData.cost_price || pRaw.Modal || 0)
+            ) as any;
+          }
+        }
+      } catch (e) {
+        console.warn('Gagal mewarisi units induk di addProductFull:', e);
+      }
+    }
+
     let finalCategory = (payload.Kategori || '').trim();
     if (!finalCategory || ['semua', 'umum', 'pokok', 'lain-lain', 'lainnya'].includes(finalCategory.toLowerCase())) {
       const autoMatch = classifyProduct(displayName);
@@ -678,7 +706,7 @@ export async function addProductFull(payload: {
         height: Number(payload.dimHeight || 0),
       },
       volumeInCtn: Number(payload.volumeInCtn || 0),
-      units: payload.units || [{ code: baseUnit, contains: 1, price: Number(payload.Ecer || 0), label: '' }],
+      units: payload.units && payload.units.length > 0 ? payload.units : [{ code: baseUnit, contains: 1, price: Number(payload.Ecer || 0), label: '' }],
       hideBaseUnit: Boolean(payload.hideBaseUnit),
       hide_base_unit: Boolean(payload.hideBaseUnit),
       defaultSellUnit: payload.defaultSellUnit || '',
@@ -2148,6 +2176,7 @@ export interface ProductVariantItem {
   wholesalePrice: number;
   stock: number;
   unit: string;
+  units?: Array<{ code: string; contains?: number; price?: number; cost?: number; label?: string }>;
   imageUrl?: string;
   isActive: boolean;
   createdAt?: string;
@@ -2192,6 +2221,7 @@ export async function getProductVariantsAction(parentId: string): Promise<{
         wholesalePrice,
         stock,
         unit: p.unit || raw.Satuan || raw.unit || 'PCS',
+        units: Array.isArray(raw.units) ? raw.units : undefined,
         imageUrl: p.image_url || raw.imageUrl || raw.Link_Foto || raw.image || '',
         isActive,
         createdAt: p.created_at,
@@ -2259,6 +2289,11 @@ export async function batchAddVariantsAction(payload: {
     const parentBaseSell = Number(parentProduct.price ?? parentRaw.Ecer ?? 0);
     const parentBaseWholesale = Number(parentRaw.Grosir ?? parentRaw.wholesalePrice ?? parentBaseSell);
     const parentSku = (parentProduct.sku || parentRaw.ID || parentProduct.id).trim();
+
+    // Ambil daftar satuan bertingkat dari induk (PCS, RTG, CTN, dll)
+    const parentUnitsRaw = Array.isArray(parentRaw.units) && parentRaw.units.length > 0
+      ? parentRaw.units
+      : (Array.isArray((parentProduct as any).units) && (parentProduct as any).units.length > 0 ? (parentProduct as any).units : null);
 
     const now = new Date().toISOString();
     const rowsToInsert: any[] = [];
@@ -2340,7 +2375,14 @@ export async function batchAddVariantsAction(payload: {
         isActive: true,
         Status: 0,
         status: 'ACTIVE',
-        units: [{ code: parentUnit, contains: 1, price: sellPrice, label: '' }],
+        units: inheritParentUnits(
+          parentUnitsRaw,
+          parentUnit,
+          sellPrice,
+          costPrice,
+          parentBaseSell,
+          parentBaseCost
+        ),
         createdAt: now,
         updatedAt: now,
       };
@@ -2599,6 +2641,111 @@ export async function detachVariantAction(variantId: string): Promise<{ success:
   } catch (err: any) {
     console.error('detachVariantAction error:', err);
     return { success: false, error: err?.message || 'Gagal melepaskan varian' };
+  }
+}
+
+/**
+ * Sinkronkan / salin satuan bertingkat (PCS, RTG, CTN, dll) dari produk induk ke semua varian anaknya.
+ * Berguna untuk memperbaiki varian lama yang satuannya belum tersalin.
+ */
+export async function syncVariantUnitsFromParentAction(
+  parentId: string,
+  targetVariantId?: string
+): Promise<{ success: boolean; updatedCount?: number; error?: string }> {
+  await requireAdmin();
+  try {
+    if (!parentId) return { success: false, error: 'Parent ID tidak valid' };
+
+    // 1. Ambil data produk induk
+    const { data: parentProduct, error: pErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', parentId)
+      .single();
+
+    if (pErr || !parentProduct) {
+      return { success: false, error: 'Produk induk tidak ditemukan' };
+    }
+
+    const parentRaw = (parentProduct.raw_data && typeof parentProduct.raw_data === 'object')
+      ? parentProduct.raw_data
+      : {};
+
+    const parentUnit = (parentProduct.unit || parentRaw.Satuan || parentRaw.unit || 'PCS').trim().toUpperCase();
+    const parentUnitsRaw = Array.isArray(parentRaw.units) && parentRaw.units.length > 0
+      ? parentRaw.units
+      : (Array.isArray((parentProduct as any).units) && (parentProduct as any).units.length > 0 ? (parentProduct as any).units : null);
+
+    if (!parentUnitsRaw || parentUnitsRaw.length === 0) {
+      return { success: false, error: 'Produk induk belum memiliki daftar satuan bertingkat (units)' };
+    }
+
+    const parentBaseCost = Number(parentProduct.cost_price ?? parentRaw.Modal ?? 0);
+    const parentBaseSell = Number(parentProduct.price ?? parentRaw.Ecer ?? 0);
+
+    // 2. Cari semua varian anak
+    let query = supabaseAdmin
+      .from('products')
+      .select('id, name, price, cost_price, raw_data')
+      .eq('raw_data->>Parent_ID', parentId);
+
+    if (targetVariantId) {
+      query = query.eq('id', targetVariantId);
+    }
+
+    const { data: children, error: cErr } = await query;
+    if (cErr) throw cErr;
+
+    if (!children || children.length === 0) {
+      return { success: false, error: 'Tidak ada varian anak yang ditemukan untuk produk ini' };
+    }
+
+    const now = new Date().toISOString();
+    let updatedCount = 0;
+
+    for (const child of children) {
+      const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const childSell = Number(child.price ?? childRaw.Ecer ?? parentBaseSell);
+      const childCost = Number(child.cost_price ?? childRaw.Modal ?? parentBaseCost);
+
+      const inheritedUnits = inheritParentUnits(
+        parentUnitsRaw,
+        parentUnit,
+        childSell,
+        childCost,
+        parentBaseSell,
+        parentBaseCost
+      );
+
+      const updatedChildRaw = {
+        ...childRaw,
+        Satuan: parentUnit,
+        unit: parentUnit,
+        units: inheritedUnits,
+        updatedAt: now,
+      };
+
+      const { error: uErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          unit: parentUnit,
+          raw_data: updatedChildRaw,
+          updated_at: now,
+        })
+        .eq('id', child.id);
+
+      if (!uErr) {
+        updatedCount++;
+      }
+    }
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${parentId}`);
+
+    return { success: true, updatedCount };
+  } catch (err: any) {
+    console.error('syncVariantUnitsFromParentAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menyinkronkan satuan varian' };
   }
 }
 

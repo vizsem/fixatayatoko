@@ -23,6 +23,94 @@ export function getPurchaseUnitPrice(basePrice: number, unit: UnitOption): numbe
   return Number(basePrice || 0) * Number(unit.contains || 1);
 }
 
+/**
+ * Salin dan adaptasi satuan bertingkat (multi-tier units: PCS, RTG, CTN, dll)
+ * dari produk induk ke varian baru atau yang disinkronkan.
+ */
+export function inheritParentUnits(
+  parentUnitsRaw: any[] | undefined,
+  parentUnit = 'PCS',
+  variantSellPrice = 0,
+  variantCostPrice = 0,
+  parentBaseSell = 0,
+  parentBaseCost = 0
+): UnitOption[] {
+  const baseUnitUpper = (parentUnit || 'PCS').trim().toUpperCase();
+
+  if (!Array.isArray(parentUnitsRaw) || parentUnitsRaw.length === 0) {
+    return [
+      {
+        code: baseUnitUpper,
+        contains: 1,
+        price: variantSellPrice,
+        modal: variantCostPrice,
+        costPrice: variantCostPrice,
+        label: 'Satuan Terkecil / Ecer',
+      },
+    ];
+  }
+
+  const priceRatio = parentBaseSell > 0 && variantSellPrice > 0 ? variantSellPrice / parentBaseSell : 1;
+  const costRatio = parentBaseCost > 0 && variantCostPrice > 0 ? variantCostPrice / parentBaseCost : 1;
+
+  const result: UnitOption[] = [];
+  const seenCodes = new Set<string>();
+
+  for (const u of parentUnitsRaw) {
+    const code = String(u.code || u.unit || '').trim().toUpperCase();
+    if (!code || seenCodes.has(code)) continue;
+    seenCodes.add(code);
+
+    const contains = Number(u.contains) || 1;
+    const isBase = contains === 1 || code === baseUnitUpper;
+
+    if (isBase) {
+      result.push({
+        code,
+        contains: 1,
+        price: variantSellPrice,
+        modal: variantCostPrice,
+        costPrice: variantCostPrice,
+        label: u.label || 'Satuan Terkecil / Ecer',
+      });
+    } else {
+      const origPrice = Number(u.price || u.priceGrosir || 0);
+      const origCost = Number(u.cost || u.modal || u.costPrice || 0);
+
+      const adaptedPrice = origPrice > 0
+        ? (priceRatio !== 1 ? Math.round(origPrice * priceRatio) : origPrice)
+        : Math.round(variantSellPrice * contains);
+
+      const adaptedCost = origCost > 0
+        ? (costRatio !== 1 ? Math.round(origCost * costRatio) : origCost)
+        : Math.round(variantCostPrice * contains);
+
+      result.push({
+        code,
+        contains,
+        price: adaptedPrice,
+        modal: adaptedCost,
+        costPrice: adaptedCost,
+        label: u.label || '',
+        barcode: u.barcode ? String(u.barcode) : undefined,
+      });
+    }
+  }
+
+  if (!seenCodes.has(baseUnitUpper)) {
+    result.unshift({
+      code: baseUnitUpper,
+      contains: 1,
+      price: variantSellPrice,
+      modal: variantCostPrice,
+      costPrice: variantCostPrice,
+      label: 'Satuan Terkecil / Ecer',
+    });
+  }
+
+  return result.sort((a, b) => (Number(a.contains) || 1) - (Number(b.contains) || 1));
+}
+
 export type NormalizedProduct = {
   id: string;
   name: string;

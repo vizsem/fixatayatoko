@@ -225,6 +225,41 @@ export default function AddProductPage() {
         setFormData(prev => ({ ...prev, Parent_ID: parentId }));
         setParentName(decodeURIComponent(pName));
         notify.admin.info(`Mode Varian: produk induk ${pName || parentId}`);
+
+        (async () => {
+          try {
+            const snap = await sbGetDoc('products', parentId);
+            if (snap.exists()) {
+              const p = snap.data();
+              const raw = (p.raw_data && typeof p.raw_data === 'object') ? p.raw_data : {};
+              const pUnits = Array.isArray(p.units) && p.units.length > 0 
+                ? p.units 
+                : (Array.isArray(raw.units) && raw.units.length > 0 ? raw.units : []);
+              
+              if (pUnits.length > 0) {
+                setUnits(pUnits);
+              }
+              setFormData(prev => ({
+                ...prev,
+                Parent_ID: parentId,
+                Kategori: prev.Kategori || p.category || raw.Kategori || '',
+                Brand: prev.Brand || raw.Brand || '',
+                Satuan: raw.Satuan || p.unit || 'PCS',
+                Satuan_Modal: raw.Satuan_Modal || raw.Satuan || p.unit || 'PCS',
+                Modal: prev.Modal || Number(p.cost_price || raw.Modal || 0),
+                Ecer: prev.Ecer || Number(p.price || raw.Ecer || 0),
+                Grosir: prev.Grosir || Number(raw.Grosir || 0),
+                Supplier: prev.Supplier || raw.Supplier || '',
+                No_WA_Supplier: prev.No_WA_Supplier || raw.No_WA_Supplier || '',
+              }));
+              if (pUnits.length > 1) {
+                notify.admin.success(`Berhasil menyalin ${pUnits.length} satuan (${pUnits.map((u: any) => u.code).join(', ')}) dari produk induk`);
+              }
+            }
+          } catch (err) {
+            console.warn('Gagal memuat produk induk untuk varian:', err);
+          }
+        })();
       }
     }
   }, []);

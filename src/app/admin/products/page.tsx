@@ -1534,6 +1534,7 @@ export default function AdminProducts() {
                                   <span className="font-semibold text-gray-500">Stok: <strong className="text-gray-900">{child.stock} {child.unit}</strong></span>
                                   <span className="font-bold text-emerald-600">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</span>
                                 </div>
+                                <StockUnitDisplay stock={child.stock} baseUnit={child.unit} units={child.units} />
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <Link
@@ -1822,6 +1823,7 @@ export default function AdminProducts() {
                                     <div className="text-right">
                                       <p className="text-[10px] font-bold text-gray-400 uppercase">Stok</p>
                                       <p className="text-xs font-black text-gray-900">{child.stock} <span className="text-[10px] uppercase font-normal">{child.unit}</span></p>
+                                      <StockUnitDisplay stock={child.stock} baseUnit={child.unit} units={child.units} />
                                     </div>
                                     <div className="text-right min-w-[90px]">
                                       <p className="text-[10px] font-bold text-gray-400 uppercase">Harga Ecer</p>
