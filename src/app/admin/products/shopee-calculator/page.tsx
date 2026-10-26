@@ -3,7 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { sbGetDoc } from '@/lib/supabase-helpers';
 import { getProducts } from '@/lib/actions/product.actions';
-import { Search, Package, X, RefreshCw } from 'lucide-react';
+import { 
+  Search, Package, X, RefreshCw, Target, Zap, ShieldAlert, 
+  Sparkles, CheckCircle2, AlertTriangle, ArrowRight, MousePointerClick 
+} from 'lucide-react';
 
 // ── KATEGORI & BIAYA ADMIN SHOPEE (Update Terbaru 2026) ────────
 const KATEGORI = [
@@ -467,6 +470,7 @@ export default function App() {
   const [adMode, setAdMode] = useState<"MANUAL_BIDDING" | "GMV_MAX">("MANUAL_BIDDING");
   const [dailyBudget, setDailyBudget] = useState<number>(30000);
   const [maxCpc, setMaxCpc] = useState<number>(250);
+  const [estCr, setEstCr] = useState<number>(2.5); // Asumsi Conversion Rate toko (%)
 
   // Toggle program (disesuaikan dengan default toko aktif: Ongkir Xtra + Promo Xtra + PPh 22)
   const [active, setActive] = useState<Record<string, boolean>>({
@@ -603,6 +607,15 @@ export default function App() {
   } else {
     adStatus = { label: "🟢 CUAN AMAN", color: "text-green-700 bg-green-100 border-green-300" };
   }
+
+  // ── KALKULASI BATAS BIDDING (MAX CPC) PER KLIK ──
+  const maxCpcImpas = marginPraIklan > 0 ? Math.floor(marginPraIklan * (estCr / 100)) : 0;
+  const maxCpcAman = marginPraIklan > 0 ? Math.floor(marginPraIklan * 0.7 * (estCr / 100)) : 0;
+
+  // Analisis Kecocokan Iklan Produk
+  const isThinMargin = marginPraIklanPct < 12 || marginPraIklan < 2000;
+  const isHealthyMargin = marginPraIklanPct >= 12 && marginPraIklanPct <= 25;
+  const isHighMargin = marginPraIklanPct > 25;
 
   // Kalkulasi target harga jual ideal
   function calcH(tm=0){
@@ -1546,6 +1559,258 @@ export default function App() {
               >
                 <span>💳</span> Top Up Saldo di Seller Centre
               </a>
+            </div>
+          </div>
+
+          {/* ── PANEL PILIH PRODUK & SATUAN UNTUK IKLAN ── */}
+          <div className="bg-white rounded-2xl p-5 border border-orange-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-orange-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-md">
+                  <Target size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm md:text-base text-gray-900 flex items-center gap-2">
+                    🎯 Produk yang Dianalisis Iklannya
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Pilih produk toko untuk menghitung kelayakan iklan, batas bid per klik, & target ROAS anti-boncos.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenProductModal}
+                className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 flex-shrink-0"
+              >
+                <Search size={14} />
+                {selectedProduct ? "Ganti Produk Lain" : "Pilih Produk dari Toko"}
+              </button>
+            </div>
+
+            {selectedProduct ? (
+              <div className="mt-4 bg-orange-50/70 rounded-xl p-4 border border-orange-200">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-sm md:text-base text-gray-900">{selectedProduct.name}</span>
+                      <span className="text-[10px] bg-orange-200 text-orange-800 font-bold px-2 py-0.5 rounded">
+                        SKU: {selectedProduct.sku || '-'}
+                      </span>
+                      <span className="text-[10px] bg-gray-200 text-gray-700 font-bold px-2 py-0.5 rounded">
+                        Kategori: {selectedProduct.category || kat.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-600 flex-wrap">
+                      <span>Stok Aktif: <strong className="text-green-700 font-bold">{selectedProduct.stock || 0} {selectedProduct.unit || 'pcs'}</strong></span>
+                      <span>HPP Terpilih: <strong className="text-amber-700 font-bold">{formatRp(hargaBeli)}</strong></span>
+                      <span>Harga Jual: <strong className="text-orange-700 font-bold">{formatRp(hargaJual)}</strong></span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-black px-3 py-1 rounded-xl border ${
+                      isThinMargin ? "bg-red-100 text-red-800 border-red-300" :
+                      isHealthyMargin ? "bg-amber-100 text-amber-800 border-amber-300" :
+                      "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    }`}>
+                      {isThinMargin ? "🚨 RISIKO TINGGI BONCOS" :
+                       isHealthyMargin ? "🟡 COCOK IKLAN TERBATAS" :
+                       "🟢 SIAP SCALE-UP IKLAN"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedProduct(null); setSelectedUnitName(""); }}
+                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-white"
+                      title="Reset Produk"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pilihan Satuan (terkecil ke terbesar) */}
+                <div className="mt-3 pt-3 border-t border-orange-200/80">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                      Ubah Satuan Iklan (terkecil → terbesar):
+                    </span>
+                    <span className="text-[11px] text-gray-400">(Misal jual eceran PCS vs paket DUS)</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Satuan base */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectProduct(selectedProduct, undefined, false)}
+                      className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                        selectedUnitName.toUpperCase() === (selectedProduct.unit || 'PCS').toUpperCase()
+                          ? 'bg-orange-600 text-white border-orange-600 shadow-md'
+                          : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-100'
+                      }`}
+                    >
+                      1 {(selectedProduct.unit || 'PCS').toUpperCase()}
+                      <span className="ml-1 opacity-75 font-normal">({formatRp(selectedProduct.priceEcer || 0)})</span>
+                    </button>
+
+                    {/* Satuan grosir/multi */}
+                    {(Array.isArray(selectedProduct.units) ? [...selectedProduct.units].sort((a: any, b: any) => (Number(a.contains) || 1) - (Number(b.contains) || 1)) : [])
+                      .filter((u: any) => u.code && u.code.toUpperCase() !== (selectedProduct.unit || 'PCS').toUpperCase())
+                      .map((u: any, idx: number) => {
+                        const uCode = (u.code || u.label || `Satuan ${idx + 2}`).toUpperCase();
+                        const contains = Number(u.contains) || 1;
+                        const uPrice = u.price || u.priceGrosir || (selectedProduct.priceEcer * contains);
+                        const isSelected = selectedUnitName.toUpperCase() === uCode;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectProduct(selectedProduct, u, false)}
+                            className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                              isSelected
+                                ? 'bg-orange-600 text-white border-orange-600 shadow-md'
+                                : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-100'
+                            }`}
+                          >
+                            1 {uCode}
+                            {contains > 1 && <span className="text-[10px] opacity-75 ml-1 font-normal">({contains} pcs)</span>}
+                            <span className="ml-1 opacity-75 font-normal">({formatRp(uPrice)})</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 rounded-xl border border-dashed border-orange-300 bg-orange-50/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div className="flex items-center gap-3">
+                  <Package size={28} className="text-orange-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-gray-800">
+                      Menggunakan Nilai Default: HPP {formatRp(hargaBeli)} & Harga Jual {formatRp(hargaJual)}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Pilih produk dari database toko Anda untuk hasil rekomendasi yang 100% akurat sesuai margin barang aslinya.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenProductModal}
+                  className="text-xs font-black text-orange-600 hover:text-orange-700 underline flex-shrink-0"
+                >
+                  Pilih Produk Sekarang →
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── CARD REKOMENDASI PENGGUNAAN IKLAN & BATAS MAX CPC ── */}
+          <div className="bg-white rounded-2xl p-6 border border-orange-100 shadow-sm space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base md:text-lg font-black text-gray-900 flex items-center gap-2">
+                  <span>💡</span> Rekomendasi Jenis Iklan & Batas Bidding CPC Anti-Boncos
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Berdasarkan margin produk <strong className="text-orange-600">{marginPraIklanPct.toFixed(1)}%</strong> ({formatRp(marginPraIklan)} per {selectedUnitName || 'pcs'}).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-xl">
+                <span className="text-[11px] font-bold text-gray-600">Asumsi Conv. Rate:</span>
+                {[1.5, 2.5, 3.5, 5.0].map(cr => (
+                  <button
+                    key={cr}
+                    onClick={() => setEstCr(cr)}
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-lg transition-all ${
+                      estCr === cr ? "bg-orange-600 text-white" : "bg-white text-orange-700 hover:bg-orange-100"
+                    }`}
+                  >
+                    {cr}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2 Kolom: Batas Bidding CPC vs Rekomendasi Mode Iklan */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kolom 1: Batas Bidding CPC Aman */}
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-200">
+                <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <MousePointerClick size={15} />
+                  Batas Bidding Per Klik (CPC) Anti-Boncos
+                </h4>
+                <div className="space-y-3">
+                  <div className="bg-white p-3 rounded-xl border border-amber-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-600">Batas Bidding Impas (BEP):</span>
+                      <span className="text-sm font-black text-red-600">{formatRp(maxCpcImpas)} / klik</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      ⚠️ Jika Anda pasang bid di atas <strong>{formatRp(maxCpcImpas)}</strong> di Seller Centre, setiap penjualan produk ini dipastikan <u>RUGI</u>!
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-green-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-700">Rekomendasi Bidding Aman (Profit 30%):</span>
+                      <span className="text-sm font-black text-green-700">{formatRp(maxCpcAman)} / klik</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      ✅ Pasang bid manual antara <strong>{formatRp(Math.min(150, maxCpcAman))} - {formatRp(maxCpcAman)}</strong> untuk tetap mengamankan sisa laba bersih.
+                    </p>
+                  </div>
+
+                  <div className="text-[11px] text-gray-500 bg-amber-100/60 p-2.5 rounded-xl">
+                    📊 <em>Simulasi Budget Harian:</em> Untuk target 100 klik per hari, alokasikan budget Rp{((maxCpcAman || 150) * 100).toLocaleString('id-ID')} / hari.
+                  </div>
+                </div>
+              </div>
+
+              {/* Kolom 2: Rekomendasi Format Iklan Shopee */}
+              <div className="bg-white rounded-2xl p-4 border border-orange-200 space-y-3">
+                <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Zap size={15} className="text-orange-500" />
+                  Rekomendasi Format Iklan Shopee
+                </h4>
+
+                <div className={`p-3 rounded-xl border text-xs ${
+                  isThinMargin ? "bg-red-50 border-red-200 text-red-900" :
+                  isHealthyMargin ? "bg-amber-50 border-amber-200 text-amber-900" :
+                  "bg-green-50 border-green-200 text-green-900"
+                }`}>
+                  <p className="font-extrabold flex items-center gap-1.5 mb-1">
+                    <span>{isThinMargin ? "❌" : isHealthyMargin ? "⚠️" : "✅"}</span>
+                    Iklan Produk GMV Max (Otomatis):
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    {isThinMargin
+                      ? "JANGAN AKTIFKAN GMV Max untuk produk ini! Algoritma Shopee mengejar omzet dan dapat menghabiskan saldo dengan cepat pada produk ber-margin tipis."
+                      : isHealthyMargin
+                      ? `Boleh dicoba, TETAPI WAJIB pasang Target ROAS minimal ${targetRoas5Pct || 6}x di Seller Centre. Jangan biarkan mode 'Tanpa Batas'.`
+                      : "Sangat direkomendasikan! Margin tebal Anda aman menyerap eksposur otomatis AI Shopee di halaman utama dan rekomendasi."}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/60 text-xs text-blue-950">
+                  <p className="font-extrabold flex items-center gap-1.5 mb-1">
+                    <span>✅</span> Bidding Manual Kata Kunci Spesifik (Pencarian):
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    Format paling aman! Pilih kata kunci spesifik (long-tail) dengan pencocokan tepat/spesifik. Batasi bid per kata kunci maksimal <strong>{formatRp(maxCpcAman || 250)}</strong>.
+                  </p>
+                </div>
+
+                {isThinMargin && (
+                  <div className="p-2.5 rounded-xl bg-orange-100 border border-orange-300 text-xs text-orange-950">
+                    <p className="font-bold flex items-center gap-1">
+                      <span>💡</span> Trik Anti-Boncos Produk Margin Tipis:
+                    </p>
+                    <p className="text-[10px] mt-0.5 leading-snug">
+                      Ubah iklan dari satuan <strong>{selectedUnitName || 'pcs'}</strong> ke paket bundling (misal isi 3, 5, atau 1 DUS). Nilai transaksi naik, biaya iklan per rupiah omzet jauh lebih hemat!
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
