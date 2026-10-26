@@ -21,6 +21,7 @@ import { sbInsertDoc } from '@/lib/supabase-helpers';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
 import { MARKETPLACE_CATEGORIES, classifyProduct } from '@/lib/marketplace-categories';
 import { inheritParentUnits } from '@/lib/normalize';
+import { getCategoryPrefix, generateVariantSuffix, formatDisplaySku } from '@/lib/sku-generator';
 
 /**
  * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
@@ -2323,18 +2324,15 @@ export async function batchAddVariantsAction(payload: {
         ? rawVariantName.toUpperCase()
         : `${parentName} - ${rawVariantName}`.toUpperCase();
 
-      // Buat SKU yang unik
-      let cleanSuffix = rawVariantName
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, '')
-        .slice(0, 8);
-      if (!cleanSuffix) cleanSuffix = `VAR${i + 1}`;
+      // Buat SKU yang ringkas dan rapi (Skema 1)
+      const cleanParentSku = formatDisplaySku(parentSku);
+      const cleanSuffix = generateVariantSuffix(rawVariantName, i);
 
-      let skuCandidate = (v.sku || `${parentSku}-${cleanSuffix}`).trim().toUpperCase();
+      let skuCandidate = (v.sku || `${cleanParentSku}-${cleanSuffix}`).trim().toUpperCase();
       let attempts = 0;
       while (existingSkus.has(skuCandidate)) {
         attempts++;
-        skuCandidate = `${parentSku}-${cleanSuffix}-${attempts}`;
+        skuCandidate = `${cleanParentSku}-${cleanSuffix}-${attempts}`;
       }
       existingSkus.add(skuCandidate);
 
@@ -2758,3 +2756,45 @@ export async function syncVariantUnitsFromParentAction(
   }
 }
 
+/**
+ * Generate SKU berikutnya dengan format Skema 1: [PREFIX]-[4_DIGIT]
+ * Contoh: SBK-0023, SNK-0007, MNM-0001
+ */
+export async function generateNextSkuAction(categoryName: string, productName?: string): Promise<{
+  success: boolean;
+  sku?: string;
+  prefix?: string;
+  nextNumber?: number;
+  error?: string;
+}> {
+  await requireStaff();
+  try {
+    const prefix = getCategoryPrefix(categoryName, productName);
+
+    // Cari SKU tertinggi untuk prefix ini (hanya pola PREFIX-NNNN tanpa suffix varian)
+    const { data: existing, error } = await supabaseAdmin
+      .from('products')
+      .select('sku')
+      .ilike('sku', `${prefix}-%`);
+
+    if (error) throw error;
+
+    let maxNum = 0;
+    for (const row of existing || []) {
+      const sku = (row.sku || '').toUpperCase().trim();
+      const match = sku.match(new RegExp(`^${prefix}-(\\d{1,6})$`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+
+    const nextNumber = maxNum + 1;
+    const sku = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
+
+    return { success: true, sku, prefix, nextNumber };
+  } catch (err: any) {
+    console.error('generateNextSkuAction error:', err);
+    return { success: false, error: err?.message || 'Gagal membuat SKU otomatis' };
+  }
+}

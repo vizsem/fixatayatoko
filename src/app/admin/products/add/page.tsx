@@ -14,7 +14,8 @@ import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
 import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import imageCompression from 'browser-image-compression';
-import { addProductFull, getCategories, batchAddVariantsAction } from '@/lib/actions/product.actions';
+import { addProductFull, getCategories, batchAddVariantsAction, generateNextSkuAction } from '@/lib/actions/product.actions';
+import { generateVariantSku } from '@/lib/sku-generator';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
@@ -705,10 +706,20 @@ export default function AddProductPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, ID: `PRD-${Date.now().toString().slice(-6)}` })}
-                    className="px-3 py-2 bg-blue-50 text-blue-600 text-xs font-black rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    onClick={async () => {
+                      const res = await generateNextSkuAction(formData.Kategori || '', formData.Nama || '');
+                      if (res.success && res.sku) {
+                        setFormData(prev => ({ ...prev, ID: res.sku! }));
+                        notify.admin.success(`SKU otomatis: ${res.sku}`);
+                      } else {
+                        notify.admin.error('Gagal generate SKU');
+                      }
+                    }}
+                    className="px-3 py-2 bg-blue-50 text-blue-600 text-xs font-black rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap flex items-center gap-1"
+                    title="Generate SKU otomatis berdasarkan kategori (Skema 1: SBK-0001)"
                   >
-                    Auto ID
+                    <Sparkles size={11} />
+                    Auto SKU
                   </button>
                 </div>
               </div>
@@ -1636,6 +1647,10 @@ export default function AddProductPage() {
                                     onChange={(e) => {
                                       const next = [...variantRows];
                                       next[vIdx].name = e.target.value;
+                                      // Auto-fill SKU jika masih kosong (Skema 1)
+                                      if (!next[vIdx].sku && formData.ID) {
+                                        next[vIdx].sku = generateVariantSku(formData.ID, e.target.value, vIdx);
+                                      }
                                       setVariantRows(next);
                                     }}
                                     className="w-full p-2 bg-gray-50 rounded-lg font-bold text-xs outline-none border border-transparent focus:border-violet-400"

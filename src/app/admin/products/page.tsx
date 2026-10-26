@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import useProducts from '@/lib/hooks/useProducts';
 import type { NormalizedProduct, UnitOption } from '@/lib/normalize';
 import { addInventoryLog } from '@/lib/inventory';
+import { formatDisplaySku } from '@/lib/sku-generator';
 
 
 import {
@@ -1369,7 +1370,7 @@ export default function AdminProducts() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-xs font-black text-blue-500 uppercase tracking-tighter italic">#{p.sku || 'N/A'}</span>
+                      <span className="text-xs font-black text-blue-500 uppercase tracking-tighter italic">#{formatDisplaySku(p.sku, p.id)}</span>
                         <span className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
                           p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                         }`}>
@@ -1619,7 +1620,7 @@ export default function AdminProducts() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                              <p className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded">#{p.sku || 'N/A'}</p>
+                              <p className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded">#{formatDisplaySku(p.sku, p.id)}</p>
                               <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
                                 p.isActive === false ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                               }`}>
@@ -1812,7 +1813,7 @@ export default function AdminProducts() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-black text-xs text-gray-900">{child.name}</span>
-                                        <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1 rounded">SKU: {child.sku || '-'}</span>
+                                        <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1 rounded">SKU: {formatDisplaySku(child.sku, child.id)}</span>
                                         {child.barcode && (
                                           <span className="text-[10px] font-mono text-gray-400">Barcode: {child.barcode}</span>
                                         )}
