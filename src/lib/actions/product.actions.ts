@@ -331,7 +331,8 @@ export async function saveEditedProduct(id: string, payload: {
     newStock: number;
     warehouseName?: string;
     adminEmail?: string;
-  }>
+  }>;
+  syncVariants?: boolean;
 }) {
   try {
     const identity = await requireAdmin();
@@ -392,6 +393,14 @@ export async function saveEditedProduct(id: string, payload: {
       } catch (error) {
         console.error('Failed to write product stock audit log:', error);
         warning = 'Produk tersimpan, tetapi sebagian log perubahan stok gagal dicatat.';
+      }
+    }
+
+    if (payload.syncVariants) {
+      try {
+        await syncVariantUnitsFromParentAction(id);
+      } catch (e) {
+        console.warn('Auto-propagasi units ke varian anak gagal:', e);
       }
     }
 

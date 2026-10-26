@@ -57,6 +57,11 @@ export interface B2bTaxInput {
   // Status Usaha Kita (Pembeli)
   buyerTaxStatus: BuyerTaxStatus;
   
+  // Satuan & Konversi Bertingkat (Multi-tier Units)
+  unitCode?: string; // misal: 'CTN', 'BAL', 'RTG', 'PCS'
+  contains?: number; // Jumlah isi satuan dasar per unit faktur (cth: 120 pcs per dus). Default: 1
+  baseUnitCode?: string; // Satuan dasar terkecil (cth: 'PCS')
+
   // Target Penjualan & Biaya Penjualan
   targetMarginPct: number; // Contoh: 15 (berarti 15%)
   marginType?: 'MARKUP_FROM_COST' | 'MARGIN_FROM_SALES'; // Default: MARGIN_FROM_SALES
@@ -79,6 +84,12 @@ export interface B2bCostBreakdown {
   
   // HPP Bersih Riil
   cleanHppPerUnit: number;
+
+  // Konversi Satuan Dasar (jika contains > 1)
+  unitCode?: string;
+  contains?: number;
+  baseUnitCode?: string;
+  cleanHppPerBaseUnit?: number;
 }
 
 export interface B2bPricingRecommendation {
@@ -99,6 +110,10 @@ export interface B2bPricingRecommendation {
   netRevenueAfterPlatformFee: number; // Duit bersih yang cair ke saldo toko
   expectedOnlineProfitNominal: number;
   expectedOnlineProfitPct: number;
+
+  // Rekomendasi per Satuan Dasar (jika contains > 1)
+  recommendedOfflinePricePerBaseUnit?: number;
+  recommendedMarketplacePricePerBaseUnit?: number;
 }
 
 export interface B2bTaxProjection {
@@ -353,13 +368,27 @@ export function calculateB2bHppAndPricing(input: B2bTaxInput): B2bTaxOutput {
       break;
   }
 
+  // Konversi Satuan Bertingkat (jika input faktur dalam satuan besar seperti Karton/Renceng)
+  const contains = Math.max(1, input.contains || 1);
+  const unitCode = (input.unitCode || 'PCS').trim().toUpperCase();
+  const baseUnitCode = (input.baseUnitCode || 'PCS').trim().toUpperCase();
+  const isMultiTier = contains > 1;
+
+  const cleanHppPerBaseUnit = isMultiTier ? Number((cleanHppPerUnit / contains).toFixed(2)) : cleanHppPerUnit;
+  const recommendedOfflinePricePerBaseUnit = isMultiTier ? Math.round(recommendedOfflinePrice / contains) : recommendedOfflinePrice;
+  const recommendedMarketplacePricePerBaseUnit = isMultiTier ? Math.round(recommendedMarketplacePrice / contains) : recommendedMarketplacePrice;
+
+  const unitSummary = isMultiTier
+    ? `\n   - Satuan Beli Faktur        : 1 ${unitCode} (Isi ${contains} ${baseUnitCode})\n   - HPP Modal Satuan Dasar    : Rp ${cleanHppPerBaseUnit.toLocaleString('id-ID')} / ${baseUnitCode}\n   - Rekomendasi Jual Ecer     : Rp ${recommendedOfflinePricePerBaseUnit.toLocaleString('id-ID')} / ${baseUnitCode}`
+    : '';
+
   // Build Summary Text in Professional Format
   const summaryText = `=== HASIL KALKULASI HPP & REKOMENDASI HARGA ANTI-BONCOS ===
 1. PRODUK & STATUS PAJAK:
    - Nama Produk: ${input.productName}
    - Kategori: ${taxCategoryDescription}
    - Status Toko: ${input.buyerTaxStatus} (${input.buyerTaxStatus === 'PKP' ? 'Bisa kreditkan PPN Masukan' : 'PPN 11% masuk beban HPP'})
-   - Status Faktur Pabrik: ${input.factoryPpnStatus}
+   - Status Faktur Pabrik: ${input.factoryPpnStatus}${unitSummary}
 
 2. RINCIAN MODAL (HPP BERSIH) PER UNIT:
    - DPP (Harga Dasar Pabrik) : Rp ${dpp.toLocaleString('id-ID')}
@@ -368,15 +397,16 @@ export function calculateB2bHppAndPricing(input: B2bTaxInput): B2bTaxOutput {
    - Cukai / PPnBM            : Rp ${cukaiOrPpnbmPerUnit.toLocaleString('id-ID')}
    - Landed Cost (Ongkir+Packing): Rp ${totalLandedCostPerUnit.toLocaleString('id-ID')}
    ----------------------------------------------------
-   TOTAL HPP BERSIH (MODAL RIIL) : Rp ${cleanHppPerUnit.toLocaleString('id-ID')} / unit
+   TOTAL HPP BERSIH (MODAL RIIL) : Rp ${cleanHppPerUnit.toLocaleString('id-ID')} / ${isMultiTier ? unitCode : 'unit'} ${isMultiTier ? `(Rp ${cleanHppPerBaseUnit.toLocaleString('id-ID')}/${baseUnitCode})` : ''}
 
 3. TITIK IMPAS (BREAK EVEN POINT):
-   - BEP Penjualan Offline/Toko : Rp ${bepOfflinePrice.toLocaleString('id-ID')}
+   - BEP Penjualan Offline/Toko : Rp ${bepOfflinePrice.toLocaleString('id-ID')} / ${isMultiTier ? unitCode : 'unit'}
    - BEP Penjualan Marketplace  : Rp ${bepMarketplacePrice.toLocaleString('id-ID')} (Harga minimal agar tidak rugi potongan platform)
 
 4. REKOMENDASI HARGA JUAL AMAN:
-   - Rekomendasi Toko Offline/POS: Rp ${recommendedOfflinePrice.toLocaleString('id-ID')} (Laba Bersih: Rp ${expectedOfflineProfitNominal.toLocaleString('id-ID')} / ${expectedOfflineProfitPct}%)
-   - Rekomendasi Marketplace      : Rp ${recommendedMarketplacePrice.toLocaleString('id-ID')}
+   - Rekomendasi Toko Offline/POS: Rp ${recommendedOfflinePrice.toLocaleString('id-ID')} / ${isMultiTier ? unitCode : 'unit'} ${isMultiTier ? `(Ecer: Rp ${recommendedOfflinePricePerBaseUnit.toLocaleString('id-ID')} / ${baseUnitCode})` : ''}
+     * Laba Bersih Offline: Rp ${expectedOfflineProfitNominal.toLocaleString('id-ID')} / ${expectedOfflineProfitPct}%
+   - Rekomendasi Marketplace      : Rp ${recommendedMarketplacePrice.toLocaleString('id-ID')} / ${isMultiTier ? unitCode : 'unit'} ${isMultiTier ? `(Ecer: Rp ${recommendedMarketplacePricePerBaseUnit.toLocaleString('id-ID')} / ${baseUnitCode})` : ''}
      * Estimasi Potongan Platform (${input.marketplaceFeePct}% + Rp ${mpFixedFee}): Rp ${marketplaceDeductionNominal.toLocaleString('id-ID')}
      * Dana Bersih Cair ke Toko   : Rp ${netRevenueAfterPlatformFee.toLocaleString('id-ID')}
      * Laba Bersih Online         : Rp ${expectedOnlineProfitNominal.toLocaleString('id-ID')} (${expectedOnlineProfitPct}% dari modal)
@@ -397,6 +427,10 @@ export function calculateB2bHppAndPricing(input: B2bTaxInput): B2bTaxOutput {
       cukaiOrPpnbmPerUnit,
       totalLandedCostPerUnit,
       cleanHppPerUnit,
+      unitCode: isMultiTier ? unitCode : undefined,
+      contains: isMultiTier ? contains : undefined,
+      baseUnitCode: isMultiTier ? baseUnitCode : undefined,
+      cleanHppPerBaseUnit: isMultiTier ? cleanHppPerBaseUnit : undefined,
     },
     pricing: {
       cleanHppPerUnit,
@@ -410,6 +444,8 @@ export function calculateB2bHppAndPricing(input: B2bTaxInput): B2bTaxOutput {
       netRevenueAfterPlatformFee,
       expectedOnlineProfitNominal,
       expectedOnlineProfitPct,
+      recommendedOfflinePricePerBaseUnit: isMultiTier ? recommendedOfflinePricePerBaseUnit : undefined,
+      recommendedMarketplacePricePerBaseUnit: isMultiTier ? recommendedMarketplacePricePerBaseUnit : undefined,
     },
     taxProjection: {
       pphFinalRatePct,

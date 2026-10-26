@@ -373,11 +373,26 @@ export default function CashierPOS() {
 
       // 2. Jika tidak ditemukan di memori, query langsung ke Supabase
       if (!matchedProd) {
-        const { data: supaProds, error } = await supabase
+        let supaProds: any[] | null = null;
+        const { data: directProds, error } = await supabase
           .from('products')
           .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active')
           .or(`barcode.eq.${cleanCode},raw_data->>Barcode.eq.${cleanCode}`)
           .limit(1);
+
+        if (!error && directProds && directProds.length > 0) {
+          supaProds = directProds;
+        } else {
+          // Cari barcode kemasan/satuan bertingkat (RTG/CTN) di raw_data->units
+          const { data: unitProds } = await supabase
+            .from('products')
+            .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active')
+            .filter('raw_data->units', 'cs', JSON.stringify([{ barcode: cleanCode }]))
+            .limit(1);
+          if (unitProds && unitProds.length > 0) {
+            supaProds = unitProds;
+          }
+        }
 
         if (!error && supaProds && supaProds.length > 0) {
           const d = supaProds[0];
