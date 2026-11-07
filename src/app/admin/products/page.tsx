@@ -476,7 +476,17 @@ export default function AdminProducts() {
     return () => { subscription.unsubscribe(); };
   }, [router]);
 
-  const rows = liveProducts as unknown as ProductRow[];
+  const rows = useMemo(() => {
+    return (liveProducts || []).map((p: any) => {
+      const parentId = (p.parentId || p.Parent_ID || p.parent_id || p.raw_data?.Parent_ID || p.raw_data?.parent_id || p.raw_data?.parentId || '').toString().trim() || undefined;
+      const brand = (p.brand || p.Brand || p.raw_data?.brand || p.raw_data?.Brand || p.raw_data?.merek || p.raw_data?.Merek || '').toString().trim() || undefined;
+      return {
+        ...p,
+        parentId,
+        brand: brand || p.brand,
+      } as ProductRow;
+    });
+  }, [liveProducts]);
 
   const displayWarehouses = useMemo(() => {
     const base = warehouses;
@@ -559,10 +569,11 @@ export default function AdminProducts() {
   const childrenByParent = useMemo(() => {
     const map = new Map<string, ProductRow[]>();
     rows.forEach((p) => {
-      if (p.parentId) {
-        const list = map.get(p.parentId) || [];
+      const pid = p.parentId?.trim();
+      if (pid) {
+        const list = map.get(pid) || [];
         list.push(p);
-        map.set(p.parentId, list);
+        map.set(pid, list);
       }
     });
     return map;
@@ -581,7 +592,7 @@ export default function AdminProducts() {
     let totalVariants = 0;
     let standalone = 0;
     rows.forEach((p) => {
-      if (p.parentId) {
+      if (p.parentId?.trim()) {
         totalVariants++;
       } else {
         const children = childrenByParent.get(p.id);
@@ -641,8 +652,8 @@ export default function AdminProducts() {
         );
         if (match) {
           directlyMatchedIds.add(p.id);
-          if (p.parentId) {
-            matchedParentsFromVariants.add(p.parentId);
+          if (p.parentId?.trim()) {
+            matchedParentsFromVariants.add(p.parentId.trim());
           }
         }
       });

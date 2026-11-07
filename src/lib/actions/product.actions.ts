@@ -185,6 +185,8 @@ export async function getProducts(options?: ProductQueryOptions) {
         priceShopee: Number(raw.priceShopee || channelPricing?.shopee?.[baseUnitUpper]?.price || 0) || undefined,
         tiktokProductId: raw.tiktokProductId || p.tiktok_product_id || undefined,
         shopeeProductId: raw.shopeeProductId || p.shopee_product_id || undefined,
+        parentId: (p.parent_id || raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
+        brand: (p.brand || raw.brand || raw.Brand || raw.merek || raw.Merek || '').toString().trim() || undefined,
         raw_data: raw,
       };
     });
