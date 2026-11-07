@@ -1782,14 +1782,22 @@ export default function AdminProducts() {
 
                 return (
                   <React.Fragment key={p.id}>
-                    <tr className={`transition-all ${isSelected ? 'bg-blue-50/50' : hasVariants ? 'bg-violet-50/40 hover:bg-violet-50/70' : 'hover:bg-blue-50/30'}`}>
-                      <td className="px-3 py-2.5 sticky left-0 bg-white z-10 text-center">
+                    <tr className={`transition-all ${isSelected ? 'bg-blue-50/50' : hasVariants ? 'bg-violet-50/40 hover:bg-violet-50/70' : 'hover:bg-blue-50/30'} ${hasVariants ? 'cursor-pointer' : ''}`}
+                      onClick={hasVariants ? () => toggleParentExpand(p.id) : undefined}
+                    >
+                      <td className="px-3 py-2.5 sticky left-0 z-10 text-center bg-inherit" onClick={e => e.stopPropagation()}>
                         <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
                           {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
                         </button>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
+                          {/* Chevron expand/collapse untuk parent */}
+                          {hasVariants && viewHierarchy !== 'flat' && (
+                            <div className={`shrink-0 w-5 h-5 flex items-center justify-center rounded-md transition-all ${isExpanded ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-600'}`}>
+                              <ChevronRight size={13} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                            </div>
+                          )}
                           <div className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs relative">
                             {p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().startsWith('http') ? (
                               <img
@@ -1824,15 +1832,11 @@ export default function AdminProducts() {
                                 </span>
                               ) : null}
                               {hasVariants && viewHierarchy !== 'flat' && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleParentExpand(p.id)}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors shadow-2xs"
-                                  title="Buka daftar varian produk ini"
-                                >
-                                  {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 select-none">
+                                  <Layers size={9} />
                                   <span>{pChildren.length} Varian</span>
-                                </button>
+                                  <span className="text-violet-400">{isExpanded ? '▾' : '▸'}</span>
+                                </span>
                               )}
                             </div>
                             <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{p.name}</h3>
@@ -1912,7 +1916,7 @@ export default function AdminProducts() {
                         </div>
                       </td>
 
-                      <td className="px-3 py-2.5 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2.5 text-right sticky right-0 bg-white z-10 pr-4 group-hover:bg-gray-50 transition-colors" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1 relative" data-action-menu>
                           <Link 
                             href={`/admin/products/edit/${p.id}`} 
