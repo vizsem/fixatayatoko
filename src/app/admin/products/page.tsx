@@ -1782,8 +1782,13 @@ export default function AdminProducts() {
 
                 return (
                   <React.Fragment key={p.id}>
-                    <tr className={`transition-all ${isSelected ? 'bg-blue-50/50' : hasVariants ? 'bg-violet-50/40 hover:bg-violet-50/70' : 'hover:bg-blue-50/30'} ${hasVariants ? 'cursor-pointer' : ''}`}
-                      onClick={hasVariants ? () => toggleParentExpand(p.id) : undefined}
+                    <tr className={`transition-all ${
+                      isSelected ? 'bg-blue-50/50' :
+                      hasVariants ? 'bg-violet-50/40 hover:bg-violet-50/70' :
+                      p.parentId ? 'bg-blue-50/20 hover:bg-blue-50/40' :
+                      'hover:bg-blue-50/30'
+                    } ${hasVariants && viewHierarchy !== 'flat' ? 'cursor-pointer' : ''}`}
+                      onClick={hasVariants && viewHierarchy !== 'flat' ? () => toggleParentExpand(p.id) : undefined}
                     >
                       <td className="px-3 py-2.5 sticky left-0 z-10 text-center bg-inherit" onClick={e => e.stopPropagation()}>
                         <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
@@ -1836,6 +1841,19 @@ export default function AdminProducts() {
                                   <Layers size={9} />
                                   <span>{pChildren.length} Varian</span>
                                   <span className="text-violet-400">{isExpanded ? '▾' : '▸'}</span>
+                                </span>
+                              )}
+                              {/* Badge INDUK di flat view */}
+                              {hasVariants && viewHierarchy === 'flat' && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-600 text-white select-none shadow-sm">
+                                  <Layers size={9} />
+                                  <span>Induk · {pChildren.length} Varian</span>
+                                </span>
+                              )}
+                              {/* Badge MANDIRI di flat view: tidak punya parentId dan tidak punya anak */}
+                              {!hasVariants && !p.parentId && viewHierarchy === 'flat' && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-slate-100 text-slate-500 select-none">
+                                  <span>Mandiri</span>
                                 </span>
                               )}
                             </div>
