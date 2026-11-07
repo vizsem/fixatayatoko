@@ -8,6 +8,7 @@ import BuyerHeaderActions from '@/components/BuyerHeaderActions';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { CartProvider } from '@/lib/context/CartContext';
 import ChatWidgets from '@/components/ChatWidgets';
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -22,11 +23,30 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://atayatoko.aty0.com'),
+  applicationName: 'ATAYATOKO',
   title: 'Grosir Sembako Kediri Termurah & Terlengkap | ATAYATOKO',
   description: 'Pusat belanja grosir sembako Kediri paling murah. Jual beras, minyak goreng, gula, snack partai besar & eceran. Gratis ongkir Kediri Kota.',
   keywords: 'grosir sembako kediri, sembako murah kediri, distributor sembako kediri, agen sembako kediri, toko sembako kediri, grosir minyak goreng kediri, grosir beras kediri, grosir snack kediri, grosir rokok kediri, agen snack kediri, grosir gula kediri, grosir minuman kediri, ATAYATOKO, atayamarket',
   authors: [{ name: 'ATAYATOKO Team' }],
   manifest: '/site.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'ATAYATOKO',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   robots: {
     index: true,
     follow: true,
@@ -79,6 +99,13 @@ export default function RootLayout({
         {/* ✅ FIX GOOGLE LOGIN (COOP) */}
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />
         <meta httpEquiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
+
+        {/* ✅ PWA & Apple Web App Fallback Meta */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="ATAYATOKO" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
         {/* ✅ Preconnect & DNS-Prefetch for Fast LCP Image Delivery */}
         <link rel="preconnect" href="https://wsrv.nl" crossOrigin="anonymous" />
@@ -185,6 +212,7 @@ export default function RootLayout({
             </div>
             {children}
             <MobileNav />
+            <PWAInstallPrompt />
           </CartProvider>
         </ErrorBoundary>
       </body>
