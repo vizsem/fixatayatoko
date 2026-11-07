@@ -26,7 +26,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -34,6 +34,7 @@ import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScanner
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import MergeVariantsModal from '@/components/admin/MergeVariantsModal';
+import BulkBrandModal from '@/components/admin/BulkBrandModal';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
 import { playScanBeep } from '@/lib/sound';
@@ -367,6 +368,7 @@ export default function AdminProducts() {
 
   // State untuk Hierarki Varian & Merge Varian
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showBulkBrandModal, setShowBulkBrandModal] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewHierarchy, setViewHierarchy] = useState<'grouped' | 'flat' | 'parents_only' | 'variants_only'>('grouped');
   const [detachingId, setDetachingId] = useState<string | null>(null);
@@ -394,6 +396,20 @@ export default function AdminProducts() {
       else next.add(parentId);
       return next;
     });
+  };
+
+  const handleSetViewHierarchy = (mode: 'grouped' | 'flat' | 'parents_only' | 'variants_only') => {
+    setViewHierarchy(mode);
+    setCurrentPage(1);
+    if (mode === 'grouped') {
+      const allParentIds = new Set<string>();
+      childrenByParent.forEach((children, parentId) => {
+        if (children.length > 0) allParentIds.add(parentId);
+      });
+      setExpandedParents(allParentIds);
+    } else if (mode === 'parents_only') {
+      setExpandedParents(new Set());
+    }
   };
 
   const handleDetachVariant = async (variant: ProductRow) => {
@@ -552,9 +568,64 @@ export default function AdminProducts() {
     return map;
   }, [rows]);
 
+  // Peta produk induk berdasarkan ID
+  const parentById = useMemo(() => {
+    const map = new Map<string, ProductRow>();
+    rows.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [rows]);
+
+  // Statistik jumlah item berdasarkan relasi varian
+  const hierarchyCounts = useMemo(() => {
+    let parentsWithVariants = 0;
+    let totalVariants = 0;
+    let standalone = 0;
+    rows.forEach((p) => {
+      if (p.parentId) {
+        totalVariants++;
+      } else {
+        const children = childrenByParent.get(p.id);
+        if (children && children.length > 0) {
+          parentsWithVariants++;
+        } else {
+          standalone++;
+        }
+      }
+    });
+    return {
+      parentsWithVariants,
+      totalVariants,
+      topLevel: parentsWithVariants + standalone,
+      totalAll: rows.length,
+    };
+  }, [rows, childrenByParent]);
+
+  // Auto-expand varian saat awal masuk dalam mode grouped jika ada varian
+  const hasInitializedExpansion = useRef(false);
+  useEffect(() => {
+    if (!hasInitializedExpansion.current && childrenByParent.size > 0 && viewHierarchy === 'grouped') {
+      hasInitializedExpansion.current = true;
+      const allParentIds = new Set<string>();
+      childrenByParent.forEach((children, parentId) => {
+        if (children.length > 0) allParentIds.add(parentId);
+      });
+      setExpandedParents(allParentIds);
+    }
+  }, [childrenByParent, viewHierarchy]);
+
   const selectedProductsForMerge = useMemo(() => {
     return rows.filter((p) => selectedIds.includes(p.id));
   }, [rows, selectedIds]);
+
+  // Daftar nama brand unik yang sudah ada di database untuk saran autocomplete
+  const existingBrands = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((p) => {
+      const b = (p.brand || (p as any).Brand || p.raw_data?.brand || p.raw_data?.Brand || '').trim();
+      if (b) set.add(b);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
 
   const filteredAndSorted = useMemo(() => {
     let result = rows;
@@ -563,22 +634,35 @@ export default function AdminProducts() {
 
     if (term) {
       const tokens = term.split(/\s+/).filter(Boolean);
-      result = result.filter((p) => {
+      const directlyMatchedIds = new Set<string>();
+
+      rows.forEach((p) => {
         const name = (p.name || '').toLowerCase();
         const sku = (p.sku || '').toLowerCase();
         const barcode = (p.barcode || '').toLowerCase();
         const category = (p.category || '').toLowerCase();
+        const brand = (p.brand || (p as any).Brand || p.raw_data?.brand || '').toLowerCase();
         const match = tokens.every(
           (t) =>
             name.includes(t) ||
             sku.includes(t) ||
             barcode.includes(t) ||
-            category.includes(t)
+            category.includes(t) ||
+            brand.includes(t)
         );
-        if (match && p.parentId) {
-          matchedParentsFromVariants.add(p.parentId);
+        if (match) {
+          directlyMatchedIds.add(p.id);
+          if (p.parentId) {
+            matchedParentsFromVariants.add(p.parentId);
+          }
         }
-        return match;
+      });
+
+      result = rows.filter((p) => {
+        if (directlyMatchedIds.has(p.id)) return true;
+        // Jika pencarian cocok dengan varian anaknya, sertakan induknya agar tetap tampak
+        if (matchedParentsFromVariants.has(p.id)) return true;
+        return false;
       });
     }
 
@@ -600,13 +684,13 @@ export default function AdminProducts() {
     // Filter mode hierarki varian
     if (viewHierarchy === 'grouped') {
       // Sembunyikan anak varian dari baris utama, tampilkan hanya induk / produk tunggal
-      // Jika pencarian aktif dan ada varian yang cocok, tampilkan induknya
-      filtered = filtered.filter((p) => !p.parentId || matchedParentsFromVariants.has(p.id));
+      // Anak varian akan terlihat dalam sub-table / accordion di bawah induknya
+      filtered = filtered.filter((p) => !p.parentId);
     } else if (viewHierarchy === 'parents_only') {
-      // Tampilkan semua produk yang BUKAN anak varian (tidak punya parentId)
-      // = produk mandiri + produk yang jadi induk
+      // Tampilkan hanya induk & mandiri tanpa ekspansi varian
       filtered = filtered.filter((p) => !p.parentId);
     } else if (viewHierarchy === 'variants_only') {
+      // Khusus menampilkan produk yang merupakan anak varian
       filtered = filtered.filter((p) => Boolean(p.parentId));
     }
     // 'flat': semua baris tampil mandiri
@@ -648,8 +732,9 @@ export default function AdminProducts() {
     try {
       const data = filteredAndSorted.map(p => ({
       ID: p.sku || '',
-      Barcode: '',
+      Barcode: p.barcode || '',
       Nama: p.name,
+      Brand: p.brand || (p as any).Brand || '',
       Kategori: p.category || 'Umum',
       Satuan: p.unit || 'Pcs',
       Stok: p.stock || 0,
@@ -1194,6 +1279,13 @@ export default function AdminProducts() {
                 <Printer size={13} /> Cetak Label ({selectedIds.length})
               </button>
               <button
+                type="button"
+                onClick={() => setShowBulkBrandModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              >
+                <Tag size={13} /> Set Brand ({selectedIds.length})
+              </button>
+              <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
@@ -1234,37 +1326,93 @@ export default function AdminProducts() {
             </span>
             <button
               type="button"
-              onClick={() => { setViewHierarchy('grouped'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
+              onClick={() => handleSetViewHierarchy('grouped')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 viewHierarchy === 'grouped'
                   ? 'bg-violet-600 text-white shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
+              title="Tampilkan produk induk dengan anak varian di dalamnya (hierarkis)"
             >
-              Hierarki Varian
+              <span>Hierarki Varian</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                viewHierarchy === 'grouped' ? 'bg-violet-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {hierarchyCounts.parentsWithVariants}
+              </span>
             </button>
             <button
               type="button"
-              onClick={() => { setViewHierarchy('flat'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
+              onClick={() => handleSetViewHierarchy('flat')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 viewHierarchy === 'flat'
                   ? 'bg-violet-600 text-white shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
+              title="Tampilkan semua baris produk dan varian secara terpisah"
             >
-              Semua Baris (Flat)
+              <span>Semua Baris (Flat)</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                viewHierarchy === 'flat' ? 'bg-violet-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {hierarchyCounts.totalAll}
+              </span>
             </button>
             <button
               type="button"
-              onClick={() => { setViewHierarchy('parents_only'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
+              onClick={() => handleSetViewHierarchy('parents_only')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 viewHierarchy === 'parents_only'
                   ? 'bg-violet-600 text-white shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
+              title="Tampilkan hanya produk induk dan mandiri (tanpa anak varian)"
             >
-              Hanya Induk & Mandiri
+              <span>Hanya Induk & Mandiri</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                viewHierarchy === 'parents_only' ? 'bg-violet-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {hierarchyCounts.topLevel}
+              </span>
             </button>
+            <button
+              type="button"
+              onClick={() => handleSetViewHierarchy('variants_only')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                viewHierarchy === 'variants_only'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+              title="Khusus menampilkan produk yang berstatus anak varian"
+            >
+              <span>Hanya Varian</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                viewHierarchy === 'variants_only' ? 'bg-violet-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {hierarchyCounts.totalVariants}
+              </span>
+            </button>
+            {viewHierarchy === 'grouped' && hierarchyCounts.parentsWithVariants > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (expandedParents.size > 0) {
+                    setExpandedParents(new Set());
+                  } else {
+                    const allParentIds = new Set<string>();
+                    childrenByParent.forEach((children, parentId) => {
+                      if (children.length > 0) allParentIds.add(parentId);
+                    });
+                    setExpandedParents(allParentIds);
+                  }
+                }}
+                className="text-[10px] font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded-lg border border-violet-200 transition-colors flex items-center gap-1 shrink-0 ml-1"
+                title={expandedParents.size > 0 ? "Tutup semua daftar varian" : "Buka semua daftar varian"}
+              >
+                {expandedParents.size > 0 ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                {expandedParents.size > 0 ? 'Tutup Semua' : 'Buka Semua'}
+              </button>
+            )}
           </div>
 
           {/* Quick Filter Chips */}
@@ -1377,13 +1525,25 @@ export default function AdminProducts() {
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
                         {p.parentId ? (
-                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
-                            Varian
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 inline-flex items-center gap-1" title={`Induk: ${parentById.get(p.parentId)?.name || p.parentId}`}>
+                            <span>↳ Varian</span>
+                            {parentById.get(p.parentId) && (
+                              <span className="font-semibold text-violet-900 truncate max-w-[100px]">
+                                ({parentById.get(p.parentId)?.name})
+                              </span>
+                            )}
                           </span>
                         ) : null}
                       </div>
                       <h3 className="font-black text-gray-900 text-sm uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
+                        {p.brand && (
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded" title={`Brand: ${p.brand}`}>
+                            {p.brand}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1504,7 +1664,7 @@ export default function AdminProducts() {
                   </div>
 
                   {/* Accordion Varian Mobile */}
-                  {childrenByParent.get(p.id) && childrenByParent.get(p.id)!.length > 0 && (
+                  {childrenByParent.get(p.id) && childrenByParent.get(p.id)!.length > 0 && viewHierarchy !== 'flat' && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <button
                         type="button"
@@ -1627,11 +1787,16 @@ export default function AdminProducts() {
                                 {p.isActive === false ? 'Arsip' : 'Aktif'}
                               </span>
                               {p.parentId ? (
-                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700" title={`Parent: ${p.parentId}`}>
-                                  ↳ Varian
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 inline-flex items-center gap-1" title={`Induk: ${parentById.get(p.parentId)?.name || p.parentId}`}>
+                                  <span>↳ Varian</span>
+                                  {parentById.get(p.parentId) && (
+                                    <span className="font-semibold text-violet-900 truncate max-w-[130px]">
+                                      ({parentById.get(p.parentId)?.name})
+                                    </span>
+                                  )}
                                 </span>
                               ) : null}
-                              {hasVariants && (
+                              {hasVariants && viewHierarchy !== 'flat' && (
                                 <button
                                   type="button"
                                   onClick={() => toggleParentExpand(p.id)}
@@ -1644,7 +1809,14 @@ export default function AdminProducts() {
                               )}
                             </div>
                             <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{p.name}</h3>
-                            <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
+                              {p.brand && (
+                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded" title={`Brand: ${p.brand}`}>
+                                  {p.brand}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1788,7 +1960,7 @@ export default function AdminProducts() {
                     </tr>
 
                     {/* Accordion Sub-table untuk Varian Produk (Desktop) */}
-                    {hasVariants && isExpanded && (
+                    {hasVariants && isExpanded && viewHierarchy !== 'flat' && (
                       <tr key={`${p.id}-variants-row`} className="bg-gradient-to-r from-violet-50/40 via-purple-50/20 to-transparent">
                         <td colSpan={6} className="px-3 py-3 pl-12 border-y border-violet-100/60">
                           <div className="rounded-2xl bg-white border border-violet-100 shadow-xs overflow-hidden">
@@ -2014,6 +2186,17 @@ export default function AdminProducts() {
         isOpen={showMergeModal}
         onClose={() => setShowMergeModal(false)}
         selectedProducts={selectedProductsForMerge}
+        onSuccess={() => {
+          setSelectedIds([]);
+        }}
+      />
+
+      {/* Modal Set Brand Produk Massal */}
+      <BulkBrandModal
+        isOpen={showBulkBrandModal}
+        onClose={() => setShowBulkBrandModal(false)}
+        selectedProducts={selectedProductsForMerge}
+        existingBrands={existingBrands}
         onSuccess={() => {
           setSelectedIds([]);
         }}

@@ -2798,3 +2798,85 @@ export async function generateNextSkuAction(categoryName: string, productName?: 
     return { success: false, error: err?.message || 'Gagal membuat SKU otomatis' };
   }
 }
+
+/**
+ * Update nama brand produk secara massal (bulk).
+ * Opsi tambahan: menyisipkan brand ke nama produk (prefix).
+ */
+export async function bulkUpdateProductBrandAction(
+  ids: string[],
+  brandName: string,
+  options?: {
+    updateProductName?: boolean;
+    brandPrefixStyle?: 'plain' | 'bracket';
+  }
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  await requireAdmin();
+  try {
+    const cleanBrand = (brandName || '').trim();
+    if (!cleanBrand) {
+      return { success: false, error: 'Nama brand tidak boleh kosong' };
+    }
+    if (!ids || ids.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    const now = new Date().toISOString();
+    const { data: products, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('id, name, raw_data')
+      .in('id', ids);
+
+    if (fetchErr) throw fetchErr;
+
+    const brandLower = cleanBrand.toLowerCase();
+
+    for (const p of products || []) {
+      const raw = (p.raw_data && typeof p.raw_data === 'object') ? { ...p.raw_data } : {};
+      raw.brand = cleanBrand;
+      raw.Brand = cleanBrand;
+      raw.merek = cleanBrand;
+
+      const currentName = String(p.name || raw.name || raw.Nama || '').trim();
+      let updatedName = currentName;
+
+      if (options?.updateProductName && currentName) {
+        if (!currentName.toLowerCase().includes(brandLower)) {
+          if (options.brandPrefixStyle === 'bracket') {
+            updatedName = `[${cleanBrand}] ${currentName}`.trim();
+          } else {
+            updatedName = `${cleanBrand} ${currentName}`.trim();
+          }
+        }
+        raw.name = updatedName;
+        raw.Nama = updatedName;
+      }
+
+      const updateData: Record<string, any> = {
+        raw_data: raw,
+        updated_at: now,
+      };
+
+      if (options?.updateProductName && updatedName !== currentName) {
+        updateData.name = updatedName;
+      }
+
+      const { error: updErr } = await supabaseAdmin
+        .from('products')
+        .update(updateData)
+        .eq('id', p.id);
+
+      if (updErr) {
+        console.error(`Gagal update brand produk ${p.id}:`, updErr);
+        throw updErr;
+      }
+    }
+
+    revalidatePath('/admin/products');
+    return { success: true, count: products?.length || 0 };
+  } catch (err: any) {
+    console.error('bulkUpdateProductBrandAction error:', err);
+    return { success: false, error: err?.message || 'Gagal mengubah brand produk' };
+  }
+}
+

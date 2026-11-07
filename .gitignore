@@ -40,3 +40,6 @@ temp_file
 supabase/.branches/
 supabase/.temp/
 
+
+# Orkestra AI — estado local (nunca versionar)
+.sta/
