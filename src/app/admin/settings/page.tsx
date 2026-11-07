@@ -2,12 +2,13 @@
 
 import { useEffect, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Settings, CreditCard, Printer, Store,
   Shield, Upload, Download,
   Plus, Trash2, Users, Tag, Save, Sparkles, AlertTriangle,
   Globe, Truck, Coins, CheckCircle2, ChevronRight, Activity, Database, RotateCcw,
-  ExternalLink, MapPin, Navigation, Package, Receipt, FileSpreadsheet
+  ExternalLink, MapPin, Navigation, Package, Receipt, FileSpreadsheet, KeyRound
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
@@ -902,10 +903,39 @@ export default function AdminSettings() {
       {activeTab === 'employees' && (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
           <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <h2 className="text-xl font-black mb-8 flex items-center gap-2"><Users className="text-slate-900" /> Kelola Staff</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl font-black flex items-center gap-2"><Users className="text-slate-900" /> Kelola Staff & Karyawan</h2>
+              <Link
+                href="/admin/users"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
+              >
+                <KeyRound size={15} /> Manajemen Akun & Password
+              </Link>
+            </div>
+
+            {/* Banner Penjelasan Password / Login */}
+            <div className="mb-8 p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl mt-0.5 shrink-0">
+                  <KeyRound size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-900">Di mana mengatur Password login Staff / Kasir?</h4>
+                  <p className="text-xs text-amber-800 leading-relaxed mt-1">
+                    Halaman ini mencatat data kepegawaian internal (biodata & absensi). Untuk membuatkan <strong>Email, Password Login, dan Hak Akses</strong> agar kasir (seperti <em>ana 1, Okta, dll</em>) bisa login di POS Kasir atau Backoffice, gunakan menu <strong>Akun Login & Password</strong>.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/admin/users"
+                className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors whitespace-nowrap shadow-sm"
+              >
+                <KeyRound size={14} /> Atur Password Kasir →
+              </Link>
+            </div>
 
             <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-8">
-              <h3 className="text-xs font-black uppercase text-slate-400 mb-4 px-2">Tambah Staff Baru</h3>
+              <h3 className="text-xs font-black uppercase text-slate-400 mb-4 px-2">Tambah Staff Baru (Data Kepegawaian)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <input type="text" placeholder="Nama Lengkap" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
                 <input type="email" placeholder="Email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="bg-white p-4 rounded-2xl text-xs font-bold outline-none" />
@@ -928,6 +958,13 @@ export default function AdminSettings() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Link
+                      href="/admin/users"
+                      title="Atur Password Akun Login"
+                      className="p-2 rounded-xl text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      <KeyRound size={16} />
+                    </Link>
                     <button onClick={() => handleToggleEmployee(emp)} className={`p-2 rounded-xl transition-all ${emp.isActive ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 bg-white'}`}><CheckCircle2 size={18} /></button>
                     <button onClick={() => handleDeleteEmployee(emp.id!)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                   </div>

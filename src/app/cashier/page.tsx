@@ -7,7 +7,7 @@ import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera,
-  Settings, Zap, ScanLine
+  Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
@@ -96,6 +96,16 @@ type Order = {
   payAmount?: number;
   changeAmount?: number;
   shiftId?: string; // Link to cashier shift
+};
+
+type HeldCart = {
+  id: string;
+  heldAt: number;
+  customerName?: string;
+  items: CartItem[];
+  total: number;
+  paymentMethod: string;
+  transactionType: 'toko' | 'online' | 'shopee' | 'tiktok';
 };
 
 type CashierShift = {
@@ -192,6 +202,29 @@ export default function CashierPOS() {
   // Offline queue
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Transaksi Ditahan (Hold & Recall Cart)
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pos-held-carts');
+        return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
+  const [showHeldModal, setShowHeldModal] = useState(false);
+
+  // Cetak Ulang Struk Terakhir (Reprint)
+  const [lastPrintedOrder, setLastPrintedOrder] = useState<Partial<Order> | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pos-last-order');
+        return saved ? JSON.parse(saved) : null;
+      } catch { return null; }
+    }
+    return null;
+  });
 
   // QRIS Modal state
   const [showQrisModal, setShowQrisModal] = useState(false);
@@ -704,19 +737,122 @@ export default function CashierPOS() {
     localStorage.setItem('pos-cart', JSON.stringify(cart));
   }, [cart]);
 
+  const printReceiptRef = useRef<((order: Partial<Order>) => Promise<void>) | null>(null);
+
+  // Fitur Tahan Transaksi (Hold Cart) [F4]
+  const handleHoldCart = useCallback(() => {
+    if (cart.length === 0) {
+      toast.error('Keranjang masih kosong, tidak ada transaksi untuk ditahan.');
+      return;
+    }
+    const newHold: HeldCart = {
+      id: `hold_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      heldAt: Date.now(),
+      customerName: customerName.trim() || undefined,
+      items: [...cart],
+      total,
+      paymentMethod,
+      transactionType,
+    };
+    const updated = [newHold, ...heldCarts];
+    setHeldCarts(updated);
+    try {
+      localStorage.setItem('pos-held-carts', JSON.stringify(updated));
+    } catch {}
+    setCart([]);
+    try {
+      localStorage.removeItem('pos-cart');
+    } catch {}
+    setCustomerName('');
+    setCustomerPhone('');
+    setCashGiven('');
+    toast.success(`Transaksi #${updated.length} ditahan. Siap melayani pembeli berikutnya.`, { icon: '⏸️' });
+  }, [cart, customerName, total, paymentMethod, transactionType, heldCarts]);
+
+  // Recall Transaksi Ditahan
+  const handleRecallCart = useCallback((hold: HeldCart) => {
+    if (cart.length > 0) {
+      const confirmReplace = window.confirm('Keranjang saat ini berisi item. Ganti dengan transaksi yang ditahan ini?');
+      if (!confirmReplace) return;
+    }
+    setCart(hold.items);
+    setPaymentMethod(hold.paymentMethod);
+    setTransactionType(hold.transactionType);
+    if (hold.customerName) setCustomerName(hold.customerName);
+    const updated = heldCarts.filter(h => h.id !== hold.id);
+    setHeldCarts(updated);
+    try {
+      localStorage.setItem('pos-held-carts', JSON.stringify(updated));
+    } catch {}
+    setShowHeldModal(false);
+    toast.success('Transaksi yang ditahan berhasil dipanggil kembali ke keranjang.', { icon: '▶️' });
+  }, [cart, heldCarts]);
+
+  // Hapus Transaksi Ditahan
+  const handleDeleteHeldCart = useCallback((id: string) => {
+    const updated = heldCarts.filter(h => h.id !== id);
+    setHeldCarts(updated);
+    try {
+      localStorage.setItem('pos-held-carts', JSON.stringify(updated));
+    } catch {}
+    toast.success('Transaksi tertahan dihapus.');
+  }, [heldCarts]);
+
+  // Cetak Ulang Struk Terakhir [F12]
+  const handleReprintLastReceipt = useCallback(() => {
+    if (!lastPrintedOrder) {
+      toast.error('Belum ada transaksi sebelumnya untuk dicetak ulang.');
+      return;
+    }
+    printReceiptRef.current?.(lastPrintedOrder);
+    toast.success(`Mencetak ulang struk #${lastPrintedOrder.id || 'terakhir'}...`);
+  }, [lastPrintedOrder]);
+
+  // Keyboard Shortcuts Lengkap (F1, F2, F3, F4, F8, F12, ESC)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+
       if (e.key === 'F1') {
         e.preventDefault();
         searchInputRef.current?.focus();
       } else if (e.key === 'F2') {
         e.preventDefault();
         handleTransactionRef.current?.();
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        if (total > 0) {
+          setCashGiven(String(total));
+          toast.success(`Uang Pas: Rp${total.toLocaleString('id-ID')}`, { id: 'quick-cash' });
+        }
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        handleHoldCart();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        const methods = ['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'];
+        setPaymentMethod(prev => {
+          const nextIdx = (methods.indexOf(prev) + 1) % methods.length;
+          const nextMethod = methods[nextIdx];
+          toast(`Metode Bayar: ${nextMethod}`, { icon: '💳', id: 'pay-method' });
+          return nextMethod;
+        });
+      } else if (e.key === 'F12') {
+        e.preventDefault();
+        handleReprintLastReceipt();
+      } else if (e.key === 'Escape' && !isInput) {
+        if (cart.length > 0) {
+          if (window.confirm('Kosongkan keranjang belanja kasir?')) {
+            setCart([]);
+            try { localStorage.removeItem('pos-cart'); } catch {}
+            toast('Keranjang dikosongkan', { icon: '🗑️' });
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [total, handleHoldCart, handleReprintLastReceipt, cart]);
 
   // === GLOBAL BARCODE SCANNER LISTENER ===
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
@@ -873,6 +1009,13 @@ export default function CashierPOS() {
         setProducts(p);
         setFilteredProducts(p);
 
+        // Cache katalog produk ke localStorage agar saat offline / refresh kasir tetap punya data
+        try {
+          localStorage.setItem('pos-cached-products', JSON.stringify(p));
+        } catch (storageErr) {
+          console.warn('Quota exceeded caching pos-products:', storageErr);
+        }
+
         // Fetch categories from master table (not derived from active products)
         // so ALL categories appear even if their products are currently filtered out.
         const { data: catRows } = await supabase
@@ -884,9 +1027,29 @@ export default function CashierPOS() {
         const productCats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || ''))).filter(Boolean) as string[];
         const allCats = Array.from(new Set([...masterCats, ...productCats])).sort();
         setCategories(allCats);
+        try {
+          localStorage.setItem('pos-cached-categories', JSON.stringify(allCats));
+        } catch {}
       } catch (error) {
         console.error('Error fetching products:', error);
-        toast.error('Gagal memuat produk. Silakan coba lagi.');
+        // Fallback muat dari cache lokal jika jaringan offline / gagal
+        try {
+          const cached = localStorage.getItem('pos-cached-products');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setProducts(parsed);
+              setFilteredProducts(parsed);
+              const cachedCats = localStorage.getItem('pos-cached-categories');
+              if (cachedCats) setCategories(JSON.parse(cachedCats));
+              toast('📴 Mode Offline: Memuat ' + parsed.length + ' produk dari cache lokal kasir.', { icon: '📦', duration: 4000 });
+              return;
+            }
+          }
+        } catch (parseErr) {
+          console.error('Error reading cached products:', parseErr);
+        }
+        toast.error('Gagal memuat produk. Silakan periksa koneksi.');
       } finally {
         setIsFetchingProducts(false);
       }
@@ -1539,6 +1702,12 @@ export default function CashierPOS() {
   }, [handleTransaction]);
 
   const printReceipt = useCallback(async (order: Partial<Order>) => {
+    // Simpan order terakhir untuk fitur Cetak Ulang Struk [F12]
+    try {
+      setLastPrintedOrder(order);
+      localStorage.setItem('pos-last-order', JSON.stringify(order));
+    } catch {}
+
     // FIX: Fetch cashier name BEFORE template string (await inside template literal tidak valid)
     let cashierDisplayName = 'Admin';
     try {
@@ -1713,6 +1882,10 @@ export default function CashierPOS() {
     w.document.close();
   }, []);
 
+  useEffect(() => {
+    printReceiptRef.current = printReceipt;
+  }, [printReceipt]);
+
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Memuat Kasir...</div>;
 
@@ -1781,6 +1954,32 @@ export default function CashierPOS() {
             <button onClick={() => setActiveTab('pos')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
             <button onClick={() => setActiveTab('orders')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
+
+          {/* Tombol Cetak Ulang Struk Terakhir [F12] */}
+          {lastPrintedOrder && (
+            <button
+              type="button"
+              onClick={handleReprintLastReceipt}
+              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-black border border-blue-200 uppercase flex items-center gap-1.5 transition-all shrink-0"
+              title="Cetak Ulang Struk Terakhir [F12]"
+            >
+              <RotateCcw size={13} />
+              <span className="hidden sm:inline">Cetak Ulang</span> [F12]
+            </button>
+          )}
+
+          {/* Tombol Antrean Transaksi Ditahan (Hold) */}
+          {heldCarts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowHeldModal(true)}
+              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-xs font-black border border-amber-300 uppercase flex items-center gap-1.5 transition-all shrink-0 animate-pulse"
+              title="Buka Transaksi yang Ditahan"
+            >
+              <PauseCircle size={13} />
+              <span>{heldCarts.length} Ditahan</span>
+            </button>
+          )}
           {currentShift && (
             <div className="flex items-center gap-2 shrink-0 md:ml-4 md:border-l md:pl-4">
               <div className="hidden md:flex flex-col text-right">
@@ -2062,7 +2261,7 @@ export default function CashierPOS() {
           </div>
 
           {/* Desktop Sidebar / Mobile Floating Drawer */}
-          <div className={`col-span-12 xl:col-span-4 flex flex-col gap-4 transition-all duration-300 ${
+          <div className={`col-span-12 xl:col-span-4 flex flex-col gap-3 transition-all duration-300 xl:sticky xl:top-16 xl:max-h-[calc(100vh-4.75rem)] ${
             isMobileCartOpen 
               ? 'fixed inset-0 z-[60] bg-gray-50 p-4 md:p-8 overflow-y-auto animate-in slide-in-from-bottom flex' 
               : 'hidden xl:flex'
@@ -2076,7 +2275,7 @@ export default function CashierPOS() {
               </div>
             )}
             
-            <div className={`p-4 rounded-2xl text-white font-black text-center text-xs tracking-widest flex items-center justify-center gap-2 shadow-lg ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
+            <div className={`p-3 rounded-2xl text-white font-black text-center text-xs tracking-widest flex items-center justify-center gap-2 shadow-sm shrink-0 ${transactionType === 'toko' ? 'bg-green-600' : (transactionType === 'online' ? 'bg-blue-600' : (transactionType === 'shopee' ? 'bg-orange-500' : 'bg-black'))} ${transactionType !== 'toko' ? 'animate-pulse' : ''}`}>
               {transactionType === 'toko' && <><CheckCircle size={14} /> MODE TRANSAKSI TOKO</>}
 
               {transactionType === 'online' && <><Truck size={14} /> MODE PESANAN ONLINE</>}
@@ -2084,24 +2283,56 @@ export default function CashierPOS() {
               {transactionType === 'tiktok' && <><ShoppingBag size={14} /> MODE TIKTOK</>}
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col overflow-hidden h-full">
-              <div className="p-5 border-b flex items-center justify-between bg-gray-50/50">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col overflow-hidden flex-1 min-h-0">
+              <div className="p-3.5 md:p-4 border-b flex items-center justify-between bg-gray-50/50 shrink-0">
                 <div className="flex items-center gap-2">
                   <ShoppingCart size={18} className={transactionType === 'online' ? 'text-blue-600' : 'text-green-600'} />
                   <h2 className="font-black text-xs uppercase tracking-widest text-gray-700">Keranjang</h2>
+                  {heldCarts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowHeldModal(true)}
+                      className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-full text-[10px] font-black animate-pulse transition-all cursor-pointer"
+                      title="Lihat transaksi yang ditahan"
+                    >
+                      {heldCarts.length} Ditahan
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {cart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleHoldCart}
+                      className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition-all"
+                      title="Tahan transaksi saat ini [F4]"
+                    >
+                      <PauseCircle size={12} />
+                      <span className="hidden sm:inline">Tahan</span> [F4]
+                    </button>
+                  )}
                   <select
                     value={transactionType}
                     onChange={(e) => setTransactionType(e.target.value as 'toko' | 'online' | 'shopee' | 'tiktok')}
-                    className="text-xs font-bold bg-gray-200 px-3 py-1 rounded-full hover:bg-gray-300 outline-none cursor-pointer"
+                    className="text-xs font-bold bg-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-300 outline-none cursor-pointer"
                   >
                     <option value="toko">OFFLINE</option>
                     <option value="online">WEBSITE</option>
                     <option value="shopee">SHOPEE</option>
                     <option value="tiktok">TIKTOK</option>
                   </select>
-                  <button onClick={() => setCart([])} className="text-red-400 hover:text-red-600"><Trash2 size={18} /></button>
+                  <button
+                    onClick={() => {
+                      if (cart.length > 0 && window.confirm('Kosongkan keranjang belanja kasir?')) {
+                        setCart([]);
+                        try { localStorage.removeItem('pos-cart'); } catch {}
+                      }
+                    }}
+                    title="Kosongkan Keranjang [ESC]"
+                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
 
@@ -2235,9 +2466,9 @@ export default function CashierPOS() {
                 ))}
               </div>
 
-              <div className="p-5 bg-white border-t space-y-4">
+              <div className="p-4 md:p-5 bg-white border-t space-y-3 shrink-0">
 
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-1.5">
                   {['CASH', 'QRIS', 'TRANSFER', 'TEMPO', 'DOMPET'].map(m => (
                     <button
                       key={m}
@@ -2319,9 +2550,9 @@ export default function CashierPOS() {
                       <button
                         type="button"
                         onClick={() => setCashGiven(String(total))}
-                        className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors"
+                        className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
                       >
-                        ⚡ Uang Pas (Rp{total.toLocaleString('id-ID')})
+                        ⚡ Uang Pas [F3] (Rp{total.toLocaleString('id-ID')})
                       </button>
                     </div>
                     <input 
@@ -2339,7 +2570,11 @@ export default function CashierPOS() {
                           key={nominal}
                           type="button"
                           onClick={() => setCashGiven(String(nominal))}
-                          className="px-2 py-1 bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-[10px] font-black rounded-lg transition-colors text-gray-700"
+                          className={`px-2.5 py-1 border text-[10px] font-black rounded-lg transition-colors ${
+                            cashGiven === String(nominal)
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                              : 'bg-white border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-gray-700'
+                          }`}
                         >
                           Rp{nominal >= 1000 ? `${nominal / 1000}k` : nominal}
                         </button>
@@ -2350,9 +2585,9 @@ export default function CashierPOS() {
                           const roundedUp50k = Math.ceil(total / 50000) * 50000;
                           setCashGiven(String(roundedUp50k));
                         }}
-                        className="px-2 py-1 bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-[10px] font-black rounded-lg transition-colors text-emerald-700"
+                        className="px-2.5 py-1 bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 text-[10px] font-black rounded-lg transition-colors text-emerald-700"
                       >
-                        Bulatkan
+                        Bulatkan 50k
                       </button>
                     </div>
 
@@ -2994,6 +3229,97 @@ export default function CashierPOS() {
             handleTransaction();
           }}
         />
+      )}
+
+      {/* ── Modal Transaksi Ditahan (Hold & Recall) ── */}
+      {showHeldModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b flex items-center justify-between bg-amber-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+                  <PauseCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm uppercase text-gray-800 tracking-tight">
+                    Transaksi Ditahan (Pending)
+                  </h3>
+                  <p className="text-xs text-gray-400 font-medium">
+                    {heldCarts.length} transaksi sedang menunggu
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowHeldModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
+              {heldCarts.length === 0 ? (
+                <div className="py-12 text-center text-gray-400">
+                  <PauseCircle size={36} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-xs font-bold">Tidak ada transaksi yang ditahan saat ini.</p>
+                </div>
+              ) : (
+                heldCarts.map((hold, idx) => (
+                  <div
+                    key={hold.id}
+                    className="p-3.5 bg-gray-50 hover:bg-amber-50/40 rounded-2xl border border-gray-200/70 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          #{idx + 1} · {hold.transactionType.toUpperCase()}
+                        </span>
+                        <span className="text-[11px] font-medium text-gray-400">
+                          {new Date(hold.heldAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-gray-800 truncate">
+                        {hold.customerName ? `Pelanggan: ${hold.customerName}` : 'Pelanggan Umum'}
+                      </p>
+                      <p className="text-[11px] font-medium text-gray-500 mt-0.5">
+                        {hold.items.reduce((s, i) => s + i.quantity, 0)} item · <strong className="text-emerald-600 font-black">Rp{hold.total.toLocaleString('id-ID')}</strong> ({hold.paymentMethod})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRecallCart(hold)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                      >
+                        <PlayCircle size={13} />
+                        <span>Lanjutkan</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteHeldCart(hold.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                        title="Hapus Transaksi Ini"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHeldModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

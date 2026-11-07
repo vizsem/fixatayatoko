@@ -11,7 +11,7 @@ import {
   ArrowUpCircle, ArrowDownCircle, Warehouse, Package as BoxIcon,
   Banknote, Bell, Landmark, MessageCircle, Mail, RefreshCcw,
   DollarSign, AlertTriangle, ClipboardCheck, UploadCloud, Store,
-  Calculator
+  Calculator, KeyRound
 } from 'lucide-react';
 
 import AdminMobileHeader from '@/components/AdminMobileHeader';
@@ -148,6 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Supplier / Distributor', href: '/admin/suppliers', icon: Truck },
         { name: 'Pelanggan & Member', href: '/admin/customers', icon: Users },
         { name: 'Karyawan & Staf', href: '/admin/employees', icon: UsersRound },
+        { name: 'Akun Login & Password', href: '/admin/users', icon: KeyRound },
         { name: 'Pesan & Kotak Masuk', href: '/admin/messages', icon: Mail, badge: unreadMessages },
         { name: 'Promosi & Diskon', href: '/admin/promotions', icon: Star },
         { name: 'Dompet Digital & Poin', href: '/admin/wallet', icon: Wallet },
