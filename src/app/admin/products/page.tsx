@@ -600,18 +600,7 @@ export default function AdminProducts() {
     };
   }, [rows, childrenByParent]);
 
-  // Auto-expand varian saat awal masuk dalam mode grouped jika ada varian
-  const hasInitializedExpansion = useRef(false);
-  useEffect(() => {
-    if (!hasInitializedExpansion.current && childrenByParent.size > 0 && viewHierarchy === 'grouped') {
-      hasInitializedExpansion.current = true;
-      const allParentIds = new Set<string>();
-      childrenByParent.forEach((children, parentId) => {
-        if (children.length > 0) allParentIds.add(parentId);
-      });
-      setExpandedParents(allParentIds);
-    }
-  }, [childrenByParent, viewHierarchy]);
+  // Semua parent collapsed by default — user klik untuk expand/collapse
 
   const selectedProductsForMerge = useMemo(() => {
     return rows.filter((p) => selectedIds.includes(p.id));
@@ -1503,6 +1492,19 @@ export default function AdminProducts() {
               const whName = displayWarehouses.find(w => w.id === p.warehouseId)?.name || 'N/A';
               const isExpired = p.expired_date && new Date(p.expired_date) < new Date();
               const isSelected = selectedIds.includes(p.id);
+              const pChildren = childrenByParent.get(p.id) || [];
+              const hasVariants = pChildren.length > 0;
+              const totalVariantStock = hasVariants ? pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) : 0;
+              const displayStock = hasVariants ? totalVariantStock : Number(p.stock || 0);
+
+              const pPrices = pChildren.map(c => Number(c.priceEcer || 0)).filter(pr => pr > 0);
+              const minPrice = pPrices.length > 0 ? Math.min(...pPrices) : Number(p.priceEcer || 0);
+              const maxPrice = pPrices.length > 0 ? Math.max(...pPrices) : Number(p.priceEcer || 0);
+
+              const pCosts = pChildren.map(c => Number(c.purchasePrice || 0)).filter(c => c > 0);
+              const minCost = pCosts.length > 0 ? Math.min(...pCosts) : Number(p.purchasePrice || 0);
+              const maxCost = pCosts.length > 0 ? Math.max(...pCosts) : Number(p.purchasePrice || 0);
+
               return (
                 <div key={p.id} className={`p-2.5 flex flex-col gap-2 ${isSelected ? 'bg-blue-50/50' : 'bg-white'}`}>
                   <div className="flex items-start gap-2.5">
@@ -1550,10 +1552,17 @@ export default function AdminProducts() {
                   <div className="grid grid-cols-2 gap-2 py-1.5 px-2 border-y border-gray-50 bg-gray-50/30 rounded-lg">
                     <div className="space-y-0.5">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Stock</p>
-                      <p className={`font-black text-xs leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                        {p.stock} <span className="text-xs uppercase">{p.unit}</span>
-                      </p>
-                      <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className={`font-black text-xs leading-none tabular-nums ${displayStock <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                          {displayStock} <span className="text-xs uppercase">{p.unit}</span>
+                        </p>
+                        {hasVariants && (
+                          <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded px-1.5 py-0.2">
+                            Total {pChildren.length} Varian
+                          </span>
+                        )}
+                      </div>
+                      {!hasVariants && <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />}
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {p.stockByWarehouse && Object.keys(p.stockByWarehouse).length > 0 ? (
                           Object.entries(p.stockByWarehouse).map(([whId, qty]) => {
@@ -1566,7 +1575,7 @@ export default function AdminProducts() {
                           })
                         ) : (
                           <span className="text-xs font-black text-gray-500 bg-white border border-gray-100 rounded px-1 py-0.5 uppercase">
-                            {whName}: {p.stock}
+                            {whName}: {displayStock}
                           </span>
                         )}
                       </div>
@@ -1575,10 +1584,12 @@ export default function AdminProducts() {
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
                       <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
                         <span className="text-xs mr-0.5">Rp</span>
-                        {(p.priceEcer || 0).toLocaleString('id-ID')}
+                        {minPrice.toLocaleString('id-ID')}
+                        {hasVariants && minPrice !== maxPrice ? ` - ${maxPrice.toLocaleString('id-ID')}` : ''}
                       </p>
                       <p className="text-xs font-bold text-blue-500/70 italic mt-0.5">
-                        Avg: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                        Avg: Rp{minCost.toLocaleString('id-ID')}
+                        {hasVariants && minCost !== maxCost ? ` - ${maxCost.toLocaleString('id-ID')}` : ''}
                       </p>
                     </div>
                   </div>
@@ -1592,9 +1603,14 @@ export default function AdminProducts() {
                     </div>
                     <div className="flex items-center gap-1.5 relative" data-action-menu>
                       <button 
-                        onClick={() => setSelectedProductRestock(p)} 
-                        className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs"
-                        title="Quick Stock"
+                        onClick={() => {
+                          if (hasVariants) setSelectedProductVariants(p);
+                          else setSelectedProductRestock(p);
+                        }} 
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs ${
+                          hasVariants ? 'bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
+                        }`}
+                        title={hasVariants ? "Kelola & Restock Varian" : "Quick Stock"}
                       >
                         <Calculator size={15} />
                       </button>
@@ -1753,9 +1769,20 @@ export default function AdminProducts() {
                 const hasVariants = pChildren.length > 0;
                 const isExpanded = expandedParents.has(p.id);
 
+                const totalVariantStock = hasVariants ? pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) : 0;
+                const displayStock = hasVariants ? totalVariantStock : Number(p.stock || 0);
+
+                const pPrices = pChildren.map(c => Number(c.priceEcer || 0)).filter(pr => pr > 0);
+                const minPrice = pPrices.length > 0 ? Math.min(...pPrices) : Number(p.priceEcer || 0);
+                const maxPrice = pPrices.length > 0 ? Math.max(...pPrices) : Number(p.priceEcer || 0);
+
+                const pCosts = pChildren.map(c => Number(c.purchasePrice || 0)).filter(c => c > 0);
+                const minCost = pCosts.length > 0 ? Math.min(...pCosts) : Number(p.purchasePrice || 0);
+                const maxCost = pCosts.length > 0 ? Math.max(...pCosts) : Number(p.purchasePrice || 0);
+
                 return (
                   <React.Fragment key={p.id}>
-                    <tr className={`hover:bg-blue-50/30 transition-all ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                    <tr className={`transition-all ${isSelected ? 'bg-blue-50/50' : hasVariants ? 'bg-violet-50/40 hover:bg-violet-50/70' : 'hover:bg-blue-50/30'}`}>
                       <td className="px-3 py-2.5 sticky left-0 bg-white z-10 text-center">
                         <button onClick={() => toggleSelectOne(p.id)} className="transition-colors mt-1">
                           {isSelected ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} className="text-gray-300 hover:text-gray-400" />}
@@ -1822,18 +1849,18 @@ export default function AdminProducts() {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <p className={`font-black text-sm leading-none tabular-nums ${Number(p.stock) <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {p.stock} <span className="text-xs font-bold uppercase text-gray-500">{p.unit}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className={`font-black text-sm leading-none tabular-nums ${displayStock <= Number(p.minStock) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {displayStock} <span className="text-xs font-bold uppercase text-gray-500">{p.unit}</span>
                             </p>
                             {hasVariants && (
-                              <span className="text-[10px] text-gray-400 font-medium">
-                                (Total: {pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) + Number(p.stock || 0)})
+                              <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded px-1.5 py-0.2">
+                                Total {pChildren.length} Varian
                               </span>
                             )}
                           </div>
-                          <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />
-                          {Number(p.stock) <= Number(p.minStock) && (
+                          {!hasVariants && <StockUnitDisplay stock={p.stock} baseUnit={p.unit} units={p.units} />}
+                          {displayStock <= Number(p.minStock) && (
                             <p className="text-[11px] font-bold text-red-500 uppercase">
                               Min: {p.minStock}
                             </p>
@@ -1850,7 +1877,7 @@ export default function AdminProducts() {
                               })
                             ) : (
                               <span className="text-[11px] font-bold bg-gray-50 border border-gray-100 text-gray-500 rounded px-1.5 py-0.5 uppercase">
-                                {whName}: {p.stock}
+                                {whName}: {displayStock}
                               </span>
                             )}
                           </div>
@@ -1859,10 +1886,12 @@ export default function AdminProducts() {
                       <td className="hidden md:table-cell px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
                           <p className="text-sm font-black text-emerald-600 leading-none tabular-nums">
-                            Rp{(p.priceEcer || 0).toLocaleString('id-ID')}
+                            Rp{minPrice.toLocaleString('id-ID')}
+                            {hasVariants && minPrice !== maxPrice ? ` - Rp${maxPrice.toLocaleString('id-ID')}` : ''}
                           </p>
                           <p className="text-[11px] font-medium text-gray-400">
-                            Modal: Rp{(p.purchasePrice || 0).toLocaleString('id-ID')}
+                            Modal: Rp{minCost.toLocaleString('id-ID')}
+                            {hasVariants && minCost !== maxCost ? ` - Rp${maxCost.toLocaleString('id-ID')}` : ''}
                           </p>
                           {Number(p.priceGrosir || 0) > 0 && (
                             <span className="text-[10px] font-bold text-purple-700 bg-purple-50 rounded px-1 py-0.2 w-max">
@@ -1893,9 +1922,14 @@ export default function AdminProducts() {
                             <Edit size={13} />
                           </Link>
                           <button 
-                            onClick={() => setSelectedProductRestock(p)} 
-                            className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-2xs"
-                            title="Restock"
+                            onClick={() => {
+                              if (hasVariants) setSelectedProductVariants(p);
+                              else setSelectedProductRestock(p);
+                            }} 
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all shadow-2xs ${
+                              hasVariants ? 'bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
+                            }`}
+                            title={hasVariants ? "Kelola & Restock Varian" : "Restock"}
                           >
                             <Calculator size={13} />
                           </button>
