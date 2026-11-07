@@ -547,9 +547,14 @@ export default function EditProductPage() {
     setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
   }, []);
 
-  // Fetch produk yang punya Parent_ID = id ini (daftar varian)
+  // Fetch produk yang punya Parent_ID = id ini (daftar varian anak)
   const [childVariants, setChildVariants] = useState<{ id: string; name: string; barcode?: string; stock: number }[]>([]);
+  // Fetch parent + saudara varian (ketika produk ini adalah anak varian)
+  const [parentProduct, setParentProduct] = useState<{ id: string; name: string; stock: number } | null>(null);
+  const [siblingVariants, setSiblingVariants] = useState<{ id: string; name: string; barcode?: string; stock: number }[]>([]);
+
   const fetchVariants = useCallback(async () => {
+    // 1. Fetch anak varian dari produk ini (kalau ini produk induk)
     const snap = await sbGetDocs({
       table: 'products',
       where: [{ field: 'raw_data->>Parent_ID', op: '==', val: id }],
@@ -567,7 +572,51 @@ export default function EditProductPage() {
         };
       }));
     }
-  }, [id]);
+
+    // 2. Jika produk ini adalah anak varian, fetch parent + saudara
+    const currentParentId = formData.Parent_ID;
+    if (currentParentId) {
+      // Fetch parent
+      try {
+        const parentSnap = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'id', op: '==', val: currentParentId }],
+          limit: 1,
+        });
+        if (parentSnap.docs.length > 0) {
+          const pd = parentSnap.docs[0];
+          const praw = pd.data() as Record<string, unknown>;
+          const prawData = (praw.raw_data || {}) as Record<string, unknown>;
+          setParentProduct({
+            id: pd.id,
+            name: (praw.name || prawData.Nama || pd.id) as string,
+            stock: Number(praw.stock || 0),
+          });
+        }
+      } catch { /* ignore */ }
+
+      // Fetch saudara varian (varian lain dari induk yang sama, kecuali diri sendiri)
+      try {
+        const sibSnap = await sbGetDocs({
+          table: 'products',
+          where: [{ field: 'raw_data->>Parent_ID', op: '==', val: currentParentId }],
+          limit: 50,
+        });
+        setSiblingVariants(sibSnap.docs
+          .filter(d => d.id !== id)
+          .map(d => {
+            const raw = d.data() as Record<string, unknown>;
+            const rawData = (raw.raw_data || {}) as Record<string, unknown>;
+            return {
+              id: d.id,
+              name: (raw.name || rawData.Nama || d.id) as string,
+              barcode: (raw.barcode || rawData.Barcode || '') as string,
+              stock: Number(raw.stock || 0),
+            };
+          }));
+      } catch { /* ignore */ }
+    }
+  }, [id, formData.Parent_ID]);
 
   // Prevent re-fetching on tab focus / auth state change
   useEffect(() => {
@@ -594,6 +643,14 @@ export default function EditProductPage() {
 
     return () => { if (__unsubscribe) __unsubscribe(); };
   }, [id, router, fetchProductData, fetchWarehouses, fetchCategories, fetchCostHistory, fetchPurchaseStats, fetchVariants]);
+
+  // Re-fetch parent & sibling info setelah formData.Parent_ID terisi dari fetchProductData
+  useEffect(() => {
+    if (formData.Parent_ID) {
+      fetchVariants();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.Parent_ID]);
 
 
   const handleSaveNewCategory = () => {
@@ -1755,59 +1812,141 @@ export default function EditProductPage() {
 
           {/* BAGIAN 3.4: DAFTAR VARIAN PRODUK */}
           <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4">
-              <div className="flex items-center gap-2 text-slate-800">
-                <Layers size={18} className="text-violet-600" />
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-widest">Varian Produk</h3>
-                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">Kelola turunan varian (warna, ukuran, rasa) dari produk ini</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowVariantModal(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black hover:bg-violet-700 transition-all shadow-sm shadow-violet-200"
-              >
-                <Layers size={14} />
-                Kelola Varian
-              </button>
-            </div>
 
-            {childVariants.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {childVariants.map((v) => (
-                  <div key={v.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:border-violet-300 transition-all">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-violet-100 text-violet-700 rounded-md">
-                          {v.id}
-                        </span>
-                        {v.barcode && (
-                          <span className="text-[10px] font-mono text-slate-500">
-                            {v.barcode}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm font-black text-slate-800 truncate">{v.name}</p>
-                      <p className="text-xs font-bold text-slate-500 mt-0.5">
-                        Stok: <span className={v.stock > 0 ? "text-emerald-600 font-black" : "text-rose-500 font-black"}>{v.stock}</span>
+            {/* ── KONDISI A: Produk ini adalah INDUK (punya varian anak) ─────────── */}
+            {!formData.Parent_ID ? (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4">
+                  <div className="flex items-center gap-2 text-slate-800">
+                    <Layers size={18} className="text-violet-600" />
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest">Varian Produk</h3>
+                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                        {childVariants.length > 0
+                          ? `${childVariants.length} varian anak terdaftar — stok induk dihitung otomatis`
+                          : 'Kelola turunan varian (warna, ukuran, rasa) dari produk ini'}
                       </p>
                     </div>
-                    <a
-                      href={`/admin/products/edit/${v.id}`}
-                      className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-violet-600 hover:border-violet-200 text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
-                    >
-                      Edit
-                    </a>
                   </div>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVariantModal(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black hover:bg-violet-700 transition-all shadow-sm shadow-violet-200"
+                  >
+                    <Layers size={14} />
+                    Kelola Varian
+                  </button>
+                </div>
+
+                {childVariants.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {childVariants.map((v) => (
+                      <div key={v.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:border-violet-300 transition-all">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-violet-100 text-violet-700 rounded-md">{v.id}</span>
+                            {v.barcode && <span className="text-[10px] font-mono text-slate-500">{v.barcode}</span>}
+                          </div>
+                          <p className="text-sm font-black text-slate-800 truncate">{v.name}</p>
+                          <p className="text-xs font-bold text-slate-500 mt-0.5">
+                            Stok: <span className={v.stock > 0 ? 'text-emerald-600 font-black' : 'text-rose-500 font-black'}>{v.stock}</span>
+                          </p>
+                        </div>
+                        <a
+                          href={`/admin/products/edit/${v.id}`}
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-violet-600 hover:border-violet-200 text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
+                        >
+                          Edit
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 px-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    <Layers className="mx-auto text-slate-300 mb-2" size={32} />
+                    <p className="text-xs font-bold text-slate-500">Belum ada produk varian yang ditautkan ke produk ini.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Klik tombol di atas untuk membuat varian seperti ukuran XL, warna merah, dll.</p>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="text-center py-8 px-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                <Layers className="mx-auto text-slate-300 mb-2" size={32} />
-                <p className="text-xs font-bold text-slate-500">Belum ada produk varian yang ditautkan ke produk ini.</p>
-                <p className="text-[11px] text-slate-400 mt-1">Klik tombol di atas untuk membuat varian seperti ukuran XL, warna merah, dll.</p>
-              </div>
+              /* ── KONDISI B: Produk ini adalah ANAK VARIAN ───────────────────────── */
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b pb-4">
+                  <div className="flex items-center gap-2 text-slate-800">
+                    <Layers size={18} className="text-amber-500" />
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-widest">Relasi Varian</h3>
+                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">Produk ini adalah varian anak — lihat induk dan varian saudara</p>
+                    </div>
+                  </div>
+                  {/* Badge: ini adalah anak varian */}
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-[11px] font-black flex-shrink-0">
+                    <Layers size={12} />
+                    Varian Anak
+                  </span>
+                </div>
+
+                {/* Produk Induk */}
+                <div className="mb-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Produk Induk</p>
+                  {parentProduct ? (
+                    <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-violet-50 border border-violet-200">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-violet-200 text-violet-800 rounded-md">{parentProduct.id}</span>
+                          <span className="text-[10px] font-black px-2 py-0.5 bg-violet-600 text-white rounded-md">INDUK</span>
+                        </div>
+                        <p className="text-sm font-black text-violet-900 truncate">{parentProduct.name}</p>
+                        <p className="text-xs font-bold text-violet-600 mt-0.5">
+                          Total Stok (semua varian): <span className="font-black">{parentProduct.stock}</span>
+                        </p>
+                      </div>
+                      <a
+                        href={`/admin/products/edit/${parentProduct.id}`}
+                        className="px-3 py-1.5 bg-white border border-violet-200 text-violet-700 hover:bg-violet-600 hover:text-white text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
+                      >
+                        Buka Induk
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-400 font-bold">
+                      Memuat data induk...
+                    </div>
+                  )}
+                </div>
+
+                {/* Varian Saudara */}
+                {siblingVariants.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                      Varian Saudara ({siblingVariants.length})
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {siblingVariants.map((v) => (
+                        <div key={v.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:border-amber-300 transition-all">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md">{v.id}</span>
+                              {v.barcode && <span className="text-[10px] font-mono text-slate-500">{v.barcode}</span>}
+                            </div>
+                            <p className="text-sm font-black text-slate-800 truncate">{v.name}</p>
+                            <p className="text-xs font-bold text-slate-500 mt-0.5">
+                              Stok: <span className={v.stock > 0 ? 'text-emerald-600 font-black' : 'text-rose-500 font-black'}>{v.stock}</span>
+                            </p>
+                          </div>
+                          <a
+                            href={`/admin/products/edit/${v.id}`}
+                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-200 text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
+                          >
+                            Edit
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
