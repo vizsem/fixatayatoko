@@ -785,7 +785,10 @@ export default function EditProductPage() {
 
       // Prepare Stock Data (edit per-gudang)
       const newStocks: Record<string, number> = { ...(formData.stockByWarehouse || {}) };
-      const totalStock = Object.values(newStocks).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+      const rawTotalStock = Object.values(newStocks).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+      // Jika produk induk (punya varian anak), stok = sum varian anak — jangan pakai stok mandiri
+      const totalVariantStock = childVariants.reduce((s, v) => s + Number(v.stock || 0), 0);
+      const totalStock = childVariants.length > 0 ? totalVariantStock : rawTotalStock;
       
       // LOG STOCK CHANGES untuk setiap gudang yang berubah
       const logEntries: any[] = [];
@@ -1223,13 +1226,25 @@ export default function EditProductPage() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-emerald-600 ml-1 block">Stok Saat Ini</label>
-                <input 
-                  required 
-                  type="number" 
-                  className="w-full p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 font-black text-emerald-800 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500" 
-                  value={formData.Stok} 
-                  onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} 
-                />
+                {childVariants.length > 0 ? (
+                  <>
+                    <div className="w-full p-3.5 bg-slate-100 rounded-2xl border border-slate-200 font-black text-slate-500 text-sm cursor-not-allowed select-none flex items-center justify-between">
+                      <span>{childVariants.reduce((s, v) => s + Number(v.stock || 0), 0)}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Auto</span>
+                    </div>
+                    <p className="text-[11px] text-violet-600 font-semibold ml-1 mt-1 leading-snug">
+                      ⚡ Produk Induk — stok dihitung otomatis dari <strong>{childVariants.length} varian anak</strong>. Kelola stok di daftar varian di bawah.
+                    </p>
+                  </>
+                ) : (
+                  <input 
+                    required 
+                    type="number" 
+                    className="w-full p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 font-black text-emerald-800 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500" 
+                    value={formData.Stok} 
+                    onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} 
+                  />
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-rose-500 ml-1 block">Min. Stok Warning</label>

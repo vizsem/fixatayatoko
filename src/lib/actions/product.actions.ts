@@ -2246,6 +2246,51 @@ export async function getProductVariantsAction(parentId: string): Promise<{
 }
 
 /**
+ * Sinkronisasi stok produk induk dari total stok semua varian anak.
+ * Menjamin stok induk selalu konsisten sebagai akumulasi varian tanpa angka ganda.
+ */
+async function syncParentStockFromVariants(parentId: string): Promise<number> {
+  if (!parentId) return 0;
+  try {
+    const { data: variants } = await supabaseAdmin
+      .from('products')
+      .select('id, stock, raw_data')
+      .eq('raw_data->>Parent_ID', parentId);
+
+    const totalStock = (variants || []).reduce((sum, v) => {
+      const raw = v.raw_data || {};
+      const s = Number(v.stock ?? raw.stock ?? raw.Stok ?? 0);
+      return sum + s;
+    }, 0);
+
+    const { data: parent } = await supabaseAdmin
+      .from('products')
+      .select('raw_data')
+      .eq('id', parentId)
+      .single();
+
+    if (parent) {
+      const raw = (parent.raw_data && typeof parent.raw_data === 'object') ? { ...parent.raw_data } : {};
+      raw.stock = totalStock;
+      raw.Stok = totalStock;
+      await supabaseAdmin
+        .from('products')
+        .update({
+          stock: totalStock,
+          raw_data: raw,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', parentId);
+    }
+
+    return totalStock;
+  } catch (err) {
+    console.error('syncParentStockFromVariants error:', err);
+    return 0;
+  }
+}
+
+/**
  * Tambah varian secara satuan atau massal (batch) dengan pewarisan otomatis dari produk induk
  */
 export async function batchAddVariantsAction(payload: {
@@ -2423,6 +2468,9 @@ export async function batchAddVariantsAction(payload: {
 
     if (insertErr) throw insertErr;
 
+    // Otomatisasi Peran Produk Induk: sinkronkan total stok varian ke produk induk
+    await syncParentStockFromVariants(parentId);
+
     revalidatePath('/admin/products');
     revalidatePath(`/admin/products/edit/${parentId}`);
     revalidatePath(`/produk/${parentId}`);
@@ -2516,6 +2564,10 @@ export async function quickUpdateVariantAction(
     if (uErr) throw uErr;
 
     const parentId = raw.Parent_ID || '';
+    if (parentId && updates.stock !== undefined) {
+      await syncParentStockFromVariants(parentId);
+    }
+
     revalidatePath('/admin/products');
     if (parentId) {
       revalidatePath(`/admin/products/edit/${parentId}`);
@@ -2595,6 +2647,9 @@ export async function mergeProductsAsVariantsAction(payload: {
         .eq('id', child.id);
     }
 
+    // Otomatisasi Peran Produk Induk: sinkronkan total stok varian ke produk induk
+    await syncParentStockFromVariants(parentId);
+
     revalidatePath('/admin/products');
     revalidatePath(`/admin/products/edit/${parentId}`);
     revalidatePath('/admin/inventory');
@@ -2639,11 +2694,13 @@ export async function detachVariantAction(variantId: string): Promise<{ success:
 
     if (uErr) throw uErr;
 
-    revalidatePath('/admin/products');
+    // Otomatisasi Peran Produk Induk: sinkronkan ulang total stok varian induk lama
     if (oldParentId) {
+      await syncParentStockFromVariants(oldParentId);
       revalidatePath(`/admin/products/edit/${oldParentId}`);
     }
 
+    revalidatePath('/admin/products');
     return { success: true };
   } catch (err: any) {
     console.error('detachVariantAction error:', err);
