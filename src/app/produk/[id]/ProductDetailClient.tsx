@@ -56,6 +56,8 @@ export type RelatedProduct = {
   category?: string;
   image: string;
   stock?: number;
+  isPreOrder?: boolean;
+  poLeadTimeDays?: number;
 };
 
 export type PromoProduct = {
@@ -69,6 +71,8 @@ export type PromoProduct = {
   category?: string;
   image: string;
   stock?: number;
+  isPreOrder?: boolean;
+  poLeadTimeDays?: number;
   promoBadge?: string;
   discountPercent?: number;
 };
@@ -363,15 +367,9 @@ export default function ProductDetailClient({
                   else { t.src = '/logo-atayatoko.png'; }
                 }}
               />
-              {product.stock <= 0 && (
+              {product.stock <= 0 && !isPreOrder && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
-                  {isPreOrder ? (
-                    <span className="bg-orange-500 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg flex items-center gap-2">
-                      <Clock size={14} /> Pre-Order {product.poLeadTimeDays || 3} Hari
-                    </span>
-                  ) : (
-                    <span className="bg-red-600 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg">Stok Habis</span>
-                  )}
+                  <span className="bg-red-600 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg">Stok Habis</span>
                 </div>
               )}
               <div className="absolute top-4 left-4">
@@ -707,7 +705,8 @@ export default function ProductDetailClient({
 
             <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide snap-x">
               {promoProducts.map((item) => {
-                const isItemOut = (item.stock ?? 1) <= 0;
+                const isItemPreOrder = Boolean(item.isPreOrder || (item as any).raw_data?.isPreOrder);
+                const isItemOut = (item.stock ?? 1) <= 0 && !isItemPreOrder;
                 const unitStr = (item.unit || 'PCS').toUpperCase();
                 return (
                   <div
@@ -753,6 +752,11 @@ export default function ProductDetailClient({
 
                     <div className="p-3.5 flex flex-col flex-1 justify-between gap-3">
                       <div>
+                        {isItemPreOrder && (item.stock ?? 1) <= 0 && (
+                          <div className="mb-1 inline-flex items-center gap-1 text-[9px] font-black uppercase text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md tracking-wider">
+                            <Clock size={9} /> Pre-Order ({item.poLeadTimeDays || 3} Hari)
+                          </div>
+                        )}
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                           {item.category || 'Promo'}
                         </span>
@@ -832,7 +836,8 @@ export default function ProductDetailClient({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
               {relatedProducts.map((item) => {
-                const isItemOut = (item.stock ?? 1) <= 0;
+                const isItemPreOrder = Boolean(item.isPreOrder || (item as any).raw_data?.isPreOrder);
+                const isItemOut = (item.stock ?? 1) <= 0 && !isItemPreOrder;
                 const unitStr = (item.unit || 'PCS').toUpperCase();
                 const hasWholesale = (item.wholesalePrice ?? 0) > 0 && (item.wholesalePrice ?? 0) < item.price;
                 return (
@@ -879,6 +884,11 @@ export default function ProductDetailClient({
 
                     <div className="p-3 sm:p-3.5 flex flex-col flex-1 justify-between gap-3">
                       <div>
+                        {isItemPreOrder && (item.stock ?? 1) <= 0 && (
+                          <div className="mb-1 inline-flex items-center gap-1 text-[9px] font-black uppercase text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md tracking-wider">
+                            <Clock size={9} /> Pre-Order ({item.poLeadTimeDays || 3} Hari)
+                          </div>
+                        )}
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                           {item.category || product.category}
                         </span>

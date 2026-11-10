@@ -232,6 +232,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
           category: d.category || rRaw.category || rRaw.Kategori || 'Umum',
           image: d.image_url || rRaw.imageUrl || rRaw.Link_Foto || rRaw.image || '/logo-atayatoko.png',
           stock: Number(d.stock ?? rRaw.stock ?? rRaw.Stok ?? 0),
+          isPreOrder: Boolean(rRaw.isPreOrder),
+          poLeadTimeDays: Number(rRaw.poLeadTimeDays || 3),
         };
       });
 
@@ -262,6 +264,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
           category: d.category || r.category || r.Kategori || 'Umum',
           image: d.image_url || r.imageUrl || r.Link_Foto || r.image || '/logo-atayatoko.png',
           stock: Number(d.stock ?? r.stock ?? r.Stok ?? 0),
+          isPreOrder: Boolean(r.isPreOrder),
+          poLeadTimeDays: Number(r.poLeadTimeDays || 3),
           promoBadge: discountPercent > 0 ? `Hemat ${discountPercent}%` : 'Grosir Spesial',
           discountPercent,
         };

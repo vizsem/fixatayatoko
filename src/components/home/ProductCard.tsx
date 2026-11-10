@@ -97,12 +97,7 @@ export const ProductCard = ({
             <span className="bg-white text-black text-xs font-bold px-3 py-1 rounded-full uppercase">Habis</span>
           </div>
         )}
-        {isPreOrder && product.stock <= 0 && (
-          <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-[10px] md:text-xs font-black px-2 py-1 rounded-lg uppercase shadow-md flex items-center gap-1 tracking-wider">
-            <Clock size={11} /> PO {poDays} Hari
-          </div>
-        )}
-        {promoInfo.hasPromo && !isOut && !(isPreOrder && product.stock <= 0) && (
+        {promoInfo.hasPromo && !isOut && (
           <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold px-2 py-1 rounded-lg uppercase animate-pulse shadow-lg flex items-center gap-1">
             <Sparkles size={11} /> Promo
           </div>
@@ -110,6 +105,12 @@ export const ProductCard = ({
       </Link>
 
       <div className="p-3 flex flex-col flex-1 relative z-20">
+        {isPreOrder && product.stock <= 0 && (
+          <div className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-black uppercase text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md tracking-wider w-fit">
+            <Clock size={10} /> Pre-Order ({poDays} Hari)
+          </div>
+        )}
+
         <Link href={`/produk/${product.id}`} className="block">
           <h3 className="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 leading-snug hover:text-green-600 transition-colors">{product.name}</h3>
         </Link>

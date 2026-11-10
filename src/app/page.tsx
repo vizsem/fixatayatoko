@@ -53,6 +53,10 @@ export default async function HomePage() {
       category: p.category || 'Umum',
       image: p.imageUrl || '/logo-atayatoko.png',
       units: p.units || [],
+      isPreOrder: Boolean(p.isPreOrder || p.raw_data?.isPreOrder),
+      poLeadTimeDays: Number(p.poLeadTimeDays || p.raw_data?.poLeadTimeDays || 3),
+      poNotes: p.poNotes || p.raw_data?.poNotes || '',
+      raw_data: p.raw_data,
     }));
 
     const categories: Category[] = Array.from(new Set(mappedProducts.map((p) => p.category))).map(
