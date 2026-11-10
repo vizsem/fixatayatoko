@@ -187,6 +187,9 @@ export async function getProducts(options?: ProductQueryOptions) {
         shopeeProductId: raw.shopeeProductId || p.shopee_product_id || undefined,
         parentId: (p.parent_id || raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
         brand: (p.brand || raw.brand || raw.Brand || raw.merek || raw.Merek || '').toString().trim() || undefined,
+        isPreOrder: Boolean(raw.isPreOrder),
+        poLeadTimeDays: Number(raw.poLeadTimeDays || 3),
+        poNotes: raw.poNotes || '',
         raw_data: raw,
       };
     });

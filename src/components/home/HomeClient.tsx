@@ -99,7 +99,8 @@ export default function HomeClient({
 
   const addToCart = useCallback(
     (product: Product) => {
-      if (product.stock <= 0) return;
+      const isPreOrder = Boolean(product.isPreOrder || (product as any).raw_data?.isPreOrder);
+      if (product.stock <= 0 && !isPreOrder) return;
       const { price } = getDiscountedPrice(product);
       const cartString = localStorage.getItem('cart');
       const cart = cartString ? JSON.parse(cartString) : [];
@@ -117,11 +118,17 @@ export default function HomeClient({
           basePrice: price,
           unitPrice: price,
           units: product.units || [],
+          isPreOrder,
+          poLeadTimeDays: product.poLeadTimeDays || (product as any).raw_data?.poLeadTimeDays || 3,
         });
       }
       localStorage.setItem('cart', JSON.stringify(cart));
       window.dispatchEvent(new Event('cart-updated'));
-      toast.success(`${product.name} ditambahkan ke keranjang!`);
+      if (isPreOrder && product.stock <= 0) {
+        toast.success(`${product.name} (Pre-Order) ditambahkan ke keranjang!`);
+      } else {
+        toast.success(`${product.name} ditambahkan ke keranjang!`);
+      }
     },
     [getDiscountedPrice]
   );

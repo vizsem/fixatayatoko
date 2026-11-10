@@ -1,5 +1,5 @@
 
-import { Trash2, Plus, Minus } from 'lucide-react';
+import { Trash2, Plus, Minus, Clock } from 'lucide-react';
 import { CartItem } from '@/lib/types';
 
 interface CartItemCardProps {
@@ -13,6 +13,8 @@ interface CartItemCardProps {
 
 export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availableUnits, lineTotal }: CartItemCardProps) {
   const itemId = item.id || (item as any).ID || (item as any).productId || '';
+  const isPreOrder = Boolean(item.isPreOrder || (item as any).raw_data?.isPreOrder);
+  const poLeadDays = Number(item.poLeadTimeDays || (item as any).raw_data?.poLeadTimeDays || 3);
   const unit = String(item.unit || item.baseUnit || 'PCS').toUpperCase();
   const contains = Math.max(1, Math.floor(Number(item.unitContains || 1)));
   const stockQty = Number(item.stock || 0);
@@ -26,7 +28,7 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
     let finalQty = newQty;
     if (finalQty < minPurchase) finalQty = minPurchase;
     if (maxPurchase > 0 && finalQty > maxPurchase) finalQty = maxPurchase;
-    if (finalQty > maxStockUnits) finalQty = maxStockUnits;
+    if (!isPreOrder && finalQty > maxStockUnits) finalQty = maxStockUnits;
     
     if (finalQty !== quantity) {
       onUpdateQty(itemId, finalQty);
@@ -51,9 +53,15 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
               <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-2 leading-tight mb-1">
                 {item.name || (item as any).Nama}
               </h3>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Stok: {Number(item.stock || 0).toLocaleString()} {item.baseUnit || 'PCS'}
-              </p>
+              {isPreOrder && stockQty <= 0 ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  <Clock size={10} /> Pre-Order ({poLeadDays} Hari)
+                </span>
+              ) : (
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Stok: {stockQty.toLocaleString()} {item.baseUnit || 'PCS'}
+                </p>
+              )}
             </div>
             <button
               onClick={() => onRemove(itemId)}
@@ -91,7 +99,7 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
                        </button>
                        <span className="w-9 text-center text-xs font-black text-slate-900">{quantity}</span>
                        <button
-                         disabled={(maxPurchase > 0 && quantity >= maxPurchase) || quantity >= maxStockUnits}
+                         disabled={(maxPurchase > 0 && quantity >= maxPurchase) || (!isPreOrder && quantity >= maxStockUnits)}
                          onClick={() => handleUpdate(quantity + 1)}
                          className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-900 active:scale-95 transition-all disabled:opacity-20"
                          aria-label="Tambah jumlah"

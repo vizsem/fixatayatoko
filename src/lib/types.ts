@@ -40,6 +40,9 @@ export interface Product {
         height: number;
     };
     volumeInCtn?: number; // Volume per unit relative to standard CTN (34x20x24)
+    isPreOrder?: boolean;
+    poLeadTimeDays?: number;
+    poNotes?: string;
     
     // Optional / Legacy Fields (Mapping from Excel)
     ID?: string;        // Internal ID

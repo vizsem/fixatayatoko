@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Heart, Sparkles } from 'lucide-react';
+import { Heart, Sparkles, Clock } from 'lucide-react';
 import { Product } from '@/lib/types';
 
 interface ProductCardProps {
@@ -28,7 +28,9 @@ export const ProductCard = ({
   onAddToCart,
   priority = false,
 }: ProductCardProps) => {
-  const isOut = product.stock <= 0;
+  const isPreOrder = Boolean(product.isPreOrder || (product as any).raw_data?.isPreOrder);
+  const poDays = Number(product.poLeadTimeDays || (product as any).raw_data?.poLeadTimeDays || 3);
+  const isOut = product.stock <= 0 && !isPreOrder;
   const baseUnit = (product.unit || 'PCS').toString().toUpperCase();
   const baseDiscount = Math.max(0, Number(product.price || 0) - Number(promoInfo.price || 0));
 
@@ -95,7 +97,12 @@ export const ProductCard = ({
             <span className="bg-white text-black text-xs font-bold px-3 py-1 rounded-full uppercase">Habis</span>
           </div>
         )}
-        {promoInfo.hasPromo && !isOut && (
+        {isPreOrder && product.stock <= 0 && (
+          <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-[10px] md:text-xs font-black px-2 py-1 rounded-lg uppercase shadow-md flex items-center gap-1 tracking-wider">
+            <Clock size={11} /> PO {poDays} Hari
+          </div>
+        )}
+        {promoInfo.hasPromo && !isOut && !(isPreOrder && product.stock <= 0) && (
           <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold px-2 py-1 rounded-lg uppercase animate-pulse shadow-lg flex items-center gap-1">
             <Sparkles size={11} /> Promo
           </div>
@@ -108,9 +115,15 @@ export const ProductCard = ({
         </Link>
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs font-medium text-gray-500">{product.category}</p>
-          <p className={`text-xs font-bold uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {isOut ? 'Habis' : `Stok ${product.stock}`}
-          </p>
+          {isPreOrder && product.stock <= 0 ? (
+            <p className="text-xs font-bold uppercase text-orange-600 flex items-center gap-1">
+              <Clock size={11} /> PO ({poDays} Hari)
+            </p>
+          ) : (
+            <p className={`text-xs font-bold uppercase ${isOut ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {isOut ? 'Habis' : `Stok ${product.stock}`}
+            </p>
+          )}
         </div>
 
         <Link href={`/produk/${product.id}`} className="flex flex-col mb-3 block cursor-pointer">
@@ -172,10 +185,24 @@ export const ProductCard = ({
             onAddToCart(product); 
           }} 
           disabled={isOut} 
-          aria-label={isOut ? 'Stok habis' : `Tambah ${product.name} ke keranjang`}
-          className={`mt-auto w-full py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all relative z-30 uppercase tracking-wider ${isOut ? 'bg-gray-100 text-gray-400' : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'}`}
+          aria-label={isOut ? 'Stok habis' : isPreOrder && product.stock <= 0 ? `Pesan Pre-Order ${product.name}` : `Tambah ${product.name} ke keranjang`}
+          className={`mt-auto w-full py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all relative z-30 uppercase tracking-wider flex items-center justify-center gap-1.5 ${
+            isOut 
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+              : isPreOrder && product.stock <= 0
+                ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20 active:scale-95'
+                : 'bg-gray-900 text-white active:bg-green-600 active:scale-95'
+          }`}
         >
-          {isOut ? 'Stok Habis' : '+ Keranjang'}
+          {isOut ? (
+            'Stok Habis'
+          ) : isPreOrder && product.stock <= 0 ? (
+            <>
+              <Clock size={13} /> + Pre-Order
+            </>
+          ) : (
+            '+ Keranjang'
+          )}
         </button>
       </div>
     </div>
