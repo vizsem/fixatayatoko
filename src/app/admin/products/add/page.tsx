@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ChevronLeft, Save, Tag, Truck,
   Barcode, Image as ImageIcon, AlertCircle, Layers, Camera, X, Package,
-  ShieldAlert, EyeOff, Plus, Trash2, Sparkles
+  ShieldAlert, EyeOff, Plus, Trash2, Sparkles, Clock
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
@@ -123,6 +123,9 @@ export default function AddProductPage() {
     volumeInCtn: 0
   });
 
+  const [isPreOrder, setIsPreOrder] = useState(false);
+  const [poLeadTimeDays, setPoLeadTimeDays] = useState(3);
+  const [poNotes, setPoNotes] = useState('');
   const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
   const [pricingRuleKey, setPricingRuleKey] = useState<string>('AUTO');
   const [pricingMarginPercent, setPricingMarginPercent] = useState<number>(0);
@@ -553,6 +556,9 @@ export default function AddProductPage() {
         defaultSellUnit: hideBaseUnit ? (defaultSellUnit || normalizedUnits.find(u => u.code !== baseUnit)?.code || '') : '',
         imageUrl,
         pricingStrategy: pricingStrategy as Record<string, unknown>,
+        isPreOrder,
+        poLeadTimeDays,
+        poNotes,
       });
 
       if (!result.success) {
@@ -1783,6 +1789,69 @@ export default function AddProductPage() {
                 <input type="text" placeholder="Nama Supplier" className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.Supplier} onChange={e => setFormData({ ...formData, Supplier: e.target.value })} />
                 <input type="text" placeholder="WA: 628..." className="w-full p-4 bg-blue-500/30 rounded-2xl border-none font-bold placeholder:text-blue-200 text-white" value={formData.No_WA_Supplier} onChange={e => setFormData({ ...formData, No_WA_Supplier: e.target.value })} />
               </div>
+            </div>
+
+            {/* Pengaturan Pre-Order (PO) */}
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-orange-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">Sistem Pre-Order</h3>
+                    <p className="text-[10px] text-gray-500 font-bold">Produk PO tetap dapat dipesan walau stok kosong</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPreOrder}
+                    onChange={(e) => setIsPreOrder(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                </label>
+              </div>
+
+              {isPreOrder && (
+                <div className="space-y-4 pt-2 border-t border-orange-100 animate-in fade-in duration-200">
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl text-[11px] text-orange-800 font-medium">
+                    Pelanggan dapat memesan produk ini ketika stok 0. Barang akan diproses dan dikirim dalam estimasi waktu kerja yang ditentukan.
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
+                      Estimasi Waktu Proses
+                    </label>
+                    <select
+                      value={poLeadTimeDays}
+                      onChange={(e) => setPoLeadTimeDays(Number(e.target.value))}
+                      className="w-full p-3.5 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-xs outline-none focus:border-orange-400"
+                    >
+                      <option value={1}>1 Hari Kerja</option>
+                      <option value={2}>2 Hari Kerja</option>
+                      <option value={3}>3 Hari Kerja</option>
+                      <option value={5}>5 Hari Kerja</option>
+                      <option value={7}>7 Hari Kerja (1 Minggu)</option>
+                      <option value={14}>14 Hari Kerja (2 Minggu)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
+                      Catatan Pre-Order (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Contoh: Barang dipesan dari supplier Jakarta setiap hari Senin & Kamis..."
+                      className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-xs outline-none focus:border-orange-400 resize-none"
+                      value={poNotes}
+                      onChange={(e) => setPoNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

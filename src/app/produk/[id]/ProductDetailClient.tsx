@@ -34,6 +34,9 @@ export type Product = {
   category: string;
   image: string;
   description?: string;
+  isPreOrder?: boolean;
+  poLeadTimeDays?: number;
+  poNotes?: string;
   units?: {
     code: string;
     price: number;
@@ -171,7 +174,7 @@ export default function ProductDetailClient({
   }, [product]);
 
   const syncToFirebaseCart = async (p: Product, q: number, redirectToCart = false) => {
-    if (p.stock <= 0) { toast.error('Maaf, stok barang sedang habis'); return false; }
+    if (p.stock <= 0 && !p.isPreOrder) { toast.error('Maaf, stok barang sedang habis'); return false; }
     setIsAdding(true);
     const localCart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
     const idToMatch = p.id;
@@ -192,7 +195,7 @@ export default function ProductDetailClient({
       }
     }
     const localIdx = localCart.findIndex(item => item.productId === idToMatch && item.unit === unitCode);
-    if (q * conversionFactor > p.stock) {
+    if (!p.isPreOrder && q * conversionFactor > p.stock) {
       toast.error(`Stok tidak mencukupi! Sisa stok: ${p.stock} ${p.unit}`);
       setIsAdding(false);
       return false;
@@ -298,7 +301,8 @@ export default function ProductDetailClient({
 
   if (loading || !product) return <ProductSkeleton />;
 
-  const isOutOfStock = product.stock <= 0;
+  const isPreOrder = Boolean(product.isPreOrder);
+  const isOutOfStock = product.stock <= 0 && !isPreOrder;
   let currentPrice = product.price;
   let currentWholesalePrice = product.wholesalePrice;
   let currentMinWholesale = product.minWholesale;
@@ -359,9 +363,15 @@ export default function ProductDetailClient({
                   else { t.src = '/logo-atayatoko.png'; }
                 }}
               />
-              {isOutOfStock && (
+              {product.stock <= 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
-                  <span className="bg-red-600 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg">Stok Habis</span>
+                  {isPreOrder ? (
+                    <span className="bg-orange-500 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg flex items-center gap-2">
+                      <Clock size={14} /> Pre-Order {product.poLeadTimeDays || 3} Hari
+                    </span>
+                  ) : (
+                    <span className="bg-red-600 text-white px-6 py-2.5 rounded-full font-black uppercase text-xs tracking-wider shadow-lg">Stok Habis</span>
+                  )}
                 </div>
               )}
               <div className="absolute top-4 left-4">
@@ -382,15 +392,39 @@ export default function ProductDetailClient({
             {/* Name & Stock */}
             <div>
               <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${isOutOfStock ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                  Stok: {product.stock.toLocaleString('id-ID')} {product.unit}
-                </span>
-                {!isOutOfStock && <span className="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1 rounded-lg">Tersedia</span>}
+                {isPreOrder ? (
+                  <span className="text-xs font-bold px-3 py-1 rounded-lg border bg-orange-50 text-orange-700 border-orange-200 flex items-center gap-1">
+                    <Clock size={12} /> Pre-Order {product.poLeadTimeDays || 3} Hari
+                  </span>
+                ) : (
+                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${product.stock <= 0 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                    Stok: {product.stock.toLocaleString('id-ID')} {product.unit}
+                  </span>
+                )}
+                {!isOutOfStock && !isPreOrder && <span className="text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1 rounded-lg">Tersedia</span>}
+                {isPreOrder && <span className="text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200 px-3 py-1 rounded-lg">Dipesan dari Supplier</span>}
               </div>
+
+              {/* Pre-Order Info Banner */}
+              {isPreOrder && (
+                <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-2xl flex items-start gap-3">
+                  <div className="p-2 bg-orange-100 text-orange-700 rounded-xl shrink-0 mt-0.5">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-orange-900 mb-1">Produk Pre-Order ({product.poLeadTimeDays || 3} Hari Kerja)</p>
+                    <p className="text-xs text-orange-800 leading-relaxed">
+                      {product.poNotes || `Produk ini akan dipesankan langsung dari supplier. Estimasi proses dan pengemasan ${product.poLeadTimeDays || 3} hari kerja sebelum diserahkan ke kurir.`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-1">{product.name}</h1>
               <p className="text-sm text-slate-500 font-medium">
                 Harga per <span className="font-bold text-slate-700">{currentUnit}</span>
-                {isOutOfStock && <span className="text-red-500 font-bold ml-2">• Sedang Kosong</span>}
+                {product.stock <= 0 && !isPreOrder && <span className="text-red-500 font-bold ml-2">• Sedang Kosong</span>}
+                {isPreOrder && <span className="text-orange-600 font-bold ml-2">• Pre-Order</span>}
               </p>
             </div>
 
@@ -543,12 +577,12 @@ export default function ProductDetailClient({
                   <span className="text-xs text-slate-500 font-medium">= Rp{(displayPrice * quantity).toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex gap-2.5">
-                  <button onClick={() => syncToFirebaseCart(product, quantity, false)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${isOutOfStock ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : isAdding ? 'bg-slate-800 text-white opacity-80' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                  <button onClick={() => syncToFirebaseCart(product, quantity, false)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${isOutOfStock ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : isPreOrder ? 'bg-orange-500 text-white hover:bg-orange-600' : isAdding ? 'bg-slate-800 text-white opacity-80' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
                     {isAdding ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
-                    {isOutOfStock ? 'Stok Habis' : '+ Keranjang'}
+                    {isOutOfStock ? 'Stok Habis' : isPreOrder ? '+ Pesan Pre-Order' : '+ Keranjang'}
                   </button>
-                  <button onClick={() => syncToFirebaseCart(product, quantity, true)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${isOutOfStock ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20'}`}>
-                    <Zap size={18} className="fill-current" /> Beli Sekarang
+                  <button onClick={() => syncToFirebaseCart(product, quantity, true)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${isOutOfStock ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : isPreOrder ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/20' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20'}`}>
+                    <Zap size={18} className="fill-current" /> {isPreOrder ? 'Pesan Sekarang' : 'Beli Sekarang'}
                   </button>
                   <button onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} className={`p-3.5 rounded-2xl border transition-all ${inWishlist ? 'border-red-200 bg-red-50 text-red-500' : 'border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-500'}`} title="Favorit">
                     <Heart size={20} className={inWishlist ? 'fill-current' : ''} />
@@ -900,11 +934,11 @@ export default function ProductDetailClient({
               <span className="w-8 text-center font-black text-sm text-slate-900">{quantity}</span>
               <button onClick={() => handleQuantity('plus')} className="w-8 h-8 flex items-center justify-center text-slate-600 active:scale-75 transition-all" aria-label="Tambah"><Plus size={15} /></button>
             </div>
-            <button onClick={() => syncToFirebaseCart(product, quantity, false)} disabled={isAdding || isOutOfStock} className="flex-1 bg-slate-900 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm disabled:bg-slate-200 disabled:text-slate-400">
-              {isAdding ? <Loader2 className="animate-spin" size={14} /> : <><ShoppingCart size={14} /> + Keranjang</>}
+            <button onClick={() => syncToFirebaseCart(product, quantity, false)} disabled={isAdding || isOutOfStock} className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm disabled:bg-slate-200 disabled:text-slate-400 ${isPreOrder ? 'bg-orange-500 text-white' : 'bg-slate-900 text-white'}`}>
+              {isAdding ? <Loader2 className="animate-spin" size={14} /> : <><ShoppingCart size={14} /> {isPreOrder ? 'Pre-Order' : '+ Keranjang'}</>}
             </button>
-            <button onClick={() => syncToFirebaseCart(product, quantity, true)} disabled={isAdding || isOutOfStock} className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-emerald-600/20 disabled:bg-slate-200 disabled:text-slate-400">
-              <Zap size={14} className="fill-current" /> Beli
+            <button onClick={() => syncToFirebaseCart(product, quantity, true)} disabled={isAdding || isOutOfStock} className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md disabled:bg-slate-200 disabled:text-slate-400 ${isPreOrder ? 'bg-orange-600 shadow-orange-600/20' : 'bg-emerald-600 shadow-emerald-600/20'} text-white`}>
+              <Zap size={14} className="fill-current" /> {isPreOrder ? 'Pesan' : 'Beli'}
             </button>
           </div>
         </div>

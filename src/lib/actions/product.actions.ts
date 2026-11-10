@@ -618,6 +618,10 @@ export async function addProductFull(payload: {
   Status: number;
   // Pricing strategy
   pricingStrategy?: Record<string, unknown>;
+  // Pre-Order
+  isPreOrder?: boolean;
+  poLeadTimeDays?: number;
+  poNotes?: string;
 }) {
   await requireAdmin();
   try {
@@ -738,6 +742,10 @@ export async function addProductFull(payload: {
       Status: isActive ? 0 : 1,  // 0=active, 1=archived in legacy schema
       status: isActive ? 'ACTIVE' : 'ARCHIVED',
       pricingStrategy: payload.pricingStrategy || { mode: 'manual' },
+      // Pre-Order fields
+      isPreOrder: Boolean((payload as any).isPreOrder),
+      poLeadTimeDays: Number((payload as any).poLeadTimeDays || 3),
+      poNotes: (payload as any).poNotes || '',
       createdAt: now,
       updatedAt: now,
     };
@@ -2936,6 +2944,42 @@ export async function bulkUpdateProductBrandAction(
   } catch (err: any) {
     console.error('bulkUpdateProductBrandAction error:', err);
     return { success: false, error: err?.message || 'Gagal mengubah brand produk' };
+  }
+}
+
+// ============================================================
+// PRE-ORDER BULK UPDATE
+// ============================================================
+
+export async function bulkUpdatePreOrderAction(
+  ids: string[],
+  isPreOrder: boolean,
+  poLeadTimeDays: number = 3,
+  poNotes: string = ''
+) {
+  await requireAdmin();
+  if (!ids || ids.length === 0) return { success: false, error: 'Tidak ada produk yang dipilih' };
+  try {
+    const now = new Date().toISOString();
+    // Update raw_data for each product to store PO fields
+    for (const id of ids) {
+      const { data: existing } = await supabaseAdmin.from('products').select('raw_data').eq('id', id).single();
+      const raw = existing?.raw_data || {};
+      const updatedRaw = {
+        ...raw,
+        isPreOrder,
+        poLeadTimeDays: isPreOrder ? Number(poLeadTimeDays) : 0,
+        poNotes: isPreOrder ? (poNotes || '') : '',
+        updatedAt: now,
+      };
+      await supabaseAdmin.from('products').update({ raw_data: updatedRaw, updated_at: now }).eq('id', id);
+    }
+    revalidatePath('/admin/products');
+    revalidatePath('/produk');
+    return { success: true };
+  } catch (err: any) {
+    console.error('bulkUpdatePreOrderAction error:', err);
+    return { success: false, error: err?.message || 'Gagal update pre-order' };
   }
 }
 

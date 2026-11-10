@@ -128,6 +128,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
         category: cleanCategory,
         image: prod.image_url || raw.imageUrl || raw.Link_Foto || raw.image || '/logo-atayatoko.png',
         description: prod.description || raw.description || raw.Deskripsi || '',
+        isPreOrder: Boolean(raw.isPreOrder),
+        poLeadTimeDays: Number(raw.poLeadTimeDays || 3),
+        poNotes: raw.poNotes || '',
         units: raw.units || [],
       };
 

@@ -17,6 +17,7 @@ import {
   restockProductViaSupabase,
   duplicateProduct,
   detachVariantAction,
+  bulkUpdatePreOrderAction,
 } from '@/lib/actions/product.actions';
 
 
@@ -26,7 +27,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -369,6 +370,10 @@ export default function AdminProducts() {
   // State untuk Hierarki Varian & Merge Varian
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showBulkBrandModal, setShowBulkBrandModal] = useState(false);
+  const [showBulkPoModal, setShowBulkPoModal] = useState(false);
+  const [bulkPoLeadTime, setBulkPoLeadTime] = useState(3);
+  const [bulkPoNotes, setBulkPoNotes] = useState('');
+  const [bulkPoSaving, setBulkPoSaving] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewHierarchy, setViewHierarchy] = useState<'grouped' | 'flat' | 'parents_only' | 'variants_only'>('grouped');
   const [detachingId, setDetachingId] = useState<string | null>(null);
@@ -426,6 +431,28 @@ export default function AdminProducts() {
       notify.admin.error(e?.message || 'Gagal melepaskan varian');
     } finally {
       setDetachingId(null);
+    }
+  };
+
+  const handleBulkSetPreOrder = async (isPreOrder: boolean) => {
+    if (selectedIds.length === 0) return;
+    setBulkPoSaving(true);
+    try {
+      const res = await bulkUpdatePreOrderAction(selectedIds, isPreOrder, bulkPoLeadTime, bulkPoNotes);
+      if (!res.success) throw new Error(res.error || 'Gagal');
+      notify.admin.success(isPreOrder
+        ? `${selectedIds.length} produk berhasil diatur sebagai Pre-Order!`
+        : `${selectedIds.length} produk berhasil dinonaktifkan Pre-Order!`
+      );
+      setShowBulkPoModal(false);
+      setSelectedIds([]);
+      setBulkPoLeadTime(3);
+      setBulkPoNotes('');
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err: any) {
+      notify.admin.error(err?.message || 'Gagal update pre-order');
+    } finally {
+      setBulkPoSaving(false);
     }
   };
 
@@ -1286,6 +1313,13 @@ export default function AdminProducts() {
                 <Tag size={13} /> Set Brand ({selectedIds.length})
               </button>
               <button
+                type="button"
+                onClick={() => setShowBulkPoModal(true)}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              >
+                <Clock size={13} /> Set Pre-Order ({selectedIds.length})
+              </button>
+              <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
@@ -1570,6 +1604,11 @@ export default function AdminProducts() {
                         {hasVariants && (
                           <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded px-1.5 py-0.2">
                             Total {pChildren.length} Varian
+                          </span>
+                        )}
+                        {(p as any).raw_data?.isPreOrder && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                            <Clock size={8} /> PO
                           </span>
                         )}
                       </div>
@@ -1889,6 +1928,11 @@ export default function AdminProducts() {
                             {hasVariants && (
                               <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded px-1.5 py-0.2">
                                 Total {pChildren.length} Varian
+                              </span>
+                            )}
+                            {(p as any).raw_data?.isPreOrder && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                <Clock size={8} /> PO
                               </span>
                             )}
                           </div>
@@ -2268,6 +2312,82 @@ export default function AdminProducts() {
           setSelectedIds([]);
         }}
       />
+
+      {/* Modal Set Pre-Order Massal */}
+      {showBulkPoModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-orange-100 rounded-2xl">
+                <Clock size={22} className="text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-gray-900">Set Pre-Order</h2>
+                <p className="text-xs text-gray-500">{selectedIds.length} produk terpilih</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-2xl text-sm text-orange-800 font-bold">
+              <p className="font-black mb-1">ℹ️ Produk Pre-Order</p>
+              <p className="font-normal text-xs">Pembeli tetap bisa memesan meskipun stok habis. Produk akan diproses dan dikirim setelah tersedia dari supplier.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">Estimasi Waktu Proses</label>
+                <select
+                  value={bulkPoLeadTime}
+                  onChange={e => setBulkPoLeadTime(Number(e.target.value))}
+                  className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-sm outline-none focus:border-orange-400"
+                >
+                  <option value={1}>1 Hari Kerja</option>
+                  <option value={2}>2 Hari Kerja</option>
+                  <option value={3}>3 Hari Kerja</option>
+                  <option value={5}>5 Hari Kerja</option>
+                  <option value={7}>7 Hari Kerja (1 Minggu)</option>
+                  <option value={14}>14 Hari Kerja (2 Minggu)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">Catatan Pre-Order (Opsional)</label>
+                <textarea
+                  value={bulkPoNotes}
+                  onChange={e => setBulkPoNotes(e.target.value)}
+                  placeholder="Contoh: Produk dikirim dari gudang supplier Jakarta..."
+                  rows={3}
+                  className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-sm outline-none focus:border-orange-400 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowBulkPoModal(false); setBulkPoLeadTime(3); setBulkPoNotes(''); }}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm rounded-2xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetPreOrder(false)}
+                disabled={bulkPoSaving}
+                className="flex-1 py-3 bg-slate-700 hover:bg-slate-800 text-white font-black text-sm rounded-2xl transition-all disabled:opacity-60"
+              >
+                {bulkPoSaving ? '...' : 'Nonaktifkan PO'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetPreOrder(true)}
+                disabled={bulkPoSaving}
+                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black text-sm rounded-2xl transition-all disabled:opacity-60 shadow-lg shadow-orange-500/20"
+              >
+                {bulkPoSaving ? '...' : 'Aktifkan PO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   </ErrorBoundary>
