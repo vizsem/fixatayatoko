@@ -68,6 +68,7 @@ type SystemSettings = {
   createdAt: string;
   displayWarehouseId?: string;
   marketplaceFees?: { shopee: number; tiktok: number; tokopedia: number; lazada: number };
+  eventTheme?: 'default' | 'ramadhan' | 'flash_sale' | 'kemerdekaan' | 'harbolnas' | 'tahun_baru';
 };
 
 type Employee = { id?: string; name: string; role: 'admin' | 'kasir'; phone: string; email: string; isActive: boolean; };
@@ -445,6 +446,39 @@ export default function AdminSettings() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* Tema Event Beranda */}
+            <section className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-100">
+              <h2 className="font-black text-xs tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2">🎨 Tema Event Beranda Web</h2>
+              <p className="text-xs text-slate-500 font-medium mb-4">Pilih tema untuk mengubah tampilan beranda pembeli sesuai event promosi yang sedang berlangsung.</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {([
+                  { id: 'default', label: 'Default', emoji: '🏪', desc: 'Tampilan standar hijau', accent: 'from-green-500 to-emerald-600' },
+                  { id: 'ramadhan', label: 'Ramadhan', emoji: '🌙', desc: 'Nuansa hijau & emas', accent: 'from-emerald-600 to-teal-700' },
+                  { id: 'flash_sale', label: 'Flash Sale', emoji: '⚡', desc: 'Merah & oranye energik', accent: 'from-red-500 to-orange-500' },
+                  { id: 'kemerdekaan', label: 'Kemerdekaan', emoji: '🇮🇩', desc: 'Merah putih nasional', accent: 'from-red-600 to-red-700' },
+                  { id: 'harbolnas', label: 'Harbolnas', emoji: '🛒', desc: 'Ungu & merah diskon', accent: 'from-purple-600 to-indigo-700' },
+                  { id: 'tahun_baru', label: 'Tahun Baru', emoji: '🎉', desc: 'Kuning & emas pesta', accent: 'from-yellow-500 to-amber-600' },
+                ] as const).map((t) => {
+                  const isActive = (settings as any).eventTheme === t.id || (!(settings as any).eventTheme && t.id === 'default');
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, eventTheme: t.id } as any)}
+                      className={`p-4 rounded-2xl border-2 text-left transition-all ${isActive ? 'border-blue-500 shadow-lg shadow-blue-100 ring-2 ring-blue-200' : 'border-slate-100 hover:border-slate-200'}`}
+                    >
+                      <div className={`w-full h-10 rounded-xl bg-gradient-to-r ${t.accent} mb-3 flex items-center justify-center text-xl`}>
+                        {t.emoji}
+                      </div>
+                      <p className="text-xs font-black text-slate-900">{t.label}</p>
+                      <p className="text-[10px] text-slate-400 font-medium">{t.desc}</p>
+                      {isActive && <span className="inline-block mt-1.5 text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Aktif</span>}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           </div>

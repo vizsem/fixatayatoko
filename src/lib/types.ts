@@ -214,6 +214,9 @@ export interface Category {
     id: string;
     name: string;
     slug: string;
+    sort_order?: number;
+    show_on_homepage?: boolean;
+    icon?: string;
 }
 
 export interface SyncConfig {
@@ -300,6 +303,7 @@ export interface Banner {
 
 export interface SystemSettings {
     displayWarehouseId?: string;
+    eventTheme?: 'default' | 'ramadhan' | 'flash_sale' | 'kemerdekaan' | 'harbolnas' | 'tahun_baru';
     store?: {
         name?: string;
         address?: string;

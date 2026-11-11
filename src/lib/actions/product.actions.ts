@@ -556,6 +556,7 @@ export async function getCategories() {
     return rows.map((c: any) => ({
       id: c.id,
       name: c.name || c.raw_data?.name || 'Kategori',
+      slug: c.slug || c.raw_data?.slug || (c.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       description: c.raw_data?.description || null,
       code: c.raw_data?.code || null,
       icon: c.raw_data?.icon || '📁',
@@ -566,6 +567,8 @@ export async function getCategories() {
       tiktokGroup: c.raw_data?.tiktokGroup || null,
       tiktokKomisi: c.raw_data?.tiktokKomisi ?? null,
       isMarketplace: Boolean(c.raw_data?.isMarketplace || c.raw_data?.code || c.raw_data?.shopeeKat),
+      sort_order: c.raw_data?.sort_order ?? 999,
+      show_on_homepage: c.raw_data?.show_on_homepage !== false,
       _count: { products: 0 }
     }));
   } catch (error) {
@@ -2990,3 +2993,27 @@ export async function bulkUpdatePreOrderAction(
   }
 }
 
+
+export async function bulkMoveCategoryAction(
+  productIds: string[],
+  newCategory: string
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
+  if (!productIds.length || !newCategory.trim()) {
+    return { success: false, updated: 0, error: 'Parameter tidak valid' };
+  }
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from('products')
+      .update({ category: newCategory.trim(), updated_at: now })
+      .in('id', productIds);
+    if (error) return { success: false, updated: 0, error: error.message };
+    revalidatePath('/admin/products');
+    revalidatePath('/');
+    return { success: true, updated: productIds.length };
+  } catch (err: any) {
+    console.error('bulkMoveCategoryAction error:', err);
+    return { success: false, updated: 0, error: err?.message || 'Gagal pindah kategori' };
+  }
+}

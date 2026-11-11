@@ -74,6 +74,18 @@ export default function HomeClient({
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
 
+  // Event theme
+  const eventTheme = (systemSettings as any)?.eventTheme || 'default';
+  const themeConfig: Record<string, { bg: string; accent: string; banner?: string; emoji?: string }> = {
+    default: { bg: 'bg-gray-50', accent: 'bg-green-700' },
+    ramadhan: { bg: 'bg-emerald-50', accent: 'bg-emerald-700', banner: 'Berkah Ramadhan Mubarak 🌙 — Promo spesial bulan suci!', emoji: '🌙' },
+    flash_sale: { bg: 'bg-red-50', accent: 'bg-red-600', banner: '⚡ FLASH SALE — Harga terbaik, stok terbatas!', emoji: '⚡' },
+    kemerdekaan: { bg: 'bg-red-50', accent: 'bg-red-700', banner: '🇮🇩 Hari Kemerdekaan — Promo Merah Putih!', emoji: '🇮🇩' },
+    harbolnas: { bg: 'bg-purple-50', accent: 'bg-purple-700', banner: '🛒 HARBOLNAS 11.11 — Diskon besar-besaran!', emoji: '🛒' },
+    tahun_baru: { bg: 'bg-yellow-50', accent: 'bg-yellow-600', banner: '🎉 Selamat Tahun Baru — Promo spesial menanti!', emoji: '🎉' },
+  };
+  const theme = themeConfig[eventTheme] || themeConfig.default;
+
   const randomProducts = useMemo(() => {
     return [...products].filter((p) => p.stock > 0).slice(0, 6);
   }, [products]);
@@ -240,11 +252,11 @@ export default function HomeClient({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black pb-24 page-fade">
+    <div className={`min-h-screen ${theme.bg} text-black pb-24 page-fade`}>
       {/* Running Marquee Header */}
-      <div className="bg-green-700 text-white py-1.5 overflow-hidden whitespace-nowrap">
+      <div className={`${theme.accent} text-white py-1.5 overflow-hidden whitespace-nowrap`}>
         <div className="animate-marquee inline-block text-xs font-bold uppercase tracking-widest px-4">
-          {systemSettings?.store?.footerMsg ||
+          {theme.banner || systemSettings?.store?.footerMsg ||
             '🚚 GRATIS ONGKIR KEDIRI KOTA • HARGA GROSIR SUPER HEMAT • ATAYAMARKET 🚚'}
         </div>
       </div>
@@ -411,7 +423,7 @@ export default function HomeClient({
             </div>
 
             {/* Category Carousels (Dynamically loaded chunk per category) */}
-            {categories.slice(0, 6).map((cat) => {
+            {categories.map((cat) => {
               const items = products.filter((p) => p.category === cat.name);
               if (items.length === 0) return null;
               return (

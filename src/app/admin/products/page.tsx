@@ -18,6 +18,8 @@ import {
   duplicateProduct,
   detachVariantAction,
   bulkUpdatePreOrderAction,
+  bulkMoveCategoryAction,
+  getCategories,
 } from '@/lib/actions/product.actions';
 
 
@@ -27,7 +29,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock, FolderInput
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -374,6 +376,10 @@ export default function AdminProducts() {
   const [bulkPoLeadTime, setBulkPoLeadTime] = useState(3);
   const [bulkPoNotes, setBulkPoNotes] = useState('');
   const [bulkPoSaving, setBulkPoSaving] = useState(false);
+  const [showBulkCatModal, setShowBulkCatModal] = useState(false);
+  const [bulkTargetCategory, setBulkTargetCategory] = useState('');
+  const [bulkCatSaving, setBulkCatSaving] = useState(false);
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [viewHierarchy, setViewHierarchy] = useState<'grouped' | 'flat' | 'parents_only' | 'variants_only'>('grouped');
   const [detachingId, setDetachingId] = useState<string | null>(null);
@@ -456,6 +462,24 @@ export default function AdminProducts() {
     }
   };
 
+  const handleBulkMoveCategory = async () => {
+    if (selectedIds.length === 0 || !bulkTargetCategory.trim()) return;
+    setBulkCatSaving(true);
+    try {
+      const res = await bulkMoveCategoryAction(selectedIds, bulkTargetCategory.trim());
+      if (!res.success) throw new Error(res.error || 'Gagal');
+      notify.admin.success(`${res.updated} produk berhasil dipindah ke kategori "${bulkTargetCategory}"`);
+      setShowBulkCatModal(false);
+      setBulkTargetCategory('');
+      setSelectedIds([]);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err: any) {
+      notify.admin.error(err?.message || 'Gagal pindah kategori');
+    } finally {
+      setBulkCatSaving(false);
+    }
+  };
+
   const { products: liveProducts, loading: productsLoading } = useProducts({
     isActive: showInactive ? false : true,
     orderByField: sortBy,
@@ -481,6 +505,13 @@ export default function AdminProducts() {
     };
     fetchCounts();
   }, [showInactive]);
+
+  // Fetch category list for bulk move
+  useEffect(() => {
+    getCategories().then(cats => {
+      setCategoryList(cats.map((c: any) => c.name).sort((a: string, b: string) => a.localeCompare(b)));
+    }).catch(() => {});
+  }, []);
 
   // Effects
   useEffect(() => {
@@ -1318,6 +1349,13 @@ export default function AdminProducts() {
                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
                 <Clock size={13} /> Set Pre-Order ({selectedIds.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBulkCatModal(true)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              >
+                <FolderInput size={13} /> Pindah Kategori ({selectedIds.length})
               </button>
               <button
                 onClick={() => handleBulkStatus(showInactive ? 0 : 1)}
@@ -2383,6 +2421,70 @@ export default function AdminProducts() {
                 className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black text-sm rounded-2xl transition-all disabled:opacity-60 shadow-lg shadow-orange-500/20"
               >
                 {bulkPoSaving ? '...' : 'Aktifkan PO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pindah Kategori Massal */}
+      {showBulkCatModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-100 rounded-2xl">
+                <FolderInput size={22} className="text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-gray-900">Pindah Kategori</h2>
+                <p className="text-xs text-gray-500">{selectedIds.length} produk terpilih akan dipindah</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl text-sm text-teal-800">
+              <p className="font-black mb-1">📂 Pilih Kategori Tujuan</p>
+              <p className="font-normal text-xs">Semua produk yang dipilih akan dipindahkan ke kategori berikut:</p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">Kategori Tujuan</label>
+              <select
+                value={bulkTargetCategory}
+                onChange={e => setBulkTargetCategory(e.target.value)}
+                className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-sm outline-none focus:border-teal-400"
+              >
+                <option value="">-- Pilih Kategori --</option>
+                {categoryList.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <div className="mt-1">
+                <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">Atau ketik nama kategori baru</label>
+                <input
+                  type="text"
+                  value={bulkTargetCategory}
+                  onChange={e => setBulkTargetCategory(e.target.value)}
+                  placeholder="Ketik nama kategori..."
+                  className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-sm outline-none focus:border-teal-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowBulkCatModal(false); setBulkTargetCategory(''); }}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm rounded-2xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkMoveCategory}
+                disabled={bulkCatSaving || !bulkTargetCategory.trim()}
+                className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black text-sm rounded-2xl transition-all disabled:opacity-60 shadow-lg shadow-teal-500/20"
+              >
+                {bulkCatSaving ? 'Memindahkan...' : `Pindahkan ${selectedIds.length} Produk`}
               </button>
             </div>
           </div>

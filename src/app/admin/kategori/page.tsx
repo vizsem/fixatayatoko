@@ -38,6 +38,8 @@ type Category = {
   description?: string;
   productCount: number;
   createdAt: any;
+  sort_order?: number;
+  show_on_homepage?: boolean;
 };
 
 export default function AdminCategories() {
@@ -74,7 +76,9 @@ export default function AdminCategories() {
     shopeeKat: 'B' as 'A' | 'B' | 'C' | 'D' | 'E' | 'X',
     shopeeStarAdmin: 9.0,
     tiktokGroup: '1',
-    tiktokKomisi: 5.25
+    tiktokKomisi: 5.25,
+    sort_order: 999,
+    show_on_homepage: true,
   });
 
   const fetchData = useCallback(async () => {
@@ -133,11 +137,20 @@ export default function AdminCategories() {
           isMarketplace: Boolean(raw.isMarketplace || mpMatch || raw.code || catName.includes('(')),
           description: data.description || raw.description || mpMatch?.description || '',
           productCount: exactCount,
-          createdAt: data.createdAt || raw.createdAt
+          createdAt: data.createdAt || raw.createdAt,
+          sort_order: raw.sort_order ?? 999,
+          show_on_homepage: raw.show_on_homepage !== false,
         };
       });
 
-      setCategories(categoryList.sort((a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name)));
+      setCategories(categoryList.sort((a, b) => {
+        // Sort by show_on_homepage first (shown first), then sort_order, then productCount, then name
+        if (a.show_on_homepage !== b.show_on_homepage) return a.show_on_homepage ? -1 : 1;
+        const oA = a.sort_order ?? 999;
+        const oB = b.sort_order ?? 999;
+        if (oA !== oB) return oA - oB;
+        return b.productCount - a.productCount || a.name.localeCompare(b.name);
+      }));
     } catch (err) {
       Sentry.captureException(err);
       notify.error("Gagal memuat kategori");
@@ -238,7 +251,9 @@ export default function AdminCategories() {
         shopeeKat: 'B',
         shopeeStarAdmin: 9.0,
         tiktokGroup: '1',
-        tiktokKomisi: 5.25
+        tiktokKomisi: 5.25,
+        sort_order: 999,
+        show_on_homepage: true,
       });
       setEditId(null);
       setShowModal(false);
@@ -378,7 +393,9 @@ export default function AdminCategories() {
                   shopeeKat: 'B',
                   shopeeStarAdmin: 9.0,
                   tiktokGroup: '1',
-                  tiktokKomisi: 5.25
+                  tiktokKomisi: 5.25,
+                  sort_order: 999,
+                  show_on_homepage: true,
                 });
                 setShowModal(true);
               }}
@@ -516,7 +533,9 @@ export default function AdminCategories() {
                           shopeeKat: cat.shopeeKat || 'B',
                           shopeeStarAdmin: cat.shopeeStarAdmin || 9.0,
                           tiktokGroup: cat.tiktokGroup || '1',
-                          tiktokKomisi: cat.tiktokKomisi || 5.25
+                          tiktokKomisi: cat.tiktokKomisi || 5.25,
+                          sort_order: cat.sort_order ?? 999,
+                          show_on_homepage: cat.show_on_homepage !== false,
                         });
                         setShowModal(true);
                       }}
@@ -590,6 +609,43 @@ export default function AdminCategories() {
                 >
                   LIHAT SKU <ChevronRight size={14} />
                 </Link>
+              </div>
+
+              {/* Homepage Controls */}
+              <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-50 gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    title={cat.show_on_homepage ? 'Tampil di beranda (klik untuk sembunyikan)' : 'Tersembunyi dari beranda (klik untuk tampilkan)'}
+                    onClick={async () => {
+                      const newVal = !cat.show_on_homepage;
+                      const { data: existing } = await (await import('@/lib/supabase')).supabase.from('categories').select('raw_data').eq('id', cat.id).single();
+                      const raw = existing?.raw_data || {};
+                      await (await import('@/lib/supabase')).supabase.from('categories').update({ raw_data: { ...raw, show_on_homepage: newVal } }).eq('id', cat.id);
+                      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, show_on_homepage: newVal } : c));
+                    }}
+                    className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg transition-all ${cat.show_on_homepage ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
+                  >
+                    <span>{cat.show_on_homepage ? '🏠 Beranda' : '🔒 Tersembunyi'}</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold">Urutan:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={cat.sort_order ?? 999}
+                    onChange={async (e) => {
+                      const newOrder = Number(e.target.value);
+                      const { data: existing } = await (await import('@/lib/supabase')).supabase.from('categories').select('raw_data').eq('id', cat.id).single();
+                      const raw = existing?.raw_data || {};
+                      await (await import('@/lib/supabase')).supabase.from('categories').update({ raw_data: { ...raw, sort_order: newOrder } }).eq('id', cat.id);
+                      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sort_order: newOrder } : c));
+                    }}
+                    className="w-16 text-center text-xs font-black border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white focus:outline-none focus:border-indigo-400"
+                    title="Urutan tampil di beranda (angka kecil = tampil lebih awal)"
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -888,6 +944,41 @@ export default function AdminCategories() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
+              </div>
+
+              {/* Homepage Display Settings */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
+                <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                  🏠 Tampilan Beranda Web
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Urutan Tampil</label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="999"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300"
+                      value={formData.sort_order ?? 999}
+                      onChange={(e) => setFormData({ ...formData, sort_order: Number(e.target.value) })}
+                    />
+                    <p className="text-[9px] text-slate-400 font-medium">Angka kecil = tampil lebih awal</p>
+                  </div>
+                  <div className="space-y-1.5 flex flex-col justify-center">
+                    <label className="flex items-center gap-2.5 cursor-pointer p-3 bg-white border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded accent-emerald-600"
+                        checked={formData.show_on_homepage !== false}
+                        onChange={(e) => setFormData({ ...formData, show_on_homepage: e.target.checked })}
+                      />
+                      <div>
+                        <p className="text-xs font-black text-slate-800">Tampil di Beranda</p>
+                        <p className="text-[9px] text-slate-400 font-medium">Aktifkan agar muncul di halaman utama pembeli</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {/* Form Buttons */}

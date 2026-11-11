@@ -9,12 +9,13 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   try {
-    const [productsData, promoSnap, bannerSnap, sysSnap, whSnap] = await Promise.all([
+    const [productsData, promoSnap, bannerSnap, sysSnap, whSnap, catSnap] = await Promise.all([
       getProducts({ isActive: true, orderByField: 'name', limit: 60 }),
       sbGetDocs({ table: 'promotions' }),
       sbGetDocs({ table: 'banners' }),
       sbGetDoc('settings', 'system'),
       sbGetDocs({ table: 'warehouses' }),
+      sbGetDocs({ table: 'categories' }),
     ]);
 
     const now = new Date();
@@ -59,13 +60,36 @@ export default async function HomePage() {
       raw_data: p.raw_data,
     }));
 
-    const categories: Category[] = Array.from(new Set(mappedProducts.map((p) => p.category))).map(
-      (name, i) => ({
-        id: `cat-${i}`,
-        name,
-        slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      })
-    );
+    // Set nama kategori dari produk aktif
+    const productCategoryNames = new Set(mappedProducts.map((p) => p.category));
+
+    // Ambil kategori dari DB, filter hanya yang show_on_homepage dan punya produk aktif
+    const dbCategories: Category[] = catSnap.docs.map((doc) => {
+      const data = doc.data();
+      const raw = data.raw_data || {};
+      return {
+        id: doc.id,
+        name: data.name || raw.name || 'Kategori',
+        slug: data.slug || raw.slug || (data.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        sort_order: raw.sort_order ?? 999,
+        show_on_homepage: raw.show_on_homepage !== false,
+        icon: raw.icon || '📦',
+      };
+    });
+
+    // Filter: hanya yang show_on_homepage=true DAN ada produk aktif, sort by sort_order
+    const categories: Category[] = dbCategories
+      .filter((c) => c.show_on_homepage && productCategoryNames.has(c.name))
+      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.name.localeCompare(b.name));
+
+    // Fallback: jika tidak ada kategori dari DB, generate dari produk
+    const finalCategories: Category[] = categories.length > 0
+      ? categories
+      : Array.from(productCategoryNames).map((name, i) => ({
+          id: `cat-${i}`,
+          name,
+          slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        }));
 
     return (
       <HomeClient
@@ -74,7 +98,7 @@ export default async function HomePage() {
         initialPromos={JSON.parse(JSON.stringify(activePromos))}
         initialSettings={JSON.parse(JSON.stringify(systemSettings))}
         initialWarehouses={JSON.parse(JSON.stringify(warehouses))}
-        initialCategories={JSON.parse(JSON.stringify(categories))}
+        initialCategories={JSON.parse(JSON.stringify(finalCategories))}
         initialWarehouseId={initialWarehouseId}
       />
     );
