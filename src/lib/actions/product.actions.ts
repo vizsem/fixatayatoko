@@ -625,6 +625,8 @@ export async function addProductFull(payload: {
   isPreOrder?: boolean;
   poLeadTimeDays?: number;
   poNotes?: string;
+  // Pajak (PPN)
+  isTaxable?: boolean;
 }) {
   await requireAdmin();
   try {
@@ -749,6 +751,8 @@ export async function addProductFull(payload: {
       isPreOrder: Boolean((payload as any).isPreOrder),
       poLeadTimeDays: Number((payload as any).poLeadTimeDays || 3),
       poNotes: (payload as any).poNotes || '',
+      // Pajak (PPN)
+      isTaxable: payload.isTaxable !== undefined ? Boolean(payload.isTaxable) : undefined,
       createdAt: now,
       updatedAt: now,
     };

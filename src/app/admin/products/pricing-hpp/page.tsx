@@ -19,7 +19,7 @@ import { getUserAndRole, sbGetDocs } from '@/lib/supabase-helpers';
 import { isCategoryTaxExempt, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
-import type { PricingStrategy } from '@/lib/normalize';
+import { recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { calculateCustomerTierPrices } from '@/lib/customer-pricing';
 import {
   updateProductPrice,
@@ -1936,11 +1936,67 @@ export default function PricingHPPPage() {
                           <span className={`text-xs font-black ${unitMarginRp >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {unitMarginRp >= 0 ? '+' : ''}Rp {unitMarginRp.toLocaleString('id-ID')} ({unitMarginPct.toFixed(1)}%)
                           </span>
-                          <div className="flex items-center justify-end gap-1 mt-1">
+                          <div className="flex flex-wrap items-center justify-end gap-1 mt-1.5">
+                            {!isBase && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rec = recommendSellingPrice({
+                                      cost: unitCost,
+                                      name: editingProduct.name,
+                                      category: editingProduct.category,
+                                    });
+                                    if (rec) {
+                                      const targetPrice = rec.recommendedPrice;
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[9px] font-black transition-colors"
+                                  title="Hitung otomatis mengikuti AI margin rekomendasi produk"
+                                >
+                                  ✨ Rekomendasi
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetPrice = editPriceEcer * (u.contains || 1);
+                                    setEditUnits(prev => {
+                                      const next = [...prev];
+                                      next[idx] = { ...next[idx], price: targetPrice };
+                                      return next;
+                                    });
+                                  }}
+                                  className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[9px] font-black transition-colors"
+                                  title="Sama dengan Ecer x Isi"
+                                >
+                                  Sama Ecer
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetPrice = Math.round((editPriceEcer * (u.contains || 1) * 0.95) / 100) * 100;
+                                    setEditUnits(prev => {
+                                      const next = [...prev];
+                                      next[idx] = { ...next[idx], price: targetPrice };
+                                      return next;
+                                    });
+                                  }}
+                                  className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded text-[9px] font-black transition-colors"
+                                  title="Potongan diskon 5% dari harga ecer"
+                                >
+                                  -5% Ecer
+                                </button>
+                              </>
+                            )}
                             <button
                               type="button"
                               onClick={() => {
-                                const targetPrice = Math.ceil((unitCost / 0.8) / 100) * 100;
+                                const targetPrice = Math.round((unitCost * 1.05) / 100) * 100;
                                 if (isBase) setEditPriceEcer(targetPrice);
                                 setEditUnits(prev => {
                                   const next = [...prev];
@@ -1948,10 +2004,26 @@ export default function PricingHPPPage() {
                                   return next;
                                 });
                               }}
-                              className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[9px] font-black transition-colors"
-                              title="Terapkan margin 20%"
+                              className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[9px] font-black transition-colors"
+                              title="Terapkan margin 5%"
                             >
-                              20%
+                              5%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetPrice = Math.round((unitCost * 1.10) / 100) * 100;
+                                if (isBase) setEditPriceEcer(targetPrice);
+                                setEditUnits(prev => {
+                                  const next = [...prev];
+                                  next[idx] = { ...next[idx], price: targetPrice };
+                                  return next;
+                                });
+                              }}
+                              className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[9px] font-black transition-colors"
+                              title="Terapkan margin 10%"
+                            >
+                              10%
                             </button>
                             <button
                               type="button"
@@ -1968,6 +2040,22 @@ export default function PricingHPPPage() {
                               title="Terapkan margin 15%"
                             >
                               15%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetPrice = Math.ceil((unitCost / 0.8) / 100) * 100;
+                                if (isBase) setEditPriceEcer(targetPrice);
+                                setEditUnits(prev => {
+                                  const next = [...prev];
+                                  next[idx] = { ...next[idx], price: targetPrice };
+                                  return next;
+                                });
+                              }}
+                              className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[9px] font-black transition-colors"
+                              title="Terapkan margin 20%"
+                            >
+                              20%
                             </button>
                           </div>
                         </div>

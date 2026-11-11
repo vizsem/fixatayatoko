@@ -23,7 +23,7 @@ import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
 
-import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
+import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, isCategoryTaxExempt, type TaxSettings } from '@/lib/tax';
 
 function UnitModalCalculator({
   contains,
@@ -205,6 +205,7 @@ export default function EditProductPage() {
   const [isPreOrder, setIsPreOrder] = useState(false);
   const [poLeadTimeDays, setPoLeadTimeDays] = useState(3);
   const [poNotes, setPoNotes] = useState('');
+  const [isTaxable, setIsTaxable] = useState<boolean>(true);
 
   // Cost History State
   const [costHistory, setCostHistory] = useState<any[]>([]);
@@ -501,6 +502,9 @@ export default function EditProductPage() {
       setIsPreOrder(Boolean(data.isPreOrder ?? (data as any).raw_data?.isPreOrder));
       setPoLeadTimeDays(Number(data.poLeadTimeDays ?? (data as any).raw_data?.poLeadTimeDays ?? 3));
       setPoNotes(String(data.poNotes ?? (data as any).raw_data?.poNotes ?? ''));
+
+      const rawTaxable = data.isTaxable ?? (data as any).raw_data?.isTaxable;
+      setIsTaxable(rawTaxable !== undefined ? Boolean(rawTaxable) : !isCategoryTaxExempt(data.Kategori || data.category));
 
       // Handle Units
       const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
@@ -943,6 +947,7 @@ export default function EditProductPage() {
         isPreOrder,
         poLeadTimeDays,
         poNotes,
+        isTaxable,
         updatedAt: new Date().toISOString(),
       };
 
@@ -1647,50 +1652,77 @@ export default function EditProductPage() {
               const ecer = Number(formData.Ecer || 0);
               if (ecer <= 0) return null;
               const category = formData.Kategori || '';
-              const breakdown = calculateTaxBreakdown({ amount: ecer, category, taxSettings });
+              const breakdown = calculateTaxBreakdown({ amount: ecer, category, taxSettings, isTaxable });
               const modal = Number(formData.Modal || 0);
               const marginAfterTax = modal > 0 && !breakdown.isExempt
                 ? (((breakdown.dpp - modal) / modal) * 100).toFixed(1)
                 : null;
               return (
-                <div className={`mb-5 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center gap-4 ${
+                <div className={`mb-5 p-4 rounded-2xl border flex flex-col gap-3.5 ${
                   !taxSettings.enabled
                     ? 'bg-slate-50 border-slate-200/60'
                     : breakdown.isExempt
                     ? 'bg-amber-50/70 border-amber-200'
                     : 'bg-indigo-50/70 border-indigo-200'
                 }`}>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
-                    <div>
-                      <p className={`text-xs font-black uppercase tracking-widest ${
-                        !taxSettings.enabled ? 'text-slate-400' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
-                      }`}>Status Pajak</p>
-                      <p className={`text-xs font-black ${
-                        !taxSettings.enabled ? 'text-slate-500' : breakdown.isExempt ? 'text-amber-900' : 'text-indigo-900'
-                      }`}>{breakdown.taxLabel}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200/60">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
+                      <div>
+                        <p className={`text-xs font-black uppercase tracking-widest ${
+                          !taxSettings.enabled ? 'text-slate-400' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
+                        }`}>Status Pajak Produk</p>
+                        <p className={`text-xs font-black ${
+                          !taxSettings.enabled ? 'text-slate-500' : breakdown.isExempt ? 'text-amber-900' : 'text-indigo-900'
+                        }`}>{breakdown.taxLabel}</p>
+                      </div>
+                    </div>
+
+                    {/* Toggle Aktifkan Pajak untuk produk ini */}
+                    <div className="flex items-center gap-2.5 bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-xs">
+                      <span className="text-xs font-black uppercase text-slate-700">Kenakan Pajak (PPN)</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isTaxable}
+                          onChange={(e) => setIsTaxable(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                      <span className={`text-[10px] font-black uppercase ${isTaxable ? 'text-indigo-700' : 'text-slate-400'}`}>
+                        {isTaxable ? 'AKTIF' : 'NON-AKTIF'}
+                      </span>
                     </div>
                   </div>
+
                   {taxSettings.enabled && !breakdown.isExempt && (
-                    <>
-                      <div className="w-px h-8 bg-indigo-200 hidden md:block" />
-                      <div className="grid grid-cols-3 gap-4 flex-1">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
-                          <p className="text-sm font-black text-indigo-950">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
-                          <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
-                          <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                            {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
-                          </p>
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-2.5 bg-white/60 rounded-xl">
+                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
+                        <p className="text-sm font-black text-indigo-950">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
                       </div>
-                    </>
+                      <div className="p-2.5 bg-white/60 rounded-xl">
+                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
+                        <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
+                      </div>
+                      <div className="p-2.5 bg-white/60 rounded-xl">
+                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
+                        <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {taxSettings.enabled && breakdown.isExempt && (
+                    <p className="text-xs font-bold text-amber-800">
+                      Produk ini bebas PPN (0%) — tidak ada potongan/kewajiban pajak yang dibebankan.
+                    </p>
+                  )}
+                  {!taxSettings.enabled && (
+                    <p className="text-xs font-bold text-slate-400">
+                      Pajak sistem sedang dinonaktifkan di Pengaturan.
+                    </p>
                   )}
                 </div>
               );
@@ -2172,6 +2204,115 @@ export default function EditProductPage() {
                           }}
                         />
                       </div>
+
+                      {/* QUICK PRESET HARGA SATUAN (IKUT REKOMENDASI / DISKON / MARGIN) */}
+                      {idx > 0 && (
+                        <div className="p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider flex items-center justify-between">
+                            <span>Auto Set Harga {code}:</span>
+                            {Number(formData.Modal || 0) > 0 && Number(current.price || 0) > 0 && (
+                              <span className={`text-[10px] font-bold ${Number(current.price || 0) >= Number(formData.Modal || 0) * (contains || 1) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                Margin: {(((Number(current.price || 0) - (Number(formData.Modal || 0) * (contains || 1))) / Number(current.price || 1)) * 100).toFixed(1)}%
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rec = recommendSellingPrice({
+                                  cost: Number(formData.Modal || 0) * (contains || 1),
+                                  name: formData.Nama,
+                                  category: formData.Kategori,
+                                  ruleKey: pricingRuleKey,
+                                  marginPercent: pricingMarginPercent,
+                                  roundingStep: pricingRoundingStep,
+                                });
+                                if (rec) {
+                                  const next = [...units];
+                                  next[idx] = { ...current, price: rec.recommendedPrice };
+                                  setUnits(next);
+                                  toast.success(`Harga ${code} diset ke Rekomendasi (Rp ${rec.recommendedPrice.toLocaleString('id-ID')})`);
+                                } else {
+                                  toast.error('Isi modal dan jumlah isi terlebih dahulu');
+                                }
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-black rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                              title="Hitung harga otomatis mengikuti AI margin rekomendasi produk"
+                            >
+                              <Sparkles size={10} className="text-indigo-600" />
+                              Ikut Rekomendasi
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = Number(formData.Ecer || 0) * (contains || 1);
+                                const next = [...units];
+                                next[idx] = { ...current, price: target };
+                                setUnits(next);
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
+                              title="Harga jual = Ecer x Isi"
+                            >
+                              Sama Ecer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = Math.round((Number(formData.Ecer || 0) * (contains || 1) * 0.97) / 100) * 100;
+                                const next = [...units];
+                                next[idx] = { ...current, price: target };
+                                setUnits(next);
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
+                              title="Potongan diskon 3% dari total harga ecer"
+                            >
+                              -3% Ecer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = Math.round((Number(formData.Ecer || 0) * (contains || 1) * 0.95) / 100) * 100;
+                                const next = [...units];
+                                next[idx] = { ...current, price: target };
+                                setUnits(next);
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
+                              title="Potongan diskon 5% dari total harga ecer"
+                            >
+                              -5% Ecer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const costSatuan = Number(formData.Modal || 0) * (contains || 1);
+                                const target = Math.round((costSatuan * 1.05) / 100) * 100;
+                                const next = [...units];
+                                next[idx] = { ...current, price: target };
+                                setUnits(next);
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
+                              title="Ambil keuntungan margin 5% dari modal kemasan"
+                            >
+                              +5% Modal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const costSatuan = Number(formData.Modal || 0) * (contains || 1);
+                                const target = Math.round((costSatuan * 1.10) / 100) * 100;
+                                const next = [...units];
+                                next[idx] = { ...current, price: target };
+                                setUnits(next);
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
+                              title="Ambil keuntungan margin 10% dari modal kemasan"
+                            >
+                              +10% Modal
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* MODAL INPUT UNTUK SATUAN DUS / NON-BASE UNIT (FIXED MANUAL INPUT BUG) */}
                       {idx > 0 && (

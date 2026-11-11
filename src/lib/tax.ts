@@ -38,6 +38,7 @@ export function calculateTaxBreakdown(opts: {
   amount: number;
   category?: string;
   taxSettings?: Partial<TaxSettings>;
+  isTaxable?: boolean;
 }) {
   const settings: TaxSettings = { ...DEFAULT_TAX_SETTINGS, ...(opts.taxSettings || {}) };
   const amount = Number(opts.amount || 0);
@@ -53,7 +54,11 @@ export function calculateTaxBreakdown(opts: {
     };
   }
 
-  const isExempt = isCategoryTaxExempt(opts.category, settings.nonTaxableCategories);
+  // Jika isTaxable ditentukan secara eksplisit per produk, gunakan nilai itu.
+  // Jika tidak ditentukan (undefined), gunakan fallback pengecekan kategori bebas PPN.
+  const isExempt = typeof opts.isTaxable === 'boolean'
+    ? !opts.isTaxable
+    : isCategoryTaxExempt(opts.category, settings.nonTaxableCategories);
 
   if (isExempt) {
     return {
@@ -62,7 +67,9 @@ export function calculateTaxBreakdown(opts: {
       taxAmount: 0,
       totalWithTax: amount,
       effectiveRate: 0,
-      taxLabel: 'Bebas PPN (0% Sembako / UU HPP)'
+      taxLabel: typeof opts.isTaxable === 'boolean' && !opts.isTaxable
+        ? 'Non-Pajak / Bebas PPN (0%)'
+        : 'Bebas PPN (0% Sembako / UU HPP)'
     };
   }
 
