@@ -1269,13 +1269,15 @@ export default function PricingHPPPage() {
                                     </span>
                                   )}
                                   {priceReview.length > 0 && (
-                                    <span
-                                      className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-700 shrink-0"
-                                      title={priceReview.map((finding) => `${finding.unitCode}: Rp${finding.currentPrice.toLocaleString('id-ID')} → target Rp${finding.recommendedPrice.toLocaleString('id-ID')}`).join(' · ')}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEdit(p)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700 shrink-0 shadow-xs transition-all cursor-pointer group"
+                                      title={`Klik untuk sesuaikan satuan: ${priceReview.map((finding) => `${finding.unitCode}: Rp${finding.currentPrice.toLocaleString('id-ID')} → target Rp${finding.recommendedPrice.toLocaleString('id-ID')}`).join(' · ')}`}
                                     >
-                                      <AlertTriangle size={10} />
-                                      Perlu naik ({priceReview.length})
-                                    </span>
+                                      <AlertTriangle size={10} className="text-rose-600 animate-pulse" />
+                                      <span>Perlu naik: <strong className="underline underline-offset-2">{priceReview.map(f => f.unitCode).join(', ')}</strong></span>
+                                    </button>
                                   )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 text-slate-400 font-mono text-[10px] mt-0.5">
@@ -1746,21 +1748,46 @@ export default function PricingHPPPage() {
 
             {/* SECTION DAFTAR SATUAN & HARGA MULTI-SATUAN */}
             <div className="space-y-3 pt-1 border-t border-slate-100">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Layers size={16} className="text-indigo-600" />
                   <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">
                     Satuan Produk & Harga Jual ({editUnits.length} Satuan)
                   </h4>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAddUnitRow(!showAddUnitRow)}
-                  className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-xl transition-colors"
-                >
-                  <Plus size={13} />
-                  {showAddUnitRow ? 'Batal Tambah' : 'Tambah Satuan'}
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditUnits(prev => prev.map(u => {
+                        const isBase = u.code === editingProduct.unit;
+                        const unitCost = editModalCost * (u.contains || 1);
+                        const rec = recommendSellingPrice({
+                          cost: unitCost,
+                          name: editingProduct.name,
+                          category: editingProduct.category,
+                        });
+                        const newPrice = rec ? rec.recommendedPrice : Math.ceil((unitCost * 1.15) / 100) * 100;
+                        if (isBase) setEditPriceEcer(newPrice);
+                        return { ...u, price: newPrice };
+                      }));
+                      notify.success('Semua satuan diset ke harga rekomendasi aman!');
+                    }}
+                    className="text-[11px] font-black text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1"
+                    title="Set semua satuan ke harga rekomendasi margin target agar peringatan 'Perlu naik' hilang"
+                  >
+                    <Sparkles size={12} className="text-amber-600" />
+                    Set Semua Rekomendasi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddUnitRow(!showAddUnitRow)}
+                    className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-xl transition-colors"
+                  >
+                    <Plus size={13} />
+                    {showAddUnitRow ? 'Batal Tambah' : 'Tambah Satuan'}
+                  </button>
+                </div>
               </div>
 
               {/* Form Tambah Satuan Baru */}
@@ -1845,12 +1872,20 @@ export default function PricingHPPPage() {
                   const currentPrice = isBase ? editPriceEcer : (u.price || 0);
                   const unitMarginRp = currentPrice - unitCost;
                   const unitMarginPct = currentPrice > 0 ? (unitMarginRp / currentPrice) * 100 : 0;
+                  const rec = recommendSellingPrice({
+                    cost: unitCost,
+                    name: editingProduct.name,
+                    category: editingProduct.category,
+                  });
+                  const isBelowTarget = Boolean(rec && currentPrice < rec.recommendedPrice);
 
                   return (
                     <div
                       key={idx}
                       className={`p-3 rounded-2xl border transition-all space-y-2 ${
-                        isBase
+                        isBelowTarget
+                          ? 'bg-rose-50/70 border-rose-300 ring-1 ring-rose-200'
+                          : isBase
                           ? 'bg-blue-50/40 border-blue-200'
                           : 'bg-slate-50 border-slate-200'
                       }`}
@@ -1858,7 +1893,11 @@ export default function PricingHPPPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${
-                            isBase ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white'
+                            isBelowTarget
+                              ? 'bg-rose-600 text-white'
+                              : isBase
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-800 text-white'
                           }`}>
                             {u.code}
                           </span>
@@ -1885,6 +1924,12 @@ export default function PricingHPPPage() {
                               />
                               <span>{editingProduct.unit}</span>
                             </div>
+                          )}
+                          {isBelowTarget && rec && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md animate-pulse">
+                              <AlertTriangle size={10} />
+                              Target: Rp {rec.recommendedPrice.toLocaleString('id-ID')}
+                            </span>
                           )}
                         </div>
 
