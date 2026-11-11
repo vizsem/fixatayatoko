@@ -2,6 +2,7 @@ import { getProducts } from '@/lib/actions/product.actions';
 import { sbGetDocs, sbGetDoc } from '@/lib/supabase-helpers';
 import { toPlainRow, toPlainRows } from '@/lib/db-schema';
 import { Product, Promotion, Banner, SystemSettings, Category } from '@/lib/types';
+import { formatProductName } from '@/lib/format';
 import HomeClient from '@/components/home/HomeClient';
 
 // Enable Incremental Static Regeneration (SSG / SSR caching every 60s)
@@ -43,7 +44,7 @@ export default async function HomePage() {
 
     const mappedProducts: Product[] = (productsData || []).map((p: any) => ({
       id: p.id,
-      name: p.name || 'Produk',
+      name: formatProductName(p.name || 'Produk'),
       price: Number(p.priceEcer || 0),
       wholesalePrice: Number(p.priceGrosir || p.priceEcer || 0),
       minWholesale: Number(p.minWholesaleQty || 1),

@@ -1,6 +1,7 @@
 
 import { Trash2, Plus, Minus, Clock } from 'lucide-react';
 import { CartItem } from '@/lib/types';
+import { formatProductName } from '@/lib/format';
 
 interface CartItemCardProps {
   item: CartItem;
@@ -50,8 +51,8 @@ export function CartItemCard({ item, onUpdateQty, onUpdateUnit, onRemove, availa
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-2 leading-tight mb-1">
-                {item.name || (item as any).Nama}
+              <h3 className="text-xs md:text-sm font-black text-slate-800 tracking-tight line-clamp-2 leading-tight mb-1">
+                {formatProductName(item.name || (item as any).Nama)}
               </h3>
               {isPreOrder && stockQty <= 0 ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md uppercase tracking-wider">

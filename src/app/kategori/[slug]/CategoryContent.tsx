@@ -10,6 +10,7 @@ import {
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { formatProductName } from '@/lib/format';
 
 type Product = {
   id: string;
@@ -261,7 +262,9 @@ export default function CategoryContent({ slug }: { slug: string }) {
                 </Link>
 
                 <div className="flex-1 flex flex-col">
-                  <h3 className="text-xs font-bold text-gray-800 uppercase line-clamp-2 leading-snug mb-1">{product.name}</h3>
+                  <h3 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug mb-1">
+                    {formatProductName(product.name)}
+                  </h3>
                   <div className="mb-3 mt-auto">
                     <p className="text-sm font-black text-green-600">Rp{product.price.toLocaleString('id-ID')}</p>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-tight">Per {product.unit}</p>

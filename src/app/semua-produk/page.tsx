@@ -12,6 +12,7 @@ import { ProductCard } from '@/components/home/ProductCard';
 import { SkeletonCard } from '@/components/home/SkeletonCard';
 import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { Product } from '@/lib/types';
+import { formatProductName } from '@/lib/format';
 import { useCart } from '@/lib/context/CartContext';
 import { getWishlist, addToWishlist } from '@/lib/wishlist';
 
@@ -60,7 +61,7 @@ function SemuaProdukContent() {
 
       return {
         ...p,
-        name: p.name || (p as any).Nama || 'Produk Sembako',
+        name: formatProductName(p.name || (p as any).Nama || 'Produk Sembako'),
         price: priceEcer,
         wholesalePrice: priceGrosir > 0 && priceGrosir < priceEcer ? priceGrosir : 0,
         minWholesale: Number(p.minWholesaleQty || (p as any).Min_Grosir || 12),

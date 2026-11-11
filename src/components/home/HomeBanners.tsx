@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { Package, Gift } from 'lucide-react';
 import { Promotion } from '@/lib/types';
+import { formatProductName } from '@/lib/format';
 
 interface Banner {
   id?: string;
@@ -65,7 +66,7 @@ export const HomeBanners = ({ banners, activePromos }: HomeBannersProps) => {
           <div key={p.id} className="min-w-[92%] md:min-w-full snap-center rounded-[2.5rem] bg-gradient-to-br from-orange-500 to-red-600 text-white p-8 relative overflow-hidden shadow-lg">
             <div className="relative z-10">
               <span className="bg-white/20 text-xs font-black px-2 py-0.5 rounded-full uppercase mb-2 inline-block">Flash Sale Aktif</span>
-              <h2 className="text-2xl md:text-3xl font-black mb-1 uppercase tracking-tighter">{p.name}</h2>
+              <h2 className="text-2xl md:text-3xl font-black mb-1 tracking-tight">{formatProductName(p.name)}</h2>
               <p className="text-orange-50 text-xs mb-6">Diskon hingga {p.discountValue.toLocaleString()} {p.discountType === 'percentage' ? '%' : 'Rp'}</p>
               <Link href="/search" className="inline-block bg-white text-orange-600 px-5 py-2 rounded-xl font-black text-xs uppercase shadow-xl tap-active">Lihat Promo</Link>
             </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Package, RefreshCw, Sparkles, Flame, ArrowRight } from 'lucide-react';
+import { Package, RefreshCw, Sparkles, Flame, ArrowRight, ChevronDown, Layers } from 'lucide-react';
 
 import { Product, Promotion, Banner, SystemSettings, NotificationItem, Category } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -89,6 +89,14 @@ export default function HomeClient({
   const randomProducts = useMemo(() => {
     return [...products].filter((p) => p.stock > 0).slice(0, 6);
   }, [products]);
+
+  // Kategori aktif yang memiliki produk di inventaris
+  const activeCategories = useMemo(() => {
+    return categories.filter((cat) => products.some((p) => p.category === cat.name));
+  }, [categories, products]);
+
+  // Jumlah kategori yang ditampilkan bertahap (default 4 agar proporsional dan tidak kepanjangan)
+  const [visibleCatCount, setVisibleCatCount] = useState<number>(4);
 
   const getDiscountedPrice = useCallback(
     (product: Product) => {
@@ -422,10 +430,9 @@ export default function HomeClient({
               </div>
             </div>
 
-            {/* Category Carousels (Dynamically loaded chunk per category) */}
-            {categories.map((cat) => {
+            {/* Category Carousels (Dynamically loaded chunk per category with Load More) */}
+            {activeCategories.slice(0, visibleCatCount).map((cat) => {
               const items = products.filter((p) => p.category === cat.name);
-              if (items.length === 0) return null;
               return (
                 <CategoryProductSection
                   key={cat.id}
@@ -438,6 +445,27 @@ export default function HomeClient({
                 />
               );
             })}
+
+            {/* Load More Categories Button */}
+            {visibleCatCount < activeCategories.length && (
+              <div className="mb-8 px-4 flex flex-col items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCatCount((prev) => prev + 4)}
+                  className="w-full max-w-sm py-3 px-5 bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-300 text-emerald-800 rounded-2xl text-xs font-black shadow-xs hover:shadow transition-all flex items-center justify-center gap-2.5 active:scale-95 group"
+                >
+                  <Layers size={15} className="text-emerald-600 group-hover:rotate-12 transition-transform" />
+                  <span>Tampilkan Kategori Lainnya</span>
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                    +{Math.min(4, activeCategories.length - visibleCatCount)}
+                  </span>
+                  <ChevronDown size={15} className="text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
+                </button>
+                <p className="text-[11px] text-gray-400 font-medium">
+                  Menampilkan {Math.min(visibleCatCount, activeCategories.length)} dari {activeCategories.length} kategori
+                </p>
+              </div>
+            )}
 
             {/* Navigation CTA Buttons */}
             <div className="mb-8 px-4 flex flex-wrap items-center justify-center gap-3">

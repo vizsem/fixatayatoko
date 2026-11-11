@@ -14,6 +14,7 @@ import CustomerGuarantees from '@/components/common/CustomerGuarantees';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbUpsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { formatProductName } from '@/lib/format';
 export type Review = {
   id: string;
   userId: string;
@@ -349,7 +350,7 @@ export default function ProductDetailClient({
           <ChevronRight size={14} className="text-slate-300 shrink-0" />
           <Link href={`/kategori?name=${encodeURIComponent(product.category)}`} className="hover:text-emerald-600 transition-colors shrink-0">{product.category}</Link>
           <ChevronRight size={14} className="text-slate-300 shrink-0" />
-          <span className="text-slate-700 font-semibold truncate max-w-[180px] md:max-w-md">{product.name}</span>
+          <span className="text-slate-700 font-semibold truncate max-w-[180px] md:max-w-md">{formatProductName(product.name)}</span>
         </nav>
 
         {/* MAIN GRID */}
@@ -418,7 +419,7 @@ export default function ProductDetailClient({
                 </div>
               )}
 
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-1">{product.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-1">{formatProductName(product.name)}</h1>
               <p className="text-sm text-slate-500 font-medium">
                 Harga per <span className="font-bold text-slate-700">{currentUnit}</span>
                 {product.stock <= 0 && !isPreOrder && <span className="text-red-500 font-bold ml-2">• Sedang Kosong</span>}

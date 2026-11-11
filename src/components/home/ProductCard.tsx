@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Heart, Sparkles, Clock } from 'lucide-react';
 import { Product } from '@/lib/types';
+import { formatProductName } from '@/lib/format';
 
 interface ProductCardProps {
   product: Product;
@@ -112,7 +113,9 @@ export const ProductCard = ({
         )}
 
         <Link href={`/produk/${product.id}`} className="block">
-          <h3 className="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 leading-snug hover:text-green-600 transition-colors">{product.name}</h3>
+          <h3 className="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 leading-snug hover:text-green-600 transition-colors">
+            {formatProductName(product.name)}
+          </h3>
         </Link>
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs font-medium text-gray-500">{product.category}</p>

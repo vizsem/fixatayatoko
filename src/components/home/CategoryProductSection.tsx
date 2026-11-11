@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Package, ArrowRight } from 'lucide-react';
 import { Product, Category } from '@/lib/types';
 import { ProductCard } from '@/components/home/ProductCard';
+import { formatProductName } from '@/lib/format';
 
 interface CategoryProductSectionProps {
   category: Category;
@@ -32,7 +33,7 @@ export default function CategoryProductSection({
             <Package size={18} />
           </div>
           <h2 id={`cat-heading-${category.id}`} className="text-sm font-black text-gray-800 tracking-tighter">
-            {category.name}
+            {formatProductName(category.name)}
           </h2>
         </div>
         <Link 
