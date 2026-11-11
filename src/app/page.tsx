@@ -61,32 +61,48 @@ export default async function HomePage() {
       raw_data: p.raw_data,
     }));
 
-    // Set nama kategori dari produk aktif
-    const productCategoryNames = new Set(mappedProducts.map((p) => p.category));
+    // Set nama kategori dari produk aktif (case-insensitive mapping)
+    const productCategoryMap = new Map<string, string>();
+    for (const p of mappedProducts) {
+      if (p.category) {
+        const clean = p.category.trim();
+        productCategoryMap.set(clean.toLowerCase(), clean);
+      }
+    }
 
-    // Ambil kategori dari DB, filter hanya yang show_on_homepage dan punya produk aktif
-    const dbCategories: Category[] = catSnap.docs.map((doc) => {
+    // Ambil kategori dari DB, deduplikasi berdasarkan nama unik
+    const seenCatNames = new Set<string>();
+    const uniqueDbCategories: Category[] = [];
+
+    for (const doc of catSnap.docs) {
       const data = doc.data();
       const raw = data.raw_data || {};
-      return {
+      const catName = (data.name || raw.name || '').trim();
+      if (!catName) continue;
+
+      const normKey = catName.toLowerCase();
+      if (seenCatNames.has(normKey)) continue;
+      seenCatNames.add(normKey);
+
+      uniqueDbCategories.push({
         id: doc.id,
-        name: data.name || raw.name || 'Kategori',
-        slug: data.slug || raw.slug || (data.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        name: productCategoryMap.get(normKey) || catName,
+        slug: data.slug || raw.slug || catName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         sort_order: raw.sort_order ?? 999,
         show_on_homepage: raw.show_on_homepage !== false,
         icon: raw.icon || '📦',
-      };
-    });
+      });
+    }
 
     // Filter: hanya yang show_on_homepage=true DAN ada produk aktif, sort by sort_order
-    const categories: Category[] = dbCategories
-      .filter((c) => c.show_on_homepage && productCategoryNames.has(c.name))
+    const categories: Category[] = uniqueDbCategories
+      .filter((c) => c.show_on_homepage && productCategoryMap.has(c.name.trim().toLowerCase()))
       .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.name.localeCompare(b.name));
 
-    // Fallback: jika tidak ada kategori dari DB, generate dari produk
+    // Fallback: jika tidak ada kategori dari DB, generate dari produk unik
     const finalCategories: Category[] = categories.length > 0
       ? categories
-      : Array.from(productCategoryNames).map((name, i) => ({
+      : Array.from(productCategoryMap.values()).map((name, i) => ({
           id: `cat-${i}`,
           name,
           slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),

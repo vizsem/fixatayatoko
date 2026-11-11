@@ -90,9 +90,20 @@ export default function HomeClient({
     return [...products].filter((p) => p.stock > 0).slice(0, 6);
   }, [products]);
 
-  // Kategori aktif yang memiliki produk di inventaris
+  // Kategori aktif yang memiliki produk di inventaris (dijamin 100% unik tanpa duplikasi)
   const activeCategories = useMemo(() => {
-    return categories.filter((cat) => products.some((p) => p.category === cat.name));
+    const seen = new Set<string>();
+    const result: Category[] = [];
+    for (const cat of categories) {
+      const key = (cat.name || '').trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      const hasProducts = products.some((p) => (p.category || '').trim().toLowerCase() === key);
+      if (hasProducts) {
+        seen.add(key);
+        result.push(cat);
+      }
+    }
+    return result;
   }, [categories, products]);
 
   // Jumlah kategori yang ditampilkan bertahap (default 4 agar proporsional dan tidak kepanjangan)
@@ -432,7 +443,8 @@ export default function HomeClient({
 
             {/* Category Carousels (Dynamically loaded chunk per category with Load More) */}
             {activeCategories.slice(0, visibleCatCount).map((cat) => {
-              const items = products.filter((p) => p.category === cat.name);
+              const catKey = cat.name.trim().toLowerCase();
+              const items = products.filter((p) => (p.category || '').trim().toLowerCase() === catKey);
               return (
                 <CategoryProductSection
                   key={cat.id}
