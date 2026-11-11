@@ -2102,6 +2102,71 @@ export default function PricingHPPPage() {
                             >
                               20%
                             </button>
+
+                            {/* Input Presentase Manual per Satuan */}
+                            <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-1.5 py-0.5" title="Ketik persentase (%) keuntungan manual">
+                              <span className="text-[9px] font-black text-slate-500">%</span>
+                              <input
+                                type="number"
+                                min="-90"
+                                max="1000"
+                                step="1"
+                                placeholder="±%"
+                                defaultValue=""
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const val = Number((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val) && val > -100 && val < 100) {
+                                      // Rumus Margin %: Harga = Modal / (1 - (val / 100))
+                                      const targetPrice = Math.ceil((unitCost / (1 - (val / 100))) / 100) * 100;
+                                      if (isBase) setEditPriceEcer(targetPrice);
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                    } else if (val >= 100) {
+                                      // Markup % jika >= 100: Harga = Modal * (1 + val/100)
+                                      const targetPrice = Math.ceil((unitCost * (1 + (val / 100))) / 100) * 100;
+                                      if (isBase) setEditPriceEcer(targetPrice);
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                    }
+                                  }
+                                }}
+                                onBlur={e => {
+                                  const val = Number(e.target.value);
+                                  if (e.target.value !== '' && !isNaN(val)) {
+                                    if (val > -100 && val < 100) {
+                                      const targetPrice = Math.ceil((unitCost / (1 - (val / 100))) / 100) * 100;
+                                      if (isBase) setEditPriceEcer(targetPrice);
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                    } else if (val >= 100) {
+                                      const targetPrice = Math.ceil((unitCost * (1 + (val / 100))) / 100) * 100;
+                                      if (isBase) setEditPriceEcer(targetPrice);
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                    }
+                                  }
+                                }}
+                                className="w-10 bg-transparent text-[10px] font-black text-slate-800 text-center focus:outline-none"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
