@@ -41,6 +41,7 @@ import BulkBrandModal from '@/components/admin/BulkBrandModal';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
 import { playScanBeep } from '@/lib/sound';
+import { formatProductName } from '@/lib/format';
 
 
 // CATATAN: SheetJS (xlsx, ±400 KB) TIDAK diimpor di sini. Library itu hanya
@@ -1620,7 +1621,7 @@ export default function AdminProducts() {
                           </span>
                         ) : null}
                       </div>
-                      <h3 className="font-black text-gray-900 text-sm uppercase leading-tight tracking-tight line-clamp-2">{p.name}</h3>
+                      <h3 className="font-bold text-gray-900 text-sm leading-tight tracking-tight line-clamp-2">{formatProductName(p.name)}</h3>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
                         {p.brand && (
@@ -1945,7 +1946,7 @@ export default function AdminProducts() {
                                 </span>
                               )}
                             </div>
-                            <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{p.name}</h3>
+                            <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{formatProductName(p.name)}</h3>
                             <div className="flex items-center gap-2">
                               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
                               {p.brand && (

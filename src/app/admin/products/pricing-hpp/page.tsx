@@ -19,6 +19,7 @@ import { getUserAndRole, sbGetDocs } from '@/lib/supabase-helpers';
 import { isCategoryTaxExempt, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { findPricesBelowTarget } from '@/lib/pricing-review';
+import { formatProductName } from '@/lib/format';
 import { recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { calculateCustomerTierPrices } from '@/lib/customer-pricing';
 import {
@@ -1256,9 +1257,9 @@ export default function PricingHPPPage() {
                                 <div className="flex items-center gap-1.5">
                                   <Link
                                     href={`/admin/products/edit/${p.id}`}
-                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors uppercase line-clamp-1"
+                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
                                   >
-                                    {p.name}
+                                    {formatProductName(p.name)}
                                   </Link>
                                   {p.isHppLocked && (
                                     <span
@@ -1597,7 +1598,7 @@ export default function PricingHPPPage() {
                       return (
                         <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">{dateStr}</td>
-                          <td className="py-3.5 px-4 font-black text-slate-800 uppercase">{l.productName || l.productId}</td>
+                          <td className="py-3.5 px-4 font-black text-slate-800">{formatProductName(l.productName || l.productId)}</td>
                           <td className="py-3.5 px-4 text-right">
                             {l.oldCost !== undefined && l.newCost !== undefined ? (
                               <div>
@@ -1645,8 +1646,8 @@ export default function PricingHPPPage() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                   Quick Update Harga & Satuan
                 </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1 uppercase line-clamp-1">
-                  {editingProduct.name}
+                <h3 className="text-lg font-black text-slate-900 mt-1 line-clamp-1">
+                  {formatProductName(editingProduct.name)}
                 </h3>
                 <p className="text-[11px] text-slate-400 font-mono">
                   SKU: {editingProduct.sku} · Kategori: {editingProduct.category}

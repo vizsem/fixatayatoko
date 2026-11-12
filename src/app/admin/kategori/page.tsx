@@ -21,6 +21,7 @@ import {
   autoClassifyProductsAction
 } from '@/lib/actions/product.actions';
 import { MARKETPLACE_CATEGORIES } from '@/lib/marketplace-categories';
+import { formatProductName } from '@/lib/format';
 
 type Category = {
   id: string;
@@ -509,7 +510,7 @@ export default function AdminCategories() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-base font-black text-slate-900 tracking-tight leading-snug">
-                          {cat.name}
+                          {formatProductName(cat.name)}
                         </h3>
                       </div>
                       {cat.code && (
