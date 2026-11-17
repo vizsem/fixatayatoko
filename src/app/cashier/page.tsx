@@ -7,7 +7,7 @@ import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera,
-  Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw
+  Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
@@ -59,6 +59,8 @@ type Product = {
   stockByWarehouse?: Record<string, number>;
   Kategori?: string;
   kategori?: string;
+  parentId?: string;
+  isParentOnly?: boolean;
   // Customer tier prices
   priceSemiGrosir?: number;
   priceGrosir?: number;
@@ -145,6 +147,7 @@ export default function CashierPOS() {
   const [displayLimit, setDisplayLimit] = useState(80);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [variantPickerParent, setVariantPickerParent] = useState<Product | null>(null);
   const [newOrderCount, setNewOrderCount] = useState(0);
   // const [showNotification, setShowNotification] = useState(false);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -259,6 +262,22 @@ export default function CashierPOS() {
     return 'direct';
   });
 
+  // Lookup varian dan produk
+  const { variantsByParentId, productsById } = useMemo(() => {
+    const vMap = new Map<string, Product[]>();
+    const pMap = new Map<string, Product>();
+    products.forEach((p) => {
+      pMap.set(p.id, p);
+      const pid = p.parentId?.trim();
+      if (pid) {
+        const arr = vMap.get(pid) || [];
+        arr.push(p);
+        vMap.set(pid, arr);
+      }
+    });
+    return { variantsByParentId: vMap, productsById: pMap };
+  }, [products]);
+
   const getChannelKey = useCallback((txType: string): ChannelKey => {
     if (txType === 'toko') return 'offline';
     if (txType === 'online') return 'website';
@@ -268,6 +287,14 @@ export default function CashierPOS() {
   }, []);
 
   const addToCartWithUnit = useCallback((product: Product, unit: UnitOption) => {
+    if (product.isParentOnly) {
+      const variants = variantsByParentId.get(product.id) || [];
+      if (variants.length > 0) {
+        setVariantPickerParent(product);
+        return;
+      }
+      return toast.error('Produk ini adalah Induk Pengelompokan dan tidak bisa di-order.');
+    }
     if (product.stock <= 0) return toast.error("Stok habis!");
 
     const code = (unit.code || product.unit || 'PCS').toUpperCase();
@@ -329,9 +356,22 @@ export default function CashierPOS() {
         appliedTier: tierResult.appliedTier,
       }];
     });
-  }, [transactionType, getChannelKey, selectedCustomer]);
+  }, [transactionType, getChannelKey, selectedCustomer, variantsByParentId]);
 
   const addToCart = useCallback((product: Product) => {
+    // Jika produk ini adalah Induk Pengelompokan atau memiliki varian
+    const variants = variantsByParentId.get(product.id) || [];
+    if (product.isParentOnly || variants.length > 0) {
+      if (variants.length > 0) {
+        setVariantPickerParent(product);
+        return;
+      }
+      if (product.isParentOnly) {
+        toast.error('Produk ini adalah Induk Pengelompokan dan tidak bisa di-order.');
+        return;
+      }
+    }
+
     if (product.stock <= 0) return toast.error("Stok habis!");
     
     // Skema 2: Jika produk diset tidak boleh dijual per satuan dasar (PCS di-hide)
@@ -394,7 +434,7 @@ export default function CashierPOS() {
         appliedTier: tierResult.appliedTier,
       }];
     });
-  }, [transactionType, getChannelKey, addToCartWithUnit, selectedCustomer]);
+  }, [transactionType, getChannelKey, addToCartWithUnit, selectedCustomer, variantsByParentId]);
 
   const handleScan = useCallback(async (code: string) => {
     try {
@@ -465,6 +505,8 @@ export default function CashierPOS() {
             Kategori: raw.Kategori || raw.kategori || 'UMUM',
             kategori: raw.Kategori || raw.kategori || 'UMUM',
             stockByWarehouse: raw.stockByWarehouse || {},
+            parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
+            isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
           };
         }
       }
@@ -1008,6 +1050,8 @@ export default function CashierPOS() {
             channelPricing: raw.channelPricing,
             priceSemiGrosir: Number(raw.priceSemiGrosir || 0) || undefined,
             priceGrosir: Number(raw.priceGrosir || 0) || undefined,
+            parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
+            isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
           });
         }
 
@@ -1194,6 +1238,7 @@ export default function CashierPOS() {
       const unitBarcodes = Array.isArray(p.units)
         ? p.units.map((u: any) => (u.barcode || '').toLowerCase()).filter(Boolean)
         : [];
+      const parentName = p.parentId ? (productsById.get(p.parentId)?.name || '').toLowerCase() : '';
 
       return tokens.every(t =>
         name.includes(t) ||
@@ -1201,6 +1246,7 @@ export default function CashierPOS() {
         sku.includes(t) ||
         brand.includes(t) ||
         category.includes(t) ||
+        parentName.includes(t) ||
         unitBarcodes.some(ub => ub.includes(t))
       );
     });
@@ -1232,6 +1278,11 @@ export default function CashierPOS() {
       (p.units && Array.isArray(p.units) && p.units.some((u: any) => u.barcode && u.barcode === trimmedQuery))
     );
     if (exactMatch && searchQuery.length >= 3) {
+      if (exactMatch.isParentOnly) {
+        setVariantPickerParent(exactMatch);
+        setSearchQuery('');
+        return;
+      }
       const unitMatch = exactMatch.units?.find((u: any) => u.barcode && u.barcode === trimmedQuery);
       if (unitMatch) {
         addToCartWithUnit(exactMatch, unitMatch);
@@ -1240,7 +1291,7 @@ export default function CashierPOS() {
       }
       setSearchQuery('');
     }
-  }, [searchQuery, products, addToCart, addToCartWithUnit, selectedCategory, stockFilter]);
+  }, [searchQuery, products, addToCart, addToCartWithUnit, selectedCategory, stockFilter, productsById]);
 
   useEffect(() => {
     if (loading) return;
@@ -2179,13 +2230,31 @@ export default function CashierPOS() {
                 style={{ maxHeight: 'calc(100vh - 240px)' }}
                 data-testid="product-grid-view"
               >
-              {filteredProducts.slice(0, displayLimit).map(p => (
+              {filteredProducts.slice(0, displayLimit).map(p => {
+                const childVariants = variantsByParentId.get(p.id) || [];
+                const isParentGroup = Boolean(p.isParentOnly || childVariants.length > 0);
+                const isVariant = Boolean(p.parentId);
+
+                return (
                 <div 
                   key={p.id} 
                   onClick={() => addToCart(p)}
-                  className={`bg-white border shadow-sm hover:border-green-500 hover:shadow-md transition-all text-left flex relative cursor-pointer active:scale-95 ${viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'} ${(p.stock || 0) <= 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
+                  className={`bg-white border shadow-sm hover:border-green-500 hover:shadow-md transition-all text-left flex relative cursor-pointer active:scale-95 ${
+                    viewMode === 'grid' ? 'flex-col p-3 rounded-2xl' : 'flex-row items-center p-2 rounded-xl gap-4'
+                  } ${
+                    p.isParentOnly
+                      ? 'border-violet-200 bg-violet-50/20 hover:border-violet-500'
+                      : (p.stock || 0) <= 0
+                      ? 'border-red-200 bg-red-50/30'
+                      : 'border-gray-100'
+                  }`}
                 >
-                  {(p.stock || 0) <= 0 && (
+                  {isParentGroup ? (
+                    <div className="absolute top-2 left-2 bg-violet-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full z-10 shadow-xs flex items-center gap-1">
+                      <Layers size={10} />
+                      <span>{childVariants.length > 0 ? `${childVariants.length} Varian` : 'Pilih Varian'}</span>
+                    </div>
+                  ) : (p.stock || 0) <= 0 && (
                     <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-black px-2 py-1 rounded-full z-10">STOK HABIS</div>
                   )}
                   <div className={`${viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14'} bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center text-gray-300 relative`}>
@@ -2193,44 +2262,69 @@ export default function CashierPOS() {
                     <img 
                       src={p.image} 
                       alt={p.name}
-                      className={`w-full h-full object-cover ${(p.stock || 0) <= 0 ? 'grayscale' : ''}`}
+                      className={`w-full h-full object-cover ${(p.stock || 0) <= 0 && !p.isParentOnly ? 'grayscale' : ''}`}
                       loading="lazy"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                     />
-                  ) : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
+                  ) : isParentGroup ? <Layers size={24} className="text-violet-400" /> : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
                 </div>
                   <div className="flex-1">
-                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug">{formatProductName(p.name)}</h3>
-                    <p className="text-green-600 font-black text-sm flex items-center gap-1">
-                      <span>Rp{(p.displayPrice || p.price).toLocaleString()}</span>
-                      {p.hideBaseUnit && p.displayUnit && (
-                        <span className="text-[10px] font-black px-1 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
-                          /{p.displayUnit}
+                    <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                      {isVariant && (
+                        <span className="text-[9px] font-bold text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.2 rounded">
+                          ↳ Varian
                         </span>
                       )}
-                    </p>
+                      {p.isParentOnly && (
+                        <span className="text-[9px] font-black text-violet-800 bg-violet-100 border border-violet-200 px-1.5 py-0.2 rounded">
+                          Induk (Non-Order)
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug">{formatProductName(p.name)}</h3>
+                    {p.isParentOnly ? (
+                      <p className="text-violet-700 font-bold text-xs flex items-center gap-1 mt-1">
+                        <Layers size={11} />
+                        <span>Klik untuk pilih varian</span>
+                      </p>
+                    ) : (
+                      <p className="text-green-600 font-black text-sm flex items-center gap-1">
+                        <span>Rp{(p.displayPrice || p.price).toLocaleString()}</span>
+                        {p.hideBaseUnit && p.displayUnit && (
+                          <span className="text-[10px] font-black px-1 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">
+                            /{p.displayUnit}
+                          </span>
+                        )}
+                      </p>
+                    )}
                     <div className="mt-1 flex items-center justify-between flex-wrap gap-y-1">
-                      {p.hideBaseUnit ? (
+                      {p.isParentOnly ? (
+                        <span className="text-[11px] font-semibold text-gray-500">
+                          Total {childVariants.length} varian produk
+                        </span>
+                      ) : p.hideBaseUnit ? (
                         <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
                           📦 Minimal {p.displayUnit || 'Kemasan'} (Ecer Nonaktif)
                         </span>
                       ) : (
                         <span className="text-xs font-bold text-gray-400">{p.unit}</span>
                       )}
-                      <span className={`text-xs font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>
-                        {p.hideBaseUnit && p.displayUnit ? (
-                          (() => {
-                            const uObj = (p.units || []).find(u => u.code === p.displayUnit);
-                            const c = Number(uObj?.contains || 1);
-                            const st = Math.floor((p.stock || 0) / (c > 0 ? c : 1));
-                            return `${st} ${p.displayUnit} (${p.stock} ${p.unit})`;
-                          })()
-                        ) : (
-                          `Stok: ${p.stock}`
-                        )}
-                      </span>
+                      {!p.isParentOnly && (
+                        <span className={`text-xs font-bold ${(p.stock || 0) < 10 ? 'text-red-500' : 'text-gray-400'}`}>
+                          {p.hideBaseUnit && p.displayUnit ? (
+                            (() => {
+                              const uObj = (p.units || []).find(u => u.code === p.displayUnit);
+                              const c = Number(uObj?.contains || 1);
+                              const st = Math.floor((p.stock || 0) / (c > 0 ? c : 1));
+                              return `${st} ${p.displayUnit} (${p.stock} ${p.unit})`;
+                            })()
+                          ) : (
+                            `Stok: ${p.stock}`
+                          )}
+                        </span>
+                      )}
                     </div>
-                    {(p.units || []).filter(u => {
+                    {!p.isParentOnly && (p.units || []).filter(u => {
                       if (p.hideBaseUnit && u.code === p.unit) return false;
                       return u.contains && Number(u.contains) > 1;
                     }).map(u => {
@@ -2270,7 +2364,8 @@ export default function CashierPOS() {
 
                   </div>
                 </div>
-              ))}
+              );
+            })}
 
               {filteredProducts.length === 0 && !isFetchingProducts && (
                 <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-20 text-center" : "py-20 text-center"}>
@@ -3365,6 +3460,132 @@ export default function CashierPOS() {
                 type="button"
                 onClick={() => setShowHeldModal(false)}
                 className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Pilih Varian Produk (Induk Pengelompokan) ── */}
+      {variantPickerParent && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setVariantPickerParent(null)}
+        >
+          <div
+            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-indigo-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                  <Layers size={20} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase text-violet-600 tracking-wider flex items-center gap-1">
+                    <span>PILIH VARIAN PRODUK</span>
+                    {variantPickerParent.isParentOnly && (
+                      <span className="bg-violet-100 text-violet-800 px-1.5 py-0.2 rounded text-[9px]">
+                        Induk Pengelompok
+                      </span>
+                    )}
+                  </span>
+                  <h3 className="text-sm font-black text-gray-900 truncate">
+                    {variantPickerParent.name}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setVariantPickerParent(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-xl transition-colors shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* List Varian */}
+            <div className="p-3 sm:p-4 overflow-y-auto space-y-2">
+              {(variantsByParentId.get(variantPickerParent.id) || []).length === 0 ? (
+                <div className="py-10 text-center text-xs text-gray-400">
+                  <Layers size={32} className="text-gray-300 mx-auto mb-2" />
+                  <p className="font-bold">Belum ada anak varian yang terhubung</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Hubungkan varian ke produk ini melalui menu Admin Produk.</p>
+                </div>
+              ) : (
+                (variantsByParentId.get(variantPickerParent.id) || []).map((v) => {
+                  const isOutOfStock = (v.stock || 0) <= 0;
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => {
+                        if (isOutOfStock) {
+                          toast.error(`Stok "${v.name}" habis!`);
+                          return;
+                        }
+                        addToCart(v);
+                        setVariantPickerParent(null);
+                        toast.success(`✅ Ditambahkan: ${v.name}`);
+                      }}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                        isOutOfStock
+                          ? 'bg-gray-50 border-gray-200 opacity-60'
+                          : 'bg-white hover:bg-emerald-50/60 hover:border-emerald-300 border-gray-200/80 shadow-2xs active:scale-[0.99]'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <CornerDownRight size={13} className="text-violet-500 shrink-0" />
+                          <span className="text-xs font-black text-gray-900">
+                            {v.name}
+                          </span>
+                          {v.sku && (
+                            <span className="text-[10px] font-mono text-gray-400">
+                              #{v.sku}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5 mt-1 text-xs pl-4 flex-wrap">
+                          <span className="font-black text-emerald-600">
+                            Rp{(v.displayPrice || v.price).toLocaleString('id-ID')}
+                            {v.hideBaseUnit && v.displayUnit && (
+                              <span className="text-[10px] font-normal text-gray-500">/{v.displayUnit}</span>
+                            )}
+                          </span>
+                          <span className={`text-[11px] font-semibold ${isOutOfStock ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
+                            Stok: <strong className={isOutOfStock ? 'text-red-600' : 'text-gray-800'}>{v.stock}</strong> {v.unit}
+                          </span>
+                          {v.barcode && (
+                            <span className="font-mono bg-gray-100 text-[10px] px-1 py-0.2 rounded text-gray-500">
+                              {v.barcode}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isOutOfStock}
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-200 disabled:text-gray-400 shadow-xs shrink-0 flex items-center gap-1"
+                      >
+                        <Plus size={13} />
+                        <span>Pilih</span>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-3 sm:p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span>Klik salah satu varian untuk menambah ke transaksi kasir</span>
+              <button
+                type="button"
+                onClick={() => setVariantPickerParent(null)}
+                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-colors"
               >
                 Tutup
               </button>
