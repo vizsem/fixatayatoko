@@ -74,11 +74,27 @@ function SemuaProdukContent() {
 
     // 1. Search Query Filter
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((p) => 
-        p.name.toLowerCase().includes(q) || 
-        p.category.toLowerCase().includes(q)
-      );
+      const q = search.toLowerCase().trim();
+      const tokens = q.split(/\s+/).filter(Boolean);
+      list = list.filter((p) => {
+        const name = (p.name || '').toLowerCase();
+        const category = (p.category || '').toLowerCase();
+        const brand = ((p as any).brand || '').toLowerCase();
+        const barcode = ((p as any).barcode || '').toLowerCase();
+        const sku = ((p as any).sku || '').toLowerCase();
+        const unitBarcodes = Array.isArray((p as any).units)
+          ? (p as any).units.map((u: any) => (u.barcode || '').toLowerCase()).filter(Boolean)
+          : [];
+
+        return tokens.every(t =>
+          name.includes(t) ||
+          category.includes(t) ||
+          brand.includes(t) ||
+          barcode.includes(t) ||
+          sku.includes(t) ||
+          unitBarcodes.some((ub: string) => ub.includes(t))
+        );
+      });
     }
 
     // 2. Category Filter

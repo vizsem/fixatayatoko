@@ -43,6 +43,8 @@ type ChannelPricing = Partial<Record<ChannelKey, Record<string, { price?: number
 type Product = {
   id: string;
   name: string;
+  sku?: string;
+  brand?: string;
   price: number; // base unit price (ecer)
   cost: number; // base unit cost (modal)
   unit: string; // base unit code
@@ -934,7 +936,7 @@ export default function CashierPOS() {
           promises.push(
             supabase
               .from('products')
-              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active')
+              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active, sku')
               .order('name', { ascending: true })
               .range(from, to)
               .then(res => res.data || [])
@@ -984,6 +986,8 @@ export default function CashierPOS() {
           p.push({
             id: d.id,
             name: d.name || raw.name || raw.Nama || 'TANPA NAMA',
+            sku: d.sku || raw.sku || raw.ID || d.id,
+            brand: raw.brand || raw.Brand || '',
             price: basePrice,
             cost: baseCost,
             unit: baseUnit,
@@ -1173,16 +1177,52 @@ export default function CashierPOS() {
 
   useEffect(() => {
     const term = searchQuery.toLowerCase().trim();
-    const filtered = products.filter(p => {
-      const matchSearch = !term || 
-        (p.name?.toLowerCase() || '').includes(term) || 
-        (p.barcode?.toLowerCase() || '').includes(term) ||
-        (p.units && Array.isArray(p.units) && p.units.some((u: any) => (u.barcode || '').toLowerCase().includes(term)));
+    const tokens = term ? term.split(/\s+/).filter(Boolean) : [];
+
+    let filtered = products.filter(p => {
       const matchCategory = selectedCategory === 'SEMUA' || (p.Kategori || p.kategori || 'UMUM') === selectedCategory;
       const matchStock = stockFilter === 'all' ? true : (stockFilter === 'instock' ? (p.stock || 0) > 0 : (p.stock || 0) <= 0);
-      
-      return matchSearch && matchCategory && matchStock;
+      if (!matchCategory || !matchStock) return false;
+
+      if (!tokens.length) return true;
+
+      const name = (p.name || '').toLowerCase();
+      const barcode = (p.barcode || '').toLowerCase();
+      const sku = (p.sku || p.id || '').toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      const category = (p.Kategori || p.kategori || '').toLowerCase();
+      const unitBarcodes = Array.isArray(p.units)
+        ? p.units.map((u: any) => (u.barcode || '').toLowerCase()).filter(Boolean)
+        : [];
+
+      return tokens.every(t =>
+        name.includes(t) ||
+        barcode.includes(t) ||
+        sku.includes(t) ||
+        brand.includes(t) ||
+        category.includes(t) ||
+        unitBarcodes.some(ub => ub.includes(t))
+      );
     });
+
+    if (term) {
+      filtered.sort((a, b) => {
+        const aName = (a.name || '').toLowerCase();
+        const bName = (b.name || '').toLowerCase();
+        const aExact = a.barcode === term || a.sku === term;
+        const bExact = b.barcode === term || b.sku === term;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+
+        const aStarts = aName.startsWith(term);
+        const bStarts = bName.startsWith(term);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        return 0;
+      });
+    }
+
     setFilteredProducts(filtered);
     setDisplayLimit(80);
 

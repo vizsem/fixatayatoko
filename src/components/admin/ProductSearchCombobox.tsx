@@ -11,7 +11,7 @@ export interface ProductOption {
   barcode?: string;
   category?: string;
   unit?: string;
-  units?: { code: string; contains: number; price?: number; label?: string }[];
+  units?: { code: string; contains: number; price?: number; label?: string; barcode?: string }[];
   purchasePrice?: number;
   priceEcer?: number;
   stock?: number;
@@ -126,13 +126,17 @@ export default function ProductSearchCombobox({
       const sku = (p.sku || '').toLowerCase();
       const barcode = (p.barcode || '').toLowerCase();
       const category = (p.category || '').toLowerCase();
+      const unitBarcodes = Array.isArray(p.units)
+        ? p.units.map((u: any) => (u.barcode || '').toLowerCase()).filter(Boolean)
+        : [];
 
       return tokens.every(
         (t) =>
           name.includes(t) ||
           sku.includes(t) ||
           barcode.includes(t) ||
-          category.includes(t)
+          category.includes(t) ||
+          unitBarcodes.some((ub: string) => ub.includes(t))
       );
     });
   }, [combinedProducts, searchTerm]);

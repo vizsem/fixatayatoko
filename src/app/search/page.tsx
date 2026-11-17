@@ -57,8 +57,27 @@ function SearchPageContent() {
     } as Product));
 
     if (query) {
-      const q = query.toLowerCase();
-      result = result.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+      const q = query.toLowerCase().trim();
+      const tokens = q.split(/\s+/).filter(Boolean);
+      result = result.filter(p => {
+        const name = (p.name || '').toLowerCase();
+        const category = (p.category || '').toLowerCase();
+        const brand = ((p as any).brand || '').toLowerCase();
+        const barcode = ((p as any).barcode || '').toLowerCase();
+        const sku = ((p as any).sku || '').toLowerCase();
+        const unitBarcodes = Array.isArray((p as any).units)
+          ? (p as any).units.map((u: any) => (u.barcode || '').toLowerCase()).filter(Boolean)
+          : [];
+
+        return tokens.every(t =>
+          name.includes(t) ||
+          category.includes(t) ||
+          brand.includes(t) ||
+          barcode.includes(t) ||
+          sku.includes(t) ||
+          unitBarcodes.some((ub: string) => ub.includes(t))
+        );
+      });
     }
 
     if (categoryFilter) {
@@ -82,7 +101,26 @@ function SearchPageContent() {
         break;
       case 'name':
       default:
-        result.sort((a, b) => a.name.localeCompare(b.name));
+        if (query) {
+          const q = query.toLowerCase().trim();
+          result.sort((a, b) => {
+            const aName = (a.name || '').toLowerCase();
+            const bName = (b.name || '').toLowerCase();
+            const aExact = aName === q;
+            const bExact = bName === q;
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+
+            const aStarts = aName.startsWith(q);
+            const bStarts = bName.startsWith(q);
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+
+            return aName.localeCompare(bName);
+          });
+        } else {
+          result.sort((a, b) => a.name.localeCompare(b.name));
+        }
         break;
     }
 
