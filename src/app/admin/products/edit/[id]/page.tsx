@@ -468,9 +468,11 @@ export default function EditProductPage() {
 
       if (spRow) {
         const raw = spRow.raw_data || {};
+        const realSku = (spRow.sku || raw.ID || raw.sku || '').toString().trim();
         data = {
           ...raw,
-          ID: spRow.id,
+          ID: realSku || spRow.id,
+          sku: realSku || spRow.id,
           Nama: spRow.name || raw.Nama || raw.name || '',
           Kategori: spRow.category || raw.Kategori || raw.category || 'UMUM',
           Satuan: spRow.unit || raw.Satuan || raw.unit || 'PCS',
@@ -500,7 +502,7 @@ export default function EditProductPage() {
 
       setFormData(prev => ({
         ...prev,
-        ID: data.ID || id,
+        ID: (data.ID || data.sku || spRow?.sku || id).toString().trim(),
         Barcode: data.Barcode || '',
         Parent_ID: data.Parent_ID || '',
         isParentOnly: Boolean(data.isParentOnly || (data as any).is_parent_only || (data.raw_data as any)?.isParentOnly || (data.raw_data as any)?.is_parent_only),
@@ -979,7 +981,9 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString(),
       };
 
+      const cleanSku = (formData.ID || '').toString().trim();
       const saveRes = await saveEditedProduct(id, {
+        sku: cleanSku,
         name: String(formData.Nama || '').toUpperCase(),
         category: categoryName,
         unit: baseUnit,

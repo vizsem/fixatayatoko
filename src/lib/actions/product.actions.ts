@@ -302,6 +302,7 @@ export async function getProductByIdForEdit(id: string) {
     const raw = spRow.raw_data || {};
     return {
       id: spRow.id,
+      sku: spRow.sku || raw.ID || raw.sku || '',
       name: spRow.name || raw.Nama || raw.name || '',
       category: spRow.category || raw.Kategori || raw.category || 'UMUM',
       unit: spRow.unit || raw.Satuan || raw.unit || 'PCS',
@@ -321,6 +322,7 @@ export async function getProductByIdForEdit(id: string) {
 }
 
 export async function saveEditedProduct(id: string, payload: {
+  sku?: string
   name: string
   category: string
   unit: string
@@ -344,8 +346,11 @@ export async function saveEditedProduct(id: string, payload: {
   try {
     const identity = await requireAdmin();
     const now = new Date().toISOString();
+    const cleanSku = (payload.sku || payload.raw_data?.ID || payload.raw_data?.sku || '').trim() || undefined;
+
     const { error } = await supabaseAdmin.from('products').upsert({
       id,
+      sku: cleanSku,
       name: payload.name,
       category: payload.category,
       unit: payload.unit,
@@ -358,6 +363,8 @@ export async function saveEditedProduct(id: string, payload: {
       is_active: payload.is_active,
       raw_data: {
         ...payload.raw_data,
+        ID: cleanSku || payload.raw_data?.ID || id,
+        sku: cleanSku || payload.raw_data?.sku || id,
         updatedAt: now,
       },
       updated_at: now,
