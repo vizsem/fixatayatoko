@@ -1077,35 +1077,35 @@ export default function AdminProducts() {
 
   return (
     <ErrorBoundary>
-      <div className="p-3 bg-gray-50 text-black">
+      <div className="p-2.5 sm:p-3.5 bg-gray-50 text-black">
       <Toaster />
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3.5 gap-2.5">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl shadow-sm shadow-blue-500/20">
-            <Package size={20} />
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl shadow-sm shadow-blue-500/20">
+            <Package size={16} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight leading-none">Katalog Produk</h1>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                <Sparkles size={11} className="text-blue-500" />
-                Live Sync
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Katalog Produk</h1>
+              <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                <Sparkles size={9} className="text-blue-500" />
+                Live
               </span>
             </div>
-            <p className="text-xs font-semibold text-gray-400 mt-1">Kelola stok inventaris, varian produk, dan penetapan harga</p>
+            <p className="hidden sm:block text-[11px] font-semibold text-gray-400 mt-0.5">Kelola stok, varian, dan harga</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={handleSync}
-            className="p-2.5 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-xs"
+            className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-xs"
             title="Sinkron & Reset Filter"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={14} />
           </button>
 
           {/* Import / Export & Integrasi Dropdown */}
@@ -1113,11 +1113,12 @@ export default function AdminProducts() {
             <button
               type="button"
               onClick={() => setShowImportExportMenu(prev => !prev)}
-              className="px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              className="px-2.5 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
             >
               <UploadCloud size={14} className="text-blue-600" />
-              <span>Import & Integrasi</span>
-              <ChevronDown size={14} className={`text-gray-400 transition-transform ${showImportExportMenu ? 'rotate-180' : ''}`} />
+              <span className="hidden sm:inline">Import & Integrasi</span>
+              <span className="sm:hidden">Import</span>
+              <ChevronDown size={13} className={`text-gray-400 transition-transform ${showImportExportMenu ? 'rotate-180' : ''}`} />
             </button>
 
             {showImportExportMenu && (
@@ -1180,54 +1181,55 @@ export default function AdminProducts() {
 
           <button
             onClick={() => router.push('/admin/products/add')}
-            className="bg-gray-900 hover:bg-black text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all active:scale-95"
+            className="bg-gray-900 hover:bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all active:scale-95"
           >
-            <Plus size={15} />
-            <span>Tambah Produk</span>
+            <Plus size={14} />
+            <span className="hidden sm:inline">Tambah Produk</span>
+            <span className="sm:hidden">Tambah</span>
           </button>
         </div>
       </div>
 
       {/* STATS KPI CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-3.5">
-        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
-          <div className="bg-blue-50 text-blue-600 p-2.5 rounded-xl shrink-0">
-            <Package size={18} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-xs flex items-center gap-2">
+          <div className="bg-blue-50 text-blue-600 p-2 rounded-lg shrink-0">
+            <Package size={15} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Katalog</p>
-            <p className="text-base font-black text-gray-900 leading-tight tabular-nums mt-0.5">{stats.totalJenis.toLocaleString('id-ID')} <span className="text-[11px] font-bold text-gray-400">SKU</span></p>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">{dbCounts.active || stats.totalJenis} Aktif • {dbCounts.inactive || 0} Arsip</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Katalog</p>
+            <p className="text-sm font-black text-gray-900 leading-tight tabular-nums">{stats.totalJenis.toLocaleString('id-ID')} <span className="text-[10px] font-bold text-gray-400">SKU</span></p>
+            <p className="text-[10px] font-semibold text-gray-500 truncate">{dbCounts.active || stats.totalJenis} Aktif • {dbCounts.inactive || 0} Arsip</p>
           </div>
         </div>
 
-        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
-          <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl shrink-0">
-            <Banknote size={18} />
+        <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-xs flex items-center gap-2">
+          <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg shrink-0">
+            <Banknote size={15} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Estimasi Nilai Aset</p>
-            <p className="text-base font-black text-emerald-700 leading-tight tabular-nums mt-0.5">
-              <span className="text-xs font-bold mr-0.5">Rp</span>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estimasi Aset</p>
+            <p className="text-sm font-black text-emerald-700 leading-tight tabular-nums">
+              <span className="text-[10px] font-bold mr-0.5">Rp</span>
               {stats.totalAset.toLocaleString('id-ID')}
             </p>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5">HPP Modal × Stok Fisik</p>
+            <p className="text-[10px] font-semibold text-gray-500">HPP × Stok Fisik</p>
           </div>
         </div>
 
         <div
           onClick={() => { setQuickFilter(quickFilter === 'out_of_stock' ? 'all' : 'out_of_stock'); setCurrentPage(1); }}
-          className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-rose-200 transition-all group"
+          className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-xs flex items-center gap-2 cursor-pointer hover:border-rose-200 transition-all group"
         >
-          <div className="bg-rose-50 text-rose-600 group-hover:bg-rose-100 p-2.5 rounded-xl shrink-0 transition-colors">
-            <AlertTriangle size={18} />
+          <div className="bg-rose-50 text-rose-600 group-hover:bg-rose-100 p-2 rounded-lg shrink-0 transition-colors">
+            <AlertTriangle size={15} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Perhatian Stok</p>
-            <p className="text-base font-black text-rose-600 leading-tight tabular-nums mt-0.5">
-              {(quickCounts.outOfStock + quickCounts.lowStock).toLocaleString('id-ID')} <span className="text-[11px] font-bold text-rose-400">Item</span>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Perhatian Stok</p>
+            <p className="text-sm font-black text-rose-600 leading-tight tabular-nums">
+              {(quickCounts.outOfStock + quickCounts.lowStock).toLocaleString('id-ID')} <span className="text-[10px] font-bold text-rose-400">Item</span>
             </p>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">
+            <p className="text-[10px] font-semibold text-gray-500 truncate">
               {quickCounts.outOfStock} Habis • {quickCounts.lowStock} Menipis
             </p>
           </div>
@@ -1235,17 +1237,17 @@ export default function AdminProducts() {
 
         <div
           onClick={() => { setQuickFilter(quickFilter === 'no_image' ? 'all' : 'no_image'); setCurrentPage(1); }}
-          className="bg-white p-3 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-purple-200 transition-all group"
+          className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-xs flex items-center gap-2 cursor-pointer hover:border-purple-200 transition-all group"
         >
-          <div className="bg-purple-50 text-purple-600 group-hover:bg-purple-100 p-2.5 rounded-xl shrink-0 transition-colors">
-            <Camera size={18} />
+          <div className="bg-purple-50 text-purple-600 group-hover:bg-purple-100 p-2 rounded-lg shrink-0 transition-colors">
+            <Camera size={15} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Perlu Dilengkapi</p>
-            <p className="text-base font-black text-purple-600 leading-tight tabular-nums mt-0.5">
-              {(quickCounts.noImage + quickCounts.noCost).toLocaleString('id-ID')} <span className="text-[11px] font-bold text-purple-400">Item</span>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Perlu Dilengkapi</p>
+            <p className="text-sm font-black text-purple-600 leading-tight tabular-nums">
+              {(quickCounts.noImage + quickCounts.noCost).toLocaleString('id-ID')} <span className="text-[10px] font-bold text-purple-400">Item</span>
             </p>
-            <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">
+            <p className="text-[10px] font-semibold text-gray-500 truncate">
               {quickCounts.noImage} Tanpa Foto • {quickCounts.noCost} Tanpa HPP
             </p>
           </div>
@@ -1255,18 +1257,18 @@ export default function AdminProducts() {
       {/* TABLE BOX */}
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
         {/* SEGMENTED TAB (AKTIF VS ARSIP) */}
-        <div className="flex border-b border-gray-100 bg-gray-50/50 p-1.5 gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex border-b border-gray-100 bg-gray-50/50 p-1 gap-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => { setShowInactive(false); setCurrentPage(1); setSelectedIds([]); }}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
               !showInactive 
                 ? 'bg-white text-emerald-700 border border-emerald-200 shadow-xs' 
                 : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
             }`}
           >
-            <Eye size={14} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
+            <Eye size={13} className={!showInactive ? 'text-emerald-600' : 'text-gray-400'} />
             <span>Produk Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
               !showInactive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.active || stats.totalJenis}
@@ -1275,15 +1277,15 @@ export default function AdminProducts() {
 
           <button
             onClick={() => { setShowInactive(true); setCurrentPage(1); setSelectedIds([]); }}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
               showInactive 
                 ? 'bg-white text-rose-700 border border-rose-200 shadow-xs' 
                 : 'text-gray-500 hover:text-gray-900 hover:bg-white/60'
             }`}
           >
-            <Archive size={14} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
-            <span>Arsip / Non-Aktif</span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            <Archive size={13} className={showInactive ? 'text-rose-600' : 'text-gray-400'} />
+            <span>Arsip</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
               showInactive ? 'bg-rose-100 text-rose-800' : 'bg-gray-200 text-gray-600'
             }`}>
               {dbCounts.inactive || 0}
@@ -1291,27 +1293,27 @@ export default function AdminProducts() {
           </button>
         </div>
 
-        <div className="p-2.5 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-white">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="p-2 border-b border-gray-100 flex flex-wrap items-center gap-1.5 bg-white">
+          <div className="relative flex-1 min-w-[160px]">
             {productsLoading ? (
-              <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={14} />
+              <RefreshCw className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={13} />
             ) : (
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
             )}
             <input
               type="text"
-              placeholder="Cari nama barang, SKU, barcode, kategori..."
-              className="w-full pl-8 pr-7 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all outline-none"
+              placeholder="Cari nama, SKU, barcode..."
+              className="w-full pl-7 pr-7 py-1.5 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all outline-none"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
             {searchTerm && (
               <button
                 onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
                 title="Hapus pencarian"
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             )}
           </div>
@@ -1319,41 +1321,40 @@ export default function AdminProducts() {
           <button
             type="button"
             onClick={() => setShowScannerModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all border border-blue-200/60 shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-all border border-blue-200/60 shadow-xs"
             title="Scan Barcode Kamera"
           >
-            <Camera size={14} />
-            <span className="hidden sm:inline">Scan Kamera</span>
+            <Camera size={13} />
+            <span className="hidden sm:inline">Scan</span>
           </button>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
-              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-bold uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
-            >
-              <option value="createdAt">URUTKAN: TERBARU</option>
-              <option value="updatedAt">URUTKAN: DIUPDATE</option>
-              <option value="name">URUTKAN: NAMA A-Z</option>
-            </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
+            className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-bold uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
+          >
+            <option value="createdAt">Terbaru</option>
+            <option value="updatedAt">Diupdate</option>
+            <option value="name">Nama A-Z</option>
+          </select>
 
-            {/* Tombol Pilih Semua Halaman Ini */}
-            <button
-              onClick={toggleSelectAll}
-              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-tight border transition-all flex items-center gap-1.5 shadow-xs active:scale-95 ${
-                selectedIds.length === currentItems.length && currentItems.length > 0
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {selectedIds.length === currentItems.length && currentItems.length > 0 ? (
-                <CheckSquare size={14} />
-              ) : (
-                <Square size={14} />
-              )}
-              <span>{selectedIds.length > 0 ? `Dipilih (${selectedIds.length})` : 'Pilih Semua'}</span>
-            </button>
-          </div>
+          {/* Tombol Pilih Semua Halaman Ini */}
+          <button
+            onClick={toggleSelectAll}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-tight border transition-all flex items-center gap-1 shadow-xs active:scale-95 ${
+              selectedIds.length === currentItems.length && currentItems.length > 0
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {selectedIds.length === currentItems.length && currentItems.length > 0 ? (
+              <CheckSquare size={13} />
+            ) : (
+              <Square size={13} />
+            )}
+            <span>{selectedIds.length > 0 ? `(${selectedIds.length})` : 'Pilih'}</span>
+          </button>
+        </div>
 
           {/* Bulk Action Button Bar */}
           {selectedIds.length > 0 && (
@@ -1420,7 +1421,6 @@ export default function AdminProducts() {
               </button>
             </div>
           )}
-        </div>
 
         {/* Mode Hierarki Varian & Quick Filter Section */}
         <div className="px-3 py-2 bg-gray-50/70 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
@@ -1623,16 +1623,16 @@ export default function AdminProducts() {
               const maxCost = pCosts.length > 0 ? Math.max(...pCosts) : Number(p.purchasePrice || 0);
 
               return (
-                <div key={p.id} className={`p-2.5 flex flex-col gap-2 ${isSelected ? 'bg-blue-50/50' : 'bg-white'}`}>
-                  <div className="flex items-start gap-2.5">
-                    <button onClick={() => toggleSelectOne(p.id)} className="mt-0.5 text-gray-300">
-                      {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
+                <div key={p.id} className={`px-2.5 py-2 flex flex-col gap-1.5 ${isSelected ? 'bg-blue-50/50' : 'bg-white'}`}>
+                  <div className="flex items-start gap-2">
+                    <button onClick={() => toggleSelectOne(p.id)} className="mt-1 text-gray-300 shrink-0">
+                      {isSelected ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} />}
                     </button>
-                    <div className="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                    <div className="w-10 h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.trim().startsWith('http') || p.imageUrl.trim().startsWith('/')) ? (
-                        <img src={p.imageUrl} alt={p.name} width={48} height={48} className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
+                        <img src={p.imageUrl} alt={p.name} width={40} height={40} className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
                       ) : (
-                        <Camera size={16} className="text-gray-300" />
+                        <Camera size={14} className="text-gray-300" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1728,47 +1728,47 @@ export default function AdminProducts() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                      <p className={`text-xs font-black uppercase tracking-tight flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
-                        {isExpired && <AlertTriangle size={10} className="animate-pulse" />}
+                      <p className={`text-[11px] font-black uppercase tracking-tight flex items-center gap-1 ${isExpired ? 'text-red-500' : 'text-gray-400'}`}>
+                        {isExpired && <AlertTriangle size={9} className="animate-pulse" />}
                         Exp: {p.expired_date || '-'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5 relative" data-action-menu>
+                    <div className="flex items-center gap-1 relative" data-action-menu>
                       <button 
                         onClick={() => {
                           if (hasVariants) setSelectedProductVariants(p);
                           else setSelectedProductRestock(p);
                         }} 
-                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs ${
+                        className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all shadow-xs ${
                           hasVariants ? 'bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
                         }`}
                         title={hasVariants ? "Kelola & Restock Varian" : "Quick Stock"}
                       >
-                        <Calculator size={15} />
+                        <Calculator size={13} />
                       </button>
                       <Link 
                         href={`/admin/products/edit/${p.id}`} 
-                        className="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-700 rounded-xl hover:bg-black hover:text-white transition-all shadow-xs"
+                        className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-700 rounded-xl hover:bg-black hover:text-white transition-all shadow-xs"
                         title="Edit Item"
                       >
-                        <Edit size={15} />
+                        <Edit size={13} />
                       </Link>
                       <button 
                         onClick={() => setSelectedProductVariants(p)}
-                        className="w-9 h-9 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-xs"
+                        className="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-xs"
                         title="Kelola Varian"
                       >
-                        <Layers size={15} />
+                        <Layers size={13} />
                       </button>
 
                       {/* More Dropdown Mobile */}
                       <button 
                         type="button"
                         onClick={() => setActiveActionMenuId(activeActionMenuId === p.id ? null : p.id)}
-                        className="w-9 h-9 flex items-center justify-center bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-100 transition-all shadow-xs"
+                        className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-100 transition-all shadow-xs"
                         title="Aksi Lainnya"
                       >
-                        <MoreVertical size={15} />
+                        <MoreVertical size={13} />
                       </button>
 
                       {activeActionMenuId === p.id && (
