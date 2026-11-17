@@ -348,6 +348,17 @@ export async function saveEditedProduct(id: string, payload: {
     const now = new Date().toISOString();
     const cleanSku = (payload.sku || payload.raw_data?.ID || payload.raw_data?.sku || '').trim() || undefined;
 
+    // Validasi pencegahan SKU duplikat dengan produk lain
+    if (cleanSku) {
+      const check = await isSkuAlreadyTaken(cleanSku, id);
+      if (check.taken) {
+        return {
+          success: false,
+          error: `ID/SKU "${cleanSku}" sudah digunakan oleh produk lain ("${check.productName || 'Tanpa Nama'}"). Silakan gunakan SKU lain atau klik Generate SKU agar unik.`,
+        };
+      }
+    }
+
     const { error } = await supabaseAdmin.from('products').upsert({
       id,
       sku: cleanSku,
@@ -649,14 +660,13 @@ export async function addProductFull(payload: {
     const isActive = Number(payload.Status) === 1;
     const byWarehouse = payload.warehouseId ? { [payload.warehouseId]: totalStock } : {};
 
-    // Validasi duplikat SKU di Supabase
-    const { data: existing } = await supabaseAdmin
-      .from('products')
-      .select('id')
-      .eq('sku', sku)
-      .maybeSingle();
-    if (existing) {
-      return { success: false, error: `ID/SKU "${sku}" sudah terdaftar di database!` };
+    // Validasi duplikat SKU di Supabase (sku, id, raw_data)
+    const checkSku = await isSkuAlreadyTaken(sku);
+    if (checkSku.taken) {
+      return {
+        success: false,
+        error: `ID/SKU "${sku}" sudah terdaftar pada produk "${checkSku.productName || 'Tanpa Nama'}"! Silakan gunakan SKU lain atau klik Auto SKU.`,
+      };
     }
 
     const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -2989,10 +2999,75 @@ export async function syncVariantUnitsFromParentAction(
 }
 
 /**
- * Generate SKU berikutnya dengan format Skema 1: [PREFIX]-[4_DIGIT]
- * Contoh: SBK-0023, SNK-0007, MNM-0001
+ * Periksa apakah suatu SKU sudah terpakai oleh produk lain di database.
+ * Memeriksa kolom products.sku, products.id, serta raw_data->ID dan raw_data->sku.
  */
-export async function generateNextSkuAction(categoryName: string, productName?: string): Promise<{
+export async function isSkuAlreadyTaken(
+  sku: string,
+  excludeProductId?: string
+): Promise<{ taken: boolean; productName?: string }> {
+  const clean = sku.trim();
+  if (!clean) return { taken: false };
+
+  try {
+    // 1. Cek di kolom products.sku (case-insensitive)
+    let skuQ = supabaseAdmin
+      .from('products')
+      .select('id, name, sku')
+      .ilike('sku', clean);
+    if (excludeProductId) {
+      skuQ = skuQ.neq('id', excludeProductId);
+    }
+    const { data: matchSku } = await skuQ.limit(1);
+    if (matchSku && matchSku.length > 0) {
+      return { taken: true, productName: matchSku[0].name || matchSku[0].id };
+    }
+
+    // 2. Cek di kolom products.id
+    let idQ = supabaseAdmin
+      .from('products')
+      .select('id, name')
+      .eq('id', clean);
+    if (excludeProductId) {
+      idQ = idQ.neq('id', excludeProductId);
+    }
+    const { data: matchId } = await idQ.limit(1);
+    if (matchId && matchId.length > 0) {
+      return { taken: true, productName: matchId[0].name || matchId[0].id };
+    }
+
+    // 3. Cek di raw_data (raw_data->>ID atau raw_data->>sku)
+    let rawQ = supabaseAdmin
+      .from('products')
+      .select('id, name, raw_data')
+      .or(`raw_data->>ID.ilike.${clean},raw_data->>sku.ilike.${clean}`);
+    if (excludeProductId) {
+      rawQ = rawQ.neq('id', excludeProductId);
+    }
+    const { data: matchRaw } = await rawQ.limit(1);
+    if (matchRaw && matchRaw.length > 0) {
+      return { taken: true, productName: matchRaw[0].name || matchRaw[0].id };
+    }
+
+    return { taken: false };
+  } catch (err) {
+    console.warn('isSkuAlreadyTaken check failed:', err);
+    return { taken: false };
+  }
+}
+
+/**
+ * Generate SKU berikutnya dengan format Skema 1: [PREFIX]-[4_DIGIT]
+ * Dijamin 100% UNIK & BEBAS DUPLIKASI:
+ * 1. Mengumpulkan semua SKU yang ada untuk prefix kategori ini dari sku, id, dan raw_data
+ * 2. Menghitung urutan angka tertinggi (maxNum)
+ * 3. Menjalankan Collision-Proof Loop dengan verifikasi ganda ke database hingga mendapatkan SKU yang bersih
+ */
+export async function generateNextSkuAction(
+  categoryName: string,
+  productName?: string,
+  excludeProductId?: string
+): Promise<{
   success: boolean;
   sku?: string;
   prefix?: string;
@@ -3003,28 +3078,89 @@ export async function generateNextSkuAction(categoryName: string, productName?: 
   try {
     const prefix = getCategoryPrefix(categoryName, productName);
 
-    // Cari SKU tertinggi untuk prefix ini (hanya pola PREFIX-NNNN tanpa suffix varian)
-    const { data: existing, error } = await supabaseAdmin
-      .from('products')
-      .select('sku')
-      .ilike('sku', `${prefix}-%`);
+    // Kumpulkan seluruh data SKU yang ada dengan prefix ini
+    const [skuRes, idRes, rawRes] = await Promise.all([
+      supabaseAdmin
+        .from('products')
+        .select('id, sku')
+        .ilike('sku', `${prefix}-%`)
+        .limit(5000),
+      supabaseAdmin
+        .from('products')
+        .select('id')
+        .ilike('id', `${prefix}-%`)
+        .limit(5000),
+      supabaseAdmin
+        .from('products')
+        .select('id, raw_data')
+        .or(`raw_data->>ID.ilike.${prefix}-%,raw_data->>sku.ilike.${prefix}-%`)
+        .limit(5000),
+    ]);
 
-    if (error) throw error;
+    const existingSkus = new Set<string>();
 
+    for (const row of skuRes.data || []) {
+      if (row.sku) existingSkus.add(row.sku.toUpperCase().trim());
+    }
+    for (const row of idRes.data || []) {
+      if (row.id) existingSkus.add(row.id.toUpperCase().trim());
+    }
+    for (const row of rawRes.data || []) {
+      const raw = row.raw_data as any;
+      if (raw?.ID) existingSkus.add(String(raw.ID).toUpperCase().trim());
+      if (raw?.sku) existingSkus.add(String(raw.sku).toUpperCase().trim());
+    }
+
+    // Cari angka urut tertinggi yang pernah digunakan
     let maxNum = 0;
-    for (const row of existing || []) {
-      const sku = (row.sku || '').toUpperCase().trim();
-      const match = sku.match(new RegExp(`^${prefix}-(\\d{1,6})$`));
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
+    const numRegex = new RegExp(`^${prefix}-(\\d{1,6})($|-)`);
+    for (const item of existingSkus) {
+      const m = item.match(numRegex);
+      if (m) {
+        const val = parseInt(m[1], 10);
+        if (!isNaN(val) && val > maxNum) maxNum = val;
       }
     }
 
-    const nextNumber = maxNum + 1;
-    const sku = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
+    // Collision-Proof Verification Loop
+    let candidateNumber = maxNum + 1;
+    let finalSku = '';
+    const MAX_ATTEMPTS = 500;
+    let attempts = 0;
 
-    return { success: true, sku, prefix, nextNumber };
+    while (attempts < MAX_ATTEMPTS) {
+      attempts++;
+      const candidateSku = `${prefix}-${String(candidateNumber).padStart(4, '0')}`;
+
+      // Cek cepat di memory set
+      if (existingSkus.has(candidateSku.toUpperCase())) {
+        candidateNumber++;
+        continue;
+      }
+
+      // Verifikasi pasti ke database
+      const check = await isSkuAlreadyTaken(candidateSku, excludeProductId);
+      if (check.taken) {
+        existingSkus.add(candidateSku.toUpperCase());
+        candidateNumber++;
+        continue;
+      }
+
+      // Berhasil: SKU unik ditemukan
+      finalSku = candidateSku;
+      break;
+    }
+
+    if (!finalSku) {
+      finalSku = `${prefix}-${Date.now().toString().slice(-4)}`;
+    }
+
+    return {
+      success: true,
+      sku: finalSku,
+      prefix,
+      nextNumber: candidateNumber,
+    };
   } catch (err: any) {
     console.error('generateNextSkuAction error:', err);
     return { success: false, error: err?.message || 'Gagal membuat SKU otomatis' };

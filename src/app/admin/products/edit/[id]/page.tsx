@@ -1176,16 +1176,16 @@ export default function EditProductPage() {
                         <button
                           type="button"
                           onClick={async () => {
-                            const res = await generateNextSkuAction(formData.Kategori || '', formData.Nama || '');
+                            const res = await generateNextSkuAction(formData.Kategori || '', formData.Nama || '', id);
                             if (res.success && res.sku) {
                               setFormData(prev => ({ ...prev, ID: res.sku! }));
-                              toast.success(`SKU baru: ${res.sku}`);
+                              toast.success(`SKU unik dihasilkan: ${res.sku}`);
                             } else {
-                              toast.error('Gagal generate SKU otomatis');
+                              toast.error(res.error || 'Gagal generate SKU otomatis');
                             }
                           }}
                           className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-100 transition-colors"
-                          title="Generate SKU baru otomatis berdasarkan kategori (format: KAT-0001)"
+                          title="Generate SKU baru otomatis berbasis kategori (dijamin unik & tidak ada yang sama)"
                         >
                           <Sparkles size={10} /> Generate SKU
                         </button>

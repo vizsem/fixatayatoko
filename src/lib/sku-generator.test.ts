@@ -37,10 +37,14 @@ describe('sku-generator (Skema 1 Kategori)', () => {
     expect(generateVariantSuffix('XL')).toBe('XL');
   });
 
-  it('membuat SKU varian lengkap yang rapi', () => {
+  it('membuat SKU varian lengkap yang rapi dan bebas bentrok', () => {
     expect(generateVariantSku('SBK-0001', 'Coklat')).toBe('SBK-0001-CKT');
     expect(generateVariantSku('SNK-0012', 'Keju')).toBe('SNK-0012-KJU');
     expect(generateVariantSku('MNM-0005', '1kg')).toBe('MNM-0005-1KG');
+
+    // Menghindari bentrok jika suffix sama
+    const existing = ['SBK-0001-CKT'];
+    expect(generateVariantSku('SBK-0001', 'Cokelat', 1, existing)).toBe('SBK-0001-CKT-2');
   });
 
   it('merapikan tampilan SKU legacy / UUID panjang di UI', () => {

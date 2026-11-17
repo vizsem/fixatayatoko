@@ -224,11 +224,28 @@ export function generateVariantSuffix(variantName: string, index = 0): string {
 /**
  * Buat SKU Varian Lengkap
  * Contoh: generateVariantSku("SBK-0001", "Coklat") -> "SBK-0001-CKT"
+ * Menjamin tidak ada SKU varian yang bentrok jika existingSkus disertakan.
  */
-export function generateVariantSku(parentSku: string, variantName: string, index = 0): string {
+export function generateVariantSku(
+  parentSku: string,
+  variantName: string,
+  index = 0,
+  existingSkus: string[] = []
+): string {
   const baseParent = (parentSku || 'PRD-0001').trim().toUpperCase();
   const suffix = generateVariantSuffix(variantName, index);
-  return `${baseParent}-${suffix}`;
+  let finalSku = `${baseParent}-${suffix}`;
+
+  if (existingSkus && existingSkus.length > 0) {
+    const upperSet = new Set(existingSkus.map(s => s.trim().toUpperCase()));
+    let count = 1;
+    while (upperSet.has(finalSku.toUpperCase())) {
+      count++;
+      finalSku = `${baseParent}-${suffix}-${count}`;
+    }
+  }
+
+  return finalSku;
 }
 
 /**
