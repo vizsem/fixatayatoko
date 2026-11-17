@@ -168,6 +168,7 @@ export default function EditProductPage() {
     ID: '',
     Barcode: '',
     Parent_ID: '',
+    isParentOnly: false,
     Nama: '',
     Kategori: '',
     Brand: '',
@@ -502,6 +503,7 @@ export default function EditProductPage() {
         ID: data.ID || id,
         Barcode: data.Barcode || '',
         Parent_ID: data.Parent_ID || '',
+        isParentOnly: Boolean(data.isParentOnly || (data as any).is_parent_only || (data.raw_data as any)?.isParentOnly || (data.raw_data as any)?.is_parent_only),
         Nama: data.Nama || data.name || '',
         Kategori: data.Kategori || 'UMUM',
         Brand: data.Brand || '',
@@ -946,6 +948,7 @@ export default function EditProductPage() {
         Lokasi: formData.Lokasi || '',
         Supplier: formData.Supplier || '',
         No_WA_Supplier: formData.No_WA_Supplier || '',
+        isParentOnly: Boolean(formData.isParentOnly),
         units: ensuredBase,
         hideBaseUnit,
         hide_base_unit: hideBaseUnit,
@@ -1234,6 +1237,25 @@ export default function EditProductPage() {
                       onChange={(e) => setFormData({ ...formData, Lokasi: e.target.value })}
                       placeholder="Rak A-01"
                     />
+                  </div>
+
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="flex items-start gap-2.5 p-2.5 bg-violet-50/60 hover:bg-violet-50 border border-violet-100 rounded-xl cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formData.isParentOnly)}
+                        onChange={(e) => setFormData({ ...formData, isParentOnly: e.target.checked })}
+                        className="mt-0.5 rounded text-violet-600 focus:ring-violet-400 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-violet-900 block">
+                          Jadikan Produk Induk Pengelompokan Saja (Non-Order)
+                        </span>
+                        <span className="text-violet-700 font-medium">
+                          Produk ini berfungsi murni sebagai payung grup (tidak bisa langsung di-order di transaksi kasir/pembelian), melainkan pesanan diarahkan untuk memilih variannya.
+                        </span>
+                      </div>
+                    </label>
                   </div>
 
                   <div className="sm:col-span-2 lg:col-span-3">

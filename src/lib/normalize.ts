@@ -119,6 +119,7 @@ export type NormalizedProduct = {
   parentId?: string;
   brand?: string;
   category: string;
+  isParentOnly?: boolean;
   warehouseId: string;
   stock: number;
   stockByWarehouse?: Record<string, number>;
@@ -189,6 +190,7 @@ export function normalizeProduct(id: string, raw: Record<string, unknown>): Norm
     sku: getStr(raw.sku ?? raw.ID),
     barcode: getStr(raw.barcode ?? raw.Barcode ?? (raw.raw_data as Record<string, unknown> | undefined)?.Barcode),
     parentId: getStr(raw.parentId ?? raw.parent_id ?? raw.Parent_ID ?? (raw.raw_data as Record<string, unknown> | undefined)?.Parent_ID),
+    isParentOnly: Boolean((raw as any).isParentOnly || (raw as any).is_parent_only || (raw.raw_data as any)?.isParentOnly || (raw.raw_data as any)?.is_parent_only),
     brand: getStr(raw.brand ?? raw.Brand ?? raw.merek ?? raw.Merek ?? (raw.raw_data as Record<string, unknown> | undefined)?.brand ?? (raw.raw_data as Record<string, unknown> | undefined)?.Brand ?? (raw.raw_data as Record<string, unknown> | undefined)?.merek),
     category: getStr(raw.category ?? raw.Kategori),
     warehouseId: getStr(raw.warehouseId),

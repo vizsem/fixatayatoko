@@ -20,6 +20,7 @@ import {
   bulkUpdatePreOrderAction,
   bulkMoveCategoryAction,
   getCategories,
+  toggleParentOnlyAction,
 } from '@/lib/actions/product.actions';
 
 
@@ -1054,6 +1055,33 @@ export default function AdminProducts() {
     }
   };
 
+  const handleToggleParentOnly = async (product: ProductRow) => {
+    const isCurrentlyParentOnly = Boolean(
+      product.isParentOnly ||
+      product.raw_data?.isParentOnly ||
+      product.raw_data?.is_parent_only
+    );
+    const nextStatus = !isCurrentlyParentOnly;
+    const promptMsg = nextStatus
+      ? `Jadikan "${product.name || product.Nama}" sebagai Induk Pengelompokan (Non-Order)?\n\nProduk ini murni sebagai judul grup dan tidak bisa langsung di-order di transaksi kasir/pembelian, melainkan pelanggan/admin memilih variannya.`
+      : `Kembalikan "${product.name || product.Nama}" menjadi produk reguler (bisa di-order)?`;
+
+    if (!confirm(promptMsg)) return;
+
+    const t = notify.admin.loading('Memperbarui peran produk...');
+    try {
+      const res = await toggleParentOnlyAction(product.id, nextStatus);
+      if (!res?.success) throw new Error(res?.error || 'Gagal mengubah status');
+      notify.admin.success(
+        nextStatus ? 'Berhasil ditandai sebagai Induk Pengelompokan!' : 'Berhasil dikembalikan jadi produk reguler!',
+        { id: t }
+      );
+      setTimeout(() => window.location.reload(), 600);
+    } catch (error: any) {
+      notify.admin.error(error?.message || 'Gagal memperbarui status', { id: t });
+    }
+  };
+
   // --- HANDLE SYNC & RESET ---
   const handleSync = () => {
     const t = notify.admin.loading("Mensinkronkan data...");
@@ -1653,6 +1681,11 @@ export default function AdminProducts() {
                             )}
                           </span>
                         ) : null}
+                        {p.isParentOnly && (
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 border border-violet-200 inline-flex items-center gap-1">
+                            <Layers size={9} /> Induk (Non-Order)
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-bold text-gray-900 text-sm leading-tight tracking-tight line-clamp-2">{formatProductName(p.name)}</h3>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1796,6 +1829,14 @@ export default function AdminProducts() {
                           >
                             {p.isActive === false ? <RotateCcw size={13} className="text-emerald-600" /> : <Archive size={13} className="text-gray-500" />}
                             <span>{p.isActive === false ? 'Pulihkan Produk' : 'Arsipkan Produk'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setActiveActionMenuId(null); handleToggleParentOnly(p); }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50 rounded-xl transition-colors"
+                          >
+                            <Layers size={13} className="text-violet-600" />
+                            <span>{p.isParentOnly ? 'Ubah Jadi Reguler (Bisa Order)' : 'Jadikan Induk (Non-Order)'}</span>
                           </button>
                           <div className="my-1 border-t border-gray-100" />
                           <button
@@ -1972,6 +2013,12 @@ export default function AdminProducts() {
                                   )}
                                 </span>
                               ) : null}
+                              {p.isParentOnly && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-800 border border-violet-200 select-none">
+                                  <Layers size={9} />
+                                  <span>Induk (Non-Order)</span>
+                                </span>
+                              )}
                               {hasVariants && viewHierarchy !== 'flat' && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-violet-100 text-violet-700 select-none">
                                   <Layers size={9} />
@@ -2150,6 +2197,14 @@ export default function AdminProducts() {
                               >
                                 {p.isActive === false ? <RotateCcw size={13} className="text-emerald-600" /> : <Archive size={13} className="text-gray-500" />}
                                 <span>{p.isActive === false ? 'Pulihkan Produk' : 'Arsipkan Produk'}</span>
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => { setActiveActionMenuId(null); handleToggleParentOnly(p); }} 
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 rounded-xl transition-colors"
+                              >
+                                <Layers size={13} className="text-violet-600" />
+                                <span>{p.isParentOnly ? 'Ubah Jadi Reguler (Bisa Order)' : 'Jadikan Induk (Non-Order)'}</span>
                               </button>
                               <div className="my-1 border-t border-gray-100" />
                               <button 

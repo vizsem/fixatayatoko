@@ -33,6 +33,7 @@ export default function MergeVariantsModal({
     const root = selectedProducts.find((p) => !p.parentId);
     return root ? root.id : (selectedProducts[0]?.id || '');
   });
+  const [isParentOnly, setIsParentOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Update selectedParentId bila daftar produk berubah
@@ -71,6 +72,7 @@ export default function MergeVariantsModal({
       const res = await mergeProductsAsVariantsAction({
         parentId: selectedParentId,
         variantProductIds: variantProducts.map((p) => p.id),
+        isParentOnly,
       });
 
       if (!res.success) {
@@ -193,6 +195,24 @@ export default function MergeVariantsModal({
               })}
             </div>
           </div>
+
+          {/* Opsi Induk Hanya Pengelompokan */}
+          <label className="flex items-start gap-3 p-3.5 bg-violet-50/60 rounded-2xl border border-violet-200/80 cursor-pointer hover:bg-violet-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={isParentOnly}
+              onChange={(e) => setIsParentOnly(e.target.checked)}
+              className="mt-0.5 rounded text-violet-600 focus:ring-violet-400 w-4 h-4 cursor-pointer"
+            />
+            <div className="text-xs">
+              <span className="font-bold text-violet-900 block">
+                Jadikan Induk hanya sebagai Pengelompokan (Non-Order)
+              </span>
+              <span className="text-violet-700 font-medium">
+                Induk ini murni sebagai payung grup (tidak bisa langsung di-order di kasir/pembelian), melainkan saat dicari akan diarahkan memilih salah satu variannya.
+              </span>
+            </div>
+          </label>
 
           {/* Langkah 2: Ringkasan Varian yang akan digabung */}
           {parentProduct && (

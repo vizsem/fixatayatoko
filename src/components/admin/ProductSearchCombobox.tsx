@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ChevronDown, Check, X, Loader2 } from 'lucide-react';
+import { Search, ChevronDown, Check, X, Loader2, Layers, CornerDownRight, Package, AlertCircle } from 'lucide-react';
 import { getProducts } from '@/lib/actions/product.actions';
+import toast from 'react-hot-toast';
 
 export interface ProductOption {
   id: string;
@@ -16,6 +17,9 @@ export interface ProductOption {
   priceEcer?: number;
   stock?: number;
   isActive?: boolean;
+  parentId?: string;
+  isParentOnly?: boolean;
+  raw_data?: any;
 }
 
 interface ProductSearchComboboxProps {
@@ -115,13 +119,29 @@ export default function ProductSearchCombobox({
     return Array.from(map.values());
   }, [products, serverResults]);
 
-  // Filter products by search term locally
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return combinedProducts;
+  // Map of children by parentId and quick lookup
+  const { parentChildMap, productById } = useMemo(() => {
+    const pcMap = new Map<string, ProductOption[]>();
+    const pMap = new Map<string, ProductOption>();
+    combinedProducts.forEach((p) => {
+      pMap.set(p.id, p);
+      const pid = p.parentId?.trim();
+      if (pid) {
+        const arr = pcMap.get(pid) || [];
+        arr.push(p);
+        pcMap.set(pid, arr);
+      }
+    });
+    return { parentChildMap: pcMap, productById: pMap };
+  }, [combinedProducts]);
 
-    const tokens = term.split(/\s+/).filter(Boolean);
-    return combinedProducts.filter((p) => {
+  // Filter products by search term locally & organize hierarchical relationships
+  const { topLevelProducts, childrenByParentInView } = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const tokens = term ? term.split(/\s+/).filter(Boolean) : [];
+
+    const matches = (p: ProductOption) => {
+      if (!tokens.length) return true;
       const name = (p.name || '').toLowerCase();
       const sku = (p.sku || '').toLowerCase();
       const barcode = (p.barcode || '').toLowerCase();
@@ -138,8 +158,40 @@ export default function ProductSearchCombobox({
           category.includes(t) ||
           unitBarcodes.some((ub: string) => ub.includes(t))
       );
+    };
+
+    // Filter all matching products
+    const matchedProducts = combinedProducts.filter(matches);
+    const matchedIds = new Set(matchedProducts.map((p) => p.id));
+
+    // Also include parents of any matched children so the hierarchy is visible
+    matchedProducts.forEach((p) => {
+      if (p.parentId && productById.has(p.parentId)) {
+        matchedIds.add(p.parentId);
+      }
     });
-  }, [combinedProducts, searchTerm]);
+
+    const viewProducts = combinedProducts.filter((p) => matchedIds.has(p.id));
+
+    // Separate top-level (parents & standalone products) vs children
+    const topLevel: ProductOption[] = [];
+    const childrenViewMap = new Map<string, ProductOption[]>();
+
+    viewProducts.forEach((p) => {
+      const pid = p.parentId?.trim();
+      if (pid && matchedIds.has(pid)) {
+        // Child has its parent present in the view -> nest it under parent
+        const arr = childrenViewMap.get(pid) || [];
+        arr.push(p);
+        childrenViewMap.set(pid, arr);
+      } else {
+        // Either a parent, standalone product, or orphan child without parent in view
+        topLevel.push(p);
+      }
+    });
+
+    return { topLevelProducts: topLevel, childrenByParentInView: childrenViewMap };
+  }, [combinedProducts, searchTerm, productById]);
 
   // Find currently selected product
   const selectedProduct = useMemo(() => {
@@ -148,6 +200,12 @@ export default function ProductSearchCombobox({
   }, [combinedProducts, value]);
 
   const handleSelect = (product: ProductOption) => {
+    if (product.isParentOnly) {
+      toast('Produk ini adalah Induk Pengelompokan. Silakan pilih salah satu variannya di bawah.', {
+        icon: 'ℹ️',
+      });
+      return;
+    }
     onChange(product.id, product);
     setIsOpen(false);
   };
@@ -165,9 +223,16 @@ export default function ProductSearchCombobox({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer flex items-center justify-between gap-1 transition-all"
       >
-        <div className="flex-1 truncate">
+        <div className="flex-1 truncate flex items-center gap-1.5">
           {selectedProduct ? (
-            <span className="font-semibold text-gray-800">{selectedProduct.name}</span>
+            <>
+              <span className="font-semibold text-gray-800 truncate">{selectedProduct.name}</span>
+              {selectedProduct.parentId && (
+                <span className="text-[9px] font-black uppercase bg-violet-50 text-violet-700 border border-violet-200 px-1 py-0.2 rounded shrink-0">
+                  Varian
+                </span>
+              )}
+            </>
           ) : (
             <span className="text-gray-400">{placeholder}</span>
           )}
@@ -189,7 +254,7 @@ export default function ProductSearchCombobox({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden min-w-[280px]">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden min-w-[320px] max-w-lg">
           {/* Search Bar */}
           <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
             <Search size={14} className="text-gray-400 ml-1 flex-shrink-0" />
@@ -198,7 +263,7 @@ export default function ProductSearchCombobox({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari nama, SKU, atau barcode..."
+              placeholder="Cari nama barang, varian, SKU, barcode..."
               className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
             />
             {isSearching && <Loader2 size={12} className="animate-spin text-emerald-600 flex-shrink-0" />}
@@ -214,37 +279,140 @@ export default function ProductSearchCombobox({
           </div>
 
           {/* List Options */}
-          <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
-            {filteredProducts.length === 0 ? (
+          <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+            {topLevelProducts.length === 0 ? (
               <div className="p-4 text-center text-xs text-gray-400">
                 {isSearching ? 'Mencari ke database...' : 'Produk aktif tidak ditemukan'}
               </div>
             ) : (
-              filteredProducts.slice(0, 100).map((p) => {
+              topLevelProducts.slice(0, 100).map((p) => {
                 const isSelected = p.id === value;
+                const children = childrenByParentInView.get(p.id) || parentChildMap.get(p.id) || [];
+                const hasVariants = children.length > 0;
+                const isParentGroup = Boolean(p.isParentOnly || hasVariants);
+
                 return (
-                  <div
-                    key={p.id}
-                    onClick={() => handleSelect(p)}
-                    className={`px-3 py-2 text-xs cursor-pointer flex items-center justify-between gap-2 hover:bg-emerald-50 transition-colors ${
-                      isSelected ? 'bg-emerald-50/70 font-bold text-emerald-900' : 'text-gray-700'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-xs font-semibold text-gray-800">{p.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                        {p.barcode && <span className="font-mono bg-gray-100 px-1 py-0.2 rounded">{p.barcode}</span>}
-                        {p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
-                          <span className="text-emerald-600 font-medium">
-                            Modal: Rp{Number(p.purchasePrice).toLocaleString('id-ID')}
-                          </span>
-                        )}
-                        {p.stock !== undefined && (
-                          <span>Stok: {p.stock}</span>
-                        )}
+                  <div key={p.id} className="transition-colors">
+                    {/* Parent Header / Standalone Item */}
+                    <div
+                      onClick={() => handleSelect(p)}
+                      className={`px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                        p.isParentOnly
+                          ? 'bg-violet-50/50 cursor-default border-b border-violet-100/60'
+                          : isSelected
+                          ? 'bg-emerald-50/70 font-bold text-emerald-900 cursor-pointer'
+                          : 'hover:bg-emerald-50 text-gray-700 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isParentGroup && (
+                            <span className="p-0.5 bg-violet-100 text-violet-700 rounded shrink-0">
+                              <Layers size={11} />
+                            </span>
+                          )}
+                          <p className={`truncate text-xs ${isParentGroup ? 'font-black text-slate-900' : 'font-semibold text-gray-800'}`}>
+                            {p.name}
+                          </p>
+                          {p.isParentOnly ? (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-violet-100 text-violet-800 border border-violet-200">
+                              Induk (Non-Order)
+                            </span>
+                          ) : hasVariants ? (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-violet-50 text-violet-700 border border-violet-100">
+                              Induk ({children.length} Varian)
+                            </span>
+                          ) : p.parentId ? (
+                            <span className="text-[9px] font-bold text-violet-700 bg-violet-50 px-1 py-0.2 rounded">
+                              ↳ Varian: {productById.get(p.parentId)?.name || p.parentId}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Sub info */}
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
+                          {p.sku && <span className="font-mono text-[10px] text-gray-500">#{p.sku}</span>}
+                          {p.barcode && <span className="font-mono bg-gray-100 text-[10px] px-1 py-0.2 rounded">{p.barcode}</span>}
+                          {!p.isParentOnly && p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
+                            <span className="text-emerald-600 font-medium">
+                              Modal: Rp{Number(p.purchasePrice).toLocaleString('id-ID')}
+                            </span>
+                          )}
+                          {!p.isParentOnly && p.stock !== undefined && (
+                            <span>Stok: {p.stock}</span>
+                          )}
+                          {p.isParentOnly && (
+                            <span className="text-violet-600 font-semibold text-[10px]">
+                              Pilih salah satu varian di bawah:
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right action indicator */}
+                      <div>
+                        {isSelected && <Check size={14} className="text-emerald-600 flex-shrink-0" />}
                       </div>
                     </div>
-                    {isSelected && <Check size={14} className="text-emerald-600 flex-shrink-0" />}
+
+                    {/* Nested Children Variants */}
+                    {hasVariants && (
+                      <div className="bg-slate-50/40 border-l-2 border-violet-300 ml-3.5 my-0.5 space-y-0.5">
+                        {children.map((child) => {
+                          const isChildSelected = child.id === value;
+                          return (
+                            <div
+                              key={child.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelect(child);
+                              }}
+                              className={`pl-5 pr-3 py-1.5 text-xs cursor-pointer flex items-center justify-between gap-2 transition-colors ${
+                                isChildSelected
+                                  ? 'bg-emerald-100/70 font-bold text-emerald-950'
+                                  : 'hover:bg-emerald-50 text-gray-700'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <CornerDownRight size={11} className="text-violet-500 shrink-0" />
+                                  <span className="font-bold text-xs text-gray-900 truncate">
+                                    {child.name}
+                                  </span>
+                                  {child.sku && (
+                                    <span className="font-mono text-[9px] text-gray-400">
+                                      #{child.sku}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5 pl-4 flex-wrap">
+                                  {child.barcode && (
+                                    <span className="font-mono bg-white border border-gray-200 text-[10px] px-1 py-0.2 rounded">
+                                      {child.barcode}
+                                    </span>
+                                  )}
+                                  {child.purchasePrice !== undefined && Number(child.purchasePrice) > 0 && (
+                                    <span className="text-emerald-700 font-semibold">
+                                      Modal: Rp{Number(child.purchasePrice).toLocaleString('id-ID')}
+                                    </span>
+                                  )}
+                                  {child.stock !== undefined && (
+                                    <span>Stok: <strong className="text-gray-700">{child.stock}</strong> {child.unit || 'PCS'}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {isChildSelected ? (
+                                <Check size={14} className="text-emerald-600 flex-shrink-0" />
+                              ) : (
+                                <span className="text-[10px] font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded border border-violet-200 shrink-0">
+                                  Pilih
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })

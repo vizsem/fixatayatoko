@@ -186,6 +186,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         tiktokProductId: raw.tiktokProductId || p.tiktok_product_id || undefined,
         shopeeProductId: raw.shopeeProductId || p.shopee_product_id || undefined,
         parentId: (p.parent_id || raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
+        isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
         brand: (p.brand || raw.brand || raw.Brand || raw.merek || raw.Merek || '').toString().trim() || undefined,
         isPreOrder: Boolean(raw.isPreOrder),
         poLeadTimeDays: Number(raw.poLeadTimeDays || 3),
@@ -2607,10 +2608,11 @@ export async function quickUpdateVariantAction(
 export async function mergeProductsAsVariantsAction(payload: {
   parentId: string;
   variantProductIds: string[];
+  isParentOnly?: boolean;
 }): Promise<{ success: boolean; mergedCount?: number; error?: string }> {
   await requireAdmin();
   try {
-    const { parentId, variantProductIds } = payload;
+    const { parentId, variantProductIds, isParentOnly } = payload;
     if (!parentId) return { success: false, error: 'Produk induk harus dipilih' };
     const validChildren = (variantProductIds || []).filter(id => id && id !== parentId);
     if (validChildren.length === 0) {
@@ -2630,14 +2632,26 @@ export async function mergeProductsAsVariantsAction(payload: {
 
     const now = new Date().toISOString();
 
-    // 2. Jika induk sebelumnya adalah anak varian, bersihkan Parent_ID agar menjadi root induk
-    const parentRaw = (parentProduct.raw_data && typeof parentProduct.raw_data === 'object') ? parentProduct.raw_data : {};
+    // 2. Perbarui data induk: bersihkan Parent_ID (jika ada) dan update isParentOnly jika disetel
+    const parentRaw = (parentProduct.raw_data && typeof parentProduct.raw_data === 'object') ? { ...parentProduct.raw_data } : {};
+    let shouldUpdateParent = false;
     if (parentRaw.Parent_ID) {
-      const cleanParentRaw = { ...parentRaw, updatedAt: now };
-      delete cleanParentRaw.Parent_ID;
+      delete parentRaw.Parent_ID;
+      shouldUpdateParent = true;
+    }
+    if (isParentOnly !== undefined) {
+      if (isParentOnly) {
+        parentRaw.isParentOnly = true;
+      } else {
+        delete parentRaw.isParentOnly;
+      }
+      shouldUpdateParent = true;
+    }
+    if (shouldUpdateParent) {
+      parentRaw.updatedAt = now;
       await supabaseAdmin
         .from('products')
-        .update({ raw_data: cleanParentRaw, updated_at: now })
+        .update({ raw_data: parentRaw, updated_at: now })
         .eq('id', parentId);
     }
 
@@ -3015,5 +3029,43 @@ export async function bulkMoveCategoryAction(
   } catch (err: any) {
     console.error('bulkMoveCategoryAction error:', err);
     return { success: false, updated: 0, error: err?.message || 'Gagal pindah kategori' };
+  }
+}
+
+
+/**
+ * Toggle status produk sebagai "Induk Pengelompok" (isParentOnly).
+ * Produk dengan flag ini hanya untuk pengelompokan varian — tidak bisa di-order langsung.
+ */
+export async function toggleParentOnlyAction(
+  productId: string,
+  setAsParent: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: product, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('id, raw_data')
+      .eq('id', productId)
+      .single();
+
+    if (fetchErr || !product) return { success: false, error: 'Produk tidak ditemukan' };
+
+    const raw = (product.raw_data && typeof product.raw_data === 'object') ? { ...product.raw_data } : {};
+    if (setAsParent) {
+      (raw as any).isParentOnly = true;
+    } else {
+      delete (raw as any).isParentOnly;
+    }
+
+    const { error } = await supabaseAdmin
+      .from('products')
+      .update({ raw_data: raw, updated_at: new Date().toISOString() })
+      .eq('id', productId);
+
+    if (error) return { success: false, error: error.message };
+    revalidatePath('/admin/products');
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Gagal mengubah status induk' };
   }
 }
