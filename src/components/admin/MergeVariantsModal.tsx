@@ -20,6 +20,7 @@ interface MergeVariantsModalProps {
   onClose: () => void;
   selectedProducts: ProductRow[];
   onSuccess?: () => void;
+  onOpenCreateParent?: () => void;
 }
 
 export default function MergeVariantsModal({
@@ -27,6 +28,7 @@ export default function MergeVariantsModal({
   onClose,
   selectedProducts,
   onSuccess,
+  onOpenCreateParent,
 }: MergeVariantsModalProps) {
   const [selectedParentId, setSelectedParentId] = useState<string>(() => {
     // Cari produk yang belum punya parentId sebagai kandidat awal
@@ -133,11 +135,27 @@ export default function MergeVariantsModal({
 
           {/* Langkah 1: Pilih Produk Induk */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Crown size={16} className="text-amber-500" />
-              <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                1. Pilih Produk Utama / Induk:
-              </label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crown size={16} className="text-amber-500" />
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                  1. Pilih Produk Utama / Induk:
+                </label>
+              </div>
+              {onOpenCreateParent && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenCreateParent();
+                  }}
+                  className="text-xs font-bold text-violet-700 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-xl transition-colors border border-violet-200 flex items-center gap-1 shadow-2xs"
+                  title="Buat produk Induk baru dan jadikan produk-produk ini sebagai anak variannya"
+                >
+                  <Layers size={12} />
+                  <span>+ Buatkan Induk Baru</span>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">

@@ -38,6 +38,7 @@ import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScanner
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import MergeVariantsModal from '@/components/admin/MergeVariantsModal';
+import CreateParentModal from '@/components/admin/CreateParentModal';
 import BulkBrandModal from '@/components/admin/BulkBrandModal';
 import TikTokImportModal from '@/components/admin/products/TikTokImportModal';
 import ShopeeImportModal from '@/components/admin/products/ShopeeImportModal';
@@ -373,6 +374,7 @@ export default function AdminProducts() {
 
   // State untuk Hierarki Varian & Merge Varian
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showCreateParentModal, setShowCreateParentModal] = useState(false);
   const [showBulkBrandModal, setShowBulkBrandModal] = useState(false);
   const [showBulkPoModal, setShowBulkPoModal] = useState(false);
   const [bulkPoLeadTime, setBulkPoLeadTime] = useState(3);
@@ -1426,11 +1428,20 @@ export default function AdminProducts() {
               >
                 <CheckSquare size={13} /> {showInactive ? 'Pulihkan (Aktifkan)' : 'Arsipkan'}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowCreateParentModal(true)}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                title="Buat produk Induk baru untuk menaungi produk-produk yang dipilih"
+              >
+                <Plus size={13} /> Buatkan Induk ({selectedIds.length})
+              </button>
               {selectedIds.length >= 2 && (
                 <button
                   type="button"
                   onClick={() => setShowMergeModal(true)}
                   className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                  title="Pilih salah satu produk yang dicentang sebagai Induk"
                 >
                   <Layers size={13} /> Jadikan Varian ({selectedIds.length})
                 </button>
@@ -2455,8 +2466,20 @@ export default function AdminProducts() {
         isOpen={showMergeModal}
         onClose={() => setShowMergeModal(false)}
         selectedProducts={selectedProductsForMerge}
+        onOpenCreateParent={() => setShowCreateParentModal(true)}
         onSuccess={() => {
           setSelectedIds([]);
+        }}
+      />
+
+      {/* Modal Buatkan Induk Baru */}
+      <CreateParentModal
+        isOpen={showCreateParentModal}
+        onClose={() => setShowCreateParentModal(false)}
+        selectedProducts={selectedProductsForMerge}
+        onSuccess={() => {
+          setSelectedIds([]);
+          setTimeout(() => window.location.reload(), 600);
         }}
       />
 

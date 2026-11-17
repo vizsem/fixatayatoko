@@ -2696,6 +2696,140 @@ export async function mergeProductsAsVariantsAction(payload: {
 }
 
 /**
+ * Membuat Produk Induk Baru dan langsung menghubungkan produk-produk terpilih sebagai varian anaknya.
+ */
+export async function createParentAndAttachVariantsAction(payload: {
+  parentName: string;
+  parentSku?: string;
+  category?: string;
+  brand?: string;
+  isParentOnly?: boolean;
+  variantProductIds: string[];
+}): Promise<{ success: boolean; parentId?: string; parentName?: string; error?: string }> {
+  await requireAdmin();
+  try {
+    const { parentName, category, brand, isParentOnly = true, variantProductIds } = payload;
+    if (!parentName || !parentName.trim()) {
+      return { success: false, error: 'Nama produk induk harus diisi' };
+    }
+    if (!variantProductIds || variantProductIds.length === 0) {
+      return { success: false, error: 'Pilih minimal 1 produk varian' };
+    }
+
+    const now = new Date().toISOString();
+    const cleanParentName = parentName.trim().toUpperCase();
+
+    // Ambil data produk varian untuk menyalin brand/kategori jika belum dispesifikasikan
+    const { data: children, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('id, name, unit, price, cost_price, raw_data, category, brand')
+      .in('id', variantProductIds);
+
+    if (fetchErr || !children || children.length === 0) {
+      return { success: false, error: 'Produk varian tidak ditemukan' };
+    }
+
+    const firstChild = children[0];
+    const firstRaw = (firstChild.raw_data && typeof firstChild.raw_data === 'object') ? firstChild.raw_data : {};
+    const finalCategory = (category || firstChild.category || firstRaw.Kategori || firstRaw.category || 'UMUM').trim().toUpperCase();
+    const finalBrand = brand || firstChild.brand || firstRaw.brand || firstRaw.Brand || '';
+    const baseUnit = String(firstChild.unit || firstRaw.unit || firstRaw.Satuan || 'PCS').toUpperCase();
+
+    // Generate SKU jika belum ada
+    let cleanSku = (payload.parentSku || '').trim();
+    if (!cleanSku) {
+      const generated = await generateNextSkuAction(finalCategory, cleanParentName);
+      cleanSku = generated.sku || `IND-${Date.now().toString().slice(-6)}`;
+    }
+
+    // Cek jika SKU sudah ada
+    const { data: existingSku } = await supabaseAdmin
+      .from('products')
+      .select('id')
+      .eq('sku', cleanSku)
+      .maybeSingle();
+
+    if (existingSku) {
+      cleanSku = `${cleanSku}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    }
+
+    const parentId = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const parentRaw = {
+      ID: cleanSku,
+      Nama: cleanParentName,
+      name: cleanParentName,
+      Kategori: finalCategory,
+      category: finalCategory,
+      Brand: finalBrand,
+      brand: finalBrand,
+      Satuan: baseUnit,
+      unit: baseUnit,
+      Stok: 0,
+      stock: 0,
+      isParentOnly: isParentOnly,
+      isActive: true,
+      Status: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // 1. Simpan Produk Induk Baru
+    const { error: insertErr } = await supabaseAdmin.from('products').insert({
+      id: parentId,
+      name: cleanParentName,
+      sku: cleanSku,
+      category: finalCategory,
+      brand: finalBrand || null,
+      unit: baseUnit,
+      price: 0,
+      cost_price: 0,
+      stock: 0,
+      is_active: true,
+      raw_data: parentRaw,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (insertErr) {
+      console.error('Insert parent error:', insertErr);
+      return { success: false, error: `Gagal membuat produk induk: ${insertErr.message}` };
+    }
+
+    // 2. Hubungkan semua produk anak varian dengan Parent_ID
+    for (const child of children) {
+      const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const updatedChildRaw = {
+        ...childRaw,
+        Parent_ID: parentId,
+        updatedAt: now,
+      };
+
+      await supabaseAdmin
+        .from('products')
+        .update({
+          raw_data: updatedChildRaw,
+          updated_at: now,
+        })
+        .eq('id', child.id);
+    }
+
+    // 3. Sinkronkan total stok varian ke induk
+    await syncParentStockFromVariants(parentId);
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${parentId}`);
+    revalidatePath('/admin/purchases');
+    revalidatePath('/cashier');
+
+    return { success: true, parentId, parentName: cleanParentName };
+  } catch (err: any) {
+    console.error('createParentAndAttachVariantsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal membuat produk induk' };
+  }
+}
+
+/**
  * Melepaskan sebuah produk varian agar menjadi produk mandiri (menghapus Parent_ID)
  */
 export async function detachVariantAction(variantId: string): Promise<{ success: boolean; error?: string }> {
