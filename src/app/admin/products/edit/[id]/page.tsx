@@ -6,7 +6,7 @@ import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
   Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package, Check, Info, Sparkles, Plus,
-  ShieldAlert, EyeOff, Clock, Scale, ArrowUpRight, ExternalLink, RotateCcw
+  ShieldAlert, EyeOff, Clock, Scale, ArrowUpRight, ExternalLink, RotateCcw, ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -17,7 +17,8 @@ import QuickVariantModal from '@/components/admin/QuickVariantModal';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy } from '@/lib/normalize';
 import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
 import { supabase } from '@/lib/supabase';
-import { getProductByIdForEdit, saveEditedProduct, deleteProduct } from '@/lib/actions/product.actions';
+import { getProductByIdForEdit, saveEditedProduct, deleteProduct, generateNextSkuAction } from '@/lib/actions/product.actions';
+import { generateVariantSku } from '@/lib/sku-generator';
 import { getPurchaseStatsByProductId } from '@/lib/actions/purchase.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
@@ -1155,16 +1156,41 @@ export default function EditProductPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   <div>
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                      ID Produk (SKU) *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                        ID Produk (SKU) *
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {formData.ID.length > 20 && (
+                          <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md">
+                            {formData.ID.length} char
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const res = await generateNextSkuAction(formData.Kategori || '', formData.Nama || '');
+                            if (res.success && res.sku) {
+                              setFormData(prev => ({ ...prev, ID: res.sku! }));
+                              toast.success(`SKU baru: ${res.sku}`);
+                            } else {
+                              toast.error('Gagal generate SKU otomatis');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-100 transition-colors"
+                          title="Generate SKU baru otomatis berdasarkan kategori (format: KAT-0001)"
+                        >
+                          <Sparkles size={10} /> Generate SKU
+                        </button>
+                      </div>
+                    </div>
                     <input
                       required
                       className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl font-mono font-bold text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                       type="text"
                       value={formData.ID}
                       onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
-                      placeholder="BRG-001"
+                      placeholder="Contoh: BRG-001 atau SBK-0001"
                     />
                   </div>
 
