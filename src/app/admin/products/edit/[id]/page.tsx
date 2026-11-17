@@ -6,7 +6,7 @@ import {
   Tag, Truck, Save, Layers, Trash2,
   Barcode, Image as ImageIcon, AlertCircle, ChevronLeft, Calendar, History as HistoryIcon,
   Store, Globe, ShoppingBag, Video, TrendingUp, TrendingDown, Camera, X, Package, Check, Info, Sparkles, Plus,
-  ShieldAlert, EyeOff, Clock
+  ShieldAlert, EyeOff, Clock, Scale, ArrowUpRight, ExternalLink, RotateCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -22,7 +22,6 @@ import { getPurchaseStatsByProductId } from '@/lib/actions/purchase.actions';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
-
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, isCategoryTaxExempt, type TaxSettings } from '@/lib/tax';
 
 function UnitModalCalculator({
@@ -47,7 +46,7 @@ function UnitModalCalculator({
     <input
       type="number"
       placeholder="Nominal modal..."
-      className="w-32 bg-amber-50/80 p-2.5 rounded-xl text-xs font-black text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
+      className="w-32 bg-amber-50/80 px-3 py-2 rounded-xl text-xs font-bold text-amber-900 text-right outline-none border border-amber-200 placeholder:text-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
       value={valStr}
       onFocus={() => setIsFocused(true)}
       onBlur={() => {
@@ -84,6 +83,7 @@ type UnitOption = {
   minQty?: number;
   label?: string;
   barcode?: string;
+  weight?: number; // Berat per satuan dalam gram
   prices?: ChannelPrices;
 };
 
@@ -92,22 +92,25 @@ interface Warehouse {
   name: string;
 }
 
-/**
- * Badge profit untuk harga jual.
- *
- * Didefinisikan di module scope — bukan di dalam render — agar identitas
- * komponen stabil dan state-nya tidak ter-reset setiap kali parent re-render.
- */
 function ProfitBadge({ profit, percentage }: { profit: number; percentage: number }) {
   const isProfitable = profit >= 0;
   return (
-    <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-      {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+    <div className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg ${isProfitable ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+      {isProfitable ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
       <span>
         {isProfitable ? '+' : ''}Rp{profit.toLocaleString('id-ID')} ({percentage.toFixed(1)}%)
       </span>
     </div>
   );
+}
+
+function formatWeightDisplay(grams: number) {
+  if (!grams || grams <= 0) return '0 g';
+  if (grams >= 1000) {
+    const kg = grams / 1000;
+    return `${grams.toLocaleString('id-ID')} g (${kg.toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg)`;
+  }
+  return `${grams.toLocaleString('id-ID')} gram`;
 }
 
 export default function EditProductPage() {
@@ -179,6 +182,7 @@ export default function EditProductPage() {
     Harga_Coret: 0,
     Grosir: 0,
     Min_Grosir: 1,
+    weight: 0, // Berat satuan dasar dalam gram
     Link_Foto: '',
     Deskripsi: '',
     Status: 1,
@@ -211,7 +215,6 @@ export default function EditProductPage() {
   const [costHistory, setCostHistory] = useState<any[]>([]);
   const [stockReason, setStockReason] = useState<'MANUAL' | 'OPNAME' | 'TRANSFER'>('MANUAL');
   const [scannerReady, setScannerReady] = useState(false);
-  // -1 = scanner untuk barcode produk utama, >= 0 = scanner untuk barcode satuan ke-idx
   const [scanUnitBarcodeIdx, setScanUnitBarcodeIdx] = useState<number>(-1);
 
   // === GLOBAL BARCODE SCANNER LISTENER ===
@@ -274,7 +277,7 @@ export default function EditProductPage() {
         next[idx] = { ...next[idx], code: baseUnit, contains: next[idx].contains ?? 1, price };
         return next;
       }
-      next.unshift({ code: baseUnit, contains: 1, price, label: '' });
+      next.unshift({ code: baseUnit, contains: 1, price, label: '', weight: formData.weight });
       return next;
     });
   };
@@ -355,41 +358,89 @@ export default function EditProductPage() {
   };
 
   const handleModalUnitChange = (newCode: string) => {
-    const newObj = availableModalUnits.find(u => u.code === newCode);
-    const ratio = newObj?.contains || 1;
+    const targetObj = availableModalUnits.find(u => u.code === newCode) || availableModalUnits[0];
+    const ratio = targetObj.contains || 1;
     const currentModal = Number(formData.Modal || 0);
+    setFormData(prev => ({
+      ...prev,
+      Satuan_Modal: newCode
+    }));
     if (currentModal > 0) {
       setModalInputStr(String(Math.round(currentModal * ratio)));
     } else {
       setModalInputStr('');
     }
-    setFormData(prev => ({
-      ...prev,
-      Satuan_Modal: newCode
+  };
+
+  // --- BERAT PRODUK: HITUNG OTOMATIS BERAT DARI TERKECIL KE TERBESAR ---
+  const handleBaseWeightChange = (newWeight: number) => {
+    const safeW = Math.max(0, newWeight);
+    setFormData(prev => ({ ...prev, weight: safeW }));
+
+    // Otomatis update berat di semua satuan bertingkat jika contains > 0
+    setUnits(prev => prev.map((u, i) => {
+      if (i === 0) {
+        return { ...u, weight: safeW };
+      }
+      const contains = Number(u.contains || 1);
+      const computedWeight = safeW > 0 ? Number((safeW * contains).toFixed(2)) : 0;
+      return {
+        ...u,
+        weight: computedWeight,
+      };
     }));
   };
 
-  // Fetch Tax Settings from Firebase
-  useEffect(() => {
-    sbGetDoc('settings', 'system').then(snap => {
-      if (snap.exists() && snap.data()?.tax) {
-        setTaxSettings({ ...DEFAULT_TAX_SETTINGS, ...snap.data().tax });
-      }
-    }).catch(() => {});
-  }, []);
-  
+  const handleUnitContainsChange = (idx: number, newContains: number) => {
+    const safeContains = Math.max(1, newContains);
+    setUnits(prev => {
+      const next = [...prev];
+      const baseW = Number(formData.weight || 0);
+      const autoW = baseW > 0 ? Number((baseW * safeContains).toFixed(2)) : (next[idx].weight || 0);
+      next[idx] = {
+        ...next[idx],
+        contains: safeContains,
+        weight: autoW,
+      };
+      return next;
+    });
+  };
+
+  const handleUnitWeightChange = (idx: number, newWeight: number) => {
+    const safeW = Math.max(0, newWeight);
+    setUnits(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], weight: safeW };
+      return next;
+    });
+  };
+
+  const handleResetUnitWeight = (idx: number) => {
+    const baseW = Number(formData.weight || 0);
+    const contains = Number(units[idx]?.contains || 1);
+    const autoW = baseW > 0 ? Number((baseW * contains).toFixed(2)) : 0;
+    setUnits(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], weight: autoW };
+      return next;
+    });
+    toast.success(`Berat ${units[idx]?.code} dihitung otomatis: ${formatWeightDisplay(autoW)}`);
+  };
+
   const fetchCostHistory = useCallback(async () => {
     try {
       const snap = await sbGetDocs({
-        table: 'product_cost_logs',
+        table: 'cost_history',
         where: [{ field: 'productId', op: '==', val: id }],
-        orderBy: [{ field: 'changeDate', direction: 'desc' }],
+        limit: 10
       });
-      const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setCostHistory(logs);
-    } catch (e) {
-      console.error("Gagal load history modal:", e);
-    }
+      if (snap.docs.length > 0) {
+        const sorted = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as any))
+          .sort((a, b) => (b.changeDate?.seconds || 0) - (a.changeDate?.seconds || 0));
+        setCostHistory(sorted);
+      }
+    } catch { /* ignore */ }
   }, [id]);
 
   const fetchPurchaseStats = useCallback(async () => {
@@ -443,6 +494,7 @@ export default function EditProductPage() {
       const baseUnit = String(data.Satuan || 'PCS').toUpperCase();
       const basePrice = Number(data.Ecer || 0);
       const cp = data.channelPricing || {};
+      const rawWeight = Number(data.weight ?? data.berat ?? data.raw_data?.weight ?? data.raw_data?.berat ?? 0);
 
       setFormData(prev => ({
         ...prev,
@@ -464,6 +516,7 @@ export default function EditProductPage() {
         Harga_Coret: Number(data.Harga_Coret || 0),
         Grosir: Number(data.Grosir || 0),
         Min_Grosir: Number(data.Min_Grosir || 1),
+        weight: rawWeight,
         Link_Foto: data.Link_Foto || data.URL_Produk || data.image_url || data.imageUrl || data.image || '',
         Deskripsi: data.Deskripsi || data.description || '',
         Status: data.Status ?? 1,
@@ -514,14 +567,18 @@ export default function EditProductPage() {
       const baseIdx = mergedUnits.findIndex(u => u.code?.toUpperCase() === baseUnit);
       if (baseIdx >= 0) {
         const [baseObj] = mergedUnits.splice(baseIdx, 1);
-        mergedUnits.unshift({ ...baseObj, code: baseUnit, contains: 1, price: basePrice });
+        mergedUnits.unshift({ ...baseObj, code: baseUnit, contains: 1, price: basePrice, weight: rawWeight });
       } else {
-        mergedUnits.unshift({ code: baseUnit, contains: 1, price: basePrice });
+        mergedUnits.unshift({ code: baseUnit, contains: 1, price: basePrice, weight: rawWeight });
       }
 
-      // Clean up units
+      // Clean up units & propagate auto weight if exists
       mergedUnits = mergedUnits.map(u => {
         const code = String(u.code || '').toUpperCase();
+        const contains = Number(u.contains || (code === baseUnit ? 1 : 0));
+        const autoWeight = rawWeight > 0 && contains > 0 ? Number((rawWeight * contains).toFixed(2)) : 0;
+        const uWeight = u.weight !== undefined && !isNaN(Number(u.weight)) ? Number(u.weight) : (code === baseUnit ? rawWeight : autoWeight);
+
         const prices: ChannelPrices = {
           offline: cp.offline?.[code]?.price ?? u.prices?.offline,
           website: cp.website?.[code]?.price ?? u.prices?.website,
@@ -532,10 +589,12 @@ export default function EditProductPage() {
         return {
           ...u,
           code,
-          contains: Number(u.contains || (code === baseUnit ? 1 : 0)),
+          contains,
           price: Number(u.price || 0),
           minQty: Number(u.minQty || 0),
           label: u.label || '',
+          barcode: u.barcode ? String(u.barcode).trim() : undefined,
+          weight: uWeight,
           prices
         };
       });
@@ -560,14 +619,11 @@ export default function EditProductPage() {
     setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
   }, []);
 
-  // Fetch produk yang punya Parent_ID = id ini (daftar varian anak)
   const [childVariants, setChildVariants] = useState<{ id: string; name: string; barcode?: string; stock: number }[]>([]);
-  // Fetch parent + saudara varian (ketika produk ini adalah anak varian)
   const [parentProduct, setParentProduct] = useState<{ id: string; name: string; stock: number } | null>(null);
   const [siblingVariants, setSiblingVariants] = useState<{ id: string; name: string; barcode?: string; stock: number }[]>([]);
 
   const fetchVariants = useCallback(async () => {
-    // 1. Fetch anak varian dari produk ini (kalau ini produk induk)
     const snap = await sbGetDocs({
       table: 'products',
       where: [{ field: 'raw_data->>Parent_ID', op: '==', val: id }],
@@ -584,35 +640,25 @@ export default function EditProductPage() {
           stock: Number(raw.stock || 0),
         };
       }));
+    } else {
+      setChildVariants([]);
     }
 
-    // 2. Jika produk ini adalah anak varian, fetch parent + saudara
-    const currentParentId = formData.Parent_ID;
-    if (currentParentId) {
-      // Fetch parent
+    if (formData.Parent_ID) {
       try {
-        const parentSnap = await sbGetDocs({
-          table: 'products',
-          where: [{ field: 'id', op: '==', val: currentParentId }],
-          limit: 1,
-        });
-        if (parentSnap.docs.length > 0) {
-          const pd = parentSnap.docs[0];
-          const praw = pd.data() as Record<string, unknown>;
-          const prawData = (praw.raw_data || {}) as Record<string, unknown>;
+        const pSnap = await sbGetDoc('products', formData.Parent_ID);
+        if (pSnap.exists()) {
+          const pRaw = pSnap.data() as Record<string, unknown>;
+          const pRawData = (pRaw.raw_data || {}) as Record<string, unknown>;
           setParentProduct({
-            id: pd.id,
-            name: (praw.name || prawData.Nama || pd.id) as string,
-            stock: Number(praw.stock || 0),
+            id: pSnap.id,
+            name: (pRaw.name || pRawData.Nama || pSnap.id) as string,
+            stock: Number(pRaw.stock || 0),
           });
         }
-      } catch { /* ignore */ }
-
-      // Fetch saudara varian (varian lain dari induk yang sama, kecuali diri sendiri)
-      try {
         const sibSnap = await sbGetDocs({
           table: 'products',
-          where: [{ field: 'raw_data->>Parent_ID', op: '==', val: currentParentId }],
+          where: [{ field: 'raw_data->>Parent_ID', op: '==', val: formData.Parent_ID }],
           limit: 50,
         });
         setSiblingVariants(sibSnap.docs
@@ -631,7 +677,6 @@ export default function EditProductPage() {
     }
   }, [id, formData.Parent_ID]);
 
-  // Prevent re-fetching on tab focus / auth state change
   useEffect(() => {
     const checkAuth = async () => {
       const { user } = await getUserAndRole();
@@ -657,14 +702,11 @@ export default function EditProductPage() {
     return () => { if (__unsubscribe) __unsubscribe(); };
   }, [id, router, fetchProductData, fetchWarehouses, fetchCategories, fetchCostHistory, fetchPurchaseStats, fetchVariants]);
 
-  // Re-fetch parent & sibling info setelah formData.Parent_ID terisi dari fetchProductData
   useEffect(() => {
     if (formData.Parent_ID) {
       fetchVariants();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.Parent_ID]);
-
+  }, [formData.Parent_ID, fetchVariants]);
 
   const handleSaveNewCategory = () => {
     const name = newKategoriInput.trim();
@@ -688,7 +730,8 @@ export default function EditProductPage() {
       toast.error('Satuan sudah ada');
       return;
     }
-    setUnits([...units, { code, contains: 0, price: 0, label: '' }]);
+    const baseW = Number(formData.weight || 0);
+    setUnits([...units, { code, contains: 0, price: 0, label: '', weight: baseW }]);
     setNewUnitCode('');
   };
 
@@ -726,14 +769,9 @@ export default function EditProductPage() {
     const loadingToast = toast.loading("Menyimpan perubahan...");
 
     try {
-      // 0. Ensure Category exists — normalize and resolve '__NEW__' or input
       let categoryName = String(formData.Kategori || 'UMUM').trim();
       if (categoryName === '__NEW__' || !categoryName) {
-        if (newKategoriInput.trim()) {
-          categoryName = newKategoriInput.trim();
-        } else {
-          categoryName = 'UMUM';
-        }
+        categoryName = newKategoriInput.trim() || 'UMUM';
       }
 
       const existingCat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
@@ -750,65 +788,52 @@ export default function EditProductPage() {
         }
       }
 
-      // 1. Ambil data stok lama untuk dibandingkan (Logika Audit)
-      const oldDoc = await sbGetDoc('products', id);
-      const oldData = oldDoc.data();
-      const oldStocks = oldData?.stockByWarehouse || {};
-
-      // 2. Proses Gambar
-      let finalImageUrl = formData.Link_Foto || '';
+      let finalImageUrl = formData.Link_Foto;
       if (imageFile) {
-        const compressed = await imageCompression(imageFile, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
-        const fd = new FormData();
-        fd.append('file', new File([compressed], imageFile.name, { type: compressed.type }));
-        fd.append('folder', 'products');
-        const uploadResult = await uploadImageAction(fd);
-        if (uploadResult.success && uploadResult.url) {
-          finalImageUrl = uploadResult.url;
-        } else {
-          toast.error(uploadResult.error || 'Gagal mengunggah foto produk');
-          setIsSubmitting(false);
-          return;
+        const uploadData = new FormData();
+        uploadData.append('file', imageFile);
+        uploadData.append('folder', 'products');
+        const uploadRes = await uploadImageAction(uploadData);
+        if (!uploadRes.success || !uploadRes.url) {
+          throw new Error(uploadRes.error || "Gagal mengupload gambar.");
         }
-      } else if (finalImageUrl.trim() && finalImageUrl.trim() !== originalImageUrlRef.current) {
-        try {
-          const fd = new FormData();
-          fd.append('url', finalImageUrl.trim());
-          fd.append('folder', 'products');
-          const uploadResult = await uploadImageAction(fd);
-          if (uploadResult.success && uploadResult.url) {
-            finalImageUrl = uploadResult.url;
-          } else {
-            // Jika unduhan otomatis diblokir oleh server pemilik foto (misal Tokopedia CDN 403 / anti-hotlink),
-            // tetap gunakan URL langsung yang diinput pengguna agar produk berhasil disimpan!
-            console.warn('Gagal mengunduh foto untuk re-host, menggunakan URL langsung:', uploadResult.error);
-            toast('Foto disimpan dengan link langsung (server foto membatasi unduhan otomatis)', { icon: 'ℹ️' });
-            finalImageUrl = finalImageUrl.trim();
-          }
-        } catch (err: any) {
-          console.warn('Gagal memproses URL foto, menggunakan link langsung:', err);
-          finalImageUrl = finalImageUrl.trim();
-        }
+        finalImageUrl = uploadRes.url;
       }
 
-      // 3. Update Logic
+      const oldDoc = await sbGetDoc('products', id);
+      const oldData = oldDoc.exists() ? oldDoc.data() : null;
+      const oldCost = Number(oldData?.Modal || oldData?.cost_price || 0);
+      const oldStocks = oldData?.stockByWarehouse || {};
+
+      if (oldCost !== Number(formData.Modal)) {
+        await sbInsertDoc('cost_history', {
+          productId: id,
+          oldCost: oldCost,
+          newCost: Number(formData.Modal),
+          changeDate: new Date(),
+          adminEmail: (await supabase.auth.getUser()).data.user?.email || 'admin'
+        });
+      }
+
       const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
-      const cleanedUnits = (units || [])
-        .map((u) => {
+
+      const cleanedUnits: UnitOption[] = units
+        .map(u => {
           const code = String(u.code || '').trim().toUpperCase();
           if (!code) return null;
           const contains = Number(u.contains || 0);
           const price = Number(u.price || 0);
           const unitEntry: UnitOption = { code, contains, price };
+          if (u.weight !== undefined && !isNaN(Number(u.weight))) unitEntry.weight = Number(u.weight);
           if (u.prices) {
-             const cleanedPrices: any = {};
-             if (u.prices.offline !== undefined && u.prices.offline !== null) cleanedPrices.offline = Number(u.prices.offline);
-             if (u.prices.website !== undefined && u.prices.website !== null) cleanedPrices.website = Number(u.prices.website);
-             if (u.prices.shopee !== undefined && u.prices.shopee !== null) cleanedPrices.shopee = Number(u.prices.shopee);
-             if (u.prices.tiktok !== undefined && u.prices.tiktok !== null) cleanedPrices.tiktok = Number(u.prices.tiktok);
-             if (Object.keys(cleanedPrices).length > 0) {
-                 unitEntry.prices = cleanedPrices;
-             }
+            const cleanedPrices: any = {};
+            if (u.prices.offline !== undefined && u.prices.offline !== null) cleanedPrices.offline = Number(u.prices.offline);
+            if (u.prices.website !== undefined && u.prices.website !== null) cleanedPrices.website = Number(u.prices.website);
+            if (u.prices.shopee !== undefined && u.prices.shopee !== null) cleanedPrices.shopee = Number(u.prices.shopee);
+            if (u.prices.tiktok !== undefined && u.prices.tiktok !== null) cleanedPrices.tiktok = Number(u.prices.tiktok);
+            if (Object.keys(cleanedPrices).length > 0) {
+              unitEntry.prices = cleanedPrices;
+            }
           }
           if (u.minQty !== undefined) unitEntry.minQty = Number(u.minQty);
           if (u.label) unitEntry.label = String(u.label);
@@ -826,7 +851,8 @@ export default function EditProductPage() {
         code: baseUnit, 
         contains: 1, 
         price: nextEcer, 
-        label: '' 
+        label: '',
+        weight: Number(formData.weight || 0),
       };
       
       const foundBaseUnit = cleanedUnits.find(u => u.code === baseUnit);
@@ -842,7 +868,6 @@ export default function EditProductPage() {
         ...cleanedUnits.filter((u) => u.code !== baseUnit),
       ];
 
-      // Construct Channel Pricing
       const channelPricing: any = { offline: {}, website: {}, shopee: {}, tiktok: {} };
       ensuredBase.forEach(u => {
         if (u.prices) {
@@ -853,14 +878,11 @@ export default function EditProductPage() {
         }
       });
 
-      // Prepare Stock Data (edit per-gudang)
       const newStocks: Record<string, number> = { ...(formData.stockByWarehouse || {}) };
       const rawTotalStock = Object.values(newStocks).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
-      // Jika produk induk (punya varian anak), stok = sum varian anak — jangan pakai stok mandiri
       const totalVariantStock = childVariants.reduce((s, v) => s + Number(v.stock || 0), 0);
       const totalStock = childVariants.length > 0 ? totalVariantStock : rawTotalStock;
       
-      // LOG STOCK CHANGES untuk setiap gudang yang berubah
       const logEntries: any[] = [];
       for (const [whId, nv] of Object.entries(newStocks)) {
         const newVal = Number(nv || 0);
@@ -907,6 +929,8 @@ export default function EditProductPage() {
         wholesalePrice: Number(formData.Grosir || 0),
         Min_Grosir: Number(formData.Min_Grosir || 0),
         minWholesale: Number(formData.Min_Grosir || 0),
+        weight: Number(formData.weight || 0),
+        weightUnit: 'g',
         barcode: formData.Barcode || '',
         Barcode: formData.Barcode || '',
         imageUrl: finalImageUrl,
@@ -951,7 +975,6 @@ export default function EditProductPage() {
         updatedAt: new Date().toISOString(),
       };
 
-      // 1. Save to Supabase
       const saveRes = await saveEditedProduct(id, {
         name: String(formData.Nama || '').toUpperCase(),
         category: categoryName,
@@ -971,7 +994,6 @@ export default function EditProductPage() {
         throw new Error(saveRes.error || 'Gagal menyimpan produk ke database');
       }
 
-      // 2. Safe sync to Firestore
       try {
         await sbUpsertDoc('products', id, updatePayload, { merge: true });
       } catch (fsErr) {
@@ -1008,16 +1030,16 @@ export default function EditProductPage() {
       }
       
       await sbInsertDoc('stock_logs', {
-          productId: id,
-          productName: formData.Nama.toUpperCase(),
-          warehouseId: 'SYSTEM',
-          warehouseName: 'SYSTEM',
-          previousStock: formData.Stok,
-          newStock: 0,
-          change: -formData.Stok,
-          type: 'DELETE_PRODUCT',
-          adminEmail: (await supabase.auth.getUser()).data.user?.email,
-          createdAt: new Date().toISOString(),
+        productId: id,
+        productName: formData.Nama.toUpperCase(),
+        warehouseId: 'SYSTEM',
+        warehouseName: 'SYSTEM',
+        previousStock: formData.Stok,
+        newStock: 0,
+        change: -formData.Stok,
+        type: 'DELETE_PRODUCT',
+        adminEmail: (await supabase.auth.getUser()).data.user?.email,
+        createdAt: new Date().toISOString(),
       });
 
       toast.success('Produk berhasil dihapus');
@@ -1031,1016 +1053,595 @@ export default function EditProductPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Memuat data produk...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const baseWeightGrams = Number(formData.weight || 0);
 
   return (
     <>
-    <div className="p-3 sm:p-4 md:p-6 bg-slate-50/70 text-slate-800 font-sans">
-      <div className="max-w-5xl mx-auto space-y-6">
-
-        {/* Header Navigation */}
-        <div className="flex items-center justify-between bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex items-center gap-3">
-            <Link href="/admin/products" className="p-2.5 bg-slate-100 rounded-2xl hover:bg-slate-900 hover:text-white transition-all">
-              <ChevronLeft size={20} />
-            </Link>
-            <div>
-              <h1 className="text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900">Edit Produk</h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Inventaris & Informasi Produk</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Tombol Tambah Varian */}
-            <button
-              type="button"
-              onClick={() => setShowVariantModal(true)}
-              className="px-3 py-2 bg-violet-600 text-white rounded-xl text-xs font-black uppercase hover:bg-violet-700 transition-all hidden sm:flex items-center gap-1.5"
-              title="Kelola & Tambah Varian"
-            >
-              <Layers size={13} /> Kelola Varian
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/admin/products')}
-              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase hover:bg-slate-200 transition-all hidden sm:block"
-            >
-              Kembali
-            </button>
-          </div>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit} className="space-y-6">
-
-          {/* BAGIAN 1: IDENTITAS BARANG */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-6 flex items-center gap-2 border-b pb-4 text-blue-600">
-              <Tag size={18} />
-              Identitas Barang
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">ID Produk *</label>
-                <input
-                  required
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm"
-                  type="text"
-                  value={formData.ID}
-                  onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
-                  placeholder="Contoh: BRG-001"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1 flex items-center justify-between">
-                  <span>Parent ID</span>
+      <form noValidate onSubmit={handleSubmit} className="min-h-screen bg-slate-50/70 text-slate-800 font-sans pb-24">
+        {/* STICKY TOP ACTION BAR */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3 shadow-2xs">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link
+                href="/admin/products"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0"
+                title="Kembali ke Daftar Produk"
+              >
+                <ChevronLeft size={18} />
+              </Link>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-sm sm:text-base font-black text-slate-900 truncate uppercase">
+                    {formData.Nama || 'Edit Produk'}
+                  </h1>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    formData.Status === 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {formData.Status === 1 ? 'Aktif' : 'Arsip'}
+                  </span>
                   {formData.Parent_ID ? (
-                    <span className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-[10px] font-black uppercase">Produk Varian</span>
-                  ) : (
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase">Produk Induk</span>
-                  )}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="flex-1 p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm"
-                    type="text"
-                    value={formData.Parent_ID}
-                    onChange={(e) => setFormData({ ...formData, Parent_ID: e.target.value })}
-                    placeholder="Opsional — isi jika ini adalah varian"
-                  />
-                  {formData.Parent_ID && (
-                    <a
-                      href={`/admin/products/edit/${formData.Parent_ID}`}
-                      className="flex-shrink-0 p-3 bg-violet-50 text-violet-600 rounded-xl text-xs font-black hover:bg-violet-100 transition-all"
-                      title="Buka produk induk"
-                    >
-                      <ChevronLeft size={14} className="rotate-180" />
-                    </a>
-                  )}
+                    <span className="px-2 py-0.5 bg-violet-100 text-violet-800 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      ↳ Varian
+                    </span>
+                  ) : childVariants.length > 0 ? (
+                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      Induk ({childVariants.length} Varian)
+                    </span>
+                  ) : null}
                 </div>
+                <p className="text-[11px] text-slate-400 font-mono">
+                  SKU: {formData.ID || id} {formData.Barcode ? `• Barcode: ${formData.Barcode}` : ''}
+                </p>
               </div>
-              <div className="sm:col-span-2 lg:col-span-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Lokasi Rak</label>
-                <input 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
-                  type="text" 
-                  value={formData.Lokasi} 
-                  onChange={e => setFormData({ ...formData, Lokasi: e.target.value })} 
-                  placeholder="Contoh: Rak A-01"
-                />
-              </div>
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Nama Produk *</label>
-                <input 
-                  required 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
-                  type="text" 
-                  value={formData.Nama} 
-                  onChange={e => setFormData({ ...formData, Nama: e.target.value })} 
-                />
-              </div>
+            </div>
 
-              {/* KATEGORI SELECTION WITH INSTANT ADD */}
-              <div className="sm:col-span-2 lg:col-span-2">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Kategori Produk</label>
-                {formData.Kategori === '__NEW__' ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      autoFocus
-                      className="flex-1 p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl font-black text-xs outline-none focus:ring-2 focus:ring-amber-500"
-                      type="text"
-                      placeholder="Ketik nama kategori baru..."
-                      value={newKategoriInput}
-                      onChange={e => setNewKategoriInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSaveNewCategory();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveNewCategory}
-                      className="px-4 py-3.5 bg-amber-600 text-white rounded-2xl text-xs font-black uppercase hover:bg-amber-700 transition-all shrink-0 flex items-center gap-1"
-                    >
-                      <Plus size={14} /> Simpan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setFormData({ ...formData, Kategori: 'UMUM' }); setNewKategoriInput(''); }}
-                      className="px-3 py-3.5 bg-slate-100 text-slate-500 rounded-2xl text-xs font-black hover:bg-slate-200"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <select
-                      className="flex-1 p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs"
-                      value={formData.Kategori}
-                      onChange={e => {
-                        if (e.target.value === '__NEW__') {
-                          setFormData({ ...formData, Kategori: '__NEW__' });
-                        } else {
-                          setFormData({ ...formData, Kategori: e.target.value });
-                        }
-                      }}
-                    >
-                      <option value="">— Pilih Kategori —</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                      ))}
-                      <option value="__NEW__">＋ Tambah Kategori Baru...</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Brand / Merk</label>
-                <input 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
-                  type="text" 
-                  value={formData.Brand} 
-                  onChange={e => setFormData({ ...formData, Brand: e.target.value })} 
-                />
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 flex justify-between items-center mb-1">
-                  <span>Barcode / SKU</span>
-                  <button type="button" onClick={() => setScannerReady(true)} className="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold">
-                    <Camera size={12} /> Scan
-                  </button>
-                </label>
-                <div className="relative">
-                  <Barcode size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-sm" 
-                    type="text" 
-                    value={formData.Barcode} 
-                    onChange={e => setFormData({ ...formData, Barcode: e.target.value })} 
-                  />
-                </div>
-                <CameraBarcodeScannerModal
-                  isOpen={scannerReady}
-                  onClose={() => { setScannerReady(false); setScanUnitBarcodeIdx(-1); }}
-                  title={scanUnitBarcodeIdx >= 0 ? `Scan Barcode ${units[scanUnitBarcodeIdx]?.code || 'Satuan'}` : 'Scan Barcode Produk'}
-                  description={scanUnitBarcodeIdx >= 0 ? `Arahkan kamera ke barcode kemasan ${units[scanUnitBarcodeIdx]?.code || ''}` : 'Arahkan kamera ke barcode / QR code produk'}
-                  onScan={(code) => {
-                    if (scanUnitBarcodeIdx >= 0) {
-                      setUnits(prev => {
-                        const next = [...prev];
-                        next[scanUnitBarcodeIdx] = { ...next[scanUnitBarcodeIdx], barcode: code };
-                        return next;
-                      });
-                      toast.success(`Barcode ${units[scanUnitBarcodeIdx]?.code} dipindai: ${code}`);
-                    } else {
-                      setFormData(prev => ({ ...prev, Barcode: code }));
-                      toast.success(`Barcode dipindai: ${code}`);
-                    }
-                    setScanUnitBarcodeIdx(-1);
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Tgl Kadaluarsa</label>
-                <div className="relative">
-                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs" 
-                    type="date" 
-                    value={formData.Expired_Default} 
-                    onChange={e => setFormData({ ...formData, Expired_Default: e.target.value, expired_date: e.target.value })} 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block mb-1">Tgl Masuk Stok</label>
-                <div className="relative">
-                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50 rounded-2xl font-black outline-none border border-slate-200/80 focus:border-blue-500 focus:bg-white transition-all text-xs" 
-                    type="date" 
-                    value={formData.tgl_masuk} 
-                    onChange={e => setFormData({ ...formData, tgl_masuk: e.target.value })} 
-                  />
-                </div>
-              </div>
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowVariantModal(true)}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+                title="Kelola & Tambah Varian"
+              >
+                <Layers size={14} /> Kelola Varian
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/admin/products')}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || isDeleting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all disabled:opacity-50"
+              >
+                <Save size={14} />
+                <span>{isSubmitting ? 'Menyimpan...' : 'Simpan'}</span>
+              </button>
             </div>
           </div>
+        </header>
 
-          {/* BAGIAN 2: STOK & GUDANG */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-6 text-emerald-600 border-b pb-4">
-              <Layers size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Stok & Gudang</h3>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Satuan Utama</label>
-                <input 
-                  required 
-                  type="text" 
-                  placeholder="Pcs/Dus/Kg" 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-black text-sm uppercase focus:bg-white focus:border-emerald-500 outline-none" 
-                  value={formData.Satuan} 
-                  onChange={e => {
-                    const newBase = e.target.value;
-                    setFormData({ ...formData, Satuan: newBase });
-                    setUnits(prev => {
-                      if (prev.length === 0) return [{ code: newBase.toUpperCase() || 'PCS', contains: 1, price: formData.Ecer }];
-                      const next = [...prev];
-                      next[0] = { ...next[0], code: newBase.toUpperCase() || 'PCS' };
-                      return next;
-                    });
-                  }} 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-emerald-600 ml-1 block">Stok Saat Ini</label>
-                {childVariants.length > 0 ? (
-                  <>
-                    <div className="w-full p-3.5 bg-slate-100 rounded-2xl border border-slate-200 font-black text-slate-500 text-sm cursor-not-allowed select-none flex items-center justify-between">
-                      <span>{childVariants.reduce((s, v) => s + Number(v.stock || 0), 0)}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Auto</span>
-                    </div>
-                    <p className="text-[11px] text-violet-600 font-semibold ml-1 mt-1 leading-snug">
-                      ⚡ Produk Induk — stok dihitung otomatis dari <strong>{childVariants.length} varian anak</strong>. Kelola stok di daftar varian di bawah.
-                    </p>
-                  </>
-                ) : (
-                  <input 
-                    required 
-                    type="number" 
-                    className="w-full p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 font-black text-emerald-800 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500" 
-                    value={formData.Stok} 
-                    onChange={e => setFormData({ ...formData, Stok: Number(e.target.value) })} 
-                  />
-                )}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-rose-500 ml-1 block">Min. Stok Warning</label>
-                <input 
-                  required 
-                  type="number" 
-                  className="w-full p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200 font-black text-rose-700 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-rose-400" 
-                  value={formData.Min_Stok} 
-                  onChange={e => setFormData({ ...formData, Min_Stok: Number(e.target.value) })} 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Gudang Utama</label>
-                <select 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none" 
-                  value={formData.warehouseId} 
-                  onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}
-                >
-                  <option value="">Pilih Gudang (Opsional)</option>
-                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </div>
-            </div>
+        {/* MAIN RESPONSIVE CONTAINER (2-COLUMNS DESKTOP, 1-COLUMN MOBILE) */}
+        <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* ======================================================== */}
+            {/* KOLOM KIRI (KONTEN UTAMA: 8 KOLOM DESKTOP)                */}
+            {/* ======================================================== */}
+            <div className="lg:col-span-8 space-y-6">
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-blue-600 ml-1 block">Min. Pembelian Trx</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  className="w-full p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 font-black text-blue-800 text-sm outline-none" 
-                  value={formData.minPurchase} 
-                  onChange={e => setFormData({ ...formData, minPurchase: Number(e.target.value) })} 
-                />
-                <p className="text-[10px] text-slate-400 font-bold px-1 uppercase">Jumlah minimal dalam 1 transaksi</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-rose-600 ml-1 block">Max. Pembelian Trx</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  className="w-full p-3.5 bg-rose-50/60 rounded-2xl border border-rose-200 font-black text-rose-800 text-sm outline-none" 
-                  value={formData.maxPurchase} 
-                  onChange={e => setFormData({ ...formData, maxPurchase: Number(e.target.value) })} 
-                />
-                <p className="text-[10px] text-slate-400 font-bold px-1 uppercase">Jumlah maksimal (0 = Tanpa batas)</p>
-              </div>
-            </div>
-
-            {/* DETAIL STOK PER GUDANG */}
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 ml-1">Rincian Stok Per Gudang</h4>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-slate-400">Alasan Log Audit:</label>
-                  <select
-                    className="p-2 bg-slate-100 rounded-xl text-xs font-bold outline-none"
-                    value={stockReason}
-                    onChange={(e) => setStockReason(e.target.value as any)}
-                  >
-                    <option value="MANUAL">Adjust (Manual)</option>
-                    <option value="OPNAME">Stock Opname</option>
-                    <option value="TRANSFER">Transfer Gudang</option>
-                  </select>
+              {/* 1. IDENTITAS BARANG */}
+              <section id="identitas" className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-blue-700 flex items-center gap-2">
+                    <Tag size={16} /> Identitas Produk
+                  </h2>
+                  <span className="text-[11px] text-slate-400 font-medium">Informasi dasar & kode produk</span>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {warehouses.map((w) => {
-                  const qty = Number(formData.stockByWarehouse?.[w.id] || 0);
-                  return (
-                    <div key={w.id} className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200/70">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1 truncate">{w.name}</label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      ID Produk (SKU) *
+                    </label>
+                    <input
+                      required
+                      className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl font-mono font-bold text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                      type="text"
+                      value={formData.ID}
+                      onChange={(e) => setFormData({ ...formData, ID: e.target.value })}
+                      placeholder="BRG-001"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Parent ID (Induk)
+                      </label>
+                      {formData.Parent_ID && (
+                        <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-1.5 py-0.2 rounded">Varian</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
                       <input
-                        type="number"
-                        min={0}
-                        className="w-full bg-white p-2.5 rounded-xl text-xs font-black text-slate-800 outline-none border border-slate-200 focus:border-emerald-500"
-                        value={qty}
+                        className="flex-1 px-3.5 py-2 bg-slate-50/80 rounded-xl font-mono text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                        type="text"
+                        value={formData.Parent_ID}
+                        onChange={(e) => setFormData({ ...formData, Parent_ID: e.target.value })}
+                        placeholder="ID Produk Induk (opsional)"
+                      />
+                      {formData.Parent_ID && (
+                        <a
+                          href={`/admin/products/edit/${formData.Parent_ID}`}
+                          className="p-2 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl text-xs font-bold transition-colors shrink-0"
+                          title="Buka produk induk"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Lokasi Rak
+                    </label>
+                    <input
+                      className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                      type="text"
+                      value={formData.Lokasi}
+                      onChange={(e) => setFormData({ ...formData, Lokasi: e.target.value })}
+                      placeholder="Rak A-01"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Nama Produk *
+                    </label>
+                    <input
+                      required
+                      className="w-full px-3.5 py-2.5 bg-slate-50/80 rounded-xl font-semibold text-sm text-slate-900 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                      type="text"
+                      value={formData.Nama}
+                      onChange={(e) => setFormData({ ...formData, Nama: e.target.value })}
+                      placeholder="Contoh: Kopi Good Day Freeze Mocafrio"
+                    />
+                  </div>
+
+                  {/* Kategori */}
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Kategori Produk
+                    </label>
+                    {formData.Kategori === '__NEW__' ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          autoFocus
+                          className="flex-1 px-3.5 py-2 bg-amber-50/80 border border-amber-300 rounded-xl text-sm font-semibold text-amber-900 outline-none focus:ring-2 focus:ring-amber-500"
+                          type="text"
+                          placeholder="Ketik kategori baru..."
+                          value={newKategoriInput}
+                          onChange={(e) => setNewKategoriInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveNewCategory();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveNewCategory}
+                          className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                        >
+                          <Plus size={14} /> Simpan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setFormData({ ...formData, Kategori: 'UMUM' }); setNewKategoriInput(''); }}
+                          className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-xs font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl text-xs font-semibold text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                        value={formData.Kategori}
                         onChange={(e) => {
-                          const nextVal = Number(e.target.value || 0);
-                          const nextMap = { ...(formData.stockByWarehouse || {}) , [w.id]: nextVal };
-                          const nextTotal = Object.values(nextMap).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
-                          setFormData({
-                            ...formData,
-                            stockByWarehouse: nextMap,
-                            Stok: nextTotal
-                          });
+                          if (e.target.value === '__NEW__') {
+                            setFormData({ ...formData, Kategori: '__NEW__' });
+                          } else {
+                            setFormData({ ...formData, Kategori: e.target.value });
+                          }
                         }}
+                      >
+                        <option value="">— Pilih Kategori —</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                        <option value="__NEW__">＋ Tambah Kategori Baru...</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Brand */}
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Brand / Merk
+                    </label>
+                    <input
+                      className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                      type="text"
+                      value={formData.Brand}
+                      onChange={(e) => setFormData({ ...formData, Brand: e.target.value })}
+                      placeholder="Contoh: Good Day, Indomie"
+                    />
+                  </div>
+
+                  {/* Barcode Utama */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Barcode Utama
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => { setScanUnitBarcodeIdx(-1); setScannerReady(true); }}
+                        className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1"
+                      >
+                        <Camera size={12} /> Scan
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Barcode size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50/80 rounded-xl font-mono text-sm text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                        type="text"
+                        value={formData.Barcode}
+                        onChange={(e) => setFormData({ ...formData, Barcode: e.target.value })}
+                        placeholder="Scan atau ketik barcode..."
                       />
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          
-          {/* BAGIAN 2.5: DIMENSI & VOLUME */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-6 text-blue-600 border-b pb-4">
-              <Package size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Dimensi & Volume (Kapasitas Gudang)</h3>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Panjang (cm)</label>
-                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimLength || ''} onChange={e => {
-                  const l = Number(e.target.value);
-                  const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Lebar (cm)</label>
-                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimWidth || ''} onChange={e => {
-                  const w = Number(e.target.value);
-                  const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Tinggi (cm)</label>
-                <input type="number" step="0.1" className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-sm outline-none" value={formData.dimHeight || ''} onChange={e => {
-                  const h = Number(e.target.value);
-                  const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
-                  setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
-                }} />
-              </div>
-              <div className="col-span-3 sm:col-span-1 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                <p className="text-[10px] font-black text-blue-500 uppercase mb-0.5">Volume Setara</p>
-                <p className="text-lg font-black text-blue-700 leading-none">{formData.volumeInCtn} <span className="text-xs uppercase">CTN</span></p>
-                <p className="text-[10px] font-bold text-blue-400 mt-1 uppercase">* Std: 34x20x24 cm</p>
-              </div>
-            </div>
-          </div>
-
-          {/* BAGIAN 3: HARGA & STRUKTUR HARGA */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-6 text-amber-600 border-b pb-4">
-              <Tag size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest">Struktur Harga</h3>
-            </div>
-
-            {/* NOMINAL AVG HPP CARD FROM PO */}
-            {poStats.count > 0 ? (
-              <div className="mb-6 p-4 sm:p-5 bg-emerald-50/80 rounded-2xl border border-emerald-200/90 shadow-sm transition-all">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shrink-0 mt-0.5 shadow-sm">
-                      <TrendingUp size={20} />
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-xs font-black uppercase tracking-wider text-emerald-900">Nominal Avg HPP (PO)</p>
-                        <span className="px-2.5 py-0.5 bg-emerald-200/90 text-emerald-900 rounded-full text-[10px] font-black border border-emerald-300/60">
-                          {poStats.count} PO ({poStats.totalQty} {formData.Satuan || 'unit'})
-                        </span>
-                      </div>
-                      {(() => {
-                        const roundedAvg = Math.round(poStats.avgCost || 0);
-                        const roundedLatest = Math.round(poStats.latestPrice || 0);
-                        return (
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">
-                              Rp {roundedAvg.toLocaleString('id-ID')}
-                              <span className="text-xs font-bold text-emerald-700 ml-1">/ {formData.Satuan || 'Pcs'}</span>
-                              {roundedLatest > 0 && roundedLatest !== roundedAvg && (
-                                <span className="ml-2 text-xs font-bold text-slate-500">
-                                  (PO Terakhir: Rp {roundedLatest.toLocaleString('id-ID')} / {formData.Satuan || 'Pcs'})
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        );
-                      })()}
-
-                      {/* RINCIAN AVG HPP PER SATUAN YANG DITAMBAHKAN */}
-                      {(() => {
-                        const baseUnitName = String(formData.Satuan || 'PCS').trim().toUpperCase();
-                        const breakdownList: Array<{ code: string; contains: number; avgCost: number; latestPrice: number }> = [];
-
-                        const roundedAvg = Math.round(poStats.avgCost || 0);
-                        const roundedLatest = Math.round(poStats.latestPrice || 0);
-
-                        (units || []).forEach((u) => {
-                          const code = String(u.code || '').trim().toUpperCase();
-                          if (!code) return;
-                          const contains = Number(u.contains || (code === baseUnitName ? 1 : 0));
-                          if (!Number.isFinite(contains) || contains <= 0 || code === baseUnitName) return;
-
-                          breakdownList.push({
-                            code,
-                            contains,
-                            avgCost: Math.round(roundedAvg * contains),
-                            latestPrice: roundedLatest > 0 ? Math.round(roundedLatest * contains) : 0,
-                          });
-                        });
-
-                        if (breakdownList.length === 0) return null;
-
-                        return (
-                          <div className="pt-2 border-t border-emerald-200/60 mt-2">
-                            <p className="text-[10px] font-black uppercase text-emerald-800/80 tracking-wider mb-1.5">
-                              Rincian Avg Modal Per Satuan:
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {breakdownList.map((ub) => {
-                                const perBaseUnit = Math.round(ub.avgCost / ub.contains);
-                                return (
-                                  <div
-                                    key={ub.code}
-                                    className="min-w-[170px] rounded-xl border border-emerald-300/80 bg-white/90 px-3 py-2 shadow-2xs"
-                                  >
-                                    <div className="text-[11px] font-black text-slate-500 pt-2 border-t border-slate-200">
-                                      {ub.code} - Rp {ub.avgCost.toLocaleString('id-ID')}
-                                      <span className="text-[10px] font-bold text-slate-400 block">
-                                        Isi {ub.contains} {baseUnitName} ( Rp {perBaseUnit.toLocaleString('id-ID')} /{baseUnitName} )
-                                      </span>
-                                    </div>
-                                    {ub.latestPrice > 0 && ub.latestPrice !== ub.avgCost && (
-                                      <div className="mt-1 text-[10px] text-slate-500 font-medium">
-                                        PO Terakhir: Rp {ub.latestPrice.toLocaleString('id-ID')}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const roundedAvg = Math.round(poStats.avgCost || 0);
-                      setFormData(prev => ({ ...prev, Modal: roundedAvg }));
-                      toast.success(`Avg Modal HPP (Rp ${roundedAvg.toLocaleString('id-ID')} / ${formData.Satuan || 'Pcs'}) berhasil diterapkan ke seluruh satuan!`);
-                    }}
-                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5 self-stretch sm:self-auto"
-                  >
-                    <Check size={14} /> Terapkan Avg Modal
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-6 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 flex items-center gap-2 text-xs text-slate-400 font-bold">
-                <Info size={16} className="shrink-0 text-slate-400" />
-                <span>Nominal Avg HPP belum tersedia (belum ada riwayat Purchase Order tercatat untuk produk ini).</span>
-              </div>
-            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between ml-1">
-                  <label className="text-xs font-black uppercase text-slate-400 block">Harga Modal / Satuan</label>
-                  {activeModalUnitObj.contains > 1 && (
-                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
-                      Isi {activeModalUnitObj.contains} {baseUnitCode}
-                    </span>
-                  )}
-                </div>
-                <div className="flex bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500">
-                  <input 
-                    required 
-                    type="number" 
-                    className="w-full p-3.5 bg-transparent border-none font-black text-sm outline-none" 
-                    value={modalInputStr}
-                    placeholder="0"
-                    onFocus={() => setIsModalInputFocused(true)}
-                    onBlur={() => {
-                      setIsModalInputFocused(false);
-                      const ratio = activeModalUnitObj?.contains || 1;
-                      const currentModal = Number(formData.Modal || 0);
-                      if (currentModal > 0) {
-                        setModalInputStr(String(Math.round(currentModal * ratio)));
-                      } else {
-                        setModalInputStr('');
-                      }
-                    }}
-                    onChange={e => handleModalInputChange(e.target.value)} 
-                  />
-                  <select 
-                    className="bg-slate-200 border-none font-bold text-slate-700 px-3 text-xs outline-none cursor-pointer"
-                    value={activeModalUnitCode}
-                    onChange={e => handleModalUnitChange(e.target.value)}
-                  >
-                    {availableModalUnits.map(s => (
-                      <option key={s.code} value={s.code}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                {activeModalUnitObj.contains > 1 ? (
-                  <p className="text-[11px] font-bold text-orange-600 ml-1 mt-1">
-                    ≈ Rp {Math.round(Number(formData.Modal || 0)).toLocaleString('id-ID')} / {baseUnitCode} (dibagi isi {activeModalUnitObj.contains})
-                  </p>
-                ) : (
-                  <p className="text-[11px] font-medium text-slate-400 ml-1 mt-1">
-                    Modal dasar per {baseUnitCode}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-black uppercase text-slate-400 ml-1">Harga Ecer (Jual Utama)</label>
-                  {formData.Ecer > 0 && formData.Modal > 0 && (
-                    <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
-                  )}
-                </div>
-                <input 
-                  required 
-                  type="number" 
-                  disabled={pricingMode === 'RECOMMENDED'} 
-                  className="w-full p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200 font-black text-blue-700 text-sm focus:ring-2 focus:ring-blue-600 disabled:opacity-70 outline-none" 
-                  value={formData.Ecer} 
-                  onChange={e => setFormData({ ...formData, Ecer: Number(e.target.value) })} 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Harga Coret (Diskon)</label>
-                <input 
-                  type="number" 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-black text-slate-400 text-sm line-through outline-none" 
-                  value={formData.Harga_Coret} 
-                  onChange={e => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })} 
-                />
-              </div>
-            </div>
-
-            {/* TAX BREAKDOWN PANEL */}
-            {(() => {
-              const ecer = Number(formData.Ecer || 0);
-              if (ecer <= 0) return null;
-              const category = formData.Kategori || '';
-              const breakdown = calculateTaxBreakdown({ amount: ecer, category, taxSettings, isTaxable });
-              const modal = Number(formData.Modal || 0);
-              const marginAfterTax = modal > 0 && !breakdown.isExempt
-                ? (((breakdown.dpp - modal) / modal) * 100).toFixed(1)
-                : null;
-              return (
-                <div className={`mb-5 p-4 rounded-2xl border flex flex-col gap-3.5 ${
-                  !taxSettings.enabled
-                    ? 'bg-slate-50 border-slate-200/60'
-                    : breakdown.isExempt
-                    ? 'bg-amber-50/70 border-amber-200'
-                    : 'bg-indigo-50/70 border-indigo-200'
-                }`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200/60">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{!taxSettings.enabled ? '💤' : breakdown.isExempt ? '🟡' : '📋'}</span>
-                      <div>
-                        <p className={`text-xs font-black uppercase tracking-widest ${
-                          !taxSettings.enabled ? 'text-slate-400' : breakdown.isExempt ? 'text-amber-800' : 'text-indigo-800'
-                        }`}>Status Pajak Produk</p>
-                        <p className={`text-xs font-black ${
-                          !taxSettings.enabled ? 'text-slate-500' : breakdown.isExempt ? 'text-amber-900' : 'text-indigo-900'
-                        }`}>{breakdown.taxLabel}</p>
-                      </div>
-                    </div>
-
-                    {/* Toggle Aktifkan Pajak untuk produk ini */}
-                    <div className="flex items-center gap-2.5 bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-xs">
-                      <span className="text-xs font-black uppercase text-slate-700">Kenakan Pajak (PPN)</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isTaxable}
-                          onChange={(e) => setIsTaxable(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                      </label>
-                      <span className={`text-[10px] font-black uppercase ${isTaxable ? 'text-indigo-700' : 'text-slate-400'}`}>
-                        {isTaxable ? 'AKTIF' : 'NON-AKTIF'}
-                      </span>
+                  {/* Tgl Masuk & Kadaluarsa */}
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Tgl Masuk Stok
+                    </label>
+                    <div className="relative">
+                      <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50/80 rounded-xl text-xs text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                        type="date"
+                        value={formData.tgl_masuk}
+                        onChange={(e) => setFormData({ ...formData, tgl_masuk: e.target.value })}
+                      />
                     </div>
                   </div>
 
-                  {taxSettings.enabled && !breakdown.isExempt && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="p-2.5 bg-white/60 rounded-xl">
-                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">DPP (Sebelum Pajak)</p>
-                        <p className="text-sm font-black text-indigo-950">Rp {breakdown.dpp.toLocaleString('id-ID')}</p>
-                      </div>
-                      <div className="p-2.5 bg-white/60 rounded-xl">
-                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Pajak {breakdown.effectiveRate}%</p>
-                        <p className="text-sm font-black text-rose-600">+Rp {breakdown.taxAmount.toLocaleString('id-ID')}</p>
-                      </div>
-                      <div className="p-2.5 bg-white/60 rounded-xl">
-                        <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Margin Riel (vs DPP)</p>
-                        <p className={`text-sm font-black ${marginAfterTax !== null && Number(marginAfterTax) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                          {marginAfterTax !== null ? `${marginAfterTax}%` : '-'}
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Tgl Kadaluarsa (Expired)
+                    </label>
+                    <div className="relative">
+                      <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50/80 rounded-xl text-xs text-slate-800 border border-slate-200 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                        type="date"
+                        value={formData.Expired_Default}
+                        onChange={(e) => setFormData({ ...formData, Expired_Default: e.target.value, expired_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 2. STRUKTUR HARGA & MODAL HPP */}
+              <section id="harga-satuan" className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-amber-700 flex items-center gap-2">
+                    <TrendingUp size={16} /> Struktur Harga & Modal
+                  </h2>
+                  <span className="text-[11px] text-slate-400 font-medium">HPP, Eceran, Grosir & Margin</span>
+                </div>
+
+                {/* PO AVG HPP BANNER */}
+                {poStats.count > 0 ? (
+                  <div className="mb-5 p-4 bg-emerald-50/70 rounded-xl border border-emerald-200/90">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-emerald-900 uppercase">Avg Modal PO Terakhir</span>
+                          <span className="px-2 py-0.2 bg-emerald-200/80 text-emerald-900 rounded-full text-[10px] font-bold">
+                            {poStats.count} PO ({poStats.totalQty} {formData.Satuan})
+                          </span>
+                        </div>
+                        <p className="text-base font-black text-emerald-800">
+                          Rp {Math.round(poStats.avgCost || 0).toLocaleString('id-ID')}
+                          <span className="text-xs font-medium text-emerald-700 ml-1">/ {formData.Satuan || 'Pcs'}</span>
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const roundedAvg = Math.round(poStats.avgCost || 0);
+                          setFormData((prev) => ({ ...prev, Modal: roundedAvg }));
+                          toast.success(`Avg Modal (Rp ${roundedAvg.toLocaleString('id-ID')}) diterapkan`);
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-2xs flex items-center gap-1 shrink-0"
+                      >
+                        <Check size={13} /> Terapkan Avg Modal
+                      </button>
                     </div>
-                  )}
-                  {taxSettings.enabled && breakdown.isExempt && (
-                    <p className="text-xs font-bold text-amber-800">
-                      Produk ini bebas PPN (0%) — tidak ada potongan/kewajiban pajak yang dibebankan.
-                    </p>
-                  )}
-                  {!taxSettings.enabled && (
-                    <p className="text-xs font-bold text-slate-400">
-                      Pajak sistem sedang dinonaktifkan di Pengaturan.
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* RECOMMENDATION MODE */}
-            <div className="p-4 sm:p-5 bg-slate-50/80 rounded-2xl border border-slate-200/70 mb-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-                <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Mode Penentuan Harga</label>
-                  <select
-                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm outline-none"
-                    value={pricingMode}
-                    onChange={(e) => setPricingMode(e.target.value === 'RECOMMENDED' ? 'RECOMMENDED' : 'MANUAL')}
-                  >
-                    <option value="MANUAL">Manual</option>
-                    <option value="RECOMMENDED">Ikuti rekomendasi margin</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Profil Margin Target</label>
-                  <select
-                    disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
-                    value={pricingRuleKey}
-                    onChange={(e) => setPricingRuleKey(e.target.value)}
-                  >
-                    {MARGIN_RULES.map((r) => (
-                      <option key={r.key} value={r.key}>
-                        {r.label} ({r.min}-{r.max}%)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Margin (%)</label>
-                  <input
-                    type="number"
-                    disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
-                    value={pricingMarginPercent || ''}
-                    onChange={(e) => setPricingMarginPercent(Number(e.target.value || 0))}
-                    placeholder={pricingRec ? String(pricingRec.marginPercent.toFixed(1)) : ''}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-slate-400 ml-1 block">Pembulatan</label>
-                  <select
-                    disabled={pricingMode !== 'RECOMMENDED'}
-                    className="w-full p-3.5 bg-white rounded-xl border border-slate-200 font-black text-xs shadow-sm disabled:opacity-60 outline-none"
-                    value={pricingRoundingStep}
-                    onChange={(e) => setPricingRoundingStep(Number(e.target.value || 100))}
-                  >
-                    <option value={1}>Tanpa pembulatan</option>
-                    <option value={50}>Kelipatan 50</option>
-                    <option value={100}>Kelipatan 100</option>
-                    <option value={500}>Kelipatan 500</option>
-                    <option value={1000}>Kelipatan 1000</option>
-                  </select>
-                </div>
-              </div>
-              {pricingMode === 'RECOMMENDED' && pricingRec && (
-                <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-3">
-                  <div className="text-xs font-black text-slate-700">
-                    Rekomendasi: Rp{pricingRec.recommendedPrice.toLocaleString('id-ID')} ({pricingRec.rule.label}, {pricingRec.rule.min}-{pricingRec.rule.max}%)
                   </div>
-                  <div className="text-xs font-black uppercase tracking-wider text-slate-500">
-                    Efektif: {pricingRec.effectiveMarginPercent.toFixed(2)}%
+                ) : null}
+
+                {/* Grid Harga Modal, Ecer, dan Coret */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-4">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Harga Modal (HPP) / Satuan
+                    </label>
+                    <div className="flex bg-slate-50/90 rounded-xl overflow-hidden border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:bg-white">
+                      <input
+                        required
+                        type="number"
+                        className="w-full px-3 py-2 bg-transparent font-bold text-sm text-slate-800 outline-none"
+                        value={modalInputStr}
+                        placeholder="0"
+                        onFocus={() => setIsModalInputFocused(true)}
+                        onBlur={() => {
+                          setIsModalInputFocused(false);
+                          const ratio = activeModalUnitObj?.contains || 1;
+                          const currentModal = Number(formData.Modal || 0);
+                          setModalInputStr(currentModal > 0 ? String(Math.round(currentModal * ratio)) : '');
+                        }}
+                        onChange={(e) => handleModalInputChange(e.target.value)}
+                      />
+                      <select
+                        className="bg-slate-100 border-none font-bold text-slate-700 px-2.5 text-xs outline-none cursor-pointer"
+                        value={activeModalUnitCode}
+                        onChange={(e) => handleModalUnitChange(e.target.value)}
+                      >
+                        {availableModalUnits.map((s) => (
+                          <option key={s.code} value={s.code}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {activeModalUnitObj.contains > 1 ? (
+                      <p className="text-[10px] font-bold text-amber-700 mt-1">
+                        ≈ Rp {Math.round(Number(formData.Modal || 0)).toLocaleString('id-ID')} / {baseUnitCode}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-slate-400 mt-1">Modal dasar per {baseUnitCode}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Harga Ecer (Jual Utama)
+                      </label>
+                      {formData.Ecer > 0 && formData.Modal > 0 && (
+                        <ProfitBadge {...calculateProfit(formData.Ecer, formData.Modal)} />
+                      )}
+                    </div>
+                    <input
+                      required
+                      type="number"
+                      disabled={pricingMode === 'RECOMMENDED'}
+                      className="w-full px-3.5 py-2 bg-blue-50/70 rounded-xl border border-blue-200 font-bold text-sm text-blue-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-75 transition-all"
+                      value={formData.Ecer}
+                      onChange={(e) => setFormData({ ...formData, Ecer: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Harga Coret (Promo)
+                    </label>
+                    <input
+                      type="number"
+                      className="w-full px-3.5 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-medium text-sm text-slate-400 line-through focus:bg-white focus:text-slate-800 focus:line-through-none outline-none transition-all"
+                      value={formData.Harga_Coret || ''}
+                      placeholder="0"
+                      onChange={(e) => setFormData({ ...formData, Harga_Coret: Number(e.target.value) })}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 sm:p-5 bg-amber-50/60 rounded-2xl border border-amber-200/80">
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-black uppercase text-amber-800 ml-1">Harga Grosir</label>
-                  {formData.Grosir > 0 && formData.Modal > 0 && (
-                    <ProfitBadge {...calculateProfit(formData.Grosir, formData.Modal)} />
-                  )}
+                {/* Grosir & Min Grosir */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-3.5 bg-amber-50/50 rounded-xl border border-amber-200/80 mb-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-amber-900 block">
+                        Harga Grosir
+                      </label>
+                      {formData.Grosir > 0 && formData.Modal > 0 && (
+                        <ProfitBadge {...calculateProfit(formData.Grosir, formData.Modal)} />
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      className="w-full px-3.5 py-2 bg-white rounded-xl border border-amber-200 font-bold text-sm text-amber-900 outline-none focus:ring-2 focus:ring-amber-500"
+                      value={formData.Grosir || ''}
+                      placeholder="0"
+                      onChange={(e) => setFormData({ ...formData, Grosir: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-amber-900 block mb-1">
+                      Min. Beli Grosir ({formData.Satuan || 'PCS'})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full px-3.5 py-2 bg-white rounded-xl border border-amber-200 font-bold text-sm text-amber-900 outline-none focus:ring-2 focus:ring-amber-500"
+                      value={formData.Min_Grosir || 1}
+                      onChange={(e) => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })}
+                    />
+                  </div>
                 </div>
-                <input type="number" className="w-full p-3.5 bg-white rounded-xl border border-amber-200 font-black text-amber-900 text-sm shadow-sm outline-none" value={formData.Grosir} onChange={e => setFormData({ ...formData, Grosir: Number(e.target.value) })} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-amber-800 ml-1 block">Min. Beli Grosir</label>
-                <input type="number" className="w-full p-3.5 bg-white rounded-xl border border-amber-200 font-black text-amber-900 text-sm shadow-sm outline-none" value={formData.Min_Grosir} onChange={e => setFormData({ ...formData, Min_Grosir: Number(e.target.value) })} />
-              </div>
-            </div>
 
-            <div className="mt-4 flex items-center gap-3">
-              <span className="text-xs font-black uppercase text-slate-400">Status Produk</span>
-              <select className="p-2.5 bg-slate-100 rounded-xl text-xs font-bold border outline-none" value={formData.Status} onChange={e => setFormData({ ...formData, Status: Number(e.target.value) })}>
-                <option value={1}>Aktif (Bisa Transaksi)</option>
-                <option value={0}>Non-Aktif (Arsip)</option>
-              </select>
-            </div>
-          </div>
+                {/* TAX PANEL & RECOMMENDATION MODE */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {/* Status Pajak */}
+                  {(() => {
+                    const ecer = Number(formData.Ecer || 0);
+                    const breakdown = calculateTaxBreakdown({
+                      amount: ecer,
+                      category: formData.Kategori || '',
+                      taxSettings,
+                      isTaxable,
+                    });
+                    return (
+                      <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pajak Produk (PPN)</p>
+                          <p className="text-xs font-bold text-slate-800">{breakdown.taxLabel}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={isTaxable}
+                            onChange={(e) => setIsTaxable(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    );
+                  })()}
 
-          {/* RIWAYAT PERUBAHAN MODAL */}
-          {costHistory.length > 0 && (
-            <div className="bg-white p-5 sm:p-6 rounded-[2rem] shadow-sm border border-slate-100">
-              <h4 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2 border-b pb-3">
-                <HistoryIcon size={16} /> Riwayat Perubahan Modal (HPP Audit Log)
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-xs text-slate-400 uppercase border-b">
-                      <th className="py-2.5">Tanggal</th>
-                      <th className="py-2.5">Admin</th>
-                      <th className="py-2.5 text-right">Modal Lama</th>
-                      <th className="py-2.5 text-right">Modal Baru</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-xs font-bold text-slate-700">
-                    {costHistory.map((log: any) => (
-                      <tr key={log.id} className="border-b border-slate-50 hover:bg-slate-50">
-                        <td className="py-2.5">
-                          {log.changeDate?.seconds ? new Date(log.changeDate.seconds * 1000).toLocaleDateString('id-ID') : '-'}
-                        </td>
-                        <td className="py-2.5">{log.adminEmail || 'System'}</td>
-                        <td className="py-2.5 text-right text-slate-400">Rp{Number(log.oldCost || 0).toLocaleString('id-ID')}</td>
-                        <td className="py-2.5 text-right text-slate-800 font-black">Rp{Number(log.newCost || 0).toLocaleString('id-ID')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* BAGIAN 3.4: DAFTAR VARIAN PRODUK */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-
-            {/* ── KONDISI A: Produk ini adalah INDUK (punya varian anak) ─────────── */}
-            {!formData.Parent_ID ? (
-              <>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4">
-                  <div className="flex items-center gap-2 text-slate-800">
-                    <Layers size={18} className="text-violet-600" />
+                  {/* Mode Rekomendasi Margin */}
+                  <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-xs font-black uppercase tracking-widest">Varian Produk</h3>
-                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">
-                        {childVariants.length > 0
-                          ? `${childVariants.length} varian anak terdaftar — stok induk dihitung otomatis`
-                          : 'Kelola turunan varian (warna, ukuran, rasa) dari produk ini'}
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Penentuan Harga</p>
+                      <p className="text-xs font-bold text-slate-800">
+                        {pricingMode === 'RECOMMENDED' ? 'Otomatis Margin' : 'Harga Manual'}
+                      </p>
+                    </div>
+                    <select
+                      className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold outline-none"
+                      value={pricingMode}
+                      onChange={(e) => setPricingMode(e.target.value as any)}
+                    >
+                      <option value="MANUAL">Manual</option>
+                      <option value="RECOMMENDED">Margin AI</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              {/* 3. SATUAN & MULTILEVEL HARGA DENGAN HITUNG BERAT OTOMATIS */}
+              <section id="satuan-multilevel" className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-4">
+                  <div>
+                    <h2 className="text-xs font-black uppercase tracking-wider text-indigo-700 flex items-center gap-2">
+                      <Scale size={16} /> Satuan Jual & Berat Produk (Hitung Otomatis)
+                    </h2>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Kelola kemasan berjenjang (PCS, RTG, CTN), barcode khusus, harga per satuan, dan berat otomatis.
+                    </p>
+                  </div>
+
+                  {/* Tambah Satuan Baru */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      className="bg-slate-50 px-3 py-1.5 rounded-xl text-xs font-bold uppercase outline-none border border-slate-200 focus:border-indigo-500"
+                      value={newUnitCode}
+                      onChange={(e) => setNewUnitCode(e.target.value)}
+                    >
+                      <option value="">+ Satuan Baru</option>
+                      {SATUAN_LIST.filter((s) => !units.some((u) => u.code === s.value)).map((s) => (
+                        <option key={s.value} value={s.value}>{s.label} ({s.desc})</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddUnit}
+                      disabled={!newUnitCode}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40"
+                    >
+                      Tambah
+                    </button>
+                  </div>
+                </div>
+
+                {/* BERAT SATUAN DASAR UTAMA (ACUAN HITUNG OTOMATIS) */}
+                <div className="p-4 bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-transparent rounded-xl border border-indigo-100/90 mb-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-indigo-600 text-white rounded-lg">
+                          <Scale size={14} />
+                        </span>
+                        <label className="text-xs font-black uppercase text-indigo-950">
+                          Berat Satuan Dasar ({formData.Satuan || 'PCS'})
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-indigo-800 leading-snug">
+                        Masukkan berat produk terkecil. Berat satuan bertingkat (RTG, PAK, DUS/CTN) akan <strong>otomatis dihitung</strong> dari berat dasar dikalikan jumlah isinya.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          className="w-36 px-3 py-2 bg-white rounded-xl border border-indigo-200 font-bold text-sm text-indigo-950 text-right outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                          value={formData.weight || ''}
+                          onChange={(e) => handleBaseWeightChange(Number(e.target.value || 0))}
+                        />
+                        <span className="absolute right-8 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-400 pointer-events-none">
+                          g
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-indigo-500 uppercase block">Konversi</span>
+                        <span className="text-xs font-black text-indigo-900">
+                          {formatWeightDisplay(baseWeightGrams)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggle Sembunyikan Eceran / Hide PCS */}
+                <div className="mb-5 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <ShieldAlert size={16} className="text-amber-700 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-950 uppercase">
+                        Nonaktifkan Penjualan Satuan Dasar ({formData.Satuan || 'PCS'})
+                      </p>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        Aktifkan jika produk hanya boleh dijual dalam kemasan lebih besar (contoh: hanya per Renceng atau Karton).
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowVariantModal(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black hover:bg-violet-700 transition-all shadow-sm shadow-violet-200"
-                  >
-                    <Layers size={14} />
-                    Kelola Varian
-                  </button>
-                </div>
-
-                {childVariants.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {childVariants.map((v) => (
-                      <div key={v.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:border-violet-300 transition-all">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-violet-100 text-violet-700 rounded-md">{v.id}</span>
-                            {v.barcode && <span className="text-[10px] font-mono text-slate-500">{v.barcode}</span>}
-                          </div>
-                          <p className="text-sm font-black text-slate-800 truncate">{v.name}</p>
-                          <p className="text-xs font-bold text-slate-500 mt-0.5">
-                            Stok: <span className={v.stock > 0 ? 'text-emerald-600 font-black' : 'text-rose-500 font-black'}>{v.stock}</span>
-                          </p>
-                        </div>
-                        <a
-                          href={`/admin/products/edit/${v.id}`}
-                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-violet-600 hover:border-violet-200 text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
-                        >
-                          Edit
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 px-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                    <Layers className="mx-auto text-slate-300 mb-2" size={32} />
-                    <p className="text-xs font-bold text-slate-500">Belum ada produk varian yang ditautkan ke produk ini.</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Klik tombol di atas untuk membuat varian seperti ukuran XL, warna merah, dll.</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* ── KONDISI B: Produk ini adalah ANAK VARIAN ───────────────────────── */
-              <>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b pb-4">
-                  <div className="flex items-center gap-2 text-slate-800">
-                    <Layers size={18} className="text-amber-500" />
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-widest">Relasi Varian</h3>
-                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">Produk ini adalah varian anak — lihat induk dan varian saudara</p>
-                    </div>
-                  </div>
-                  {/* Badge: ini adalah anak varian */}
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-[11px] font-black flex-shrink-0">
-                    <Layers size={12} />
-                    Varian Anak
-                  </span>
-                </div>
-
-                {/* Produk Induk */}
-                <div className="mb-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Produk Induk</p>
-                  {parentProduct ? (
-                    <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-violet-50 border border-violet-200">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-violet-200 text-violet-800 rounded-md">{parentProduct.id}</span>
-                          <span className="text-[10px] font-black px-2 py-0.5 bg-violet-600 text-white rounded-md">INDUK</span>
-                        </div>
-                        <p className="text-sm font-black text-violet-900 truncate">{parentProduct.name}</p>
-                        <p className="text-xs font-bold text-violet-600 mt-0.5">
-                          Total Stok (semua varian): <span className="font-black">{parentProduct.stock}</span>
-                        </p>
-                      </div>
-                      <a
-                        href={`/admin/products/edit/${parentProduct.id}`}
-                        className="px-3 py-1.5 bg-white border border-violet-200 text-violet-700 hover:bg-violet-600 hover:text-white text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
-                      >
-                        Buka Induk
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-400 font-bold">
-                      Memuat data induk...
-                    </div>
-                  )}
-                </div>
-
-                {/* Varian Saudara */}
-                {siblingVariants.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                      Varian Saudara ({siblingVariants.length})
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {siblingVariants.map((v) => (
-                        <div key={v.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:border-amber-300 transition-all">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md">{v.id}</span>
-                              {v.barcode && <span className="text-[10px] font-mono text-slate-500">{v.barcode}</span>}
-                            </div>
-                            <p className="text-sm font-black text-slate-800 truncate">{v.name}</p>
-                            <p className="text-xs font-bold text-slate-500 mt-0.5">
-                              Stok: <span className={v.stock > 0 ? 'text-emerald-600 font-black' : 'text-rose-500 font-black'}>{v.stock}</span>
-                            </p>
-                          </div>
-                          <a
-                            href={`/admin/products/edit/${v.id}`}
-                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-200 text-xs font-black rounded-xl transition-all shadow-sm flex-shrink-0"
-                          >
-                            Edit
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* BAGIAN 3.5: SATUAN JUAL MULTI-LEVEL */}
-          <div className="bg-white p-5 sm:p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4">
-              <div className="flex items-center gap-2 text-slate-800">
-                <Tag size={18} />
-                <h3 className="text-xs font-black uppercase tracking-widest">Satuan & Multilevel Harga</h3>
-              </div>
-              <div className="flex gap-2">
-                <select
-                  className="bg-slate-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
-                  value={newUnitCode}
-                  onChange={(e) => setNewUnitCode(e.target.value)}
-                >
-                  <option value="">-- Pilih Satuan Tambahan --</option>
-                  {SATUAN_LIST.filter(s => !units.some(u => u.code === s.value)).map(s => (
-                    <option key={s.value} value={s.value}>{s.label} – {s.desc}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleAddUnit}
-                  disabled={!newUnitCode}
-                  className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase hover:bg-slate-800 transition-all disabled:opacity-40"
-                >
-                  + Tambah
-                </button>
-              </div>
-            </div>
-
-            {/* Toggle: Tidak Dijual Per Satuan Dasar / Ecer (Hide PCS) */}
-            <div className="mb-5 space-y-3">
-              <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-start gap-2.5">
-                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl mt-0.5 shrink-0">
-                    <ShieldAlert size={17} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-amber-950 uppercase tracking-tight">
-                      Nonaktifkan Penjualan Satuan Dasar ({formData.Satuan || 'PCS'})
-                    </p>
-                    <p className="text-[11px] text-amber-800 font-medium leading-relaxed mt-0.5">
-                      Aktifkan jika produk <b>tidak boleh dijual eceran per {formData.Satuan || 'PCS'}</b> di kasir (hanya boleh dijual dalam kemasan lebih besar seperti RTG, PAK, atau CTN/DUS).
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 self-end sm:self-center">
                     <input
                       type="checkbox"
                       checked={hideBaseUnit}
@@ -2048,253 +1649,247 @@ export default function EditProductPage() {
                         const checked = e.target.checked;
                         setHideBaseUnit(checked);
                         if (checked && !defaultSellUnit) {
-                          const firstHigher = units.find(u => u.code !== (formData.Satuan || 'PCS') && Number(u.contains || 0) > 1);
+                          const firstHigher = units.find((u) => u.code !== (formData.Satuan || 'PCS') && Number(u.contains || 0) > 1);
                           if (firstHigher) setDefaultSellUnit(firstHigher.code);
                         }
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
                   </label>
                 </div>
-              </div>
 
-              {hideBaseUnit && (
-                <div className="p-3.5 bg-blue-50/80 border border-blue-200/90 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                    <div>
-                      <p className="text-xs font-black text-blue-950 uppercase">Satuan Jual Default di Kasir</p>
-                      <p className="text-[11px] text-blue-700">Satuan yang otomatis masuk ke keranjang saat kasir klik atau scan produk ini.</p>
-                    </div>
-                  </div>
-                  <select
-                    value={defaultSellUnit}
-                    onChange={(e) => setDefaultSellUnit(e.target.value)}
-                    className="bg-white border border-blue-300 text-xs font-black text-blue-900 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400 shadow-xs shrink-0"
-                  >
-                    <option value="">-- Pilih Satuan Default --</option>
-                    {units.filter(u => u.code !== (formData.Satuan || 'PCS')).map(u => (
-                      <option key={u.code} value={u.code}>
-                        {u.code} (Isi {u.contains} {formData.Satuan || 'PCS'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
+                {/* GRID KARTU SATUAN BERTINGKAT */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {units.map((u, index) => {
+                    const code = u.code || '';
+                    const idx = index;
+                    const baseUnit = String(formData.Satuan || 'PCS').toUpperCase();
+                    const isCurrentBase = code === baseUnit || idx === 0;
+                    const contains = Number(u.contains || (idx === 0 ? 1 : 0));
+                    const unitPrice = Number(u.price || 0);
+                    const autoComputedWeight = baseWeightGrams > 0 && contains > 0 ? Number((baseWeightGrams * contains).toFixed(2)) : 0;
+                    const isAutoWeightSynced = Math.abs(Number(u.weight || 0) - autoComputedWeight) < 0.01;
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {units.map((u, index) => {
-                const code = u.code || '';
-                const idx = index;
-                const current = u;
-                const baseUnit = String(formData.Satuan || 'PCS').toUpperCase();
-                const isCurrentBase = code === baseUnit || idx === 0;
-                const isBaseHidden = isCurrentBase && hideBaseUnit;
-                const basePrice = Number(formData.Ecer || 0);
-                const contains = Number(current.contains || (idx === 0 ? 1 : 0));
-                const unitPrice = Number(current.price || 0);
-                const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
-
-                return (
-                  <div key={idx} className={`p-4 rounded-2xl border relative group space-y-3 transition-all ${
-                    isBaseHidden 
-                      ? 'bg-amber-50/40 border-dashed border-amber-300 opacity-80' 
-                      : defaultSellUnit === code 
-                        ? 'bg-blue-50/30 border-blue-400 ring-2 ring-blue-100' 
-                        : 'bg-slate-50/70 border-slate-200'
-                  }`}>
-                    {isBaseHidden && (
-                      <div className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <EyeOff size={11} /> Tidak Dijual Eceran
-                      </div>
-                    )}
-                    {!isBaseHidden && defaultSellUnit === code && (
-                      <div className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        ⭐ Satuan Utama Kasir
-                      </div>
-                    )}
-                    {idx > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveUnit(idx)}
-                        className="absolute top-3 right-3 p-1.5 bg-rose-100 text-rose-600 rounded-lg opacity-80 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-200"
-                        title="Hapus Satuan"
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-xl border relative transition-all space-y-3 ${
+                          defaultSellUnit === code
+                            ? 'bg-blue-50/30 border-blue-400 ring-2 ring-blue-100'
+                            : 'bg-slate-50/70 border-slate-200'
+                        }`}
                       >
-                        <X size={14} />
-                      </button>
-                    )}
-
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Kode Satuan</label>
-                        <input 
-                           type="text" 
-                           className="w-full bg-white p-2.5 rounded-xl text-xs font-black text-slate-800 outline-none border focus:ring-2 focus:ring-blue-500 uppercase disabled:bg-slate-100 disabled:text-slate-500"
-                           value={code}
-                           disabled={idx === 0}
-                           onChange={(e) => {
-                             const val = e.target.value.toUpperCase();
-                             const next = [...units];
-                             next[idx] = { ...current, code: val };
-                             setUnits(next);
-                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Label / Description</label>
-                        <input
-                          type="text"
-                          className="w-full bg-white p-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none border"
-                          placeholder="Nama Satuan"
-                          value={current.label || ''}
-                          onChange={(e) => {
-                            const next = [...units];
-                            next[idx] = { ...current, label: e.target.value };
-                            setUnits(next);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                     {/* BARCODE PER SATUAN */}
-                     <div>
-                       <label className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center justify-between">
-                         <span className="flex items-center gap-1"><Barcode size={10} /> Barcode {code}</span>
-                         <button
-                           type="button"
-                           onClick={() => { setScanUnitBarcodeIdx(idx); setScannerReady(true); }}
-                           className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                         >
-                           <Camera size={10} /> Scan
-                         </button>
-                       </label>
-                       <input
-                         type="text"
-                         className="w-full bg-white p-2.5 rounded-xl text-xs font-mono text-slate-700 outline-none border border-slate-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
-                         placeholder={`Barcode kemasan ${code}...`}
-                         value={current.barcode || ''}
-                         onChange={(e) => {
-                           const next = [...units];
-                           next[idx] = { ...current, barcode: e.target.value || undefined };
-                           setUnits(next);
-                         }}
-                       />
-                     </div>
-
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-slate-600 uppercase">Harga Jual</span>
-                        {Number(current.price) > 0 && formData.Modal > 0 && (
-                           <span className={`text-[11px] font-bold ${calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                             {calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit >= 0 ? '+' : ''}
-                             {((calculateProfit(Number(current.price), formData.Modal * (current.contains || 1)).profit / (formData.Modal * (current.contains || 1))) * 100).toFixed(0)}%
-                           </span>
-                        )}
-                        <input
-                          type="number"
-                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200 focus:border-blue-500"
-                          value={current.price || ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                            const next = [...units];
-                            next[idx] = { ...current, price: val };
-                            setUnits(next);
-                          }}
-                        />
-                      </div>
-
-                      {/* QUICK PRESET HARGA SATUAN (IKUT REKOMENDASI / DISKON / MARGIN) */}
-                      {idx > 0 && (
-                        <div className="p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1.5">
-                          <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider flex items-center justify-between">
-                            <span>Auto Set Harga {code}:</span>
-                            {Number(formData.Modal || 0) > 0 && Number(current.price || 0) > 0 && (
-                              <span className={`text-[10px] font-bold ${Number(current.price || 0) >= Number(formData.Modal || 0) * (contains || 1) ? 'text-emerald-700' : 'text-rose-600'}`}>
-                                Margin: {(((Number(current.price || 0) - (Number(formData.Modal || 0) * (contains || 1))) / Number(current.price || 1)) * 100).toFixed(1)}%
+                        {/* Header Satuan Card */}
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-xs font-black uppercase">
+                              {code}
+                            </span>
+                            {isCurrentBase && (
+                              <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.2 rounded">
+                                Satuan Dasar
                               </span>
                             )}
-                          </span>
-                          <div className="flex flex-wrap gap-1">
+                            {!isCurrentBase && (
+                              <span className="text-[11px] font-bold text-slate-600">
+                                Isi: {contains} {baseUnit}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveUnit(idx)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Hapus Satuan"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Label & Isi Satuan */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">
+                              Nama Label
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Contoh: Renceng / Dus"
+                              className="w-full px-2.5 py-1.5 bg-white rounded-lg text-xs font-semibold text-slate-800 border border-slate-200 outline-none focus:border-blue-500"
+                              value={u.label || ''}
+                              onChange={(e) => {
+                                const next = [...units];
+                                next[idx] = { ...u, label: e.target.value };
+                                setUnits(next);
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">
+                              Jumlah Isi ({baseUnit})
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              disabled={idx === 0}
+                              className="w-full px-2.5 py-1.5 bg-white rounded-lg text-xs font-bold text-slate-800 border border-slate-200 outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400 text-right"
+                              value={idx === 0 ? 1 : (u.contains || '')}
+                              onChange={(e) => handleUnitContainsChange(idx, Number(e.target.value || 1))}
+                            />
+                          </div>
+                        </div>
+
+                        {/* BERAT SATUAN (HITUNG OTOMATIS) */}
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/90 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold uppercase text-slate-600 flex items-center gap-1">
+                              <Scale size={11} className="text-indigo-600" /> Berat Kemasan {code}
+                            </label>
+                            <span className="text-[11px] font-black text-indigo-900">
+                              {formatWeightDisplay(Number(u.weight || 0))}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="w-full px-2.5 py-1.5 bg-slate-50/80 rounded-lg text-xs font-bold text-slate-800 border border-slate-200 outline-none focus:bg-white focus:border-indigo-500 text-right pr-7"
+                                value={u.weight || ''}
+                                placeholder="0"
+                                onChange={(e) => handleUnitWeightChange(idx, Number(e.target.value || 0))}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                                g
+                              </span>
+                            </div>
+
+                            {!isCurrentBase && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetUnitWeight(idx)}
+                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors shrink-0 flex items-center gap-1 border ${
+                                  isAutoWeightSynced
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                }`}
+                                title="Hitung ulang otomatis berdasarkan perkalian isi"
+                              >
+                                {isAutoWeightSynced ? (
+                                  <>
+                                    <Sparkles size={10} /> Auto
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw size={10} /> Auto Hitung
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {!isCurrentBase && baseWeightGrams > 0 && (
+                            <p className="text-[9px] text-slate-400">
+                              Rumus: {baseWeightGrams}g × {contains} = {autoComputedWeight}g
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Barcode Satuan */}
+                        <div>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className="text-[10px] font-bold uppercase text-slate-500 flex items-center gap-1">
+                              <Barcode size={11} /> Barcode {code}
+                            </label>
                             <button
                               type="button"
-                              onClick={() => {
-                                const rec = recommendSellingPrice({
-                                  cost: Number(formData.Modal || 0) * (contains || 1),
-                                  name: formData.Nama,
-                                  category: formData.Kategori,
-                                  ruleKey: pricingRuleKey,
-                                  marginPercent: pricingMarginPercent,
-                                  roundingStep: pricingRoundingStep,
-                                });
-                                if (rec) {
-                                  const next = [...units];
-                                  next[idx] = { ...current, price: rec.recommendedPrice };
-                                  setUnits(next);
-                                  toast.success(`Harga ${code} diset ke Rekomendasi (Rp ${rec.recommendedPrice.toLocaleString('id-ID')})`);
-                                } else {
-                                  toast.error('Isi modal dan jumlah isi terlebih dahulu');
-                                }
-                              }}
-                              className="px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-black rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
-                              title="Hitung harga otomatis mengikuti AI margin rekomendasi produk"
+                              onClick={() => { setScanUnitBarcodeIdx(idx); setScannerReady(true); }}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5"
                             >
-                              <Sparkles size={10} className="text-indigo-600" />
-                              Ikut Rekomendasi
+                              <Camera size={10} /> Scan
                             </button>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder={`Barcode khusus ${code}...`}
+                            className="w-full px-2.5 py-1.5 bg-white rounded-lg text-xs font-mono text-slate-800 border border-slate-200 outline-none focus:border-blue-500"
+                            value={u.barcode || ''}
+                            onChange={(e) => {
+                              const next = [...units];
+                              next[idx] = { ...u, barcode: e.target.value || undefined };
+                              setUnits(next);
+                            }}
+                          />
+                        </div>
+
+                        {/* Harga Jual Satuan */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase text-slate-700">Harga Jual {code}</span>
+                            {Number(u.price) > 0 && formData.Modal > 0 && (
+                              <span className={`text-[10px] font-bold ${
+                                calculateProfit(Number(u.price), formData.Modal * (contains || 1)).profit >= 0
+                                  ? 'text-emerald-600'
+                                  : 'text-rose-600'
+                              }`}>
+                                Profit: Rp{calculateProfit(Number(u.price), formData.Modal * (contains || 1)).profit.toLocaleString('id-ID')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
+                              Rp
+                            </span>
+                            <input
+                              type="number"
+                              className="w-full pl-8 pr-2.5 py-1.5 bg-white rounded-lg text-xs font-bold text-slate-900 border border-slate-200 outline-none focus:border-blue-500 text-right"
+                              value={u.price || ''}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                const next = [...units];
+                                next[idx] = { ...u, price: val };
+                                setUnits(next);
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Preset Cepat Harga Satuan */}
+                        {idx > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-200/60">
                             <button
                               type="button"
                               onClick={() => {
                                 const target = Number(formData.Ecer || 0) * (contains || 1);
                                 const next = [...units];
-                                next[idx] = { ...current, price: target };
+                                next[idx] = { ...u, price: target };
                                 setUnits(next);
                               }}
-                              className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
-                              title="Harga jual = Ecer x Isi"
+                              className="px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] font-medium text-slate-600 transition-colors"
                             >
                               Sama Ecer
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                const target = Math.round((Number(formData.Ecer || 0) * (contains || 1) * 0.97) / 100) * 100;
-                                const next = [...units];
-                                next[idx] = { ...current, price: target };
-                                setUnits(next);
-                              }}
-                              className="px-2 py-1 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
-                              title="Potongan diskon 3% dari total harga ecer"
-                            >
-                              -3% Ecer
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
                                 const target = Math.round((Number(formData.Ecer || 0) * (contains || 1) * 0.95) / 100) * 100;
                                 const next = [...units];
-                                next[idx] = { ...current, price: target };
+                                next[idx] = { ...u, price: target };
                                 setUnits(next);
                               }}
-                              className="px-2 py-1 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
-                              title="Potongan diskon 5% dari total harga ecer"
+                              className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-[10px] font-bold text-emerald-800 transition-colors"
                             >
-                              -5% Ecer
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const costSatuan = Number(formData.Modal || 0) * (contains || 1);
-                                const target = Math.round((costSatuan * 1.05) / 100) * 100;
-                                const next = [...units];
-                                next[idx] = { ...current, price: target };
-                                setUnits(next);
-                              }}
-                              className="px-2 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
-                              title="Ambil keuntungan margin 5% dari modal kemasan"
-                            >
-                              +5% Modal
+                              Diskon 5%
                             </button>
                             <button
                               type="button"
@@ -2302,383 +1897,520 @@ export default function EditProductPage() {
                                 const costSatuan = Number(formData.Modal || 0) * (contains || 1);
                                 const target = Math.round((costSatuan * 1.10) / 100) * 100;
                                 const next = [...units];
-                                next[idx] = { ...current, price: target };
+                                next[idx] = { ...u, price: target };
                                 setUnits(next);
                               }}
-                              className="px-2 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black rounded-lg transition-colors shadow-2xs"
-                              title="Ambil keuntungan margin 10% dari modal kemasan"
+                              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded text-[10px] font-bold text-amber-800 transition-colors"
                             >
                               +10% Modal
                             </button>
                           </div>
-                        </div>
-                      )}
-
-                      {/* MODAL INPUT UNTUK SATUAN DUS / NON-BASE UNIT (FIXED MANUAL INPUT BUG) */}
-                      {idx > 0 && (
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-dashed border-slate-200">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-amber-700 uppercase">Modal / {code || 'Satuan'}</span>
-                            <span className="text-[10px] font-bold text-slate-400">Total modal 1 {code || 'satuan'}</span>
-                          </div>
-                          <UnitModalCalculator
-                            contains={contains && contains > 0 ? contains : 1}
-                            baseModal={Number(formData.Modal || 0)}
-                            onBaseModalChange={(newBase) => setFormData(prev => ({ ...prev, Modal: newBase }))}
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-slate-600 uppercase">Isi / Konversi ({baseUnit})</span>
-                        <input
-                          type="number"
-                          disabled={idx === 0}
-                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200 disabled:opacity-60"
-                          value={idx === 0 ? 1 : (current.contains || '')}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                            const next = [...units];
-                            next[idx] = { ...current, contains: idx === 0 ? 1 : val };
-                            setUnits(next);
-                          }}
-                        />
+                        )}
                       </div>
+                    );
+                  })}
+                </div>
+              </section>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-black text-slate-600 uppercase">Min Qty Jual</span>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-32 bg-white p-2.5 rounded-xl text-xs font-black text-right outline-none border border-slate-200"
-                          value={current.minQty || ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                            const next = [...units];
-                            next[idx] = { ...current, minQty: val };
-                            setUnits(next);
-                          }}
-                        />
-                      </div>
+              {/* 4. INVENTARIS STOK & GUDANG */}
+              <section id="stok-gudang" className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-emerald-700 flex items-center gap-2">
+                    <Layers size={16} /> Stok & Pergudangan
+                  </h2>
+                  <span className="text-[11px] text-slate-400 font-medium">Pengelolaan stok & multi-gudang</span>
+                </div>
 
-                      {/* CHANNEL PRICING */}
-                      <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-                        <p className="text-[10px] font-black text-blue-600 uppercase">Harga Khusus Channel</p>
-                        <div className="grid grid-cols-2 gap-2">
-                           <div>
-                              <div className="flex justify-between">
-                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Store size={10}/> Offline</label>
-                              </div>
-                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
-                                value={current.prices?.offline || ''}
-                                onChange={e => {
-                                  const val = e.target.value ? Number(e.target.value) : undefined;
-                                  const next = [...units];
-                                  next[idx] = { ...current, prices: { ...current.prices, offline: val } };
-                                  setUnits(next);
-                                }}
-                              />
-                           </div>
-                           <div>
-                              <div className="flex justify-between">
-                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Globe size={10}/> Website</label>
-                              </div>
-                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
-                                value={current.prices?.website || ''}
-                                onChange={e => {
-                                  const val = e.target.value ? Number(e.target.value) : undefined;
-                                  const next = [...units];
-                                  next[idx] = { ...current, prices: { ...current.prices, website: val } };
-                                  setUnits(next);
-                                }}
-                              />
-                           </div>
-                           <div>
-                              <div className="flex justify-between">
-                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><ShoppingBag size={10}/> Shopee</label>
-                              </div>
-                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
-                                value={current.prices?.shopee || ''}
-                                onChange={e => {
-                                  const val = e.target.value ? Number(e.target.value) : undefined;
-                                  const next = [...units];
-                                  next[idx] = { ...current, prices: { ...current.prices, shopee: val } };
-                                  setUnits(next);
-                                }}
-                              />
-                           </div>
-                           <div>
-                              <div className="flex justify-between">
-                                <label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Video size={10}/> TikTok</label>
-                              </div>
-                              <input type="number" placeholder="Default" className="w-full bg-white p-1.5 rounded-lg text-xs font-bold border outline-none" 
-                                value={current.prices?.tiktok || ''}
-                                onChange={e => {
-                                  const val = e.target.value ? Number(e.target.value) : undefined;
-                                  const next = [...units];
-                                  next[idx] = { ...current, prices: { ...current.prices, tiktok: val } };
-                                  setUnits(next);
-                                }}
-                              />
-                           </div>
-                        </div>
-                      </div>
-
-                      <div className="text-[11px] font-black text-slate-500 pt-2 border-t border-slate-200">
-                        {code} - Rp{Number(unitPrice || 0).toLocaleString('id-ID')}{' '}
-                        <span className="text-[10px] font-bold text-slate-400 block">Isi {contains || 1} {baseUnit} ( Rp {perPcs.toLocaleString('id-ID')} /{baseUnit} )</span>
-                      </div>
-                    </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-4">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Satuan Dasar
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-3 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-bold text-xs uppercase focus:bg-white focus:border-emerald-500 outline-none"
+                      value={formData.Satuan}
+                      onChange={(e) => {
+                        const newBase = e.target.value;
+                        setFormData({ ...formData, Satuan: newBase });
+                        setUnits((prev) => {
+                          if (prev.length === 0) return [{ code: newBase.toUpperCase() || 'PCS', contains: 1, price: formData.Ecer, weight: formData.weight }];
+                          const next = [...prev];
+                          next[0] = { ...next[0], code: newBase.toUpperCase() || 'PCS' };
+                          return next;
+                        });
+                      }}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* BAGIAN 4: MEDIA & SUPPLIER */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
-              <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2 border-b pb-3">
-                <ImageIcon size={16} /> Foto & Deskripsi Produk
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-28 h-28 border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden relative flex items-center justify-center bg-slate-50 shrink-0">
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" width={112} height={112} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }} />
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block mb-1">
+                      Total Stok
+                    </label>
+                    {childVariants.length > 0 ? (
+                      <div className="w-full px-3 py-2 bg-slate-100 rounded-xl border border-slate-200 font-black text-slate-600 text-xs flex items-center justify-between">
+                        <span>{childVariants.reduce((s, v) => s + Number(v.stock || 0), 0)}</span>
+                        <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold uppercase">Auto Varian</span>
+                      </div>
                     ) : (
-                      <ImageIcon size={24} className="text-slate-300" />
+                      <input
+                        required
+                        type="number"
+                        className="w-full px-3 py-2 bg-emerald-50/70 rounded-xl border border-emerald-200 font-black text-xs text-emerald-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                        value={formData.Stok}
+                        onChange={(e) => setFormData({ ...formData, Stok: Number(e.target.value) })}
+                      />
                     )}
                   </div>
-                  <label className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-2xl cursor-pointer text-xs font-black text-slate-700 transition-all">
-                    Ganti Foto
+
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-rose-600 block mb-1">
+                      Min. Stok Warning
+                    </label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageChange}
+                      required
+                      type="number"
+                      className="w-full px-3 py-2 bg-rose-50/70 rounded-xl border border-rose-200 font-bold text-xs text-rose-800 outline-none focus:bg-white focus:ring-2 focus:ring-rose-400"
+                      value={formData.Min_Stok}
+                      onChange={(e) => setFormData({ ...formData, Min_Stok: Number(e.target.value) })}
                     />
-                  </label>
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="URL Foto Produk (Opsional)" 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none focus:bg-white focus:border-blue-500" 
-                  value={formData.Link_Foto} 
-                  onChange={e => { setFormData({ ...formData, Link_Foto: e.target.value }); setImagePreview(e.target.value || null); }} 
-                />
-                <textarea 
-                  rows={3} 
-                  placeholder="Deskripsi Singkat Produk..." 
-                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 font-bold text-xs outline-none focus:bg-white focus:border-blue-500" 
-                  value={formData.Deskripsi} 
-                  onChange={e => setFormData({ ...formData, Deskripsi: e.target.value })}
-                ></textarea>
-              </div>
-            </div>
-
-            {/* SUPPLIER CARD WITH AUTO PO INTEGRATION & HISTORICAL VENDORS */}
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[2.5rem] shadow-xl text-white">
-              <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
-                <h3 className="text-xs font-black uppercase text-blue-100 flex items-center gap-2">
-                  <Truck size={16} /> Supplier / Vendor
-                </h3>
-                {poStats.suppliers && poStats.suppliers.length > 0 && (
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-white/20 text-white rounded-full uppercase tracking-wider backdrop-blur-sm">
-                    {poStats.suppliers.length} Supplier PO Recorded
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">Nama Supplier Utaman / Pilihan</label>
-                  <input 
-                    type="text" 
-                    placeholder="Nama Supplier" 
-                    className="w-full p-3.5 bg-white/10 rounded-2xl border border-white/20 font-bold placeholder:text-blue-200 text-white text-sm outline-none focus:bg-white/20 focus:border-white transition-all" 
-                    value={formData.Supplier} 
-                    onChange={e => setFormData({ ...formData, Supplier: e.target.value })} 
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-blue-200 ml-1 block mb-1">No. WA Supplier</label>
-                  <input 
-                    type="text" 
-                    placeholder="628123456789" 
-                    className="w-full p-3.5 bg-white/10 rounded-2xl border border-white/20 font-bold placeholder:text-blue-200 text-white text-sm outline-none focus:bg-white/20 focus:border-white transition-all" 
-                    value={formData.No_WA_Supplier} 
-                    onChange={e => setFormData({ ...formData, No_WA_Supplier: e.target.value })} 
-                  />
-                </div>
-
-                {/* DAFTAR RIWAYAT SUPPLIER / VENDOR DARI PO */}
-                {poStats.suppliers && poStats.suppliers.length > 0 && (
-                  <div className="pt-3 border-t border-white/10 space-y-2">
-                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-wider">
-                      Riwayat Supplier / Vendor (Pernah Beli):
-                    </p>
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {poStats.suppliers.map((sup, idx) => {
-                        const isSelected = formData.Supplier && formData.Supplier.trim().toLowerCase() === sup.name.trim().toLowerCase();
-                        return (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
-                              isSelected
-                                ? 'bg-white/25 border-white text-white shadow-sm'
-                                : 'bg-white/10 border-white/15 hover:bg-white/20 text-blue-50'
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-black text-xs text-white truncate">{sup.name}</span>
-                                {isSelected && (
-                                  <span className="px-2 py-0.5 bg-emerald-500 text-white rounded-full text-[9px] font-black uppercase shadow-xs">
-                                    ✓ Aktif
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-blue-100 font-bold mt-0.5">
-                                {sup.count}x PO ({sup.totalQty} {formData.Satuan || 'unit'})
-                                {sup.lastPrice > 0 && ` • Terakhir: Rp ${Math.round(sup.lastPrice).toLocaleString('id-ID')}`}
-                              </p>
-                              {sup.phone && (
-                                <p className="text-[10px] text-blue-300 font-mono mt-0.5">WA: {sup.phone}</p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  Supplier: sup.name,
-                                  No_WA_Supplier: sup.phone || prev.No_WA_Supplier,
-                                }));
-                                toast.success(`Supplier "${sup.name}" dipilih`);
-                              }}
-                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all shrink-0 shadow-sm ${
-                                isSelected
-                                  ? 'bg-emerald-500 text-white cursor-default'
-                                  : 'bg-white text-blue-900 hover:bg-blue-50 active:scale-95'
-                              }`}
-                            >
-                              {isSelected ? 'Terpilih' : 'Gunakan'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Pengaturan Pre-Order (PO) */}
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-orange-100 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
-                    <Clock size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-900">Sistem Pre-Order</h3>
-                    <p className="text-[10px] text-gray-500 font-bold">Produk PO tetap dapat dipesan walau stok kosong</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isPreOrder}
-                    onChange={(e) => setIsPreOrder(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                </label>
-              </div>
-
-              {isPreOrder && (
-                <div className="space-y-4 pt-2 border-t border-orange-100 animate-in fade-in duration-200">
-                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl text-[11px] text-orange-800 font-medium">
-                    Pelanggan dapat memesan produk ini ketika stok 0. Barang akan diproses dan dikirim dalam estimasi waktu kerja yang ditentukan.
                   </div>
 
                   <div>
-                    <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
-                      Estimasi Waktu Proses
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                      Gudang Utama
                     </label>
                     <select
-                      value={poLeadTimeDays}
-                      onChange={(e) => setPoLeadTimeDays(Number(e.target.value))}
-                      className="w-full p-3.5 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-xs outline-none focus:border-orange-400"
+                      className="w-full px-3 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-semibold text-xs outline-none"
+                      value={formData.warehouseId}
+                      onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
                     >
-                      <option value={1}>1 Hari Kerja</option>
-                      <option value={2}>2 Hari Kerja</option>
-                      <option value={3}>3 Hari Kerja</option>
-                      <option value={5}>5 Hari Kerja</option>
-                      <option value={7}>7 Hari Kerja (1 Minggu)</option>
-                      <option value={14}>14 Hari Kerja (2 Minggu)</option>
+                      <option value="">(Semua Gudang)</option>
+                      {warehouses.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
                     </select>
+                  </div>
+                </div>
+
+                {/* Rincian Stok Per Gudang */}
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Rincian Stok Per Gudang
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 font-medium">Alasan Audit:</span>
+                      <select
+                        className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-bold outline-none"
+                        value={stockReason}
+                        onChange={(e) => setStockReason(e.target.value as any)}
+                      >
+                        <option value="MANUAL">Manual</option>
+                        <option value="OPNAME">Stock Opname</option>
+                        <option value="TRANSFER">Transfer</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                    {warehouses.map((w) => {
+                      const qty = Number(formData.stockByWarehouse?.[w.id] || 0);
+                      return (
+                        <div key={w.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5 truncate">{w.name}</label>
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-full px-2 py-1 bg-white rounded-lg text-xs font-bold text-slate-800 border border-slate-200 outline-none focus:border-emerald-500 text-right"
+                            value={qty}
+                            onChange={(e) => {
+                              const nextVal = Number(e.target.value || 0);
+                              const nextMap = { ...(formData.stockByWarehouse || {}), [w.id]: nextVal };
+                              const nextTotal = Object.values(nextMap).reduce((sum: number, v: any) => sum + Number(v || 0), 0);
+                              setFormData({
+                                ...formData,
+                                stockByWarehouse: nextMap,
+                                Stok: nextTotal,
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+
+              {/* 5. DAFTAR VARIAN PRODUK */}
+              {childVariants.length > 0 ? (
+                <section id="varian" className="bg-white p-5 sm:p-6 rounded-2xl border border-violet-100 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-violet-100 pb-3 mb-4">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-violet-800 flex items-center gap-2">
+                      <Layers size={16} /> Daftar Varian Terhubung ({childVariants.length})
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowVariantModal(true)}
+                      className="px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold uppercase transition-colors"
+                    >
+                      + Tambah Varian
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {childVariants.map((v) => (
+                      <div key={v.id} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{v.name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            ID: {v.id} {v.barcode ? `• Barcode: ${v.barcode}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs font-black text-slate-700">{v.stock} unit</span>
+                          <Link
+                            href={`/admin/products/edit/${v.id}`}
+                            className="p-1.5 bg-slate-100 hover:bg-violet-100 text-slate-600 hover:text-violet-700 rounded-lg text-xs font-bold transition-colors"
+                            title="Edit Varian Ini"
+                          >
+                            <ExternalLink size={13} />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+
+            {/* ======================================================== */}
+            {/* KOLOM KANAN (SIDEBAR: 4 KOLOM DESKTOP, STICKY)            */}
+            {/* ======================================================== */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
+
+              {/* SIDEBAR CARD 1: MEDIA & FOTO PRODUK */}
+              <section className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2 border-b border-slate-100 pb-2.5 mb-3.5">
+                  <ImageIcon size={15} /> Foto Produk
+                </h3>
+
+                <div className="space-y-3">
+                  <div className="w-full aspect-square border-2 border-dashed border-slate-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-slate-50">
+                    {imagePreview ? (
+                      <img
+                        src={imagePreview}
+                        alt="Preview Produk"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-slate-300">
+                        <ImageIcon size={32} />
+                        <span className="text-[11px] font-medium text-slate-400">Belum ada foto</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <label className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl cursor-pointer text-xs font-bold text-center transition-colors">
+                      Pilih Foto Baru
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    {imagePreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFile(null);
+                          setImagePreview(null);
+                          setFormData((prev) => ({ ...prev, Link_Foto: '' }));
+                        }}
+                        className="p-2 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs font-bold transition-colors"
+                        title="Hapus Foto"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
 
                   <div>
-                    <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
-                      Catatan Pre-Order (Opsional)
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                      Deskripsi Singkat
                     </label>
                     <textarea
-                      rows={2}
-                      placeholder="Contoh: Barang dipesan dari supplier Jakarta setiap hari Senin & Kamis..."
-                      className="w-full p-3 bg-gray-50 rounded-2xl border border-gray-200 font-bold text-xs outline-none focus:border-orange-400 resize-none"
-                      value={poNotes}
-                      onChange={(e) => setPoNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Keterangan singkat produk..."
+                      className="w-full px-3 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-medium text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500 resize-none transition-all"
+                      value={formData.Deskripsi}
+                      onChange={(e) => setFormData({ ...formData, Deskripsi: e.target.value })}
                     />
                   </div>
                 </div>
-              )}
+              </section>
+
+              {/* SIDEBAR CARD 2: STATUS & VISIBILITAS PUBLIK */}
+              <section className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2.5">
+                  Status & Visibilitas
+                </h3>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Status Produk</p>
+                    <p className="text-[11px] text-slate-400">Produk aktif dapat ditransaksikan di kasir</p>
+                  </div>
+                  <select
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold outline-none border transition-colors ${
+                      formData.Status === 1
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}
+                    value={formData.Status}
+                    onChange={(e) => setFormData({ ...formData, Status: Number(e.target.value) })}
+                  >
+                    <option value={1}>Aktif</option>
+                    <option value={0}>Non-Aktif (Arsip)</option>
+                  </select>
+                </div>
+
+                {/* Pre-Order Toggle */}
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <Clock size={12} className="text-orange-500" /> Mode Pre-Order (PO)
+                      </p>
+                      <p className="text-[10px] text-slate-400">Dapat dipesan walau stok 0</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isPreOrder}
+                        onChange={(e) => setIsPreOrder(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                    </label>
+                  </div>
+
+                  {isPreOrder && (
+                    <div className="p-3 bg-orange-50/80 rounded-xl border border-orange-200 space-y-2">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-orange-900 block mb-1">
+                          Estimasi Waktu Proses
+                        </label>
+                        <select
+                          value={poLeadTimeDays}
+                          onChange={(e) => setPoLeadTimeDays(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-orange-200 text-xs font-bold text-orange-950 outline-none"
+                        >
+                          <option value={1}>1 Hari Kerja</option>
+                          <option value={2}>2 Hari Kerja</option>
+                          <option value={3}>3 Hari Kerja</option>
+                          <option value={5}>5 Hari Kerja</option>
+                          <option value={7}>7 Hari Kerja (1 Minggu)</option>
+                          <option value={14}>14 Hari Kerja (2 Minggu)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-orange-900 block mb-1">
+                          Catatan Pre-Order
+                        </label>
+                        <textarea
+                          rows={2}
+                          placeholder="Contoh: Estimasi pengiriman hari Jumat..."
+                          className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-orange-200 text-xs text-orange-950 outline-none resize-none"
+                          value={poNotes}
+                          onChange={(e) => setPoNotes(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* SIDEBAR CARD 3: DIMENSI & VOLUME GUDANG */}
+              <section className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Package size={15} /> Dimensi & Volume Rak
+                </h3>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">P (cm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-right outline-none"
+                      value={formData.dimLength || ''}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const l = Number(e.target.value);
+                        const vol = (l * formData.dimWidth * formData.dimHeight) / (34 * 20 * 24);
+                        setFormData({ ...formData, dimLength: l, volumeInCtn: Number(vol.toFixed(4)) });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">L (cm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-right outline-none"
+                      value={formData.dimWidth || ''}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const w = Number(e.target.value);
+                        const vol = (formData.dimLength * w * formData.dimHeight) / (34 * 20 * 24);
+                        setFormData({ ...formData, dimWidth: w, volumeInCtn: Number(vol.toFixed(4)) });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">T (cm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-right outline-none"
+                      value={formData.dimHeight || ''}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const h = Number(e.target.value);
+                        const vol = (formData.dimLength * formData.dimWidth * h) / (34 * 20 * 24);
+                        setFormData({ ...formData, dimHeight: h, volumeInCtn: Number(vol.toFixed(4)) });
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-100 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-blue-900">Volume Setara Karton</span>
+                  <span className="text-xs font-black text-blue-800">{formData.volumeInCtn || 0} CTN</span>
+                </div>
+              </section>
+
+              {/* SIDEBAR CARD 4: SUPPLIER / VENDOR */}
+              <section className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Truck size={15} /> Supplier
+                  </h3>
+                  {poStats.suppliers && poStats.suppliers.length > 0 && (
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded-full">
+                      {poStats.suppliers.length} PO Supplier
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">Nama Supplier</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                      value={formData.Supplier}
+                      onChange={(e) => setFormData({ ...formData, Supplier: e.target.value })}
+                      placeholder="Contoh: PT Sumber Pangan"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">No. WA Supplier</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                      value={formData.No_WA_Supplier}
+                      onChange={(e) => setFormData({ ...formData, No_WA_Supplier: e.target.value })}
+                      placeholder="628123456789"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* SIDEBAR CARD 5: TINDAKAN SIMPAN & HAPUS */}
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isDeleting}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 tracking-wider disabled:opacity-50"
+                >
+                  <Save size={16} />
+                  <span>{isSubmitting ? 'MENYIMPAN...' : 'SIMPAN PERUBAHAN'}</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/admin/products')}
+                    className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold uppercase text-xs rounded-xl transition-colors text-center"
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isSubmitting || isDeleting}
+                    className="py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold uppercase text-xs rounded-xl border border-rose-100 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 size={13} />
+                    <span>Hapus</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
+        </main>
+      </form>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col-reverse sm:flex-row gap-4 pt-4">
-            <button 
-                type="button" 
-                onClick={handleDelete}
-                disabled={isSubmitting || isDeleting}
-                className="p-4 sm:p-5 bg-rose-50 text-rose-600 font-black uppercase text-xs rounded-2xl shadow-sm border border-rose-100 hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
-            >
-               <Trash2 size={18} /> Hapus Produk
-            </button>
-            <div className="flex-1 flex gap-3">
-                <button type="button" onClick={() => router.back()} className="flex-1 p-4 sm:p-5 bg-white text-slate-500 font-black uppercase text-xs rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-100 transition-all">
-                Batal
-                </button>
-                <button type="submit" disabled={isSubmitting || isDeleting} className="flex-[2] p-4 sm:p-5 bg-slate-900 text-white font-black uppercase text-xs rounded-2xl shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 tracking-wider">
-                {isSubmitting ? 'MENYIMPAN...' : <><Save size={18} /> Simpan Perubahan</>}
-                </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    {showVariantModal && (
-      <QuickVariantModal
-        isOpen={showVariantModal}
-        product={{
-          id,
-          name: formData.Nama || '',
-          sku: formData.ID || id,
-          barcode: formData.Barcode,
-          category: formData.Kategori,
-          unit: formData.Satuan,
-          costPrice: formData.Modal,
-          priceEcer: formData.Ecer,
-          stock: formData.Stok,
+      {/* CAMERA SCANNER MODAL */}
+      <CameraBarcodeScannerModal
+        isOpen={scannerReady}
+        onClose={() => { setScannerReady(false); setScanUnitBarcodeIdx(-1); }}
+        title={scanUnitBarcodeIdx >= 0 ? `Scan Barcode ${units[scanUnitBarcodeIdx]?.code || 'Satuan'}` : 'Scan Barcode Produk'}
+        description={scanUnitBarcodeIdx >= 0 ? `Arahkan kamera ke barcode kemasan ${units[scanUnitBarcodeIdx]?.code || ''}` : 'Arahkan kamera ke barcode / QR code produk'}
+        onScan={(code) => {
+          if (scanUnitBarcodeIdx >= 0) {
+            setUnits((prev) => {
+              const next = [...prev];
+              next[scanUnitBarcodeIdx] = { ...next[scanUnitBarcodeIdx], barcode: code };
+              return next;
+            });
+            toast.success(`Barcode ${units[scanUnitBarcodeIdx]?.code} dipindai: ${code}`);
+          } else {
+            setFormData((prev) => ({ ...prev, Barcode: code }));
+            toast.success(`Barcode dipindai: ${code}`);
+          }
+          setScanUnitBarcodeIdx(-1);
         }}
-        onClose={() => setShowVariantModal(false)}
-        onSuccess={() => fetchVariants()}
       />
-    )}
+
+      {/* QUICK VARIANT MODAL */}
+      {showVariantModal && (
+        <QuickVariantModal
+          isOpen={showVariantModal}
+          product={{
+            id,
+            name: formData.Nama || '',
+            sku: formData.ID || id,
+            barcode: formData.Barcode,
+            category: formData.Kategori,
+            unit: formData.Satuan,
+            costPrice: formData.Modal,
+            priceEcer: formData.Ecer,
+            stock: formData.Stok,
+          }}
+          onClose={() => setShowVariantModal(false)}
+          onSuccess={() => fetchVariants()}
+        />
+      )}
     </>
   );
 }
