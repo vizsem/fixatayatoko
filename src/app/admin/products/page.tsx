@@ -29,7 +29,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock, FolderInput
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock, FolderInput, Barcode
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -568,7 +568,7 @@ export default function AdminProducts() {
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
 
   // Handle barcode scanned from camera or hardware USB scanner
-  const handleBarcodeScanned = (code: string) => {
+  const handleBarcodeScanned = async (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
 
@@ -584,9 +584,26 @@ export default function AdminProducts() {
       setCurrentPage(1);
       notify.admin.success(`Produk ditemukan: ${found.name}`);
     } else {
-      // Tidak ditemukan -> Munculkan modal pilihan cerdas
-      setUnfoundBarcode(trimmed);
-      setShowUnfoundModal(true);
+      // Coba query langsung ke database jika belum termuat di memori
+      try {
+        const { data } = await supabase
+          .from('products')
+          .select('id, name')
+          .or(`barcode.eq.${trimmed},raw_data.cs.{"units":[{"barcode":"${trimmed}"}]},raw_data.cs.{"units":[{"Barcode":"${trimmed}"}]}`)
+          .limit(1);
+
+        if (data && data.length > 0) {
+          setSearchTerm(trimmed);
+          setCurrentPage(1);
+          notify.admin.success(`Produk ditemukan: ${data[0].name}`);
+        } else {
+          setUnfoundBarcode(trimmed);
+          setShowUnfoundModal(true);
+        }
+      } catch {
+        setUnfoundBarcode(trimmed);
+        setShowUnfoundModal(true);
+      }
     }
   };
 
@@ -701,11 +718,27 @@ export default function AdminProducts() {
         const barcode = (p.barcode || '').toLowerCase();
         const category = (p.category || '').toLowerCase();
         const brand = (p.brand || (p as any).Brand || p.raw_data?.brand || '').toLowerCase();
+
+        // Ambil semua barcode dari satuan produk (PCS, RTG, CTN, dll)
+        const unitBarcodes = (p.units || [])
+          .map((u: any) => (u.barcode || u.Barcode || '').toLowerCase().trim())
+          .filter(Boolean);
+
+        // Ambil juga barcode dari anak-anak varian jika produk ini adalah induk
+        const pChildren = childrenByParent.get(p.id) || [];
+        const childBarcodes = pChildren.flatMap((c) => [
+          (c.barcode || '').toLowerCase().trim(),
+          ...(c.units || []).map((u: any) => (u.barcode || u.Barcode || '').toLowerCase().trim())
+        ]).filter(Boolean);
+
+        const allBarcodes = [...unitBarcodes, ...childBarcodes];
+
         const match = tokens.every(
           (t) =>
             name.includes(t) ||
             sku.includes(t) ||
             barcode.includes(t) ||
+            allBarcodes.some((ub: string) => ub.includes(t)) ||
             category.includes(t) ||
             brand.includes(t)
         );
@@ -1629,6 +1662,16 @@ export default function AdminProducts() {
                             {p.brand}
                           </span>
                         )}
+                        {p.barcode && (
+                          <span className="text-[10px] font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1" title="Barcode Utama">
+                            <Barcode size={10} /> {p.barcode}
+                          </span>
+                        )}
+                        {p.units?.filter((u: any) => u.barcode).map((u: any) => (
+                          <span key={u.code} className="text-[10px] font-mono text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1" title={`Barcode Satuan ${u.code}`}>
+                            <span className="font-bold">{u.code}:</span> {u.barcode}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1856,7 +1899,11 @@ export default function AdminProducts() {
                 const isSelected = selectedIds.includes(p.id);
                 const pChildren = childrenByParent.get(p.id) || [];
                 const hasVariants = pChildren.length > 0;
-                const isExpanded = expandedParents.has(p.id);
+                const pHasMatchingVariantBarcode = Boolean(searchTerm.trim()) && pChildren.some(c =>
+                  (c.barcode && c.barcode.toLowerCase().includes(searchTerm.trim().toLowerCase())) ||
+                  (c.units && c.units.some((u: any) => (u.barcode && u.barcode.toLowerCase().includes(searchTerm.trim().toLowerCase()))))
+                );
+                const isExpanded = expandedParents.has(p.id) || pHasMatchingVariantBarcode;
 
                 const totalVariantStock = hasVariants ? pChildren.reduce((s, c) => s + Number(c.stock || 0), 0) : 0;
                 const displayStock = hasVariants ? totalVariantStock : Number(p.stock || 0);
@@ -1947,13 +1994,23 @@ export default function AdminProducts() {
                               )}
                             </div>
                             <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{formatProductName(p.name)}</h3>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
                               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
                               {p.brand && (
                                 <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded" title={`Brand: ${p.brand}`}>
                                   {p.brand}
                                 </span>
                               )}
+                              {p.barcode && (
+                                <span className="text-[10px] font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1" title="Barcode Utama">
+                                  <Barcode size={10} /> {p.barcode}
+                                </span>
+                              )}
+                              {p.units?.filter((u: any) => u.barcode).map((u: any) => (
+                                <span key={u.code} className="text-[10px] font-mono text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1" title={`Barcode Satuan ${u.code}`}>
+                                  <span className="font-bold">{u.code}:</span> {u.barcode}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -2137,8 +2194,15 @@ export default function AdminProducts() {
                                         <span className="font-black text-xs text-gray-900">{child.name}</span>
                                         <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1 rounded">SKU: {formatDisplaySku(child.sku, child.id)}</span>
                                         {child.barcode && (
-                                          <span className="text-[10px] font-mono text-gray-400">Barcode: {child.barcode}</span>
+                                          <span className="text-[10px] font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1" title="Barcode Utama">
+                                            <Barcode size={9} /> {child.barcode}
+                                          </span>
                                         )}
+                                        {child.units?.filter((u: any) => u.barcode).map((u: any) => (
+                                          <span key={u.code} className="text-[10px] font-mono text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1" title={`Barcode Satuan ${u.code}`}>
+                                            <span className="font-bold">{u.code}:</span> {u.barcode}
+                                          </span>
+                                        ))}
                                       </div>
                                     </div>
                                   </div>

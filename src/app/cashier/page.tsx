@@ -27,6 +27,7 @@ import { getUserAndRole } from '@/lib/supabase-helpers';
 import { uploadToSupabase } from '@/lib/supabase';
 import { sbGetDoc, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { timestampId, uniqueFileName } from '@/lib/ids';
+import { formatProductName } from '@/lib/format';
 
 // Types
 type UnitOption = {
@@ -1175,7 +1176,8 @@ export default function CashierPOS() {
     const filtered = products.filter(p => {
       const matchSearch = !term || 
         (p.name?.toLowerCase() || '').includes(term) || 
-        (p.barcode?.toLowerCase() || '').includes(term);
+        (p.barcode?.toLowerCase() || '').includes(term) ||
+        (p.units && Array.isArray(p.units) && p.units.some((u: any) => (u.barcode || '').toLowerCase().includes(term)));
       const matchCategory = selectedCategory === 'SEMUA' || (p.Kategori || p.kategori || 'UMUM') === selectedCategory;
       const matchStock = stockFilter === 'all' ? true : (stockFilter === 'instock' ? (p.stock || 0) > 0 : (p.stock || 0) <= 0);
       
@@ -1184,12 +1186,21 @@ export default function CashierPOS() {
     setFilteredProducts(filtered);
     setDisplayLimit(80);
 
-    const exactMatch = products.find(p => p.barcode && p.barcode === searchQuery.trim());
+    const trimmedQuery = searchQuery.trim();
+    const exactMatch = products.find(p => 
+      (p.barcode && p.barcode === trimmedQuery) ||
+      (p.units && Array.isArray(p.units) && p.units.some((u: any) => u.barcode && u.barcode === trimmedQuery))
+    );
     if (exactMatch && searchQuery.length >= 3) {
-      addToCart(exactMatch);
+      const unitMatch = exactMatch.units?.find((u: any) => u.barcode && u.barcode === trimmedQuery);
+      if (unitMatch) {
+        addToCartWithUnit(exactMatch, unitMatch);
+      } else {
+        addToCart(exactMatch);
+      }
       setSearchQuery('');
     }
-  }, [searchQuery, products, addToCart, selectedCategory, stockFilter]);
+  }, [searchQuery, products, addToCart, addToCartWithUnit, selectedCategory, stockFilter]);
 
   useEffect(() => {
     if (loading) return;
@@ -1544,7 +1555,7 @@ export default function CashierPOS() {
         const localProduct = products.find(p => p.id === item.id);
         if (localProduct && localProduct.stock < pcsToDeduct) {
           setIsProcessing(false);
-          return toast.error(`Stok ${item.name} tidak cukup! Tersedia: ${localProduct.stock}, Dibutuhkan: ${pcsToDeduct}`);
+          return toast.error(`Stok ${formatProductName(item.name)} tidak cukup! Tersedia: ${localProduct.stock}, Dibutuhkan: ${pcsToDeduct}`);
         }
       }
 
@@ -1835,7 +1846,7 @@ export default function CashierPOS() {
           
           ${order.items?.map((i: CartItem) => `
             <div class="item-row">
-              <div class="item-name">${i.name}</div>
+              <div class="item-name">${formatProductName(i.name)}</div>
               <div class="item-detail">
                 <span>${i.quantity} x ${i.price.toLocaleString('id-ID')}</span>
                 <span>${(i.price * i.quantity).toLocaleString('id-ID')}</span>
@@ -2149,7 +2160,7 @@ export default function CashierPOS() {
                   ) : p.barcode ? <Barcode size={24} /> : <Package size={24} />}
                 </div>
                   <div className="flex-1">
-                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 uppercase">{p.name}</h3>
+                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug">{formatProductName(p.name)}</h3>
                     <p className="text-green-600 font-black text-sm flex items-center gap-1">
                       <span>Rp{(p.displayPrice || p.price).toLocaleString()}</span>
                       {p.hideBaseUnit && p.displayUnit && (
@@ -2341,7 +2352,7 @@ export default function CashierPOS() {
                   <div key={item.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex justify-between items-start">
                     <div className="flex flex-col">
-                        <p className="text-xs font-bold text-gray-700 uppercase">{item.name}</p>
+                        <p className="text-xs font-bold text-gray-800 leading-snug">{formatProductName(item.name)}</p>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-medium text-gray-400">
                             {item.unit}{item.contains && item.contains > 1 ? ` · Isi ${item.contains}` : ''}

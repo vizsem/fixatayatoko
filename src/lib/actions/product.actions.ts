@@ -99,12 +99,12 @@ export async function getProducts(options?: ProductQueryOptions) {
       const tokens = options.search
         .trim()
         .split(/\s+/)
-        .map((t) => t.replace(/[%_,()]/g, '').trim())
+        .map((t) => t.replace(/[%_,()'"\\]/g, '').trim())
         .filter(Boolean);
 
       tokens.forEach((token) => {
         query = query.or(
-          `name.ilike.%${token}%,sku.ilike.%${token}%,barcode.ilike.%${token}%,category.ilike.%${token}%`
+          `name.ilike.%${token}%,sku.ilike.%${token}%,barcode.ilike.%${token}%,category.ilike.%${token}%,raw_data.cs.{"units":[{"barcode":"${token}"}]},raw_data.cs.{"units":[{"Barcode":"${token}"}]}`
         );
       });
 

@@ -20,6 +20,7 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
 import { isAdminRole } from '@/lib/auth-helpers';
+import { formatProductName } from '@/lib/format';
 const OrderMap = dynamic(() => import('@/components/OrderMap'), { ssr: false });
 
 // Tipe data pesanan
@@ -266,7 +267,7 @@ export default function CashierOrderDetail({ params }: { params: Promise<{ id: s
           {order.items.map((item, index) => (
             <div key={index} className="px-4 py-3 flex justify-between">
               <div>
-                <p className="font-medium text-black">{item.name}</p>
+                <p className="font-medium text-black">{formatProductName(item.name)}</p>
                 <p className="text-sm text-gray-600">
                   {item.quantity} × Rp{item.price.toLocaleString('id-ID')}
                 </p>

@@ -40,6 +40,7 @@ export interface ProductUnitItem {
   price?: number;
   minQty?: number;
   label?: string;
+  barcode?: string;
 }
 
 interface ProductItem {
@@ -238,6 +239,7 @@ export default function PricingHPPPage() {
             price: typeof u.price === 'number' ? u.price : Number(u.price || 0),
             minQty: typeof u.minQty === 'number' ? u.minQty : undefined,
             label: u.label || '',
+            barcode: u.barcode ? String(u.barcode).trim() : undefined,
           })).filter((u: any) => Boolean(u.code));
         }
 
@@ -248,11 +250,15 @@ export default function PricingHPPPage() {
             code: baseUnit,
             contains: 1,
             price: ecer,
+            barcode: p.barcode || raw.Barcode || '',
           });
         } else {
           // Sinkronkan harga ecer untuk base unit jika di units belum ada harga
           if (!unitsList[baseUnitIdx].price) {
             unitsList[baseUnitIdx].price = ecer;
+          }
+          if (!unitsList[baseUnitIdx].barcode && (p.barcode || raw.Barcode)) {
+            unitsList[baseUnitIdx].barcode = p.barcode || raw.Barcode;
           }
         }
 
@@ -381,7 +387,11 @@ export default function PricingHPPPage() {
     const q = search.toLowerCase().trim();
     return products
       .filter(p => {
-        const matchSearch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q);
+        const matchSearch = !q ||
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          p.barcode.toLowerCase().includes(q) ||
+          (p.units && p.units.some((u: any) => (u.barcode || '').toLowerCase().includes(q)));
         const matchCat = selectedCategory === 'ALL' || p.category === selectedCategory;
 
         let matchMargin = true;
