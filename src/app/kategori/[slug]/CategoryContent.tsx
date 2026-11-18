@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
-import { sbGetDoc, sbGetDocs } from '@/lib/supabase-helpers';
+import { getCategoryPageData } from '@/lib/actions/product.actions';
 import { formatProductName } from '@/lib/format';
 
 type Product = {
@@ -28,17 +28,30 @@ type CartItem = Product & {
   quantity: number;
 };
 
-export default function CategoryContent({ slug }: { slug: string }) {
+interface CategoryContentProps {
+  slug: string;
+  initialCategoryName?: string;
+  initialCategoryIcon?: string;
+  initialProducts?: Product[];
+}
+
+export default function CategoryContent({
+  slug,
+  initialCategoryName = '',
+  initialCategoryIcon = '📦',
+  initialProducts,
+}: CategoryContentProps) {
   const router = useRouter();
-  
-  const [loading, setLoading] = useState(true);
-  const [allCategoryProducts, setAllCategoryProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [categoryName, setCategoryName] = useState('');
-  
+
+  const [loading, setLoading] = useState(!initialProducts);
+  const [allCategoryProducts, setAllCategoryProducts] = useState<Product[]>(initialProducts || []);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>(initialProducts || []);
+  const [categoryName, setCategoryName] = useState(initialCategoryName || slug.replace(/-/g, ' '));
+  const [categoryIcon, setCategoryIcon] = useState(initialCategoryIcon);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 20;
 
@@ -50,109 +63,37 @@ export default function CategoryContent({ slug }: { slug: string }) {
   };
 
   useEffect(() => {
+    // Jika sudah ada data dari SSR, tidak perlu fetch ulang kecuali slug berubah
+    if (initialProducts && initialProducts.length > 0 && initialCategoryName) {
+      setAllCategoryProducts(initialProducts);
+      setFilteredProducts(initialProducts);
+      setCategoryName(initialCategoryName);
+      setCategoryIcon(initialCategoryIcon);
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        const settingsSnap = await sbGetDoc('settings', 'system');
-        const displayWarehouseId = settingsSnap.exists() ? settingsSnap.data().displayWarehouseId : null;
-
-        const indexedSnap = await sbGetDocs({
-          table: 'products',
-          where: [
-            { field: 'isActive', op: '==', val: true },
-            { field: 'category', op: '==', val: slug }
-          ],
-          orderBy: [{ field: 'name', direction: 'asc' }],
-          useAdmin: false,
-        });
-        let products: Product[] = indexedSnap.docs
-          .map(docSnap => {
-            const d = docSnap.data() as Record<string, unknown>;
-            const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
-            if (!isActive) return null;
-
-            let stock = Number(d.Stok ?? d.stock ?? 0);
-            const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
-
-            if (displayWarehouseId && stockByWarehouse) {
-              stock = Number(stockByWarehouse[displayWarehouseId] || 0);
-            } else if (displayWarehouseId && !stockByWarehouse) {
-              stock = 0;
-            }
-
-            return {
-              id: docSnap.id,
-              name: String(d.Nama ?? d.name ?? 'Produk'),
-              price: Number(d.Ecer ?? d.price ?? 0),
-              wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
-              minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
-              category: String(d.Kategori ?? d.category ?? 'Umum'),
-              image: String(d.Link_Foto ?? d.image ?? ''),
-              unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-              stock: stock
-            };
-          })
-          .filter(Boolean) as Product[];
-
-        if (products.length === 0) {
-          const activeSnap = await sbGetDocs({
-            table: 'products',
-            where: [{ field: 'isActive', op: '==', val: true }],
-            orderBy: [{ field: 'name', direction: 'asc' }],
-            useAdmin: false,
-          });
-          const mapped = activeSnap.docs
-            .map(docSnap => {
-              const d = docSnap.data() as Record<string, unknown>;
-              const isActive = typeof d.isActive === 'boolean' ? d.isActive : (Number(d.Status ?? 1) !== 0);
-              if (!isActive) return null;
-
-              let stock = Number(d.Stok ?? d.stock ?? 0);
-              const stockByWarehouse = d.stockByWarehouse as Record<string, number> | undefined;
-
-              if (displayWarehouseId && stockByWarehouse) {
-                stock = Number(stockByWarehouse[displayWarehouseId] || 0);
-              } else if (displayWarehouseId && !stockByWarehouse) {
-                stock = 0;
-              }
-
-              return {
-                id: docSnap.id,
-                name: String(d.Nama ?? d.name ?? 'Produk'),
-                price: Number(d.Ecer ?? d.price ?? 0),
-                wholesalePrice: Number(d.Grosir ?? d.wholesalePrice ?? 0),
-                minWholesale: Number(d.Min_Grosir ?? (d as Record<string, unknown>).minWholesaleQty ?? 12),
-                category: String(d.Kategori ?? d.category ?? 'Umum'),
-                image: String(d.Link_Foto ?? d.image ?? ''),
-                unit: String(d.Satuan ?? d.unit ?? 'pcs'),
-                stock: stock
-              } as Product;
-            })
-            .filter(Boolean) as Product[];
-          products = mapped.filter(p => {
-            const generatedSlug = p.category.toLowerCase()
-              .replace(/&/g, 'dan')
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/^-+|-+$/g, '');
-            return generatedSlug === slug;
-          });
-        }
-
-        if (products.length > 0) {
-          setCategoryName(products[0].category);
-          setAllCategoryProducts(products);
+        const res = await getCategoryPageData(slug);
+        if (res.success) {
+          setCategoryName(res.categoryName);
+          setCategoryIcon(res.categoryIcon || '📦');
+          setAllCategoryProducts(res.products as Product[]);
+          setFilteredProducts(res.products as Product[]);
         } else {
           setCategoryName(slug.replace(/-/g, ' '));
         }
       } catch (error) {
         console.error(error);
-        notify.user.error("Gagal memuat produk");
+        notify.user.error("Gagal memuat produk kategori");
       } finally {
         setLoading(false);
       }
     };
-    if (slug) fetchData();
+
+    fetchData();
   }, [slug]);
 
   useEffect(() => {
@@ -193,19 +134,31 @@ export default function CategoryContent({ slug }: { slug: string }) {
       <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-gray-100 px-4 py-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <button onClick={() => router.back()} className="p-2.5 bg-gray-50 rounded-2xl active:scale-90 transition-transform">
-                <ArrowLeft size={18}/>
+            <div className="flex items-center gap-3 min-w-0">
+              <button 
+                onClick={() => router.back()} 
+                aria-label="Kembali"
+                className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl active:scale-90 transition-transform shrink-0"
+              >
+                <ArrowLeft size={18} className="text-gray-700" />
               </button>
-              <div>
-                <h1 className="text-xs font-black text-green-600 uppercase tracking-tighter leading-none mb-1">{categoryName}</h1>
-                <p className="text-xs font-bold text-gray-400 uppercase">{filteredProducts.length} Produk Tersedia</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-base sm:text-lg">{categoryIcon || '📦'}</span>
+                  <h1 className="text-sm sm:text-base font-black text-gray-900 tracking-tight leading-tight truncate capitalize">
+                    {categoryName}
+                  </h1>
+                </div>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-tight">
+                  {filteredProducts.length} Produk Tersedia
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} 
-                className="p-2.5 bg-gray-50 rounded-2xl text-gray-600 active:scale-90 transition-all"
+                className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl text-gray-600 active:scale-90 transition-all"
+                title={viewMode === 'grid' ? 'Tampilan List' : 'Tampilan Grid'}
               >
                 {viewMode === 'grid' ? <List size={20}/> : <LayoutGrid size={20}/>}
               </button>
@@ -227,9 +180,28 @@ export default function CategoryContent({ slug }: { slug: string }) {
 
       <div className="max-w-7xl mx-auto px-4 mt-6">
         {currentItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Package size={48} className="text-gray-200 mb-4" />
-            <p className="font-black text-gray-300 uppercase italic text-xs tracking-widest">Produk Tidak Ditemukan</p>
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-white rounded-3xl border border-gray-100 shadow-xs mt-4">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+              <Package size={32} />
+            </div>
+            <h3 className="text-base font-black text-gray-900 mb-1">Belum Ada Produk</h3>
+            <p className="text-xs text-gray-400 max-w-sm mb-6">
+              Produk untuk kategori &ldquo;{categoryName}&rdquo; sedang dalam proses restock atau belum tersedia saat ini.
+            </p>
+            <div className="flex gap-2.5">
+              <Link
+                href="/semua-kategori"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-sm transition-all active:scale-95"
+              >
+                Lihat Kategori Lain
+              </Link>
+              <Link
+                href="/"
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all active:scale-95"
+              >
+                Ke Beranda
+              </Link>
+            </div>
           </div>
         ) : (
           <div className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3" : "flex flex-col gap-3"}>

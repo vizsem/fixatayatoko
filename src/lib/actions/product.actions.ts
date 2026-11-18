@@ -3346,3 +3346,165 @@ export async function toggleParentOnlyAction(
     return { success: false, error: err?.message || 'Gagal mengubah status induk' };
   }
 }
+
+/**
+ * Helper pencocokan slug kategori multi-format:
+ * Mendukung format tanpa karakter khusus ("bahan-bumbu"),
+ * format dengan kata 'dan' ("bahan-dan-bumbu"),
+ * format nama persis, dan format slug dari database.
+ */
+export function matchesCategorySlug(
+  categoryName: string,
+  categorySlugInDb: string | undefined,
+  targetSlug: string
+): boolean {
+  const normTarget = decodeURIComponent(targetSlug || '')
+    .toLowerCase()
+    .trim()
+    .replace(/^-+|-+$/g, '');
+
+  if (!normTarget) return false;
+
+  // 1. Cek langsung slug DB jika ada
+  if (categorySlugInDb && categorySlugInDb.toLowerCase().trim() === normTarget) {
+    return true;
+  }
+
+  const normCatName = (categoryName || '').toLowerCase().trim();
+  if (!normCatName) return false;
+
+  // 2. Cek nama persis
+  if (normCatName === normTarget) return true;
+
+  // 3. Format standar: replace non-alphanumeric dengan '-' (cth: "Bahan & Bumbu" -> "bahan-bumbu")
+  const standardSlug = normCatName.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (standardSlug === normTarget) return true;
+
+  // 4. Format dengan 'dan': replace '&' dengan 'dan' (cth: "Bahan & Bumbu" -> "bahan-dan-bumbu")
+  const danSlug = normCatName.replace(/&/g, 'dan').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (danSlug === normTarget) return true;
+
+  // 5. Format spasi (cth: "bahan-bumbu" -> "bahan bumbu")
+  const spaceSlug = normTarget.replace(/-/g, ' ');
+  if (normCatName === spaceSlug) return true;
+
+  // 6. Pencocokan tanpa spasi & strip (cth: "bahanbumbu")
+  const strippedCat = normCatName.replace(/[^a-z0-9]/g, '');
+  const strippedTarget = normTarget.replace(/[^a-z0-9]/g, '');
+  if (strippedCat && strippedCat === strippedTarget) return true;
+
+  return false;
+}
+
+/**
+ * Server Action: Ambil data kategori dan seluruh produk aktifnya berdasarkan slug URL.
+ * Menjamin URL seperti `/kategori/bahan-bumbu` atau `/kategori/bahan-dan-bumbu`
+ * langsung menemukan produk kategori "Bahan & Bumbu" secara cepat dan akurat.
+ */
+export async function getCategoryPageData(slug: string) {
+  const cleanSlug = decodeURIComponent(slug || '').trim();
+  if (!cleanSlug) {
+    return { success: false, categoryName: '', categoryIcon: '📦', products: [], error: 'Slug kategori tidak valid' };
+  }
+
+  try {
+    // 1. Ambil seluruh kategori dari DB untuk mencocokkan slug dengan nama resmi
+    const { data: catRows } = await supabaseAdmin
+      .from('categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    let matchedCategoryName = '';
+    let matchedCategoryIcon = '📦';
+
+    for (const c of catRows || []) {
+      const raw = c.raw_data || {};
+      const catName = c.name || raw.name || '';
+      const catSlug = c.slug || raw.slug || '';
+      if (matchesCategorySlug(catName, catSlug, cleanSlug)) {
+        matchedCategoryName = catName;
+        matchedCategoryIcon = raw.icon || c.icon || '📦';
+        break;
+      }
+    }
+
+    // 2. Jika belum ditemukan di tabel categories, cari dari kolom products.category yang unik
+    if (!matchedCategoryName) {
+      const { data: prodCatRows } = await supabaseAdmin
+        .from('products')
+        .select('category')
+        .not('category', 'is', null)
+        .limit(1000);
+
+      const uniqueCats = Array.from(new Set((prodCatRows || []).map(r => (r.category || '').trim()).filter(Boolean)));
+      for (const catName of uniqueCats) {
+        if (matchesCategorySlug(catName, undefined, cleanSlug)) {
+          matchedCategoryName = catName;
+          break;
+        }
+      }
+    }
+
+    // Fallback jika tetap tidak ditemukan
+    if (!matchedCategoryName) {
+      matchedCategoryName = cleanSlug.replace(/-/g, ' ');
+    }
+
+    // 3. Ambil produk aktif untuk kategori ini langsung dari database
+    const { data: products, error } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .ilike('category', matchedCategoryName)
+      .or('is_active.eq.true,is_active.is.null')
+      .order('name', { ascending: true })
+      .limit(300);
+
+    if (error) {
+      console.error('getCategoryPageData query error:', error);
+      return { success: false, categoryName: matchedCategoryName, categoryIcon: matchedCategoryIcon, products: [], error: error.message };
+    }
+
+    // Ambil setting displayWarehouseId jika ada
+    let displayWarehouseId: string | null = null;
+    try {
+      const { data: sysDoc } = await supabaseAdmin.from('settings').select('*').eq('id', 'system').maybeSingle();
+      if (sysDoc?.raw_data?.displayWarehouseId) {
+        displayWarehouseId = sysDoc.raw_data.displayWarehouseId;
+      }
+    } catch {}
+
+    const mappedProducts = (products || []).map((p: any) => {
+      const raw = p.raw_data || {};
+      let stock = Number(p.stock ?? raw.stock ?? raw.Stok ?? 0);
+      const stockByWarehouse = raw.stockByWarehouse as Record<string, number> | undefined;
+
+      if (displayWarehouseId && stockByWarehouse) {
+        stock = Number(stockByWarehouse[displayWarehouseId] || 0);
+      }
+
+      return {
+        id: p.id,
+        name: String(p.name || raw.Nama || raw.name || 'Produk'),
+        price: Number(p.price ?? raw.Ecer ?? raw.price ?? 0),
+        wholesalePrice: Number(raw.Grosir ?? raw.wholesalePrice ?? 0),
+        minWholesale: Number(raw.Min_Grosir ?? raw.minWholesaleQty ?? 12),
+        category: String(p.category || raw.Kategori || matchedCategoryName),
+        image: String(p.image_url || raw.Link_Foto || raw.image || raw.imageUrl || ''),
+        unit: String(p.unit || raw.Satuan || raw.unit || 'pcs').toUpperCase(),
+        stock,
+        isPreOrder: Boolean(p.isPreOrder || raw.isPreOrder),
+        poLeadTimeDays: Number(p.poLeadTimeDays || raw.poLeadTimeDays || 3),
+      };
+    });
+
+    return {
+      success: true,
+      categoryName: matchedCategoryName,
+      categoryIcon: matchedCategoryIcon,
+      products: mappedProducts,
+    };
+  } catch (err: any) {
+    console.error('getCategoryPageData exception:', err);
+    return { success: false, categoryName: cleanSlug.replace(/-/g, ' '), categoryIcon: '📦', products: [], error: err.message };
+  }
+}

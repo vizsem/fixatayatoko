@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { supabase } from '@/lib/supabase';
+import { getCategoryPageData } from '@/lib/actions/product.actions';
 import CategoryContent from './CategoryContent';
 
 const BASE_URL = 'https://atayatoko.aty0.com';
@@ -8,38 +8,11 @@ type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
-// ─── Helper: ambil nama kategori dari Supabase ───────────────────────────────
-async function fetchCategoryName(slug: string): Promise<string> {
-  try {
-    const { data } = await supabase
-      .from('products')
-      .select('category')
-      .eq('is_active', true)
-      .limit(20);
-
-    if (data && data.length > 0) {
-      // Cari produk yang kategorinya cocok dengan slug
-      const match = data.find((d: any) => {
-        const cat = String(d.category || '');
-        const generatedSlug = cat
-          .toLowerCase()
-          .replace(/&/g, 'dan')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        return generatedSlug === slug || cat.toLowerCase() === slug;
-      });
-      if (match) return match.category;
-    }
-  } catch {
-    // fallback
-  }
-  return slug.replace(/-/g, ' ');
-}
-
 // ─── 1. SEO Metadata per-kategori ───────────────────────────────────────────
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const categoryName = await fetchCategoryName(slug);
+  const categoryData = await getCategoryPageData(slug);
+  const categoryName = categoryData.categoryName || slug.replace(/-/g, ' ');
 
   const title = `${categoryName} Grosir Murah Kediri | ATAYATOKO`;
   const description = `Beli ${categoryName} grosir murah di ATAYATOKO Kediri. Tersedia partai besar & eceran, gratis ongkir Kediri Kota. Stok lengkap & harga terbaik.`;
@@ -78,7 +51,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ─── 2. Server Component ─────────────────────────────────────────────────────
 export default async function CategoryPage({ params }: PageProps) {
   const { slug } = await params;
-  const categoryName = await fetchCategoryName(slug);
+  const categoryData = await getCategoryPageData(slug);
+  const categoryName = categoryData.categoryName || slug.replace(/-/g, ' ');
   const canonicalUrl = `${BASE_URL}/kategori/${slug}`;
 
   const collectionSchema = {
@@ -120,7 +94,12 @@ export default async function CategoryPage({ params }: PageProps) {
           __html: JSON.stringify(breadcrumbSchema).replace(/</g, '\\u003c'),
         }}
       />
-      <CategoryContent slug={slug} />
+      <CategoryContent
+        slug={slug}
+        initialCategoryName={categoryName}
+        initialCategoryIcon={categoryData.categoryIcon || '📦'}
+        initialProducts={categoryData.products || []}
+      />
     </>
   );
 }
