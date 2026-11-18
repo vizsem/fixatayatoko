@@ -98,6 +98,13 @@ export type ProductVariant = {
   stock: number;
   image?: string;
   unit?: string;
+  units?: any[];
+  wholesalePrice?: number;
+  minWholesale?: number;
+  isPreOrder?: boolean;
+  poLeadTimeDays?: number;
+  poNotes?: string;
+  description?: string;
   isCurrent?: boolean;
 };
 
@@ -117,7 +124,7 @@ export default function ProductDetailClient({
   initialVariants = []
 }: ProductDetailClientProps) {
   const router = useRouter();
-  const [product] = useState<Product | null>(initialProduct);
+  const [product, setProduct] = useState<Product | null>(initialProduct);
   const [variants] = useState<ProductVariant[]>(initialVariants);
   const [relatedProducts] = useState<RelatedProduct[]>(initialRelatedProducts);
   const [promoProducts] = useState<PromoProduct[]>(initialPromoProducts);
@@ -128,6 +135,38 @@ export default function ProductDetailClient({
   const [selectedUnit, setSelectedUnit] = useState<string>(product?.unit || 'pcs');
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Instant Variant Switcher (0 ms delay - tanpa full page reload)
+  const handleVariantSelect = (v: ProductVariant) => {
+    if (!product || v.id === product.id) return;
+
+    setProduct((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        id: v.id,
+        name: v.name,
+        price: v.price,
+        wholesalePrice: v.wholesalePrice !== undefined ? v.wholesalePrice : prev.wholesalePrice,
+        minWholesale: v.minWholesale !== undefined ? v.minWholesale : prev.minWholesale,
+        stock: v.stock,
+        image: v.image || prev.image,
+        unit: v.unit || prev.unit,
+        units: v.units || prev.units,
+        isPreOrder: v.isPreOrder !== undefined ? v.isPreOrder : prev.isPreOrder,
+        poLeadTimeDays: v.poLeadTimeDays !== undefined ? v.poLeadTimeDays : prev.poLeadTimeDays,
+        poNotes: v.poNotes !== undefined ? v.poNotes : prev.poNotes,
+        description: v.description !== undefined ? v.description : prev.description,
+      };
+    });
+
+    setSelectedUnit(v.unit || 'PCS');
+    setQuantity(1);
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/produk/${v.id}`);
+    }
+  };
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -447,6 +486,10 @@ export default function ProductDetailClient({
                       <Link
                         key={v.id}
                         href={`/produk/${v.id}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleVariantSelect(v);
+                        }}
                         className={`group p-2.5 rounded-2xl border transition-all flex flex-col justify-between ${
                           isSelected
                             ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-500/20 ring-2 ring-violet-400/40'
@@ -507,16 +550,33 @@ export default function ProductDetailClient({
               </div>
             )}
 
-            {/* PRICE CARD */}
-            <div className={`rounded-3xl p-5 md:p-6 border transition-all duration-500 ${isWholesaleEligible ? 'bg-gradient-to-br from-orange-500 to-orange-600 border-orange-600 shadow-xl shadow-orange-500/20' : 'bg-white border-slate-200 shadow-sm'}`}>
-              {/* Unit Selection */}
+            {/* PRICE CARD: Ramping, Proporsional & Bebas Duplikasi (Mobile & Desktop) */}
+            <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 border bg-white border-slate-200/90 shadow-2xs transition-all">
+              {/* Unit Selection Multi-Satuan */}
               {product.units && product.units.length > 0 && product.units.some(u => u.code !== product.unit) && (
-                <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                  <button onClick={() => setSelectedUnit(product.unit)} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedUnit === product.unit ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUnit(product.unit)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${
+                      selectedUnit === product.unit
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
                     {product.unit} (Ecer)
                   </button>
                   {product.units.filter(u => u.code !== product.unit).map(u => (
-                    <button key={u.code} onClick={() => setSelectedUnit(u.code)} className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedUnit === u.code ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    <button
+                      key={u.code}
+                      type="button"
+                      onClick={() => setSelectedUnit(u.code)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${
+                        selectedUnit === u.code
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
                       {u.code} <span className="opacity-70">(@{u.contains} {product.unit})</span>
                     </button>
                   ))}
@@ -524,67 +584,139 @@ export default function ProductDetailClient({
               )}
 
               {/* Price Display */}
-              <div className="flex flex-col mb-4">
-                <span className={`text-xs font-bold uppercase tracking-wider mb-1 ${isWholesaleEligible ? 'text-orange-100' : 'text-slate-500'}`}>
-                  {isWholesaleEligible ? '✨ Harga Grosir Aktif' : 'Harga Eceran'}
-                </span>
-                <div className="flex items-end gap-2 flex-wrap">
-                  <span className={`text-3xl md:text-4xl font-black tracking-tight ${isWholesaleEligible ? 'text-white' : 'text-slate-900'}`}>
+              <div className="flex flex-col mb-3">
+                {isWholesaleEligible ? (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-50 border border-orange-200/80 text-orange-700 text-[11px] font-black tracking-wide w-fit mb-1.5">
+                    <Sparkles size={11} className="text-orange-500 fill-orange-500" />
+                    <span>Harga Grosir Aktif (Min. {currentMinWholesale} {currentUnit})</span>
+                  </div>
+                ) : (
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Harga Satuan
+                  </span>
+                )}
+
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight ${isWholesaleEligible ? 'text-orange-600' : 'text-slate-900'}`}>
                     Rp{displayPrice.toLocaleString('id-ID')}
                   </span>
-                  <span className={`text-base font-semibold mb-0.5 ${isWholesaleEligible ? 'text-orange-200' : 'text-slate-400'}`}>/{currentUnit}</span>
-                </div>
-              </div>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400">/{currentUnit}</span>
 
-              {/* Wholesale Info */}
-              {currentWholesalePrice > 0 && currentWholesalePrice < currentPrice ? (
-                <div className={`pt-4 border-t border-dashed ${isWholesaleEligible ? 'border-orange-400' : 'border-slate-200'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className={`text-xs font-black uppercase ${isWholesaleEligible ? 'text-white' : 'text-slate-700'}`}>Harga Grosir</p>
-                      <p className={`text-xs mt-0.5 ${isWholesaleEligible ? 'text-orange-100' : 'text-slate-500'}`}>Min. beli {currentMinWholesale} {currentUnit}</p>
-                    </div>
-                    <span className={`text-xl font-black ${isWholesaleEligible ? 'text-white' : 'text-slate-900'}`}>Rp{currentWholesalePrice.toLocaleString('id-ID')}</span>
-                  </div>
-                  {!isWholesaleEligible && (
-                    <div>
-                      <div className="bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-500 h-full rounded-full transition-all duration-700" style={{ width: `${wholesaleProgress}%` }} />
-                      </div>
-                      <p className="mt-2 text-xs font-bold text-emerald-700 flex items-center gap-1">
-                        <Sparkles size={12} /> Tambah {Math.max(0, (currentMinWholesale || 12) - quantity)} lagi untuk harga grosir!
-                      </p>
+                  {isWholesaleEligible && currentWholesalePrice < currentPrice && (
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <span className="text-xs font-bold text-slate-400 line-through">
+                        Rp{currentPrice.toLocaleString('id-ID')}
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded">
+                        Hemat Rp{(currentPrice - currentWholesalePrice).toLocaleString('id-ID')}
+                      </span>
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className={`pt-4 border-t border-dashed ${isWholesaleEligible ? 'border-orange-400' : 'border-slate-200'} flex items-center gap-2 ${isWholesaleEligible ? 'text-orange-100' : 'text-slate-500'} text-xs font-medium`}>
-                  <ShieldCheck size={15} className="shrink-0 text-emerald-600" />
-                  <span>Jaminan 100% Produk Asli &amp; Harga Langsung Distributor</span>
+              </div>
+
+              {/* Wholesale Tier Info: HANYA tampil jika ada harga grosir lebih murah dan kuantiti saat ini belum mencapai syarat */}
+              {currentWholesalePrice > 0 && currentWholesalePrice < currentPrice && !isWholesaleEligible && (
+                <div className="pt-3 border-t border-dashed border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-xs font-black uppercase text-slate-700">Tersedia Harga Grosir</p>
+                      <p className="text-[11px] text-slate-500">Min. beli {currentMinWholesale} {currentUnit}</p>
+                    </div>
+                    <span className="text-base sm:text-lg font-black text-orange-600">
+                      Rp{currentWholesalePrice.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${wholesaleProgress}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                      <Sparkles size={11} /> Tambah {Math.max(0, (currentMinWholesale || 12) - quantity)} {currentUnit} lagi untuk harga grosir!
+                    </p>
+                  </div>
                 </div>
               )}
 
+              {/* Jaminan Keaslian */}
+              <div className="pt-3 mt-1 border-t border-slate-100 flex items-center gap-2 text-slate-500 text-[11px] font-medium">
+                <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
+                <span>Jaminan 100% Produk Asli &amp; Harga Langsung Distributor</span>
+              </div>
+
               {/* Desktop Action Buttons */}
-              <div className="hidden md:flex flex-col mt-5 pt-5 border-t border-dashed border-slate-200/60 gap-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-slate-600">Jumlah:</span>
-                  <div className="flex items-center bg-slate-100 rounded-2xl p-1 border border-slate-200">
-                    <button onClick={() => handleQuantity('minus')} className="p-2.5 text-slate-600 hover:bg-white hover:shadow rounded-xl transition-all" aria-label="Kurangi"><Minus size={16} /></button>
-                    <span className="w-12 text-center font-black text-base text-slate-900">{quantity}</span>
-                    <button onClick={() => handleQuantity('plus')} className="p-2.5 text-slate-600 hover:bg-white hover:shadow rounded-xl transition-all" aria-label="Tambah"><Plus size={16} /></button>
+              <div className="hidden md:flex flex-col mt-4 pt-4 border-t border-dashed border-slate-200/60 gap-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-600">Jumlah:</span>
+                  <div className="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantity('minus')}
+                      className="p-2 text-slate-600 hover:bg-white hover:shadow-xs rounded-lg transition-all"
+                      aria-label="Kurangi"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-10 text-center font-black text-sm text-slate-900">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantity('plus')}
+                      className="p-2 text-slate-600 hover:bg-white hover:shadow-xs rounded-lg transition-all"
+                      aria-label="Tambah"
+                    >
+                      <Plus size={14} />
+                    </button>
                   </div>
                   <span className="text-xs text-slate-500 font-medium">= Rp{(displayPrice * quantity).toLocaleString('id-ID')}</span>
                 </div>
-                <div className="flex gap-2.5">
-                  <button onClick={() => syncToFirebaseCart(product, quantity, false)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${isOutOfStock ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : isPreOrder ? 'bg-orange-500 text-white hover:bg-orange-600' : isAdding ? 'bg-slate-800 text-white opacity-80' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-                    {isAdding ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
-                    {isOutOfStock ? 'Stok Habis' : isPreOrder ? '+ Pesan Pre-Order' : '+ Keranjang'}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => syncToFirebaseCart(product, quantity, false)}
+                    disabled={isOutOfStock || isAdding}
+                    className={`flex-1 py-3 rounded-xl font-black uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] ${
+                      isOutOfStock
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        : isPreOrder
+                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        : isAdding
+                        ? 'bg-slate-800 text-white opacity-80'
+                        : 'bg-slate-900 text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {isAdding ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />}
+                    <span>{isOutOfStock ? 'Stok Habis' : isPreOrder ? '+ Pesan Pre-Order' : '+ Keranjang'}</span>
                   </button>
-                  <button onClick={() => syncToFirebaseCart(product, quantity, true)} disabled={isOutOfStock || isAdding} className={`flex-1 py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${isOutOfStock ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : isPreOrder ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/20' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20'}`}>
-                    <Zap size={18} className="fill-current" /> {isPreOrder ? 'Pesan Sekarang' : 'Beli Sekarang'}
-                  </button>
-                  <button onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }} className={`p-3.5 rounded-2xl border transition-all ${inWishlist ? 'border-red-200 bg-red-50 text-red-500' : 'border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-500'}`} title="Favorit">
-                    <Heart size={20} className={inWishlist ? 'fill-current' : ''} />
+                  {!isOutOfStock && (
+                    <button
+                      type="button"
+                      onClick={() => syncToFirebaseCart(product, quantity, true)}
+                      disabled={isOutOfStock || isAdding}
+                      className={`flex-1 py-3 rounded-xl font-black uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+                        isOutOfStock
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : isPreOrder
+                          ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-sm shadow-orange-600/20'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20'
+                      }`}
+                    >
+                      <Zap size={16} className="fill-current" /> {isPreOrder ? 'Pesan Sekarang' : 'Beli Sekarang'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { addToWishlist(product.id); setInWishlist(!inWishlist); }}
+                    title="Favorit"
+                    className={`p-3 rounded-xl border transition-all ${
+                      inWishlist
+                        ? 'border-red-200 bg-red-50 text-red-500'
+                        : 'border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-500'
+                    }`}
+                  >
+                    <Heart size={18} className={inWishlist ? 'fill-current' : ''} />
                   </button>
                 </div>
               </div>

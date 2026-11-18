@@ -177,13 +177,23 @@ export default async function ProductDetailPage({ params }: PageProps) {
         if (allFamilyRows.length > 1) {
           variants = allFamilyRows.map((v: any) => {
             const vRaw = v.raw_data || {};
+            const price = Number(v.price ?? vRaw.price ?? vRaw.Ecer ?? 0);
+            const rawWholesale = Number(vRaw.wholesalePrice ?? vRaw.Grosir ?? vRaw.Harga_Grosir ?? 0);
+            const wholesalePrice = rawWholesale > 0 && rawWholesale < price ? rawWholesale : 0;
             return {
               id: v.id,
               name: v.name || vRaw.name || vRaw.Nama || v.id,
-              price: Number(v.price ?? vRaw.price ?? vRaw.Ecer ?? 0),
+              price,
+              wholesalePrice,
+              minWholesale: Number(vRaw.minWholesale ?? vRaw.Min_Grosir ?? vRaw.Min_Stok_Grosir ?? 12),
               stock: Number(v.stock ?? vRaw.stock ?? vRaw.Stok ?? 0),
               image: v.image_url || vRaw.imageUrl || vRaw.Link_Foto || vRaw.image || '',
               unit: v.unit || vRaw.unit || vRaw.Satuan || 'PCS',
+              units: vRaw.units || [],
+              description: v.description || vRaw.description || vRaw.Deskripsi || '',
+              isPreOrder: Boolean(vRaw.isPreOrder),
+              poLeadTimeDays: Number(vRaw.poLeadTimeDays || 3),
+              poNotes: vRaw.poNotes || '',
               isCurrent: v.id === id,
             };
           });
