@@ -3353,7 +3353,7 @@ export async function toggleParentOnlyAction(
  * format dengan kata 'dan' ("bahan-dan-bumbu"),
  * format nama persis, dan format slug dari database.
  */
-export function matchesCategorySlug(
+function matchesCategorySlug(
   categoryName: string,
   categorySlugInDb: string | undefined,
   targetSlug: string
