@@ -1660,6 +1660,7 @@ export async function applyPriceRecommendations(
         priceEcer,
         units,
         pricingStrategy: raw.pricingStrategy,
+        isHppLocked: Boolean(raw.isHppLocked),
       });
 
       if (findings.length === 0) {

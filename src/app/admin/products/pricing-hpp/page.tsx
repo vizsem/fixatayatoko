@@ -1102,7 +1102,7 @@ export default function PricingHPPPage() {
                   <option value="SLIM">🟡 Margin Sedang (8 - 19%)</option>
                   <option value="CRITICAL">🟠 Margin Tipis (1 - 7%)</option>
                   <option value="NEGATIVE">🔴 Margin Nol / Rugi (≤ 0%)</option>
-                  <option value="NEEDS_REVIEW">Perlu penyesuaian harga ({productsNeedingPriceReview})</option>
+                  <option value="NEEDS_REVIEW">🔴 Di bawah modal / Rugi ({productsNeedingPriceReview})</option>
                 </select>
 
                 <select
@@ -1346,7 +1346,7 @@ export default function PricingHPPPage() {
                                       title={`Klik untuk sesuaikan satuan: ${priceReview.map((finding) => `${finding.unitCode}: Rp${finding.currentPrice.toLocaleString('id-ID')} → target Rp${finding.recommendedPrice.toLocaleString('id-ID')}`).join(' · ')}`}
                                     >
                                       <AlertTriangle size={10} className="text-rose-600 animate-pulse" />
-                                      <span>Perlu naik: <strong className="underline underline-offset-2">{priceReview.map(f => f.unitCode).join(', ')}</strong></span>
+                                      <span>Di bawah modal: <strong className="underline underline-offset-2">{priceReview.map(f => f.unitCode).join(', ')}</strong></span>
                                     </button>
                                   )}
                                 </div>
