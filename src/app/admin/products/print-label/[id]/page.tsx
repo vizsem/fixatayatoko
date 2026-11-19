@@ -121,10 +121,10 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
 
               {/* Harga Utama (Tebal & Kontras) */}
               <div className="mt-0.5 flex items-baseline gap-1 leading-none">
-                <span className="text-[12px] font-black tracking-tighter leading-none text-slate-900">
+                <span className="text-[13.5px] font-black tracking-tighter leading-none text-slate-900">
                   {formatRp(product.price || product.Ecer)}
                 </span>
-                <span className="text-[5px] font-bold text-gray-500 uppercase">
+                <span className="text-[5.5px] font-bold text-gray-500 uppercase">
                   /{baseUnitStr}
                 </span>
               </div>
@@ -139,7 +139,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                         <span className="font-bold text-gray-600 uppercase">
                           1 {u.code} <span className="font-normal text-gray-400">({u.contains} {baseUnitStr})</span>
                         </span>
-                        <span className="text-[5.5px] font-black tracking-tighter text-slate-900">
+                        <span className="text-[6px] font-black tracking-tighter text-slate-900">
                           {formatRp(u.price)}
                         </span>
                       </div>
@@ -149,7 +149,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
 
               {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong) */}
               {(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir) > 0 && (
-                <div className="flex items-center justify-between text-[5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
+                <div className="flex items-center justify-between text-[5.5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
                   <span className="uppercase text-gray-600 font-bold">Grosir:</span>
                   <span className="font-black text-black">
                     &ge;{product.minWholesale || product.Min_Grosir || product.raw_data?.Min_Grosir || 2} @{formatRp(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir)}
@@ -161,7 +161,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}
             <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-gray-200">
                <div className="bg-white p-0.5 w-full flex justify-center">
-                 <QRCodeSVG value={skuValue} size={42} level="L" marginSize={0} />
+                 <QRCodeSVG value={skuValue} size={44} level="L" marginSize={0} />
                </div>
                <span className="text-[4px] font-mono font-bold text-gray-700 uppercase tracking-tight mt-0.5 text-center leading-none">SKU: {skuValue}</span>
             </div>

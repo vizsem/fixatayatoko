@@ -476,6 +476,9 @@ function BulkPrintContent() {
             || (item.barcode && String(item.barcode).trim()) 
             || skuValue;
           
+          const isLarge = labelSize === '60x40';
+          const isSmall = labelSize === '40x30';
+          
           return (
             <div 
               key={`${item.id}-${index}`}
@@ -483,7 +486,7 @@ function BulkPrintContent() {
               style={{ 
                 width: currentSize.width, 
                 height: currentSize.height,
-                padding: '1.2mm 2mm',
+                padding: isLarge ? '1.5mm 2.2mm' : '1.2mm 2mm',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -493,14 +496,14 @@ function BulkPrintContent() {
             >
               {/* Header Toko & Kategori */}
               <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-                <span className="text-[6px] font-black uppercase tracking-tight">ATAYA TOKO</span>
+                <span className={`font-black uppercase tracking-tight ${isLarge ? 'text-[7px]' : 'text-[6px]'}`}>ATAYA TOKO</span>
                 <div className="flex items-center gap-1">
                   {!showQr && (
-                    <span className="text-[5px] font-mono font-bold text-slate-600 uppercase">
+                    <span className={`font-mono font-bold text-slate-600 uppercase ${isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
                       SKU: {skuValue} ·
                     </span>
                   )}
-                  <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">
+                  <span className={`font-bold uppercase truncate ${isLarge ? 'text-[6px] max-w-[34mm]' : 'text-[5px] max-w-[28mm]'}`}>
                     {item.category || 'UMUM'}
                   </span>
                 </div>
@@ -514,35 +517,35 @@ function BulkPrintContent() {
                   <div className="min-w-0">
                     {item.isVariant ? (
                       <div className="flex items-center gap-1 min-w-0">
-                        <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
+                        <h2 className={`font-black leading-tight uppercase truncate ${isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`}>
                           {item.parentName || item.name}
                         </h2>
-                        <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
+                        <span className={`bg-black text-white rounded-[2px] font-black uppercase shrink-0 leading-none ${isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
                           {item.variantName || 'VAR'}
                         </span>
                       </div>
                     ) : item.isUnitLabel ? (
                       <div className="flex items-center gap-1 min-w-0">
-                        <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
+                        <h2 className={`font-black leading-tight uppercase truncate ${isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`}>
                           {item.parentName || item.name}
                         </h2>
-                        <span className="px-1 py-0.2 bg-slate-800 text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
+                        <span className={`bg-slate-800 text-white rounded-[2px] font-black uppercase shrink-0 leading-none ${isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
                           {item.variantName || `SATUAN ${item.unit}`}
                         </span>
                       </div>
                     ) : (
-                      <h2 className="text-[7.5px] font-black leading-tight uppercase line-clamp-2">
+                      <h2 className={`font-black leading-tight uppercase line-clamp-2 ${isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`}>
                         {item.name}
                       </h2>
                     )}
                   </div>
 
-                  {/* Harga Utama (Tebal & Kontras) */}
+                  {/* Harga Utama (Tebal & Kontras - Diperbesar agar jelas dari kejauhan) */}
                   <div className="mt-0.5 flex items-baseline gap-1 leading-none">
-                    <span className="text-[12px] font-black tracking-tighter leading-none text-slate-900">
+                    <span className={`font-black tracking-tighter leading-none text-slate-900 ${isLarge ? 'text-[17px]' : isSmall ? 'text-[12px]' : 'text-[13.5px]'}`}>
                       {formatRp(item.price)}
                     </span>
-                    <span className="text-[5px] font-bold text-gray-500 uppercase">
+                    <span className={`font-bold text-gray-500 uppercase ${isLarge ? 'text-[6.5px]' : 'text-[5.5px]'}`}>
                       /{item.unit}
                     </span>
                   </div>
@@ -553,11 +556,11 @@ function BulkPrintContent() {
                       {item.units
                         .filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase())
                         .map((u: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center leading-none text-[5px]">
-                            <span className="font-bold text-gray-600 uppercase">
+                          <div key={idx} className="flex justify-between items-center leading-none">
+                            <span className={`font-bold text-gray-600 uppercase ${isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
                               1 {u.code} <span className="font-normal text-gray-400">({u.contains} {item.unit})</span>
                             </span>
-                            <span className="text-[5.5px] font-black tracking-tighter text-slate-900">
+                            <span className={`font-black tracking-tighter text-slate-900 ${isLarge ? 'text-[7px]' : 'text-[6px]'}`}>
                               {formatRp(u.price || (item.price * (u.contains || 1)))}
                             </span>
                           </div>
@@ -567,7 +570,7 @@ function BulkPrintContent() {
 
                   {/* Info Grosir (Jika Ada & Diaktifkan - Selalu Terlihat Tanpa Terpotong) */}
                   {showWholesale && (item.wholesalePrice || 0) > 0 && (
-                    <div className="flex items-center justify-between text-[5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
+                    <div className={`flex items-center justify-between font-bold bg-gray-100 rounded-[2px] mt-0.5 leading-none shrink-0 ${isLarge ? 'text-[6.5px] px-1.5 py-0.5' : 'text-[5.5px] px-1 py-0.5'}`}>
                       <span className="uppercase text-gray-600 font-bold">Grosir:</span>
                       <span className="font-black text-black">
                         &ge;{item.minWholesale || 2} @{formatRp(item.wholesalePrice || 0)}
@@ -578,11 +581,11 @@ function BulkPrintContent() {
 
                 {/* Kanan: QR Code untuk Scan Cepat via Kamera HP / Kasir (Menggunakan SKU Toko) */}
                 {showQr && (
-                  <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-gray-200">
+                  <div className={`flex flex-col justify-center items-center shrink-0 pl-1 border-l border-dashed border-gray-200 ${isLarge ? 'w-[19mm]' : 'w-[15mm]'}`}>
                     <div className="bg-white p-0.5 flex justify-center">
-                      <QRCodeSVG value={skuValue} size={42} level="L" marginSize={0} />
+                      <QRCodeSVG value={skuValue} size={isLarge ? 52 : isSmall ? 38 : 44} level="L" marginSize={0} />
                     </div>
-                    <span className="text-[4px] font-mono font-bold text-slate-700 uppercase tracking-tight mt-0.5 text-center leading-none">
+                    <span className={`font-mono font-bold text-slate-700 uppercase tracking-tight mt-0.5 text-center leading-none ${isLarge ? 'text-[5px]' : 'text-[4px]'}`}>
                       SKU: {skuValue}
                     </span>
                   </div>
@@ -595,10 +598,10 @@ function BulkPrintContent() {
                   <div className="w-full flex justify-center items-center">
                     <Barcode 
                       value={pcsBarcode} 
-                      width={1.15} 
-                      height={18} 
-                      fontSize={7} 
-                      margin={2} 
+                      width={isLarge ? 1.25 : 1.15} 
+                      height={isLarge ? 24 : isSmall ? 16 : 19} 
+                      fontSize={isLarge ? 8 : 7} 
+                      margin={isLarge ? 3 : 2} 
                       displayValue={true} 
                       background="#ffffff"
                       lineColor="#000000"
