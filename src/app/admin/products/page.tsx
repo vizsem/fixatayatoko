@@ -26,7 +26,7 @@ import {
 
 import Link from 'next/link';
 import {
-  Plus, Edit, Trash2, Download, Upload, Search, X,
+  Plus, Minus, Edit, Trash2, Download, Upload, Search, X,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
@@ -375,6 +375,11 @@ export default function AdminProducts() {
   // State untuk Hierarki Varian & Merge Varian
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showCreateParentModal, setShowCreateParentModal] = useState(false);
+  const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
+  const [bulkPrintIncludeVariants, setBulkPrintIncludeVariants] = useState(true);
+  const [bulkPrintIncludeUnits, setBulkPrintIncludeUnits] = useState(false);
+  const [bulkPrintCopies, setBulkPrintCopies] = useState(1);
+  const [bulkPrintSize, setBulkPrintSize] = useState<'50x30' | '40x30' | '60x40'>('50x30');
   const [showBulkBrandModal, setShowBulkBrandModal] = useState(false);
   const [showBulkPoModal, setShowBulkPoModal] = useState(false);
   const [bulkPoLeadTime, setBulkPoLeadTime] = useState(3);
@@ -1393,10 +1398,8 @@ export default function AdminProducts() {
                 {selectedIds.length} Produk Terpilih:
               </span>
               <button
-                onClick={() => {
-                  const idsParam = selectedIds.join(',');
-                  window.open(`/admin/products/print-label/bulk?ids=${idsParam}`, '_blank');
-                }}
+                type="button"
+                onClick={() => setShowBulkPrintModal(true)}
                 className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
               >
                 <Printer size={13} /> Cetak Label ({selectedIds.length})
@@ -2482,6 +2485,139 @@ export default function AdminProducts() {
           setTimeout(() => window.location.reload(), 600);
         }}
       />
+
+      {/* Modal Konfigurasi Cetak Label Rak Masal */}
+      {showBulkPrintModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-200 border border-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 rounded-2xl text-amber-700">
+                  <Printer size={22} />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-gray-900">Cetak Label Rak Masal</h2>
+                  <p className="text-xs text-gray-500">{selectedIds.length} produk terpilih</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkPrintModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Opsi Ukuran Label */}
+              <div>
+                <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
+                  Ukuran Label Thermal
+                </label>
+                <select
+                  value={bulkPrintSize}
+                  onChange={(e) => setBulkPrintSize(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 font-bold text-slate-800 outline-none focus:border-amber-500"
+                >
+                  <option value="50x30">50mm × 30mm (Standar Label Rak Toko)</option>
+                  <option value="40x30">40mm × 30mm (Kompak / Sempit)</option>
+                  <option value="60x40">60mm × 40mm (Supermarket / Besar)</option>
+                </select>
+              </div>
+
+              {/* Opsi Sertakan Varian Anak */}
+              <label className="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={bulkPrintIncludeVariants}
+                  onChange={(e) => setBulkPrintIncludeVariants(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-0 mt-0.5"
+                />
+                <div>
+                  <span className="font-black text-slate-900 block flex items-center gap-1.5">
+                    <Layers size={14} className="text-purple-600" /> Sertakan Semua Varian Anak
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Otomatis cetak label untuk setiap varian rasa/aroma/ukuran dari produk induk yang dipilih.
+                  </span>
+                </div>
+              </label>
+
+              {/* Opsi Label Satuan Kardus / Renceng */}
+              <label className="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={bulkPrintIncludeUnits}
+                  onChange={(e) => setBulkPrintIncludeUnits(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-0 mt-0.5"
+                />
+                <div>
+                  <span className="font-black text-slate-900 block flex items-center gap-1.5">
+                    <Tag size={14} className="text-emerald-600" /> Cetak Label Satuan Dus / Renceng
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Cetak stiker terpisah untuk produk yang memiliki satuan kardus atau renceng.
+                  </span>
+                </div>
+              </label>
+
+              {/* Jumlah Rangkap */}
+              <div>
+                <label className="text-xs font-black uppercase text-gray-600 mb-1.5 block">
+                  Jumlah Lembar per Produk
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBulkPrintCopies(Math.max(1, bulkPrintCopies - 1))}
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-black text-slate-700 active:scale-95"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-12 text-center text-sm font-black bg-slate-50 border border-slate-200 py-2 rounded-xl">
+                    {bulkPrintCopies}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBulkPrintCopies(bulkPrintCopies + 1)}
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-black text-slate-700 active:scale-95"
+                  >
+                    <Plus size={14} />
+                  </button>
+                  <span className="text-xs text-slate-400 font-bold ml-1">lembar stiker</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowBulkPrintModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const idsParam = selectedIds.join(',');
+                  const incVar = bulkPrintIncludeVariants ? '1' : '0';
+                  const incUnit = bulkPrintIncludeUnits ? '1' : '0';
+                  window.open(
+                    `/admin/products/print-label/bulk?ids=${idsParam}&includeVariants=${incVar}&includeUnits=${incUnit}&copies=${bulkPrintCopies}&size=${bulkPrintSize}`,
+                    '_blank'
+                  );
+                  setShowBulkPrintModal(false);
+                }}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase rounded-2xl transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Printer size={14} /> Buka Antrean Cetak
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Set Brand Produk Massal */}
       <BulkBrandModal

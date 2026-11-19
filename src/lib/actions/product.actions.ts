@@ -3508,3 +3508,205 @@ export async function getCategoryPageData(slug: string) {
     return { success: false, categoryName: cleanSlug.replace(/-/g, ' '), categoryIcon: '📦', products: [], error: err.message };
   }
 }
+
+
+export interface BulkPrintProductItem {
+  id: string;
+  name: string;
+  displayName: string;
+  parentName?: string;
+  variantName?: string;
+  isVariant: boolean;
+  isParent: boolean;
+  isUnitLabel?: boolean;
+  category: string;
+  price: number;
+  wholesalePrice?: number;
+  minWholesale?: number;
+  unit: string;
+  sku: string;
+  barcode: string;
+  units?: Array<{
+    code: string;
+    contains: number;
+    price?: number;
+    barcode?: string;
+  }>;
+}
+
+/**
+ * Server action untuk mengambil data produk lengkap dengan seluruh varian anak
+ * dan varian satuan (multi-unit) guna pencetakan massal label rak thermal.
+ */
+export async function getProductsForBulkPrintAction(
+  ids: string[],
+  options: {
+    includeVariants?: boolean;
+    includeUnits?: boolean;
+  } = {}
+): Promise<{
+  success: boolean;
+  items?: BulkPrintProductItem[];
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    if (!ids || ids.length === 0) {
+      return { success: true, items: [] };
+    }
+
+    // 1. Ambil produk utama berdasarkan list ID
+    const { data: baseProducts, error: baseErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .in('id', ids);
+
+    if (baseErr) throw baseErr;
+
+    const baseList = baseProducts || [];
+    const baseMap = new Map<string, any>();
+    baseList.forEach(p => baseMap.set(p.id, p));
+
+    // 2. Jika includeVariants aktif, cari semua anak varian yang memiliki Parent_ID dari salah satu ID
+    let variantsList: any[] = [];
+    if (options.includeVariants) {
+      const { data: vData, error: vErr } = await supabaseAdmin
+        .from('products')
+        .select('*')
+        .in('raw_data->>Parent_ID', ids);
+
+      if (!vErr && vData) {
+        variantsList = vData;
+      }
+    }
+
+    // Grouping anak varian per parent ID
+    const variantsByParent = new Map<string, any[]>();
+    variantsList.forEach(v => {
+      const pId = (v.parent_id || v.raw_data?.Parent_ID || v.raw_data?.parentId || '').toString().trim();
+      if (pId) {
+        if (!variantsByParent.has(pId)) variantsByParent.set(pId, []);
+        variantsByParent.get(pId)!.push(v);
+      }
+    });
+
+    const resultItems: BulkPrintProductItem[] = [];
+
+    // Proses setiap produk terpilih
+    for (const p of baseList) {
+      const raw = p.raw_data || {};
+      const children = variantsByParent.get(p.id) || [];
+      const hasChildren = children.length > 0;
+      const isParentOnly = Boolean(raw.is_parent_only || raw.isParentOnly);
+
+      const baseUnit = String(p.unit || raw.Satuan || raw.unit || 'PCS').toUpperCase();
+      const basePrice = Number(p.price ?? raw.Ecer ?? raw.price ?? 0);
+      const wPrice = Number(raw.Grosir ?? raw.wholesalePrice ?? 0);
+      const minW = Number(raw.Min_Grosir ?? raw.minWholesaleQty ?? 0);
+      const category = String(p.category || raw.Kategori || raw.category || 'UMUM');
+      const sku = String(p.sku || raw.ID || raw.sku || p.id.slice(0, 8));
+      const barcode = String(p.barcode || raw.Barcode || raw.barcode || sku);
+
+      const parentIdOfThis = (p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim();
+      const isThisVariant = Boolean(parentIdOfThis);
+
+      // Jika produk bukan "is_parent_only", sertakan produk ini ke hasil cetak
+      if (!isParentOnly || !hasChildren) {
+        resultItems.push({
+          id: p.id,
+          name: String(p.name || raw.Nama || 'Produk'),
+          displayName: String(p.name || raw.Nama || 'Produk'),
+          isVariant: isThisVariant,
+          isParent: hasChildren,
+          category,
+          price: basePrice,
+          wholesalePrice: wPrice,
+          minWholesale: minW,
+          unit: baseUnit,
+          sku,
+          barcode,
+          units: Array.isArray(raw.units) ? raw.units : undefined,
+        });
+      }
+
+      // Jika ada anak varian dan includeVariants = true, masukkan semua varian anak
+      if (hasChildren && options.includeVariants) {
+        for (const child of children) {
+          if (baseMap.has(child.id)) continue;
+
+          const cRaw = child.raw_data || {};
+          const cUnit = String(child.unit || cRaw.Satuan || cRaw.unit || baseUnit).toUpperCase();
+          const cPrice = Number(child.price ?? cRaw.Ecer ?? cRaw.price ?? basePrice);
+          const cWPrice = Number(cRaw.Grosir ?? cRaw.wholesalePrice ?? wPrice);
+          const cMinW = Number(cRaw.Min_Grosir ?? cRaw.minWholesaleQty ?? minW);
+          const cSku = String(child.sku || cRaw.ID || cRaw.sku || child.id.slice(0, 8));
+          const cBarcode = String(child.barcode || cRaw.Barcode || cRaw.barcode || cSku);
+
+          const parentName = String(p.name || raw.Nama || '');
+          const rawChildName = String(child.name || cRaw.Nama || 'Varian');
+          let variantName = rawChildName;
+          if (parentName && rawChildName.toLowerCase().startsWith(parentName.toLowerCase())) {
+            variantName = rawChildName.slice(parentName.length).replace(/^[\s\-_:]+/, '').trim() || rawChildName;
+          }
+
+          resultItems.push({
+            id: child.id,
+            name: rawChildName,
+            displayName: parentName ? `${parentName} - ${variantName}` : rawChildName,
+            parentName: parentName || undefined,
+            variantName: variantName || undefined,
+            isVariant: true,
+            isParent: false,
+            category: String(child.category || cRaw.Kategori || category),
+            price: cPrice,
+            wholesalePrice: cWPrice,
+            minWholesale: cMinW,
+            unit: cUnit,
+            sku: cSku,
+            barcode: cBarcode,
+            units: Array.isArray(cRaw.units) ? cRaw.units : undefined,
+          });
+        }
+      }
+
+      // Jika opsi includeUnits = true, tambahkan stiker terpisah untuk tiap satuan kardus/renceng
+      if (options.includeUnits && Array.isArray(raw.units)) {
+        for (const u of raw.units) {
+          const uCode = (u.code || '').toString().trim().toUpperCase();
+          if (!uCode || uCode === baseUnit) continue;
+          const uContains = Math.max(1, Number(u.contains || 1));
+          const uPrice = typeof u.price === 'number' ? Number(u.price) : basePrice * uContains;
+          const uBarcode = String(u.barcode || barcode);
+          const uSku = `${sku}-${uCode}`;
+
+          resultItems.push({
+            id: `${p.id}-unit-${uCode}`,
+            name: `${p.name || raw.Nama} (${uCode})`,
+            displayName: `${p.name || raw.Nama} [${uCode} ISI ${uContains}]`,
+            parentName: String(p.name || raw.Nama),
+            variantName: `${uCode} (ISI ${uContains} ${baseUnit})`,
+            isVariant: false,
+            isParent: false,
+            isUnitLabel: true,
+            category,
+            price: uPrice,
+            unit: uCode,
+            sku: uSku,
+            barcode: uBarcode,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      items: resultItems,
+    };
+  } catch (err: any) {
+    console.error('getProductsForBulkPrintAction error:', err);
+    return {
+      success: false,
+      error: err?.message || 'Gagal memuat produk untuk cetak label',
+    };
+  }
+}
