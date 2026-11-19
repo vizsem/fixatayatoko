@@ -504,7 +504,7 @@ function BulkPrintContent() {
             >
               {/* Header Toko & Kategori */}
               <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-                <span className={`font-bold uppercase tracking-tight text-black ${isLarge ? 'text-[7.5px]' : 'text-[6.5px]'}`}>ATAYA TOKO</span>
+                <span className={`font-bold uppercase tracking-tight text-black ${isLarge ? 'text-[7.5px]' : 'text-[6.5px]'}`}>ATAYATOKO</span>
                 <div className="flex items-center gap-1">
                   {!showQr && (
                     <span className={`font-mono font-bold text-black uppercase ${isLarge ? 'text-[6px]' : 'text-[5px]'}`}>

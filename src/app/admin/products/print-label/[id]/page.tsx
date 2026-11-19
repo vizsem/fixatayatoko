@@ -107,7 +107,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
         >
           {/* Header Toko / Kategori */}
           <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-            <span className="text-[6.5px] font-bold uppercase tracking-tight text-black">ATAYA TOKO</span>
+            <span className="text-[6.5px] font-bold uppercase tracking-tight text-black">ATAYATOKO</span>
             <span className="text-[5px] font-bold uppercase truncate max-w-[28mm] text-black">{product.category || product.Kategori || 'UMUM'}</span>
           </div>
 
