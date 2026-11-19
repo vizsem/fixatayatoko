@@ -1375,8 +1375,23 @@ export async function restockProductViaSupabase(productId: string, stokMasuk: nu
  * Menghitung AVG HPP semua produk dari riwayat PO (purchases) dalam satu query.
  * Mengembalikan Map: productId -> { avgCost, totalQty, poCount }
  */
+/**
+ * Mengambil harga beli PO Terakhir (Last Purchase Price) dan riwayat PO untuk seluruh produk.
+ * Memuat juga data varian anak/induk agar produk varian otomatis tercover secara menyeluruh.
+ * avgCost disetel sama dengan lastPoCost untuk kompatibilitas penuh dengan sistem harga jual & margin.
+ */
 export async function getAllProductsAvgHpp(): Promise<
-  Record<string, { avgCost: number; totalQty: number; poCount: number }>
+  Record<string, { 
+    avgCost: number; 
+    lastPoCost: number;
+    lastPoDate?: string;
+    lastPoSupplier?: string;
+    lastPoNumber?: string;
+    totalQty: number; 
+    poCount: number;
+    isInheritedFromParent?: boolean;
+    isInheritedFromVariant?: boolean;
+  }>
 > {
   await requireAdmin();
   try {
@@ -1387,19 +1402,29 @@ export async function getAllProductsAvgHpp(): Promise<
 
     if (error || !rows) return {};
 
-    // productId -> { totalCost, totalQty, poCount }
-    const accumulator: Record<string, { totalCost: number; totalQty: number; poCount: number }> = {};
+    // productId -> stats
+    const productStats: Record<string, { 
+      lastPoCost: number; 
+      lastPoDate?: string;
+      lastPoSupplier?: string;
+      lastPoNumber?: string;
+      totalCost: number; 
+      totalQty: number; 
+      poCount: number;
+    }> = {};
 
     for (const p of rows) {
       const raw = p.raw_data || {};
       const status = (raw.status || '').toUpperCase();
-      // Hanya hitung PO yang sudah RECEIVED/DITERIMA, skip yang dibatalkan
       if (status === 'CANCELLED' || status === 'DIBATALKAN') continue;
+
+      const poDate = raw.receivedAt || raw.createdAt || p.created_at;
+      const poSupplier = raw.supplierName || raw.supplier;
+      const poNumber = raw.poNumber || raw.reference;
 
       const items: any[] = raw.items || [];
       for (const item of items) {
-        const pid: string | undefined =
-          item.productId || item.product_id || undefined;
+        const pid: string | undefined = item.productId || item.product_id || undefined;
         if (!pid) continue;
 
         const qty = Number(item.quantity ?? item.qty ?? 1);
@@ -1408,23 +1433,93 @@ export async function getAllProductsAvgHpp(): Promise<
 
         if (qty <= 0 || price <= 0) continue;
 
-        if (!accumulator[pid]) {
-          accumulator[pid] = { totalCost: 0, totalQty: 0, poCount: 0 };
+        const baseQty = qty * (conversion || 1);
+        const costPerBaseUnit = conversion > 1 ? (price / conversion) : price;
+        const roundedCost = Math.round(costPerBaseUnit);
+
+        if (!productStats[pid]) {
+          // Baris pertama yang ditemukan adalah PO TERAKHIR (karena order by created_at desc)
+          productStats[pid] = {
+            lastPoCost: roundedCost,
+            lastPoDate: poDate,
+            lastPoSupplier: poSupplier,
+            lastPoNumber: poNumber,
+            totalCost: qty * price,
+            totalQty: baseQty,
+            poCount: 1,
+          };
+        } else {
+          productStats[pid].totalCost += qty * price;
+          productStats[pid].totalQty += baseQty;
+          productStats[pid].poCount += 1;
         }
-        const baseQty = qty * conversion;
-        accumulator[pid].totalCost += qty * price;
-        accumulator[pid].totalQty += baseQty;
-        accumulator[pid].poCount += 1;
       }
     }
 
-    const result: Record<string, { avgCost: number; totalQty: number; poCount: number }> = {};
-    for (const [pid, val] of Object.entries(accumulator)) {
+    // ── Dukungan Produk Varian: Hubungkan Varian Anak <-> Induk ──
+    const { data: prods } = await supabaseAdmin
+      .from('products')
+      .select('id, parent_id, raw_data');
+
+    const parentToChildren = new Map<string, string[]>();
+    const childToParent = new Map<string, string>();
+
+    (prods || []).forEach((pr: any) => {
+      const pId = (pr.parent_id || pr.raw_data?.Parent_ID || pr.raw_data?.parentId || '').toString().trim();
+      if (pId) {
+        childToParent.set(pr.id, pId);
+        if (!parentToChildren.has(pId)) parentToChildren.set(pId, []);
+        parentToChildren.get(pId)!.push(pr.id);
+      }
+    });
+
+    const result: Record<string, { 
+      avgCost: number; 
+      lastPoCost: number;
+      lastPoDate?: string;
+      lastPoSupplier?: string;
+      lastPoNumber?: string;
+      totalQty: number; 
+      poCount: number;
+      isInheritedFromParent?: boolean;
+      isInheritedFromVariant?: boolean;
+    }> = {};
+
+    for (const [pid, val] of Object.entries(productStats)) {
       result[pid] = {
-        avgCost: val.totalQty > 0 ? Math.round(val.totalCost / val.totalQty) : 0,
+        avgCost: val.lastPoCost, // Gunakan PO Terakhir sebagai HPP acuan
+        lastPoCost: val.lastPoCost,
+        lastPoDate: val.lastPoDate,
+        lastPoSupplier: val.lastPoSupplier,
+        lastPoNumber: val.lastPoNumber,
         totalQty: val.totalQty,
         poCount: val.poCount,
       };
+    }
+
+    // Wariskan harga PO Terakhir ke varian anak jika anak belum pernah dibeli terpisah
+    for (const [childId, pId] of childToParent.entries()) {
+      if (!result[childId] && result[pId]) {
+        result[childId] = {
+          ...result[pId],
+          isInheritedFromParent: true,
+        };
+      }
+    }
+
+    // Wariskan harga PO Terakhir ke produk induk jika pembelian dicatat di anak varian
+    for (const [pId, children] of parentToChildren.entries()) {
+      if (!result[pId]) {
+        for (const childId of children) {
+          if (result[childId]) {
+            result[pId] = {
+              ...result[childId],
+              isInheritedFromVariant: true,
+            };
+            break;
+          }
+        }
+      }
     }
 
     return result;

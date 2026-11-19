@@ -70,12 +70,22 @@ interface ProductItem {
   taxStatus: 'TAXABLE' | 'EXEMPT' | 'PPH22';
   taxLabel: string;
   isTaxExempt: boolean;
+  parentId?: string;
+  parentName?: string;
+  isVariant: boolean;
+  isParent: boolean;
 }
 
 interface AvgHppInfo {
   avgCost: number;
+  lastPoCost?: number;
+  lastPoDate?: string;
+  lastPoSupplier?: string;
+  lastPoNumber?: string;
   totalQty: number;
   poCount: number;
+  isInheritedFromParent?: boolean;
+  isInheritedFromVariant?: boolean;
 }
 
 interface CostPriceLog {
@@ -106,6 +116,7 @@ export default function PricingHPPPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
+  const [variantFilter, setVariantFilter] = useState<'ALL' | 'VARIANTS' | 'PARENTS' | 'REGULAR'>('ALL');
   const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [sortBy, setSortBy] = useState<'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('name');
@@ -193,6 +204,15 @@ export default function PricingHPPPage() {
         .limit(1000);
 
       if (error) throw error;
+
+      // Map untuk relasi varian anak <-> induk
+      const nameMap = new Map<string, string>();
+      const parentIdsSet = new Set<string>();
+      (data || []).forEach((p: any) => {
+        nameMap.set(p.id, p.name || p.raw_data?.Nama || 'Produk');
+        const pId = (p.parent_id || p.raw_data?.Parent_ID || p.raw_data?.parentId || '').toString().trim();
+        if (pId) parentIdsSet.add(pId);
+      });
 
       const rawItems = (data || []).map((p: Record<string, any>) => {
         const raw = p.raw_data || {};
@@ -291,6 +311,10 @@ export default function PricingHPPPage() {
           taxStatus,
           taxLabel,
           isTaxExempt: taxStatus === 'EXEMPT',
+          parentId: (p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim() || undefined,
+          parentName: (p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim() ? nameMap.get((p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim()) : undefined,
+          isVariant: Boolean((p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim()),
+          isParent: parentIdsSet.has(p.id),
         };
       });
 
@@ -406,7 +430,12 @@ export default function PricingHPPPage() {
         else if (taxFilter === 'EXEMPT') matchTax = p.taxStatus === 'EXEMPT';
         else if (taxFilter === 'PPH22') matchTax = p.taxStatus === 'PPH22';
 
-        return matchSearch && matchCat && matchMargin && matchTax;
+        let matchVariant = true;
+        if (variantFilter === 'VARIANTS') matchVariant = p.isVariant;
+        else if (variantFilter === 'PARENTS') matchVariant = p.isParent;
+        else if (variantFilter === 'REGULAR') matchVariant = !p.isVariant && !p.isParent;
+
+        return matchSearch && matchCat && matchMargin && matchTax && matchVariant;
       })
       .sort((a, b) => {
         if (sortBy === 'marginPct_desc') return b.marginPct - a.marginPct;
@@ -421,7 +450,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, marginFilter, taxFilter, sortBy, avgHppMap, priceReviewByProduct]);
+  }, [products, search, selectedCategory, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct]);
 
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
@@ -979,7 +1008,7 @@ export default function PricingHPPPage() {
 
           <div className={`p-5 rounded-3xl border shadow-sm space-y-2 ${kpis.avgDriftCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
             <div className={`flex items-center justify-between ${kpis.avgDriftCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Drift AVG HPP</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Selisih PO Terakhir</span>
               <div className={`p-2 rounded-xl ${kpis.avgDriftCount > 0 ? 'bg-amber-100' : 'bg-emerald-50'}`}>
                 <AlertTriangle size={18} />
               </div>
@@ -987,7 +1016,7 @@ export default function PricingHPPPage() {
             <p className={`text-2xl md:text-3xl font-black ${kpis.avgDriftCount > 0 ? 'text-amber-700' : 'text-emerald-600'}`}>
               {avgLoading ? '...' : kpis.avgDriftCount}
             </p>
-            <p className="text-xs font-bold text-slate-400">Produk HPP ≠ AVG PO</p>
+            <p className="text-xs font-bold text-slate-400">Produk HPP ≠ PO Terakhir</p>
           </div>
         </div>
 
@@ -1044,6 +1073,20 @@ export default function PricingHPPPage() {
                   {categories.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
+                </select>
+
+                <select
+                  value={variantFilter}
+                  onChange={e => {
+                    setVariantFilter(e.target.value as any);
+                    setSelectedIds(new Set());
+                  }}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="ALL">Semua Tipe Varian</option>
+                  <option value="VARIANTS">🔀 Hanya Varian ({products.filter(p => p.isVariant).length})</option>
+                  <option value="PARENTS">📦 Hanya Produk Induk ({products.filter(p => p.isParent).length})</option>
+                  <option value="REGULAR">🏷️ Produk Mandiri ({products.filter(p => !p.isVariant && !p.isParent).length})</option>
                 </select>
 
                 <select
@@ -1121,10 +1164,10 @@ export default function PricingHPPPage() {
                     onClick={handleResetAvgHpp}
                     disabled={selectedWithAvg.length === 0}
                     className="px-3.5 py-2 bg-white text-blue-700 hover:bg-blue-50 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Restart AVG dengan perlindungan data manual"
+                    title="Terapkan harga beli PO terakhir menjadi HPP aktif produk"
                   >
                     <RotateCcw size={13} />
-                    Restart AVG ({selectedWithAvg.length})
+                    Terapkan PO Terakhir ({selectedWithAvg.length})
                   </button>
                   <button
                     onClick={() => setShowSyncAvgModal(true)}
@@ -1271,6 +1314,22 @@ export default function PricingHPPPage() {
                                   >
                                     {formatProductName(p.name)}
                                   </Link>
+                                  {p.isVariant && (
+                                    <span 
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-700 shrink-0"
+                                      title={p.parentName ? `Varian turunan dari induk: ${p.parentName}` : 'Produk varian'}
+                                    >
+                                      <Layers size={9} /> Varian
+                                    </span>
+                                  )}
+                                  {p.isParent && (
+                                    <span 
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-indigo-100 text-indigo-700 shrink-0"
+                                      title="Produk Induk yang memiliki varian"
+                                    >
+                                      <Package size={9} /> Induk
+                                    </span>
+                                  )}
                                   {p.isHppLocked && (
                                     <span
                                       className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-100 text-blue-700 shrink-0"
@@ -1537,7 +1596,7 @@ export default function PricingHPPPage() {
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-50"
                       >
                         <RotateCcw size={13} />
-                        Restart AVG HPP
+                        Terapkan PO Terakhir
                       </button>
                       <button
                         onClick={() => setShowSyncAvgModal(true)}
@@ -2307,9 +2366,9 @@ export default function PricingHPPPage() {
                 <RotateCcw size={22} className="text-amber-700" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900">Restart AVG HPP dari PO</h3>
+                <h3 className="text-lg font-black text-slate-900">Terapkan Harga PO Terakhir Menjadi HPP</h3>
                 <p className="text-xs text-slate-500 font-bold mt-1">
-                  Sinkronisasi HPP aktif dengan rata-rata harga beli faktur riwayat PO.
+                  Sinkronisasi HPP aktif dengan harga beli pada faktur/nota PO terbaru (Replacement Cost).
                 </p>
               </div>
             </div>

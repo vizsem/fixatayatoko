@@ -356,12 +356,13 @@ export const addStock = async (params: {
     // Stok dan FIFO layers tetap diperbarui normal.
     const isHppLocked = Boolean(raw.isHppLocked);
 
-    // ── [Guard 3] Kalkulasi AVG Modal (WAC) hanya jika harga masuk valid & HPP tidak dikunci ──
+    // ── [Guard 3] Skema PO Terakhir (Last Purchase Price): HPP langsung mengadopsi harga beli PO terbaru ──
     // incomingPrice=0 atau undefined jangan dipakai untuk reset HPP (Guard 3).
     let newCostPrice = currentCost;
     const hasValidIncomingPrice = incomingPrice !== undefined && incomingPrice > 0;
     if (hasValidIncomingPrice && !isHppLocked) {
-      newCostPrice = computeAverageCost(currentStock, currentCost, amount, incomingPrice, 1);
+      // Menggantikan rumus AVG: HPP langsung mengadopsi harga beli PO terbaru (Replacement Cost)
+      newCostPrice = Math.round(incomingPrice);
     }
 
     // Sinkronkan modal/HPP ke seluruh unit (Satuan Lainnya) jika ada
