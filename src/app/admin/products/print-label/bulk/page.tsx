@@ -350,23 +350,23 @@ function BulkPrintContent() {
 
           {/* Toggle Elemen Barcode */}
           <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-600">
-            <label className="flex items-center gap-1.5 cursor-pointer">
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Barcode garis vertikal untuk scanner kasir tembak (menggunakan Barcode Pabrik/EAN)">
               <input
                 type="checkbox"
                 checked={showBarcode1D}
                 onChange={(e) => setShowBarcode1D(e.target.checked)}
                 className="rounded text-blue-600"
               />
-              <BarcodeIcon size={14} /> Barcode Garis 1D
+              <BarcodeIcon size={14} /> Barcode 1D (Barcode Pabrik)
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
+            <label className="flex items-center gap-1.5 cursor-pointer" title="QR Code matriks 2D untuk scan HP kasir / aplikasi (menggunakan SKU Toko)">
               <input
                 type="checkbox"
                 checked={showQr}
                 onChange={(e) => setShowQr(e.target.checked)}
                 className="rounded text-blue-600"
               />
-              <QrCode size={14} /> QR Code (HP Kasir)
+              <QrCode size={14} /> QR Code (SKU Toko)
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input
@@ -503,7 +503,8 @@ function BulkPrintContent() {
       {/* --- AREA CETAK (PRINT ENGINE) --- */}
       <div className="print-only-container flex flex-wrap justify-center gap-4 max-w-4xl mx-auto px-4">
         {printableList.map((item, index) => {
-          const barcodeValue = item.barcode || item.sku || item.id.slice(0, 10);
+          const skuValue = String(item.sku || item.id.slice(0, 8)).trim();
+          const factoryBarcode = String(item.barcode || skuValue).trim();
           
           return (
             <div 
@@ -523,9 +524,16 @@ function BulkPrintContent() {
               {/* Header Toko & Kategori */}
               <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
                 <span className="text-[6px] font-black uppercase tracking-tight">ATAYA TOKO</span>
-                <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">
-                  {item.category || 'UMUM'}
-                </span>
+                <div className="flex items-center gap-1">
+                  {!showQr && (
+                    <span className="text-[5px] font-mono font-bold text-slate-600 uppercase">
+                      SKU: {skuValue} ·
+                    </span>
+                  )}
+                  <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">
+                    {item.category || 'UMUM'}
+                  </span>
+                </div>
               </div>
 
               {/* Area Tengah: Nama, Varian, Harga & QR */}
@@ -580,25 +588,25 @@ function BulkPrintContent() {
                   )}
                 </div>
 
-                {/* Kanan: QR Code untuk Scan Cepat via Kamera HP / Kasir */}
+                {/* Kanan: QR Code untuk Scan Cepat via Kamera HP / Kasir (Menggunakan SKU Toko) */}
                 {showQr && (
                   <div className="flex flex-col justify-center items-center shrink-0 w-[24mm] pl-1 border-l border-dashed border-gray-200">
                     <div className="bg-white p-0.5 flex justify-center">
-                      <QRCodeSVG value={barcodeValue} size={24} level="M" />
+                      <QRCodeSVG value={skuValue} size={24} level="M" />
                     </div>
-                    <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 text-center leading-none">
-                      {item.sku || barcodeValue.slice(0, 8)}
+                    <span className="text-[4.5px] font-mono font-bold text-slate-700 uppercase tracking-tight mt-0.5 text-center leading-none">
+                      SKU: {skuValue}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Barcode Garis 1D di Bawah */}
+              {/* Barcode Garis 1D di Bawah (Menggunakan Barcode Pabrik) */}
               {showBarcode1D && (
                 <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full">
-                  <div className="bg-white overflow-hidden flex justify-center w-full max-h-[12px]">
+                  <div className="bg-white overflow-hidden flex justify-center w-full max-h-[14px]">
                     <Barcode 
-                      value={barcodeValue} 
+                      value={factoryBarcode} 
                       width={1} 
                       height={9} 
                       fontSize={7} 

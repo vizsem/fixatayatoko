@@ -43,8 +43,9 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
 
   const formatRp = (n: number) => `Rp${(n || 0).toLocaleString('id-ID')}`;
   
-  // Gunakan barcode khusus jika ada, jika tidak pakai id produk
-  const barcodeValue = product.Barcode || product.barcode || product.id.slice(0, 10);
+  // SKU internal toko (untuk QR Code kasir HP) & Barcode Pabrik (untuk Barcode 1D scanner kasir)
+  const skuValue = String(product.sku || product.SKU || product.raw_data?.sku || product.id.slice(0, 8)).trim();
+  const factoryBarcode = String(product.barcode || product.Barcode || product.raw_data?.barcode || product.raw_data?.Barcode || skuValue).trim();
 
   return (
     <div className="bg-gray-100 min-h-screen text-black font-sans pb-20">
@@ -132,22 +133,22 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
-            {/* Kanan: QR Code di Tengah Samping */}
+            {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}
             <div className="flex flex-col justify-center items-center shrink-0 w-[24px]">
                <div className="bg-white p-0.5 w-full flex justify-center">
-                 <QRCodeSVG value={barcodeValue} size={24} level="M" />
+                 <QRCodeSVG value={skuValue} size={24} level="M" />
                </div>
-               <span className="text-[4px] font-bold text-gray-500 uppercase tracking-widest mt-1 text-center leading-tight">SKU: <br/> {product.sku || product.id.slice(0,6)}</span>
+               <span className="text-[4px] font-mono font-bold text-gray-700 uppercase tracking-tight mt-1 text-center leading-tight">SKU: <br/> {skuValue}</span>
             </div>
           </div>
 
-          {/* Barcode Garis 1D & Keterangan Bawah */}
+          {/* Barcode Garis 1D & Keterangan Bawah (Menggunakan Barcode Pabrik) */}
           <div className="flex items-end justify-center mt-0.5 border-t border-black pt-0.5 w-full">
             <div className="flex flex-col w-full items-center">
               {/* Barcode Garis (1D) */}
-              <div className="bg-white overflow-hidden flex justify-center w-full max-h-[12px]">
+              <div className="bg-white overflow-hidden flex justify-center w-full max-h-[14px]">
                 <Barcode 
-                  value={barcodeValue} 
+                  value={factoryBarcode} 
                   width={1} 
                   height={10} 
                   fontSize={8} 
