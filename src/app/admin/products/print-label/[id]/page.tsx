@@ -42,6 +42,12 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
   if (!product) return <div className="p-10 text-center font-black text-red-500 uppercase">Data Kosong</div>;
 
   const formatRp = (n: number) => `Rp${(n || 0).toLocaleString('id-ID')}`;
+
+  // Format Nama Produk ke Title Case (Huruf besar di awal kata agar rapi, hemat ruang & profesional)
+  const formatTitleCase = (str: string = '') => {
+    if (!str) return '';
+    return str.toLowerCase().replace(/(^|[\s\-\(\)\/\.,])([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+  };
   
   // SKU internal toko (untuk QR Code kasir HP) & Barcode Pabrik (untuk Barcode 1D scanner kasir)
   const skuValue = String(product.sku || product.SKU || product.raw_data?.sku || product.id.slice(0, 8)).trim();
@@ -95,23 +101,24 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             justifyContent: 'space-between',
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
+            color: '#000000',
             fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'
           }}
         >
           {/* Header Toko / Kategori */}
           <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-            <span className="text-[6.5px] font-bold uppercase tracking-tight">ATAYA TOKO</span>
-            <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">{product.category || product.Kategori || 'UMUM'}</span>
+            <span className="text-[6.5px] font-bold uppercase tracking-tight text-black">ATAYA TOKO</span>
+            <span className="text-[5px] font-bold uppercase truncate max-w-[28mm] text-black">{product.category || product.Kategori || 'UMUM'}</span>
           </div>
 
           <div className="flex flex-row gap-1 mt-0.5 flex-1 min-h-0">
             {/* Kiri: Detail Produk & Harga */}
             <div className="flex flex-col justify-between flex-1 min-w-0">
-              {/* Nama Produk & Varian (Satu Baris Kompak) */}
+              {/* Nama Produk (Title Case: Rapi, Modern & Hemat Ruang) & Varian */}
               <div className="min-w-0">
                 <div className="flex items-center gap-1 min-w-0">
-                  <h2 className="text-[7.5px] font-bold leading-tight uppercase truncate">
-                    {product.name || product.Nama}
+                  <h2 className="text-[7.5px] font-bold leading-tight truncate text-black" title={product.name || product.Nama}>
+                    {formatTitleCase(product.name || product.Nama)}
                   </h2>
                   {(product.isVariant || product.parent_id || product.raw_data?.Parent_ID) && (
                     <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-bold uppercase shrink-0 leading-none">
@@ -121,27 +128,27 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
 
-              {/* Harga Utama (Tebal & Bersih - Font Extrabold anti-gumpal) */}
+              {/* Harga Utama (Tebal & Bersih - Tracking Normal Anti-Bayangan) */}
               <div className="mt-0.5 flex items-baseline gap-1 leading-none">
-                <span className="text-[13.5px] font-extrabold tracking-tight leading-none text-black">
+                <span className="text-[13.5px] font-extrabold tracking-normal leading-none text-black">
                   {formatRp(product.price || product.Ecer)}
                 </span>
-                <span className="text-[5.5px] font-bold text-gray-600 uppercase">
+                <span className="text-[5.5px] font-bold text-black uppercase">
                   /{baseUnitStr}
                 </span>
               </div>
 
               {/* List Harga Satuan Lainnya (DUS, RENCENG, PACK) dalam 1 Label */}
               {rawUnits.filter((u: any) => u.code?.toUpperCase() !== baseUnitStr).length > 0 && (
-                <div className="mt-0.5 pt-0.5 border-t border-dashed border-gray-300 flex flex-col justify-start gap-0.5 shrink-0">
+                <div className="mt-0.5 pt-0.5 border-t border-dashed border-black flex flex-col justify-start gap-0.5 shrink-0">
                   {rawUnits
                     .filter((u: any) => u.code?.toUpperCase() !== baseUnitStr)
                     .map((u: any, idx: number) => (
                       <div key={idx} className="flex justify-between items-center leading-none text-[5px]">
-                        <span className="font-bold text-gray-700 uppercase">
-                          1 {u.code} <span className="font-normal text-gray-500">({u.contains} {baseUnitStr})</span>
+                        <span className="font-bold text-black uppercase">
+                          1 {u.code} <span className="font-normal text-black">({u.contains} {baseUnitStr})</span>
                         </span>
-                        <span className="text-[6px] font-bold tracking-tight text-black">
+                        <span className="text-[6px] font-bold tracking-normal text-black">
                           {formatRp(u.price)}
                         </span>
                       </div>
@@ -149,10 +156,10 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
 
-              {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong) */}
+              {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong & Tanpa Dither Gray) */}
               {(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir) > 0 && (
-                <div className="flex items-center justify-between text-[5.5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
-                  <span className="uppercase text-gray-700 font-bold">Grosir:</span>
+                <div className="flex items-center justify-between text-[5.5px] font-bold border border-black px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0 text-black">
+                  <span className="uppercase text-black font-bold">Grosir:</span>
                   <span className="font-bold text-black">
                     &ge;{product.minWholesale || product.Min_Grosir || product.raw_data?.Min_Grosir || 2} @{formatRp(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir)}
                   </span>
@@ -161,11 +168,11 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}
-            <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-gray-200">
+            <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-black">
                <div className="bg-white p-0.5 w-full flex justify-center">
                  <QRCodeSVG value={skuValue} size={44} level="L" marginSize={0} />
                </div>
-               <span className="text-[4px] font-mono font-bold text-gray-800 uppercase tracking-tight mt-0.5 text-center leading-none">SKU: {skuValue}</span>
+               <span className="text-[4px] font-mono font-bold text-black uppercase tracking-normal mt-0.5 text-center leading-none">SKU: {skuValue}</span>
             </div>
           </div>
 
@@ -174,7 +181,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             <div className="w-full flex justify-center items-center">
               <Barcode 
                 value={factoryBarcode} 
-                width={1.15} 
+                width={1.2} 
                 height={18} 
                 fontSize={7} 
                 font='system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif'
@@ -246,6 +253,12 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               page-break-after: avoid !important;
               page-break-before: avoid !important;
               overflow: hidden !important;
+            }
+            .print-exact-size, .print-exact-size * {
+              color: #000000 !important;
+              text-shadow: none !important;
+              -webkit-font-smoothing: antialiased !important;
+              text-rendering: geometricPrecision !important;
             }
             svg {
               shape-rendering: crispEdges !important;
