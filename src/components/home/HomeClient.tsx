@@ -26,11 +26,12 @@ const CategoryProductSection = dynamic(() => import('@/components/home/CategoryP
       <div className="h-6 w-36 bg-gray-200 rounded-lg mb-3" />
       <div className="flex gap-4 overflow-hidden">
         <SkeletonCard />
-        <SkeletonCard />
-      </div>
+        <SkeletonCard />      </div>
     </div>
   ),
 });
+
+const HomeQuickMenu = dynamic(() => import('@/components/home/HomeQuickMenu'), { ssr: false });
 
 export interface HomeClientProps {
   initialProducts: Product[];
@@ -108,6 +109,23 @@ export default function HomeClient({
 
   // Jumlah kategori yang ditampilkan bertahap (default 4 agar proporsional dan tidak kepanjangan)
   const [visibleCatCount, setVisibleCatCount] = useState<number>(4);
+
+  // Status login berdasarkan currentUserName (null = belum login)
+  const isLoggedIn = currentUserName !== null;
+
+  // Daftar brand unik dari seluruh produk (untuk HomeQuickMenu modal brand)
+  const brands = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const p of products) {
+      const brand = ((p as any).brand || (p as any).raw_data?.brand || (p as any).raw_data?.Brand || '').trim();
+      if (brand && !seen.has(brand.toLowerCase())) {
+        seen.add(brand.toLowerCase());
+        result.push(brand);
+      }
+    }
+    return result.sort((a, b) => a.localeCompare(b));
+  }, [products]);
 
   const getDiscountedPrice = useCallback(
     (product: Product) => {
@@ -346,6 +364,11 @@ export default function HomeClient({
       {/* Hero Banners */}
       {!searchQuery && <HomeBanners banners={banners} activePromos={activePromos} />}
 
+      {/* Quick Navigation Menu */}
+      {!searchQuery && (
+        <HomeQuickMenu activeCategories={activeCategories} brands={brands} />
+      )}
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-4">
         {searchQuery ? (
@@ -366,6 +389,7 @@ export default function HomeClient({
                     onWishlistToggle={onWishlistToggle}
                     onAddToCart={addToCart}
                     priority={idx < 4}
+                    isLoggedIn={isLoggedIn}
                   />
                 ))}
               </div>
@@ -392,6 +416,7 @@ export default function HomeClient({
                       onWishlistToggle={onWishlistToggle}
                       onAddToCart={addToCart}
                       priority={idx < 4}
+                      isLoggedIn={isLoggedIn}
                     />
                   ))}
                 </div>
@@ -414,6 +439,7 @@ export default function HomeClient({
                       isWish={wishlist.includes(p.id)}
                       onWishlistToggle={onWishlistToggle}
                       onAddToCart={addToCart}
+                      isLoggedIn={isLoggedIn}
                     />
                   ))}
                 </div>
@@ -436,6 +462,7 @@ export default function HomeClient({
                     onWishlistToggle={onWishlistToggle}
                     onAddToCart={addToCart}
                     priority={promoProducts.length === 0 && idx < 4}
+                    isLoggedIn={isLoggedIn}
                   />
                 ))}
               </div>
@@ -454,6 +481,7 @@ export default function HomeClient({
                   wishlist={wishlist}
                   onWishlistToggle={onWishlistToggle}
                   onAddToCart={addToCart}
+                  isLoggedIn={isLoggedIn}
                 />
               );
             })}

@@ -14,6 +14,7 @@ interface CategoryProductSectionProps {
   wishlist: string[];
   onWishlistToggle: (id: string) => void;
   onAddToCart: (p: Product) => void;
+  isLoggedIn?: boolean;
 }
 
 export default function CategoryProductSection({
@@ -23,6 +24,7 @@ export default function CategoryProductSection({
   wishlist,
   onWishlistToggle,
   onAddToCart,
+  isLoggedIn = false,
 }: CategoryProductSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +97,7 @@ export default function CategoryProductSection({
               isWish={wishlist.includes(p.id)}
               onWishlistToggle={onWishlistToggle}
               onAddToCart={onAddToCart}
+              isLoggedIn={isLoggedIn}
             />
           ))}
         </div>

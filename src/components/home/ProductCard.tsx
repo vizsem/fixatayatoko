@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Heart, Sparkles, Clock } from 'lucide-react';
+import { Heart, Sparkles, Clock, Lock } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { formatProductName } from '@/lib/format';
 
@@ -12,6 +12,7 @@ interface ProductCardProps {
   onWishlistToggle: (id: string) => void;
   onAddToCart: (product: Product) => void;
   priority?: boolean;
+  isLoggedIn?: boolean;
 }
 
 const getOptimizedThumb = (url?: string) => {
@@ -28,6 +29,7 @@ export const ProductCard = ({
   onWishlistToggle, 
   onAddToCart,
   priority = false,
+  isLoggedIn = false,
 }: ProductCardProps) => {
   const isPreOrder = Boolean(product.isPreOrder || (product as any).raw_data?.isPreOrder);
   const poDays = Number(product.poLeadTimeDays || (product as any).raw_data?.poLeadTimeDays || 3);
@@ -137,24 +139,34 @@ export const ProductCard = ({
           </div>
           
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {unitList.filter(u => u.code !== baseUnit).slice(0, 4).map((u) => (
-              <span
-                key={u.code}
-                className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-700"
-                title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
-              >
-                <span className="text-gray-900">{u.code}</span>
-                {u.contains > 1 && <span className="text-gray-500">×{u.contains}</span>}
-                <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
-              </span>
-            ))}
-            {unitList.filter(u => u.code !== baseUnit).length > 4 && (
-              <span
-                className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-500"
-                title={unitList.filter(u => u.code !== baseUnit).slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
-              >
-                +{unitList.filter(u => u.code !== baseUnit).length - 4}
-              </span>
+            {isLoggedIn ? (
+              <>
+                {unitList.filter(u => u.code !== baseUnit).slice(0, 4).map((u) => (
+                  <span
+                    key={u.code}
+                    className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-700"
+                    title={`${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''} • Rp${unitPrice(u).toLocaleString('id-ID')}`}
+                  >
+                    <span className="text-gray-900">{u.code}</span>
+                    {u.contains > 1 && <span className="text-gray-500">×{u.contains}</span>}
+                    <span className="text-gray-900 not-italic">Rp{unitPrice(u).toLocaleString('id-ID')}</span>
+                  </span>
+                ))}
+                {unitList.filter(u => u.code !== baseUnit).length > 4 && (
+                  <span
+                    className="inline-flex items-center bg-white border border-gray-200 px-2 py-1 rounded-full text-xs font-bold uppercase text-gray-500"
+                    title={unitList.filter(u => u.code !== baseUnit).slice(4).map((u) => `${u.code}${u.contains > 1 ? ` (isi ${u.contains})` : ''}: Rp${unitPrice(u).toLocaleString('id-ID')}`).join(' | ')}
+                  >
+                    +{unitList.filter(u => u.code !== baseUnit).length - 4}
+                  </span>
+                )}
+              </>
+            ) : (
+              unitList.filter(u => u.code !== baseUnit).length > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full">
+                  <Lock size={10} /> {unitList.filter(u => u.code !== baseUnit).length} satuan lain
+                </span>
+              )
             )}
           </div>
 
@@ -163,6 +175,19 @@ export const ProductCard = ({
             const wQty = Number(product.minWholesale || 0);
             
             if (wQty > 1) {
+              if (!isLoggedIn) {
+                return (
+                  <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
+                    <Link
+                      href="/profil/login"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-emerald-600 transition-colors"
+                    >
+                      <Lock size={10} /> Login untuk harga grosir
+                    </Link>
+                  </div>
+                );
+              }
               return (
                 <div className="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center justify-between">
                   <div className="flex flex-col">
