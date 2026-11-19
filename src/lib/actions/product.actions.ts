@@ -3709,7 +3709,12 @@ export async function getProductsForBulkPrintAction(
       const minW = Number(raw.Min_Grosir ?? raw.minWholesaleQty ?? 0);
       const category = String(p.category || raw.Kategori || raw.category || 'UMUM');
       const sku = String(p.sku || raw.ID || raw.sku || p.id.slice(0, 8));
-      const barcode = String(p.barcode || raw.Barcode || raw.barcode || sku);
+      
+      // Ambil barcode khusus satuan PCS jika ada di units[]
+      const rawUnits = Array.isArray(raw.units) ? raw.units : (Array.isArray(p.units) ? p.units : []);
+      const pcsUnitInRaw = rawUnits.find((u: any) => u.code?.toUpperCase() === 'PCS' && u.barcode && String(u.barcode).trim())
+        || rawUnits.find((u: any) => (u.code?.toUpperCase() === baseUnit || Number(u.contains) === 1) && u.barcode && String(u.barcode).trim());
+      const barcode = String(pcsUnitInRaw?.barcode || p.barcode || raw.Barcode || raw.barcode || sku);
 
       const parentIdOfThis = (p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim();
       const isThisVariant = Boolean(parentIdOfThis);
@@ -3744,7 +3749,12 @@ export async function getProductsForBulkPrintAction(
           const cWPrice = Number(cRaw.Grosir ?? cRaw.wholesalePrice ?? wPrice);
           const cMinW = Number(cRaw.Min_Grosir ?? cRaw.minWholesaleQty ?? minW);
           const cSku = String(child.sku || cRaw.ID || cRaw.sku || child.id.slice(0, 8));
-          const cBarcode = String(child.barcode || cRaw.Barcode || cRaw.barcode || cSku);
+          
+          // Ambil barcode khusus satuan PCS untuk varian anak
+          const cRawUnits = Array.isArray(cRaw.units) ? cRaw.units : (Array.isArray(child.units) ? child.units : []);
+          const pcsUnitInChild = cRawUnits.find((u: any) => u.code?.toUpperCase() === 'PCS' && u.barcode && String(u.barcode).trim())
+            || cRawUnits.find((u: any) => (u.code?.toUpperCase() === cUnit || Number(u.contains) === 1) && u.barcode && String(u.barcode).trim());
+          const cBarcode = String(pcsUnitInChild?.barcode || child.barcode || cRaw.Barcode || cRaw.barcode || cSku);
 
           const parentName = String(p.name || raw.Nama || '');
           const rawChildName = String(child.name || cRaw.Nama || 'Varian');

@@ -467,7 +467,14 @@ function BulkPrintContent() {
       <div className="print-only-container flex flex-wrap justify-center gap-4 max-w-4xl mx-auto px-4">
         {printableList.map((item, index) => {
           const skuValue = String(item.sku || item.id.slice(0, 8)).trim();
-          const factoryBarcode = String(item.barcode || skuValue).trim();
+          
+          // Cari barcode khusus satuan PCS di units[] terlebih dahulu
+          const pcsUnit = item.units?.find((u: any) => u.code?.toUpperCase() === 'PCS' && u.barcode && String(u.barcode).trim())
+            || item.units?.find((u: any) => (u.code?.toUpperCase() === item.unit.toUpperCase() || Number(u.contains) === 1) && u.barcode && String(u.barcode).trim());
+          
+          const pcsBarcode = (pcsUnit?.barcode && String(pcsUnit.barcode).trim()) 
+            || (item.barcode && String(item.barcode).trim()) 
+            || skuValue;
           
           return (
             <div 
@@ -476,7 +483,7 @@ function BulkPrintContent() {
               style={{ 
                 width: currentSize.width, 
                 height: currentSize.height,
-                padding: '2mm',
+                padding: '1.2mm 2mm',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -503,54 +510,54 @@ function BulkPrintContent() {
               <div className="flex flex-row gap-1 mt-0.5 flex-1 min-h-0">
                 {/* Kiri: Nama Produk, Varian, & Harga */}
                 <div className="flex flex-col justify-between flex-1 min-w-0">
-                  {/* Nama Produk & Varian */}
+                  {/* Nama Produk & Varian (Satu Baris Kompak agar tidak makan tempat) */}
                   <div className="min-w-0">
                     {item.isVariant ? (
-                      <>
+                      <div className="flex items-center gap-1 min-w-0">
                         <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
                           {item.parentName || item.name}
                         </h2>
-                        <div className="inline-block mt-0.5 px-1 py-0.2 bg-black text-white rounded-[2px] text-[6px] font-black uppercase leading-tight truncate max-w-full">
-                          VAR: {item.variantName || item.name}
-                        </div>
-                      </>
+                        <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
+                          {item.variantName || 'VAR'}
+                        </span>
+                      </div>
                     ) : item.isUnitLabel ? (
-                      <>
+                      <div className="flex items-center gap-1 min-w-0">
                         <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
                           {item.parentName || item.name}
                         </h2>
-                        <div className="inline-block mt-0.5 px-1 py-0.2 bg-slate-800 text-white rounded-[2px] text-[6px] font-black uppercase leading-tight truncate max-w-full">
+                        <span className="px-1 py-0.2 bg-slate-800 text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
                           {item.variantName || `SATUAN ${item.unit}`}
-                        </div>
-                      </>
+                        </span>
+                      </div>
                     ) : (
-                      <h2 className="text-[8px] font-black leading-tight uppercase line-clamp-2">
+                      <h2 className="text-[7.5px] font-black leading-tight uppercase line-clamp-2">
                         {item.name}
                       </h2>
                     )}
                   </div>
 
                   {/* Harga Utama (Tebal & Kontras) */}
-                  <div className="mt-0.5 flex flex-col leading-none">
-                    <span className="text-[5px] font-bold text-gray-500 uppercase">
-                      Harga / {item.unit}
-                    </span>
-                    <span className="text-[13px] font-black tracking-tighter leading-none mt-0.5">
+                  <div className="mt-0.5 flex items-baseline gap-1 leading-none">
+                    <span className="text-[12px] font-black tracking-tighter leading-none text-slate-900">
                       {formatRp(item.price)}
+                    </span>
+                    <span className="text-[5px] font-bold text-gray-500 uppercase">
+                      /{item.unit}
                     </span>
                   </div>
 
                   {/* List Harga Satuan Lainnya (DUS, RENCENG, PACK) dalam 1 Label */}
                   {showSubUnits && item.units && Array.isArray(item.units) && (
-                    <div className="flex-1 mt-0.5 pt-0.5 border-t border-dashed border-gray-300 flex flex-col justify-start">
+                    <div className="mt-0.5 pt-0.5 border-t border-dashed border-gray-300 flex flex-col justify-start gap-0.5 shrink-0">
                       {item.units
                         .filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase())
                         .map((u: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
-                            <span className="text-[5px] font-bold text-gray-600 uppercase">
-                              1 {u.code} <span className="text-[4px] font-normal text-gray-400">({u.contains} {item.unit})</span>
+                          <div key={idx} className="flex justify-between items-center leading-none text-[5px]">
+                            <span className="font-bold text-gray-600 uppercase">
+                              1 {u.code} <span className="font-normal text-gray-400">({u.contains} {item.unit})</span>
                             </span>
-                            <span className="text-[6px] font-black tracking-tighter text-slate-900">
+                            <span className="text-[5.5px] font-black tracking-tighter text-slate-900">
                               {formatRp(u.price || (item.price * (u.contains || 1)))}
                             </span>
                           </div>
@@ -558,12 +565,12 @@ function BulkPrintContent() {
                     </div>
                   )}
 
-                  {/* Info Grosir (Jika Ada & Diaktifkan) */}
+                  {/* Info Grosir (Jika Ada & Diaktifkan - Selalu Terlihat Tanpa Terpotong) */}
                   {showWholesale && (item.wholesalePrice || 0) > 0 && (
-                    <div className="flex items-center justify-between text-[5px] font-bold bg-gray-100 px-1 py-0.2 rounded-xs mt-0.5">
-                      <span className="uppercase text-gray-600">Grosir:</span>
+                    <div className="flex items-center justify-between text-[5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
+                      <span className="uppercase text-gray-600 font-bold">Grosir:</span>
                       <span className="font-black text-black">
-                        Min {item.minWholesale || 2} @{formatRp(item.wholesalePrice || 0)}
+                        &ge;{item.minWholesale || 2} @{formatRp(item.wholesalePrice || 0)}
                       </span>
                     </div>
                   )}
@@ -582,16 +589,16 @@ function BulkPrintContent() {
                 )}
               </div>
 
-              {/* Barcode Garis 1D di Bawah (Menggunakan Barcode Pabrik - Ukuran Optimal Laser Scanner) */}
+              {/* Barcode Garis 1D di Bawah (Selalu Menggunakan Kode Barcode Satuan PCS) */}
               {showBarcode1D && (
                 <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full bg-white">
                   <div className="w-full flex justify-center items-center">
                     <Barcode 
-                      value={factoryBarcode} 
-                      width={1.2} 
-                      height={20} 
-                      fontSize={7.5} 
-                      margin={4} 
+                      value={pcsBarcode} 
+                      width={1.15} 
+                      height={18} 
+                      fontSize={7} 
+                      margin={2} 
                       displayValue={true} 
                       background="#ffffff"
                       lineColor="#000000"

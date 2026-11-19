@@ -45,7 +45,15 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
   
   // SKU internal toko (untuk QR Code kasir HP) & Barcode Pabrik (untuk Barcode 1D scanner kasir)
   const skuValue = String(product.sku || product.SKU || product.raw_data?.sku || product.id.slice(0, 8)).trim();
-  const factoryBarcode = String(product.barcode || product.Barcode || product.raw_data?.barcode || product.raw_data?.Barcode || skuValue).trim();
+  
+  // Ambil barcode khusus satuan PCS dari units[] terlebih dahulu
+  const rawUnits = Array.isArray(product.units) ? product.units : (Array.isArray(product.raw_data?.units) ? product.raw_data.units : []);
+  const baseUnitStr = String(product.unit || product.Satuan || 'PCS').toUpperCase();
+  const pcsUnit = rawUnits.find((u: any) => u.code?.toUpperCase() === 'PCS' && u.barcode && String(u.barcode).trim())
+    || rawUnits.find((u: any) => (u.code?.toUpperCase() === baseUnitStr || Number(u.contains) === 1) && u.barcode && String(u.barcode).trim());
+  
+  const factoryBarcode = (pcsUnit?.barcode && String(pcsUnit.barcode).trim())
+    || String(product.barcode || product.Barcode || product.raw_data?.barcode || product.raw_data?.Barcode || skuValue).trim();
 
   return (
     <div className="bg-gray-100 min-h-screen text-black font-sans pb-20">
@@ -81,7 +89,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
           style={{ 
             width: '50mm', 
             height: '30mm',
-            padding: '2mm',
+            padding: '1.2mm 2mm',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -89,48 +97,65 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
           }}
         >
           {/* Header Toko / Kategori */}
-          <div className="flex justify-between items-center border-b border-black pb-0.5">
-            <span className="text-[6px] font-black uppercase">ATAYA TOKO</span>
-            <span className="text-[5px] font-bold uppercase">{product.category || product.Kategori || 'UMUM'}</span>
+          <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
+            <span className="text-[6px] font-black uppercase tracking-tight">ATAYA TOKO</span>
+            <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">{product.category || product.Kategori || 'UMUM'}</span>
           </div>
 
-          <div className="flex flex-row gap-2 mt-0.5 flex-1">
+          <div className="flex flex-row gap-1 mt-0.5 flex-1 min-h-0">
             {/* Kiri: Detail Produk & Harga */}
-            <div className="flex flex-col flex-1">
-              {/* Nama Produk */}
-              <div>
-                <h2 className="text-xs font-black leading-tight uppercase line-clamp-2">
-                  {product.name || product.Nama}
-                </h2>
+            <div className="flex flex-col justify-between flex-1 min-w-0">
+              {/* Nama Produk & Varian (Satu Baris Kompak) */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1 min-w-0">
+                  <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
+                    {product.name || product.Nama}
+                  </h2>
+                  {(product.isVariant || product.parent_id || product.raw_data?.Parent_ID) && (
+                    <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
+                      {product.variantName || product.raw_data?.variantName || 'VAR'}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Harga Utama (Sangat Besar) */}
-              <div className="mt-1 flex flex-col">
-                <span className="text-[5px] font-bold text-gray-500 uppercase">Harga {product.unit || product.Satuan || 'PCS'}</span>
-                <span className="text-[14px] font-black tracking-tighter leading-none">
+              {/* Harga Utama (Tebal & Kontras) */}
+              <div className="mt-0.5 flex items-baseline gap-1 leading-none">
+                <span className="text-[12px] font-black tracking-tighter leading-none text-slate-900">
                   {formatRp(product.price || product.Ecer)}
+                </span>
+                <span className="text-[5px] font-bold text-gray-500 uppercase">
+                  /{baseUnitStr}
                 </span>
               </div>
 
-              {/* List Harga Turunan & Grosir - Filter satuan utama agar tidak dobel */}
-              <div className="flex-1 mt-1 flex flex-col justify-start border-t border-dashed border-gray-300 pt-0.5">
-                {product.units && Array.isArray(product.units) && product.units
-                  .filter((u: any) => u.code?.toUpperCase() !== (product.unit || product.Satuan || 'PCS').toUpperCase())
-                  .map((u: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
-                    <span className="text-[5px] font-bold text-gray-600 uppercase">1 {u.code} <span className="text-[4px] font-normal">({u.contains} {product.unit || 'PCS'})</span></span>
-                    <span className="text-[6px] font-black tracking-tighter">{formatRp(u.price)}</span>
-                  </div>
-                ))}
+              {/* List Harga Satuan Lainnya (DUS, RENCENG, PACK) dalam 1 Label */}
+              {rawUnits.filter((u: any) => u.code?.toUpperCase() !== baseUnitStr).length > 0 && (
+                <div className="mt-0.5 pt-0.5 border-t border-dashed border-gray-300 flex flex-col justify-start gap-0.5 shrink-0">
+                  {rawUnits
+                    .filter((u: any) => u.code?.toUpperCase() !== baseUnitStr)
+                    .map((u: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center leading-none text-[5px]">
+                        <span className="font-bold text-gray-600 uppercase">
+                          1 {u.code} <span className="font-normal text-gray-400">({u.contains} {baseUnitStr})</span>
+                        </span>
+                        <span className="text-[5.5px] font-black tracking-tighter text-slate-900">
+                          {formatRp(u.price)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
 
-                {/* Harga Grosir (Jika ada) */}
-                {(product.wholesalePrice || product.Grosir) > 0 && (
-                  <div className="flex justify-between items-center leading-none bg-gray-100 px-0.5 rounded-sm mt-0.5">
-                    <span className="text-[4px] font-black text-gray-800 uppercase">Grosir</span>
-                    <span className="text-[6px] font-black tracking-tighter">{formatRp(product.wholesalePrice || product.Grosir)}</span>
-                  </div>
-                )}
-              </div>
+              {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong) */}
+              {(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir) > 0 && (
+                <div className="flex items-center justify-between text-[5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
+                  <span className="uppercase text-gray-600 font-bold">Grosir:</span>
+                  <span className="font-black text-black">
+                    &ge;{product.minWholesale || product.Min_Grosir || product.raw_data?.Min_Grosir || 2} @{formatRp(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}
@@ -142,15 +167,15 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* Barcode Garis 1D & Keterangan Bawah (Menggunakan Barcode Pabrik - Ukuran Optimal Laser Scanner) */}
+          {/* Barcode Garis 1D & Keterangan Bawah (Selalu Menggunakan Kode Barcode Satuan PCS) */}
           <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full bg-white">
             <div className="w-full flex justify-center items-center">
               <Barcode 
                 value={factoryBarcode} 
-                width={1.2} 
-                height={20} 
-                fontSize={7.5} 
-                margin={4} 
+                width={1.15} 
+                height={18} 
+                fontSize={7} 
+                margin={2} 
                 displayValue={true} 
                 background="#ffffff"
                 lineColor="#000000"
