@@ -54,8 +54,8 @@ function BulkPrintContent() {
   const [showQr, setShowQr] = useState<boolean>(true);
   const [showBarcode1D, setShowBarcode1D] = useState<boolean>(true);
   const [showWholesale, setShowWholesale] = useState<boolean>(true);
-  // Set satuan yang diaktifkan untuk dicetak (kosong = semua ditampilkan)
-  const [activeUnitCodes, setActiveUnitCodes] = useState<Set<string>>(new Set());
+  // Tampilkan semua harga satuan (DUS, RENCENG, PACK) langsung di dalam 1 label stiker yang sama
+  const [showSubUnits, setShowSubUnits] = useState<boolean>(true);
 
   // Fetch Data Produk & Varian
   const loadData = async (incVar = includeVariants, incUnit = includeUnits) => {
@@ -102,6 +102,7 @@ function BulkPrintContent() {
               unit: String(data.unit || data.raw_data?.Satuan || 'PCS').toUpperCase(),
               sku,
               barcode: data.barcode || data.raw_data?.Barcode || sku,
+              units: Array.isArray(data.units) ? data.units : (Array.isArray(data.raw_data?.units) ? data.raw_data.units : undefined),
               copies: defaultCopies,
               isSelected: true,
             });
@@ -150,45 +151,15 @@ function BulkPrintContent() {
   // Flatten items berdasarkan copies & status seleksi
   const printableList = useMemo(() => {
     const result: PrintableItem[] = [];
-    items.filter(it => it.isSelected && (activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase()))).forEach(item => {
+    items.filter(it => it.isSelected).forEach(item => {
       for (let i = 0; i < item.copies; i++) {
         result.push(item);
       }
     });
     return result;
-  }, [items, activeUnitCodes]);
-
-  // Semua unit codes unik yang ada di items (PCS, RENCENG, DUS, dll)
-  const allUnitCodes = useMemo(() => {
-    const codes = new Set<string>();
-    items.forEach(item => codes.add(item.unit.toUpperCase()));
-    return Array.from(codes).sort();
   }, [items]);
 
-  // Inisialisasi activeUnitCodes setiap kali items pertama kali di-load
-  useEffect(() => {
-    if (items.length > 0) {
-      const codes = new Set<string>();
-      items.forEach(item => codes.add(item.unit.toUpperCase()));
-      setActiveUnitCodes(codes);
-    }
-  }, [items]);
-
-  // Toggle satu unit code
-  const toggleUnitCode = (code: string) => {
-    setActiveUnitCodes(prev => {
-      const next = new Set(prev);
-      if (next.has(code)) {
-        if (next.size === 1) return prev; // minimal 1 harus aktif
-        next.delete(code);
-      } else {
-        next.add(code);
-      }
-      return next;
-    });
-  };
-
-  const totalSelectedUnique = items.filter(it => it.isSelected && (activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase()))).length;
+  const totalSelectedUnique = items.filter(it => it.isSelected).length;
   const totalStickersToPrint = printableList.length;
 
   const formatRp = (n: number) => `Rp${(n || 0).toLocaleString('id-ID')}`;
@@ -348,7 +319,7 @@ function BulkPrintContent() {
             </div>
           </div>
 
-          {/* Toggle Elemen Barcode */}
+          {/* Toggle Elemen Barcode & Satuan */}
           <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-600">
             <label className="flex items-center gap-1.5 cursor-pointer" title="Barcode garis vertikal untuk scanner kasir tembak (menggunakan Barcode Pabrik/EAN)">
               <input
@@ -377,28 +348,15 @@ function BulkPrintContent() {
               />
               Info Grosir
             </label>
-
-            {/* Pemilihan Satuan yang Dicetak (muncul jika ada > 1 unit code) */}
-            {allUnitCodes.length > 1 && (
-              <div className="flex items-center gap-2 ml-2 pl-3 border-l border-slate-200">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Satuan:</span>
-                {allUnitCodes.map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={() => toggleUnitCode(code)}
-                    className={`px-2 py-0.5 rounded-lg text-[11px] font-black border transition-all ${
-                      activeUnitCodes.has(code)
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-slate-100 text-slate-400 border-slate-200 hover:border-slate-300'
-                    }`}
-                    title={activeUnitCodes.has(code) ? `Sembunyikan label ${code}` : `Tampilkan label ${code}`}
-                  >
-                    {code}
-                  </button>
-                ))}
-              </div>
-            )}
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Gabungkan daftar harga satuan lain (DUS, RENCENG, PACK) langsung di dalam 1 label stiker rak yang sama">
+              <input
+                type="checkbox"
+                checked={showSubUnits}
+                onChange={(e) => setShowSubUnits(e.target.checked)}
+                className="rounded text-blue-600"
+              />
+              <Layers size={14} className="text-emerald-600" /> Satuan Lain Jadi 1 Label (DUS/Renceng)
+            </label>
           </div>
         </div>
 
@@ -419,12 +377,12 @@ function BulkPrintContent() {
                 onClick={() => selectAll(totalSelectedUnique !== items.length)}
                 className="text-slate-600 hover:text-slate-900 flex items-center gap-1.5 text-xs font-bold"
               >
-                {totalSelectedUnique === items.filter(it => activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase())).length ? (
+                {totalSelectedUnique === items.length ? (
                   <CheckSquare size={16} className="text-blue-600" />
                 ) : (
                   <Square size={16} />
                 )}
-                <span>Pilih Semua ({items.filter(it => activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase())).length})</span>
+                <span>Pilih Semua ({items.length})</span>
               </button>
             </div>
             <span className="text-[11px] text-slate-400 font-bold">
@@ -433,7 +391,7 @@ function BulkPrintContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1">
-            {items.filter(item => activeUnitCodes.size === 0 || activeUnitCodes.has(item.unit.toUpperCase())).map((item) => (
+            {items.map((item) => (
               <div
                 key={item.id}
                 className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
@@ -455,7 +413,7 @@ function BulkPrintContent() {
                     <p className="text-xs font-black truncate leading-tight">
                       {item.displayName}
                     </p>
-                    <div className="flex items-center gap-1.5 text-[10px] mt-0.5">
+                    <div className="flex items-center gap-1.5 text-[10px] mt-0.5 flex-wrap">
                       {item.isVariant && (
                         <span className="px-1 py-0.2 bg-purple-100 text-purple-700 rounded-sm font-bold">Varian</span>
                       )}
@@ -464,6 +422,11 @@ function BulkPrintContent() {
                       )}
                       <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-black uppercase text-[9px]">{item.unit}</span>
                       <span className="font-bold text-blue-600">{formatRp(item.price)}</span>
+                      {item.units && item.units.filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase()).length > 0 && (
+                        <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded font-bold" title="Satuan lain yang ikut dicantumkan dalam label ini">
+                          +{item.units.filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase()).map((u: any) => u.code).join(', ')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -576,6 +539,24 @@ function BulkPrintContent() {
                       {formatRp(item.price)}
                     </span>
                   </div>
+
+                  {/* List Harga Satuan Lainnya (DUS, RENCENG, PACK) dalam 1 Label */}
+                  {showSubUnits && item.units && Array.isArray(item.units) && (
+                    <div className="flex-1 mt-0.5 pt-0.5 border-t border-dashed border-gray-300 flex flex-col justify-start">
+                      {item.units
+                        .filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase())
+                        .map((u: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center leading-none mb-0.5">
+                            <span className="text-[5px] font-bold text-gray-600 uppercase">
+                              1 {u.code} <span className="text-[4px] font-normal text-gray-400">({u.contains} {item.unit})</span>
+                            </span>
+                            <span className="text-[6px] font-black tracking-tighter text-slate-900">
+                              {formatRp(u.price || (item.price * (u.contains || 1)))}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
 
                   {/* Info Grosir (Jika Ada & Diaktifkan) */}
                   {showWholesale && (item.wholesalePrice || 0) > 0 && (

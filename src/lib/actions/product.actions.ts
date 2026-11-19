@@ -3729,7 +3729,7 @@ export async function getProductsForBulkPrintAction(
           unit: baseUnit,
           sku,
           barcode,
-          units: Array.isArray(raw.units) ? raw.units : undefined,
+          units: Array.isArray(raw.units) ? raw.units : (Array.isArray(p.units) ? p.units : undefined),
         });
       }
 
@@ -3768,7 +3768,7 @@ export async function getProductsForBulkPrintAction(
             unit: cUnit,
             sku: cSku,
             barcode: cBarcode,
-            units: Array.isArray(cRaw.units) ? cRaw.units : undefined,
+            units: Array.isArray(cRaw.units) ? cRaw.units : (Array.isArray(child.units) ? child.units : undefined),
           });
         }
       }
