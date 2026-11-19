@@ -121,6 +121,7 @@ export default function PricingHPPPage() {
   // Filter States
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'ARCHIVED' | 'ALL'>('ACTIVE');
   const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
   const [variantFilter, setVariantFilter] = useState<'ALL' | 'VARIANTS' | 'PARENTS' | 'REGULAR'>('ALL');
   const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
@@ -203,12 +204,19 @@ export default function PricingHPPPage() {
         console.warn('Gagal membaca pengaturan pajak:', err);
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select('*')
-        .or('is_active.eq.true,is_active.is.null')
         .order('name', { ascending: true })
         .limit(1000);
+
+      if (statusFilter === 'ACTIVE') {
+        query = query.or('is_active.eq.true,is_active.is.null');
+      } else if (statusFilter === 'ARCHIVED') {
+        query = query.eq('is_active', false);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -291,6 +299,16 @@ export default function PricingHPPPage() {
 
         const isHppLocked = Boolean(raw.isHppLocked);
 
+        const isArchivedLegacy = 
+          raw.isActive === false || 
+          raw.isActive === 'false' || 
+          raw.status === 'ARCHIVED' || 
+          raw.status === 'DRAFT' || 
+          raw.isDraft === true ||
+          raw.isArchived === true;
+
+        const isItemActive = p.is_active === false || isArchivedLegacy ? false : true;
+
         return {
           id: p.id,
           name: p.name || raw.Nama || 'Tanpa Nama',
@@ -308,7 +326,7 @@ export default function PricingHPPPage() {
           priceSemiGrosir: Number(raw.priceSemiGrosir ?? raw.wholesaleSemiPrice ?? raw.Harga_Semi_Grosir ?? 0),
           priceGrosir: grosir,
           minGrosir: minG,
-          isActive: p.is_active !== false,
+          isActive: isItemActive,
           satuanModal: raw.Satuan_Modal || raw.Satuan || p.unit || 'PCS',
           marginRp,
           marginPct,
@@ -352,7 +370,7 @@ export default function PricingHPPPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchData();
@@ -443,7 +461,12 @@ export default function PricingHPPPage() {
         else if (variantFilter === 'PARENTS') matchVariant = p.isParent;
         else if (variantFilter === 'REGULAR') matchVariant = !p.isVariant && !p.isParent;
 
-        return matchSearch && matchCat && matchMargin && matchTax && matchVariant;
+        const matchStatus =
+          statusFilter === 'ALL' ||
+          (statusFilter === 'ACTIVE' && p.isActive) ||
+          (statusFilter === 'ARCHIVED' && !p.isActive);
+
+        return matchStatus && matchSearch && matchCat && matchMargin && matchTax && matchVariant;
       })
       .sort((a, b) => {
         if (sortBy === 'urgent_first') {
@@ -487,7 +510,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct]);
+  }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct]);
 
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
@@ -1120,6 +1143,19 @@ export default function PricingHPPPage() {
                 </select>
 
                 <select
+                  value={statusFilter}
+                  onChange={e => {
+                    setStatusFilter(e.target.value as any);
+                    setSelectedIds(new Set());
+                  }}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full md:w-auto"
+                >
+                  <option value="ACTIVE">✅ Produk Aktif ({products.filter(p => p.isActive).length})</option>
+                  <option value="ARCHIVED">📁 Arsip / Nonaktif ({products.filter(p => !p.isActive).length})</option>
+                  <option value="ALL">Semua Status ({products.length})</option>
+                </select>
+
+                <select
                   value={variantFilter}
                   onChange={e => {
                     setVariantFilter(e.target.value as any);
@@ -1382,6 +1418,14 @@ export default function PricingHPPPage() {
                                       title="HPP produk ini dikunci/diset manual (aman dari Restart AVG)"
                                     >
                                       <Lock size={10} />
+                                    </span>
+                                  )}
+                                  {!p.isActive && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-rose-100 text-rose-700 shrink-0"
+                                      title="Produk nonaktif / diarsipkan"
+                                    >
+                                      Nonaktif
                                     </span>
                                   )}
                                 </div>
@@ -1672,7 +1716,7 @@ export default function PricingHPPPage() {
                 {/* TABLE FOOTER */}
                 <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <p className="text-xs font-bold text-slate-400">
-                    Menampilkan <span className="text-slate-700">{filteredProducts.length}</span> dari <span className="text-slate-700">{products.length}</span> produk aktif
+                    Menampilkan <span className="text-slate-700">{filteredProducts.length}</span> dari <span className="text-slate-700">{products.length}</span> produk {statusFilter === 'ACTIVE' ? 'aktif' : statusFilter === 'ARCHIVED' ? 'nonaktif / arsip' : ''}
                   </p>
                   {selectedCount > 0 && (
                     <div className="flex items-center gap-2">

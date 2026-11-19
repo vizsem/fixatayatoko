@@ -359,6 +359,20 @@ export async function saveEditedProduct(id: string, payload: {
       }
     }
 
+    // Cek apakah ada perubahan harga modal atau harga jual untuk audit log
+    const { data: oldProd } = await supabaseAdmin
+      .from('products')
+      .select('price, cost_price, name')
+      .eq('id', id)
+      .maybeSingle();
+
+    const oldCost = Number(oldProd?.cost_price || 0);
+    const newCost = Number(payload.cost_price || 0);
+    const oldPrice = Number(oldProd?.price || 0);
+    const newPrice = Number(payload.price || 0);
+    const costChanged = oldCost !== newCost;
+    const priceChanged = oldPrice !== newPrice;
+
     const { error } = await supabaseAdmin.from('products').upsert({
       id,
       sku: cleanSku,
@@ -382,6 +396,30 @@ export async function saveEditedProduct(id: string, payload: {
     });
 
     if (error) throw error;
+
+    // Catat log audit ke product_cost_logs jika modal atau harga berubah
+    if (oldProd && (costChanged || priceChanged)) {
+      try {
+        await supabaseAdmin.from('product_cost_logs').insert({
+          id: `pcl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          productId: id,
+          productName: payload.name || oldProd.name,
+          oldCost,
+          newCost,
+          oldPrice,
+          newPrice,
+          adminEmail: identity.email || 'admin',
+          changeDate: now,
+          notes: costChanged && priceChanged 
+            ? 'Edit form: Modal & Harga Jual disesuaikan'
+            : (costChanged ? 'Edit form: Harga Modal disesuaikan' : 'Edit form: Harga Jual disesuaikan'),
+          source: 'MANUAL',
+          created_at: now,
+        });
+      } catch (logErr) {
+        console.warn('Gagal mencatat log perubahan harga:', logErr);
+      }
+    }
 
     if (payload.category) {
       const { data: existingCat } = await supabaseAdmin.from('categories').select('id').ilike('name', payload.category).maybeSingle();
