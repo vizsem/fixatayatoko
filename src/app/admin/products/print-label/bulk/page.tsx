@@ -54,6 +54,8 @@ function BulkPrintContent() {
   const [showQr, setShowQr] = useState<boolean>(true);
   const [showBarcode1D, setShowBarcode1D] = useState<boolean>(true);
   const [showWholesale, setShowWholesale] = useState<boolean>(true);
+  // Set satuan yang diaktifkan untuk dicetak (kosong = semua ditampilkan)
+  const [activeUnitCodes, setActiveUnitCodes] = useState<Set<string>>(new Set());
 
   // Fetch Data Produk & Varian
   const loadData = async (incVar = includeVariants, incUnit = includeUnits) => {
@@ -116,7 +118,9 @@ function BulkPrintContent() {
   };
 
   useEffect(() => {
-    loadData(defaultIncludeVariants, defaultIncludeUnits);
+    if (idsParam.trim()) {
+      loadData(defaultIncludeVariants, defaultIncludeUnits);
+    }
   }, [idsParam]);
 
   // Handler update seleksi
@@ -146,15 +150,45 @@ function BulkPrintContent() {
   // Flatten items berdasarkan copies & status seleksi
   const printableList = useMemo(() => {
     const result: PrintableItem[] = [];
-    items.filter(it => it.isSelected).forEach(item => {
+    items.filter(it => it.isSelected && (activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase()))).forEach(item => {
       for (let i = 0; i < item.copies; i++) {
         result.push(item);
       }
     });
     return result;
+  }, [items, activeUnitCodes]);
+
+  // Semua unit codes unik yang ada di items (PCS, RENCENG, DUS, dll)
+  const allUnitCodes = useMemo(() => {
+    const codes = new Set<string>();
+    items.forEach(item => codes.add(item.unit.toUpperCase()));
+    return Array.from(codes).sort();
   }, [items]);
 
-  const totalSelectedUnique = items.filter(it => it.isSelected).length;
+  // Inisialisasi activeUnitCodes setiap kali items pertama kali di-load
+  useEffect(() => {
+    if (items.length > 0) {
+      const codes = new Set<string>();
+      items.forEach(item => codes.add(item.unit.toUpperCase()));
+      setActiveUnitCodes(codes);
+    }
+  }, [items]);
+
+  // Toggle satu unit code
+  const toggleUnitCode = (code: string) => {
+    setActiveUnitCodes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        if (next.size === 1) return prev; // minimal 1 harus aktif
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  };
+
+  const totalSelectedUnique = items.filter(it => it.isSelected && (activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase()))).length;
   const totalStickersToPrint = printableList.length;
 
   const formatRp = (n: number) => `Rp${(n || 0).toLocaleString('id-ID')}`;
@@ -343,6 +377,28 @@ function BulkPrintContent() {
               />
               Info Grosir
             </label>
+
+            {/* Pemilihan Satuan yang Dicetak (muncul jika ada > 1 unit code) */}
+            {allUnitCodes.length > 1 && (
+              <div className="flex items-center gap-2 ml-2 pl-3 border-l border-slate-200">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Satuan:</span>
+                {allUnitCodes.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => toggleUnitCode(code)}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-black border transition-all ${
+                      activeUnitCodes.has(code)
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 hover:border-slate-300'
+                    }`}
+                    title={activeUnitCodes.has(code) ? `Sembunyikan label ${code}` : `Tampilkan label ${code}`}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -363,12 +419,12 @@ function BulkPrintContent() {
                 onClick={() => selectAll(totalSelectedUnique !== items.length)}
                 className="text-slate-600 hover:text-slate-900 flex items-center gap-1.5 text-xs font-bold"
               >
-                {totalSelectedUnique === items.length ? (
+                {totalSelectedUnique === items.filter(it => activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase())).length ? (
                   <CheckSquare size={16} className="text-blue-600" />
                 ) : (
                   <Square size={16} />
                 )}
-                <span>Pilih Semua ({items.length})</span>
+                <span>Pilih Semua ({items.filter(it => activeUnitCodes.size === 0 || activeUnitCodes.has(it.unit.toUpperCase())).length})</span>
               </button>
             </div>
             <span className="text-[11px] text-slate-400 font-bold">
@@ -377,7 +433,7 @@ function BulkPrintContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1">
-            {items.map((item) => (
+            {items.filter(item => activeUnitCodes.size === 0 || activeUnitCodes.has(item.unit.toUpperCase())).map((item) => (
               <div
                 key={item.id}
                 className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
@@ -406,6 +462,7 @@ function BulkPrintContent() {
                       {item.isUnitLabel && (
                         <span className="px-1 py-0.2 bg-emerald-100 text-emerald-700 rounded-sm font-bold">Satuan</span>
                       )}
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-black uppercase text-[9px]">{item.unit}</span>
                       <span className="font-bold text-blue-600">{formatRp(item.price)}</span>
                     </div>
                   </div>
