@@ -944,119 +944,121 @@ export default function PricingHPPPage() {
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <Link href="/admin/products" className="text-slate-400 hover:text-slate-800 transition-colors p-1.5 hover:bg-slate-100 rounded-xl">
+              <Link href="/admin/products" className="text-slate-400 hover:text-slate-800 transition-colors p-1.5 hover:bg-slate-100 rounded-xl shrink-0">
                 <ArrowLeft size={18} />
               </Link>
-              <span className="text-xs font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full whitespace-nowrap">
                 Katalog & Keuangan
               </span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-              <DollarSign className="text-emerald-600" />
-              Struktur HPP, Harga & Margin Produk
+            <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 md:gap-3 leading-tight">
+              <DollarSign className="text-emerald-600 shrink-0" size={22} />
+              <span>Struktur HPP, Harga & Margin</span>
             </h1>
-            <p className="text-xs md:text-sm text-slate-400 font-bold mt-1">
+            <p className="text-xs md:text-sm text-slate-400 font-bold mt-1 leading-relaxed">
               Pantau HPP aktif vs AVG dari riwayat PO, harga jual, persentase keuntungan, dan riwayat fluktuasi harga.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
               onClick={() => { fetchData(); fetchAvgHpp(); }}
               disabled={loading}
-              className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl border border-slate-200 text-xs font-black transition-all flex items-center gap-2"
+              className="p-2.5 md:p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl border border-slate-200 text-xs font-black transition-all flex items-center gap-2"
               title="Refresh Data"
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <Link
               href="/admin/tax-calculator"
-              className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm shadow-indigo-200"
+              className="px-3 md:px-4 py-2.5 md:py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 md:gap-2 shadow-sm shadow-indigo-200"
             >
-              <Calculator size={16} />
-              Kalkulator Pajak Anti-Boncos
+              <Calculator size={15} />
+              <span className="hidden sm:inline">Kalkulator Pajak</span>
+              <span className="sm:hidden">Pajak</span>
             </Link>
             <button
               onClick={handleExportExcel}
               disabled={filteredProducts.length === 0}
-              className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm shadow-emerald-200"
+              className="px-3 md:px-4 py-2.5 md:py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 md:gap-2 shadow-sm shadow-emerald-200 disabled:opacity-50"
             >
-              <Download size={16} />
-              Export Excel
+              <Download size={15} />
+              <span className="hidden sm:inline">Export Excel</span>
+              <span className="sm:hidden">Excel</span>
             </button>
           </div>
         </div>
 
         {/* METRICS CARDS */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
             <div className="flex items-center justify-between text-blue-600">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Produk Aktif</span>
-              <div className="p-2 bg-blue-50 rounded-xl"><Package size={18} /></div>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Produk Aktif</span>
+              <div className="p-1.5 md:p-2 bg-blue-50 rounded-xl shrink-0"><Package size={16} /></div>
             </div>
             <p className="text-2xl md:text-3xl font-black text-slate-900">{kpis.totalCount}</p>
             <p className="text-xs font-bold text-slate-400">Siap dijual</p>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
             <div className="flex items-center justify-between text-indigo-600">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status Pajak</span>
-              <div className="p-2 bg-indigo-50 rounded-xl"><Receipt size={18} /></div>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Status Pajak</span>
+              <div className="p-1.5 md:p-2 bg-indigo-50 rounded-xl shrink-0"><Receipt size={16} /></div>
             </div>
             <p className="text-2xl md:text-3xl font-black text-indigo-700">{kpis.taxableCount}</p>
-            <p className="text-xs font-bold text-slate-400">
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">
               <span className="text-indigo-600 font-extrabold">{kpis.taxableCount} PPN</span> · <span className="text-emerald-600 font-extrabold">{kpis.exemptCount} Bebas</span>
             </p>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
             <div className="flex items-center justify-between text-indigo-600">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Rata-rata Margin</span>
-              <div className="p-2 bg-indigo-50 rounded-xl"><Percent size={18} /></div>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Rata-rata Margin</span>
+              <div className="p-1.5 md:p-2 bg-indigo-50 rounded-xl shrink-0"><Percent size={16} /></div>
             </div>
             <p className={`text-2xl md:text-3xl font-black ${kpis.avgMarginPct >= 15 ? 'text-emerald-600' : 'text-amber-600'}`}>
               {kpis.avgMarginPct.toFixed(1)}%
             </p>
-            <p className="text-xs font-bold text-slate-400">Rata-rata laba kotor</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">Rata-rata laba kotor</p>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
             <div className="flex items-center justify-between text-rose-600">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total Modal Stok</span>
-              <div className="p-2 bg-rose-50 rounded-xl"><Layers size={18} /></div>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Total Modal</span>
+              <div className="p-1.5 md:p-2 bg-rose-50 rounded-xl shrink-0"><Layers size={16} /></div>
             </div>
-            <p className="text-lg md:text-xl font-black text-slate-900">
+            <p className="text-sm md:text-base lg:text-lg font-black text-slate-900 leading-tight">
               Rp {kpis.totalStockValue.toLocaleString('id-ID')}
             </p>
-            <p className="text-xs font-bold text-slate-400">Nilai aset stok aktif</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">Nilai aset stok aktif</p>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-2">
+          <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
             <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Potensi Laba Kotor</span>
-              <div className="p-2 bg-emerald-50 rounded-xl"><TrendingUp size={18} /></div>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Potensi Laba</span>
+              <div className="p-1.5 md:p-2 bg-emerald-50 rounded-xl shrink-0"><TrendingUp size={16} /></div>
             </div>
-            <p className="text-lg md:text-xl font-black text-emerald-600">
+            <p className="text-sm md:text-base lg:text-lg font-black text-emerald-600 leading-tight">
               +Rp {kpis.totalPotentialProfit.toLocaleString('id-ID')}
             </p>
-            <p className="text-xs font-bold text-slate-400">Estimasi profit jika laku</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">Estimasi profit jika laku</p>
           </div>
 
-          <div className={`p-5 rounded-3xl border shadow-sm space-y-2 ${kpis.avgDriftCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
+          <div className={`p-4 md:p-5 rounded-3xl border shadow-sm space-y-1.5 md:space-y-2 ${kpis.avgDriftCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
             <div className={`flex items-center justify-between ${kpis.avgDriftCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Selisih PO Terakhir</span>
-              <div className={`p-2 rounded-xl ${kpis.avgDriftCount > 0 ? 'bg-amber-100' : 'bg-emerald-50'}`}>
-                <AlertTriangle size={18} />
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Selisih PO</span>
+              <div className={`p-1.5 md:p-2 rounded-xl shrink-0 ${kpis.avgDriftCount > 0 ? 'bg-amber-100' : 'bg-emerald-50'}`}>
+                <AlertTriangle size={16} />
               </div>
             </div>
             <p className={`text-2xl md:text-3xl font-black ${kpis.avgDriftCount > 0 ? 'text-amber-700' : 'text-emerald-600'}`}>
               {avgLoading ? '...' : kpis.avgDriftCount}
             </p>
-            <p className="text-xs font-bold text-slate-400">Produk HPP ≠ PO Terakhir</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">HPP ≠ PO Terakhir</p>
           </div>
         </div>
 
@@ -1091,8 +1093,9 @@ export default function PricingHPPPage() {
           <div className="space-y-4">
 
             {/* FILTERS TOOLBAR */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-              <div className="relative flex-1">
+            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+              {/* Search bar - full width */}
+              <div className="relative">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -1103,11 +1106,12 @@ export default function PricingHPPPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filter selects - grid 2 cols on mobile, flex wrap on md+ */}
+              <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-2.5">
                 <select
                   value={selectedCategory}
                   onChange={e => setSelectedCategory(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-auto truncate"
                 >
                   <option value="ALL">Semua Kategori</option>
                   {categories.map(c => (
@@ -1121,12 +1125,12 @@ export default function PricingHPPPage() {
                     setVariantFilter(e.target.value as any);
                     setSelectedIds(new Set());
                   }}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 w-full md:w-auto"
                 >
-                  <option value="ALL">Semua Tipe Varian</option>
-                  <option value="VARIANTS">🔀 Hanya Varian ({products.filter(p => p.isVariant).length})</option>
-                  <option value="PARENTS">📦 Hanya Produk Induk ({products.filter(p => p.isParent).length})</option>
-                  <option value="REGULAR">🏷️ Produk Mandiri ({products.filter(p => !p.isVariant && !p.isParent).length})</option>
+                  <option value="ALL">Semua Varian</option>
+                  <option value="VARIANTS">🔀 Varian ({products.filter(p => p.isVariant).length})</option>
+                  <option value="PARENTS">📦 Induk ({products.filter(p => p.isParent).length})</option>
+                  <option value="REGULAR">🏷️ Mandiri ({products.filter(p => !p.isVariant && !p.isParent).length})</option>
                 </select>
 
                 <select
@@ -1135,14 +1139,14 @@ export default function PricingHPPPage() {
                     setMarginFilter(e.target.value as typeof marginFilter);
                     setSelectedIds(new Set());
                   }}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
                 >
                   <option value="ALL">Semua Margin</option>
-                  <option value="HEALTHY">🟢 Margin Sehat (≥ 20%)</option>
-                  <option value="SLIM">🟡 Margin Sedang (8 - 19%)</option>
-                  <option value="CRITICAL">🟠 Margin Tipis (1 - 7%)</option>
-                  <option value="NEGATIVE">🔴 Margin Nol / Rugi (≤ 0%)</option>
-                  <option value="NEEDS_REVIEW">🔴 Di bawah modal / Rugi ({productsNeedingPriceReview})</option>
+                  <option value="HEALTHY">🟢 Sehat (≥ 20%)</option>
+                  <option value="SLIM">🟡 Sedang (8-19%)</option>
+                  <option value="CRITICAL">🟠 Tipis (1-7%)</option>
+                  <option value="NEGATIVE">🔴 Rugi (≤ 0%)</option>
+                  <option value="NEEDS_REVIEW">🔴 Di bawah modal ({productsNeedingPriceReview})</option>
                 </select>
 
                 <select
@@ -1151,18 +1155,18 @@ export default function PricingHPPPage() {
                     setTaxFilter(e.target.value as any);
                     setSelectedIds(new Set());
                   }}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full md:w-auto"
                 >
-                  <option value="ALL">Semua Status Pajak</option>
-                  <option value="TAXABLE">📋 Wajib Pajak (PPN 11%) ({kpis.taxableCount})</option>
-                  <option value="EXEMPT">🟢 Bebas Pajak (0% Sembako) ({kpis.exemptCount})</option>
-                  <option value="PPH22">🏗️ PPh 22 Industri ({kpis.pph22Count})</option>
+                  <option value="ALL">Semua Pajak</option>
+                  <option value="TAXABLE">📋 PPN 11% ({kpis.taxableCount})</option>
+                  <option value="EXEMPT">🟢 Bebas PPN ({kpis.exemptCount})</option>
+                  <option value="PPH22">🏗️ PPh 22 ({kpis.pph22Count})</option>
                 </select>
 
                 <select
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as any)}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 col-span-2 w-full md:w-auto"
                 >
                   <option value="urgent_first">🔥 Prioritas: Di Bawah Modal & PO Terbaru</option>
                   <option value="po_latest">📦 Tanggal PO Terakhir (HPP Terbaru)</option>
@@ -1273,11 +1277,11 @@ export default function PricingHPPPage() {
             ) : (
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-400 uppercase tracking-widest font-black">
+                  <table className="w-full text-left text-xs" style={{ minWidth: '900px' }}>
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase tracking-widest font-black">
                         {/* Checkbox Column */}
-                        <th className="py-4 pl-6 pr-2">
+                        <th className="py-4 pl-6 pr-2 w-10">
                           <button
                             onClick={toggleSelectAll}
                             className="p-1 hover:text-blue-600 transition-colors"
@@ -1294,19 +1298,19 @@ export default function PricingHPPPage() {
                             )}
                           </button>
                         </th>
-                        <th className="py-4 px-4">Produk & SKU</th>
-                        <th className="py-4 px-4 text-center">Stok & Satuan Terdaftar</th>
-                        <th className="py-4 px-4 text-right">HPP Aktif (Modal)</th>
-                        <th className="py-4 px-4 text-right">
+                        <th className="py-4 px-4 min-w-[200px] max-w-[280px]">Produk & SKU</th>
+                        <th className="py-4 px-4 text-center min-w-[160px]">Stok & Satuan</th>
+                        <th className="py-4 px-4 text-right min-w-[120px]">HPP Aktif</th>
+                        <th className="py-4 px-4 text-right min-w-[110px]">
                           <div className="flex items-center justify-end gap-1">
                             <Sparkles size={12} className="text-amber-500" />
                             AVG HPP (PO)
                           </div>
                         </th>
-                        <th className="py-4 px-4 text-right">Harga Jual (Ecer)</th>
-                        <th className="py-4 px-4 text-right">Margin (Rp / %)</th>
-                        <th className="py-4 px-4 text-right">Grosir / Min Qty</th>
-                        <th className="py-4 px-6 text-center">Aksi</th>
+                        <th className="py-4 px-4 text-right min-w-[110px]">Harga Jual</th>
+                        <th className="py-4 px-4 text-right min-w-[140px]">Margin (Rp / %)</th>
+                        <th className="py-4 px-4 text-right min-w-[100px]">Grosir</th>
+                        <th className="py-4 px-5 text-center min-w-[90px]">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -1347,12 +1351,12 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Produk Info */}
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 max-w-[280px]">
                               <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
+                                <div className="flex items-start gap-1.5 flex-wrap">
                                   <Link
                                     href={`/admin/products/edit/${p.id}`}
-                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors line-clamp-2 leading-snug break-words"
+                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors line-clamp-2 leading-snug break-words min-w-0"
                                   >
                                     {formatProductName(p.name)}
                                   </Link>
@@ -1639,14 +1643,14 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Aksi */}
-                            <td className="py-4 px-6 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
+                            <td className="py-4 px-5 text-center">
+                              <div className="flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => handleOpenEdit(p)}
-                                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-black text-xs transition-colors flex items-center gap-1"
+                                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-black text-xs transition-colors flex items-center gap-1 whitespace-nowrap"
                                   title="Ubah HPP, harga ecer, dan semua satuan produk"
                                 >
-                                  <Edit3 size={13} />
+                                  <Edit3 size={12} />
                                   Ubah
                                 </button>
                                 <Link
@@ -1654,7 +1658,7 @@ export default function PricingHPPPage() {
                                   className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-colors"
                                   title="Edit Lengkap"
                                 >
-                                  <ChevronRight size={15} />
+                                  <ChevronRight size={14} />
                                 </Link>
                               </div>
                             </td>
