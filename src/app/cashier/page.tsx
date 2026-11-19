@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
-  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera,
+  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera, User,
   Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
@@ -186,7 +186,7 @@ export default function CashierPOS() {
   // Shift States
   const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
   const [showShiftModal, setShowShiftModal] = useState<'open' | 'close' | null>(null);
-  const [shiftInput, setShiftInput] = useState({ initialCash: '', actualCash: '', notes: '' });
+  const [shiftInput, setShiftInput] = useState({ cashierName: '', initialCash: '', actualCash: '', notes: '' });
   const [shiftSummary, setShiftSummary] = useState<{
     totalCash: number;
     totalNonCash: number;
@@ -690,6 +690,13 @@ export default function CashierPOS() {
     const checkAuthAndShift = async () => {
       // Cek Supabase session (sumber utama auth)
       const { data: { user: supaUser } } = await supabase.auth.getUser();
+      if (supaUser) {
+        const rememberedName = typeof window !== 'undefined' ? localStorage.getItem('pos_cashier_name') : null;
+        const autoName = rememberedName || supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || supaUser.email?.split('@')[0] || '';
+        if (autoName) {
+          setShiftInput(prev => ({ ...prev, cashierName: prev.cashierName || autoName }));
+        }
+      }
       if (!supaUser) {
         router.push('/profil/login');
         return;
@@ -1334,6 +1341,8 @@ export default function CashierPOS() {
 
   // --- SHIFT MANAGEMENT ---
   const handleOpenShift = async () => {
+    const enteredName = (shiftInput.cashierName || '').trim();
+    if (!enteredName) return toast.error('Masukkan nama petugas kasir yang membuka!');
     if (!shiftInput.initialCash) return toast.error('Masukkan modal awal!');
     
     setLoading(true);
@@ -1341,7 +1350,10 @@ export default function CashierPOS() {
       const initial = parseInt(shiftInput.initialCash.replace(/\D/g, '')) || 0;
       const { data: { user: authUser } } = await supabase.auth.getUser();
       const cashierId = authUser?.id || '';
-      const cashierName = authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Cashier';
+      const cashierName = enteredName;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pos_cashier_name', enteredName);
+      }
       const newShift: Partial<CashierShift> = {
         cashierId,
         cashierName,
@@ -1359,7 +1371,7 @@ export default function CashierPOS() {
       // Simpan ke sessionStorage agar tidak muncul modal saat pindah tab
       sessionStorage.setItem('pos-current-shift', JSON.stringify(openedShift));
       setShowShiftModal(null);
-      setShiftInput({ initialCash: '', actualCash: '', notes: '' });
+      setShiftInput({ cashierName: enteredName, initialCash: '', actualCash: '', notes: '' });
       toast.success('Kasir Dibuka!');
     } catch (e) {
       console.error(e);
@@ -1460,7 +1472,7 @@ export default function CashierPOS() {
       
       setCurrentShift(null);
       setShowShiftModal(null);
-      setShiftInput({ initialCash: '', actualCash: '', notes: '' });
+      setShiftInput({ cashierName: '', initialCash: '', actualCash: '', notes: '' });
       setShiftSummary(null);
       // Hapus cache shift agar modal muncul kembali saat kasir dibuka berikutnya
       sessionStorage.removeItem('pos-current-shift');
@@ -3020,9 +3032,21 @@ export default function CashierPOS() {
             {/* Body */}
             <div className="p-6 space-y-4">
               <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                  <User size={13} className="text-green-600" /> Nama Kasir (Yang Buka)
+                </label>
+                <input 
+                  type="text"
+                  value={shiftInput.cashierName}
+                  onChange={e => setShiftInput({ ...shiftInput, cashierName: e.target.value })}
+                  className="w-full p-3 text-sm font-bold border-2 border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-50/50"
+                  placeholder="Contoh: Siti / Budi / Kasir 1"
+                />
+              </div>
+
+              <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">💰 Modal Awal (Uang di Laci)</label>
                 <input 
-                  autoFocus
                   type="number" 
                   value={shiftInput.initialCash}
                   onChange={e => setShiftInput({ ...shiftInput, initialCash: e.target.value })}
@@ -3038,7 +3062,7 @@ export default function CashierPOS() {
               </div>
               <button 
                 onClick={handleOpenShift} 
-                disabled={loading}
+                disabled={loading || !shiftInput.cashierName?.trim()}
                 className="w-full py-3.5 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 active:scale-95 transition-all uppercase text-sm shadow-lg shadow-green-200 disabled:opacity-60"
               >
                 {loading ? 'Membuka...' : '🟢 MULAI SHIFT'}
