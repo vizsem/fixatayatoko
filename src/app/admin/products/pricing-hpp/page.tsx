@@ -74,6 +74,7 @@ interface ProductItem {
   parentName?: string;
   isVariant: boolean;
   isParent: boolean;
+  updatedAt?: string;
 }
 
 interface AvgHppInfo {
@@ -124,7 +125,7 @@ export default function PricingHPPPage() {
   const [variantFilter, setVariantFilter] = useState<'ALL' | 'VARIANTS' | 'PARENTS' | 'REGULAR'>('ALL');
   const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
-  const [sortBy, setSortBy] = useState<'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('name');
+  const [sortBy, setSortBy] = useState<'urgent_first' | 'po_latest' | 'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('urgent_first');
 
   // Multi-select States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -321,6 +322,7 @@ export default function PricingHPPPage() {
           parentName: (p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim() ? nameMap.get((p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim()) : undefined,
           isVariant: Boolean((p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim()),
           isParent: parentIdsSet.has(p.id),
+          updatedAt: p.updated_at || raw.updatedAt || raw.customHppUpdatedAt || '',
         };
       });
 
@@ -444,6 +446,35 @@ export default function PricingHPPPage() {
         return matchSearch && matchCat && matchMargin && matchTax && matchVariant;
       })
       .sort((a, b) => {
+        if (sortBy === 'urgent_first') {
+          // 1. Indikator harga jual perlu naik (di bawah modal / rugi) di paling atas
+          const needsReviewA = (priceReviewByProduct.get(a.id)?.length || 0) > 0 ? 1 : 0;
+          const needsReviewB = (priceReviewByProduct.get(b.id)?.length || 0) > 0 ? 1 : 0;
+          if (needsReviewA !== needsReviewB) return needsReviewB - needsReviewA;
+
+          // 2. Tanggal update PO terakhir (lastPoDate)
+          const poDateA = avgHppMap[a.id]?.lastPoDate ? new Date(avgHppMap[a.id]!.lastPoDate!).getTime() : 0;
+          const poDateB = avgHppMap[b.id]?.lastPoDate ? new Date(avgHppMap[b.id]!.lastPoDate!).getTime() : 0;
+          if (poDateA !== poDateB) return poDateB - poDateA;
+
+          // 3. Tanggal update HPP / data produk terakhir
+          const updatedA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const updatedB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          if (updatedA !== updatedB) return updatedB - updatedA;
+
+          return a.name.localeCompare(b.name);
+        }
+        if (sortBy === 'po_latest') {
+          const poDateA = avgHppMap[a.id]?.lastPoDate ? new Date(avgHppMap[a.id]!.lastPoDate!).getTime() : 0;
+          const poDateB = avgHppMap[b.id]?.lastPoDate ? new Date(avgHppMap[b.id]!.lastPoDate!).getTime() : 0;
+          if (poDateA !== poDateB) return poDateB - poDateA;
+
+          const updatedA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const updatedB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          if (updatedA !== updatedB) return updatedB - updatedA;
+
+          return a.name.localeCompare(b.name);
+        }
         if (sortBy === 'marginPct_desc') return b.marginPct - a.marginPct;
         if (sortBy === 'marginPct_asc') return a.marginPct - b.marginPct;
         if (sortBy === 'cost_desc') return b.costPrice - a.costPrice;
@@ -1133,6 +1164,8 @@ export default function PricingHPPPage() {
                   onChange={e => setSortBy(e.target.value as any)}
                   className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="urgent_first">🔥 Prioritas: Di Bawah Modal & PO Terbaru</option>
+                  <option value="po_latest">📦 Tanggal PO Terakhir (HPP Terbaru)</option>
                   <option value="name">Urut: Nama (A-Z)</option>
                   <option value="marginPct_desc">Urut: Margin Tertinggi (%)</option>
                   <option value="marginPct_asc">Urut: Margin Terendah (%)</option>
@@ -1315,11 +1348,11 @@ export default function PricingHPPPage() {
 
                             {/* Produk Info */}
                             <td className="py-4 px-4">
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-1.5">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <Link
                                     href={`/admin/products/edit/${p.id}`}
-                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
+                                    className="font-black text-slate-900 hover:text-blue-600 transition-colors line-clamp-2 leading-snug break-words"
                                   >
                                     {formatProductName(p.name)}
                                   </Link>
@@ -1347,18 +1380,21 @@ export default function PricingHPPPage() {
                                       <Lock size={10} />
                                     </span>
                                   )}
-                                  {priceReview.length > 0 && (
+                                </div>
+
+                                {priceReview.length > 0 && (
+                                  <div className="pt-0.5">
                                     <button
                                       type="button"
                                       onClick={() => handleOpenEdit(p)}
-                                      className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700 shrink-0 shadow-xs transition-all cursor-pointer group"
+                                      className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 px-2.5 py-0.5 text-[9px] font-black text-rose-700 shadow-2xs transition-all cursor-pointer group"
                                       title={`Klik untuk sesuaikan satuan: ${priceReview.map((finding) => `${finding.unitCode}: Rp${finding.currentPrice.toLocaleString('id-ID')} → target Rp${finding.recommendedPrice.toLocaleString('id-ID')}`).join(' · ')}`}
                                     >
-                                      <AlertTriangle size={10} className="text-rose-600 animate-pulse" />
+                                      <AlertTriangle size={10} className="text-rose-600 animate-pulse shrink-0" />
                                       <span>Di bawah modal: <strong className="underline underline-offset-2">{priceReview.map(f => f.unitCode).join(', ')}</strong></span>
                                     </button>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                                 <div className="flex flex-wrap items-center gap-1.5 text-slate-400 font-mono text-[10px] mt-0.5">
                                   <span>SKU: {p.sku}</span>
                                   {p.barcode && <span>• {p.barcode}</span>}
@@ -1534,9 +1570,12 @@ export default function PricingHPPPage() {
                             {/* Margin Keuntungan */}
                             <td className="py-4 px-4 text-right">
                               <div className="flex flex-col items-end">
-                                <span className={`font-black ${isLoss ? 'text-rose-600' : isSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {p.marginRp >= 0 ? '+' : ''}Rp {p.marginRp.toLocaleString('id-ID')}
-                                </span>
+                                <div className="flex items-baseline gap-1">
+                                  <span className={`font-black ${isLoss ? 'text-rose-600' : isSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                    {p.marginRp >= 0 ? '+' : ''}Rp {p.marginRp.toLocaleString('id-ID')}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
+                                </div>
                                 <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                   isLoss ? 'bg-rose-50 text-rose-600' : isSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
                                 }`}>
@@ -1549,6 +1588,40 @@ export default function PricingHPPPage() {
                                   >
                                     <AlertTriangle size={8} /> Margin &lt; PPN 11%
                                   </span>
+                                )}
+
+                                {/* Margin Satuan Lainnya (DUS, PACK, CTN, dll) */}
+                                {otherUnitCosts.length > 0 && (
+                                  <div className="mt-1.5 flex flex-col items-end gap-1">
+                                    {otherUnitCosts.map((unit) => {
+                                      const unitCost = p.costPrice * (unit.contains || 1);
+                                      const unitPrice = Number(unit.price || 0);
+                                      const unitMarginRp = unitPrice - unitCost;
+                                      const unitMarginPct = unitPrice > 0 ? (unitMarginRp / unitPrice) * 100 : 0;
+                                      const isUnitLoss = unitMarginRp <= 0;
+                                      const isUnitSlim = unitMarginPct > 0 && unitMarginPct < 8;
+
+                                      return (
+                                        <div
+                                          key={unit.code}
+                                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] transition-colors hover:bg-slate-100/80"
+                                          title={`Margin per ${unit.code} (isi ${unit.contains} ${p.unit}): Harga Rp ${unitPrice.toLocaleString('id-ID')} - Modal Rp ${unitCost.toLocaleString('id-ID')}`}
+                                        >
+                                          <span className="font-black text-slate-600 uppercase">
+                                            {unit.code}
+                                          </span>
+                                          <span className={`font-black ${isUnitLoss ? 'text-rose-600' : isUnitSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                            {unitMarginRp >= 0 ? '+' : ''}Rp {unitMarginRp.toLocaleString('id-ID')}
+                                          </span>
+                                          <span className={`px-1 py-0.2 rounded text-[9px] font-black ${
+                                            isUnitLoss ? 'bg-rose-100 text-rose-700' : isUnitSlim ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                                          }`}>
+                                            {unitMarginPct.toFixed(1)}%
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 )}
                               </div>
                             </td>
